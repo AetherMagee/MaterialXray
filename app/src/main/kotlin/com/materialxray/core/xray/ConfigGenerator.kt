@@ -1,0 +1,195 @@
+package com.materialxray.core.xray
+
+import com.materialxray.model.Protocol
+import com.materialxray.model.ServerConfig
+import kotlinx.serialization.json.*
+
+class ConfigGenerator {
+
+    fun generate(
+        server: ServerConfig,
+        tunName: String = "xray0",
+        fwmark: Int = 255,
+        dnsServers: String = "1.1.1.1,8.8.8.8",
+        physicalInterface: String? = null,
+    ): String {
+        val config = buildJsonObject {
+            put("log", buildJsonObject { put("loglevel", "info") })
+            put("dns", buildDns(dnsServers))
+            put("inbounds", buildJsonArray { add(buildTunInbound(tunName)) })
+            put("outbounds", buildJsonArray {
+                add(buildProxyOutbound(server, fwmark, physicalInterface))
+                add(buildDirectOutbound(fwmark, physicalInterface))
+                add(buildDnsOutbound(fwmark, physicalInterface))
+            })
+            put("routing", buildRouting())
+        }
+        return Json { prettyPrint = true }.encodeToString(JsonObject.serializer(), config)
+    }
+
+    fun injectTunIntoRawConfig(rawJson: String, tunName: String = "xray0", fwmark: Int = 255): String {
+        val original = Json.parseToJsonElement(rawJson).jsonObject.toMutableMap()
+        val existingInbounds = original["inbounds"]?.jsonArray?.toMutableList() ?: mutableListOf()
+        existingInbounds.add(0, buildTunInbound(tunName))
+        original["inbounds"] = JsonArray(existingInbounds)
+        val outbounds = original["outbounds"]?.jsonArray?.map { ob ->
+            val obj = ob.jsonObject.toMutableMap()
+            val stream = obj["streamSettings"]?.jsonObject?.toMutableMap() ?: mutableMapOf()
+            stream["sockopt"] = buildSockopt(fwmark, physicalInterface = null)
+            obj["streamSettings"] = JsonObject(stream)
+            JsonObject(obj)
+        } ?: emptyList()
+        original["outbounds"] = JsonArray(outbounds)
+        return Json { prettyPrint = true }.encodeToString(JsonObject.serializer(), JsonObject(original))
+    }
+
+    private fun buildTunInbound(tunName: String) = buildJsonObject {
+        put("port", 0)
+        put("protocol", "tun")
+        put("settings", buildJsonObject {
+            put("name", tunName)
+            put("MTU", 1500)
+        })
+        put("tag", "tun-in")
+    }
+
+    private fun buildProxyOutbound(server: ServerConfig, fwmark: Int, physicalInterface: String?) = buildJsonObject {
+        put("tag", "proxy")
+        put("protocol", server.protocol.scheme)
+        put("settings", buildOutboundSettings(server))
+        put("streamSettings", buildStreamSettings(server, fwmark, physicalInterface))
+    }
+
+    private fun buildOutboundSettings(server: ServerConfig): JsonObject = when (server.protocol) {
+        Protocol.VLESS -> buildJsonObject {
+            put("vnext", buildJsonArray {
+                add(buildJsonObject {
+                    put("address", server.address)
+                    put("port", server.port)
+                    put("users", buildJsonArray {
+                        add(buildJsonObject {
+                            put("id", server.password)
+                            put("encryption", server.extra["encryption"] ?: "none")
+                            server.extra["flow"]?.let { put("flow", it) }
+                        })
+                    })
+                })
+            })
+        }
+        Protocol.VMESS -> buildJsonObject {
+            put("vnext", buildJsonArray {
+                add(buildJsonObject {
+                    put("address", server.address)
+                    put("port", server.port)
+                    put("users", buildJsonArray {
+                        add(buildJsonObject {
+                            put("id", server.password)
+                            put("alterId", server.extra["alterId"]?.toIntOrNull() ?: 0)
+                            put("security", "auto")
+                        })
+                    })
+                })
+            })
+        }
+        Protocol.TROJAN -> buildJsonObject {
+            put("servers", buildJsonArray {
+                add(buildJsonObject {
+                    put("address", server.address)
+                    put("port", server.port)
+                    put("password", server.password)
+                })
+            })
+        }
+        Protocol.SHADOWSOCKS -> buildJsonObject {
+            put("servers", buildJsonArray {
+                add(buildJsonObject {
+                    put("address", server.address)
+                    put("port", server.port)
+                    put("method", server.extra["method"] ?: "aes-256-gcm")
+                    put("password", server.password)
+                })
+            })
+        }
+    }
+
+    private fun buildStreamSettings(server: ServerConfig, fwmark: Int, physicalInterface: String?) = buildJsonObject {
+        put("network", server.transport.type)
+        put("security", server.security.type)
+        put("sockopt", buildSockopt(fwmark, physicalInterface))
+
+        when (server.security.type) {
+            "tls" -> put("tlsSettings", buildJsonObject {
+                if (server.security.sni.isNotEmpty()) put("serverName", server.security.sni)
+                if (server.security.fingerprint.isNotEmpty()) put("fingerprint", server.security.fingerprint)
+                if (server.security.alpn.isNotEmpty()) put("alpn", buildJsonArray { server.security.alpn.forEach { add(it) } })
+            })
+            "reality" -> put("realitySettings", buildJsonObject {
+                if (server.security.sni.isNotEmpty()) put("serverName", server.security.sni)
+                if (server.security.fingerprint.isNotEmpty()) put("fingerprint", server.security.fingerprint)
+                if (server.security.publicKey.isNotEmpty()) put("publicKey", server.security.publicKey)
+                if (server.security.shortId.isNotEmpty()) put("shortId", server.security.shortId)
+            })
+        }
+
+        when (server.transport.type) {
+            "ws" -> put("wsSettings", buildJsonObject {
+                if (server.transport.path.isNotEmpty()) put("path", server.transport.path)
+                if (server.transport.host.isNotEmpty()) put("headers", buildJsonObject { put("Host", server.transport.host) })
+            })
+            "grpc" -> put("grpcSettings", buildJsonObject {
+                if (server.transport.serviceName.isNotEmpty()) put("serviceName", server.transport.serviceName)
+            })
+            "xhttp" -> put("xhttpSettings", buildJsonObject {
+                if (server.transport.path.isNotEmpty()) put("path", server.transport.path)
+                if (server.transport.host.isNotEmpty()) put("host", server.transport.host)
+                if (server.transport.mode.isNotEmpty()) put("mode", server.transport.mode)
+            })
+            "httpupgrade" -> put("httpupgradeSettings", buildJsonObject {
+                if (server.transport.path.isNotEmpty()) put("path", server.transport.path)
+                if (server.transport.host.isNotEmpty()) put("host", server.transport.host)
+            })
+        }
+    }
+
+    private fun buildDirectOutbound(fwmark: Int, physicalInterface: String?) = buildJsonObject {
+        put("tag", "direct")
+        put("protocol", "freedom")
+        put("settings", buildJsonObject {})
+        put("streamSettings", buildJsonObject { put("sockopt", buildSockopt(fwmark, physicalInterface)) })
+    }
+
+    private fun buildDnsOutbound(fwmark: Int, physicalInterface: String?) = buildJsonObject {
+        put("tag", "dns-out")
+        put("protocol", "dns")
+        put("settings", buildJsonObject {})
+        put("streamSettings", buildJsonObject { put("sockopt", buildSockopt(fwmark, physicalInterface)) })
+    }
+
+    private fun buildSockopt(fwmark: Int, physicalInterface: String?) = buildJsonObject {
+        put("mark", fwmark)
+        put("domainStrategy", "UseIP")
+        if (!physicalInterface.isNullOrBlank()) {
+            put("interface", physicalInterface)
+        }
+    }
+
+    private fun buildDns(servers: String) = buildJsonObject {
+        put("servers", buildJsonArray {
+            servers.split(",").map { it.trim() }.filter { it.isNotEmpty() }.forEach { add(it) }
+        })
+    }
+
+    private fun buildRouting() = buildJsonObject {
+        put("domainStrategy", "AsIs")
+        put("rules", buildJsonArray {
+            add(buildJsonObject {
+                put("type", "field")
+                put("inboundTag", buildJsonArray { add("tun-in") })
+                put("port", "53")
+                put("outboundTag", "dns-out")
+            })
+            add(buildJsonObject { put("type", "field"); put("ip", buildJsonArray { add("geoip:private") }); put("outboundTag", "direct") })
+            add(buildJsonObject { put("type", "field"); put("port", "0-65535"); put("outboundTag", "proxy") })
+        })
+    }
+}

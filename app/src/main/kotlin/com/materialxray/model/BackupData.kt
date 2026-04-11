@@ -1,0 +1,24 @@
+package com.materialxray.model
+
+import kotlinx.serialization.Serializable
+
+@Serializable
+data class BackupData(
+    val version: Int = 1,
+    val subscriptions: List<BackupSubscription>,
+    val servers: List<BackupServer> = emptyList(),
+    val bypassedApps: List<String>,
+    val settings: Map<String, String>,
+) {
+    @Serializable
+    data class BackupSubscription(
+        val name: String,
+        val url: String,
+    )
+
+    @Serializable
+    data class BackupServer(
+        val subscriptionUrl: String?,
+        val config: ServerConfig,
+    )
+}

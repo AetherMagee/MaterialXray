@@ -1,0 +1,95 @@
+package com.materialxray.core.xray
+
+import com.materialxray.model.Protocol
+import com.materialxray.model.ServerConfig
+import kotlinx.serialization.json.*
+import org.junit.Assert.*
+import org.junit.Test
+
+class ConfigGeneratorTest {
+
+    private val generator = ConfigGenerator()
+
+    private val vlessReality = ServerConfig(
+        protocol = Protocol.VLESS,
+        name = "Test",
+        address = "1.2.3.4",
+        port = 443,
+        password = "test-uuid",
+        transport = ServerConfig.Transport(type = "tcp"),
+        security = ServerConfig.Security(
+            type = "reality", sni = "example.com",
+            fingerprint = "chrome", publicKey = "testpbk",
+        ),
+        extra = mapOf("flow" to "xtls-rprx-vision", "encryption" to "none"),
+    )
+
+    @Test
+    fun `generates TUN inbound with correct name and MTU`() {
+        val config = generator.generate(vlessReality, tunName = "wlan2", fwmark = 255)
+        val json = Json.parseToJsonElement(config).jsonObject
+        val inbounds = json["inbounds"]!!.jsonArray
+        val tun = inbounds.first { it.jsonObject["protocol"]?.jsonPrimitive?.content == "tun" }.jsonObject
+        assertEquals(0, tun["port"]?.jsonPrimitive?.int)
+        val settings = tun["settings"]!!.jsonObject
+        assertEquals("wlan2", settings["name"]?.jsonPrimitive?.content)
+        assertEquals(1500, settings["MTU"]?.jsonPrimitive?.int)
+    }
+
+    @Test
+    fun `sets fwmark on all outbounds`() {
+        val config = generator.generate(vlessReality, tunName = "xray0", fwmark = 255)
+        val json = Json.parseToJsonElement(config).jsonObject
+        val outbounds = json["outbounds"]!!.jsonArray
+        for (ob in outbounds) {
+            val mark = ob.jsonObject["streamSettings"]?.jsonObject
+                ?.get("sockopt")?.jsonObject?.get("mark")?.jsonPrimitive?.int
+            assertEquals("All outbounds must have fwmark", 255, mark)
+        }
+    }
+
+    @Test
+    fun `sets outbound domain resolution to xray dns`() {
+        val config = generator.generate(vlessReality, tunName = "xray0", fwmark = 255)
+        val json = Json.parseToJsonElement(config).jsonObject
+        val outbounds = json["outbounds"]!!.jsonArray
+        for (ob in outbounds) {
+            val domainStrategy = ob.jsonObject["streamSettings"]?.jsonObject
+                ?.get("sockopt")?.jsonObject?.get("domainStrategy")?.jsonPrimitive?.content
+            assertEquals("All outbounds must resolve domains through xray DNS", "UseIP", domainStrategy)
+        }
+    }
+
+    @Test
+    fun `generates VLESS REALITY outbound correctly`() {
+        val config = generator.generate(vlessReality, tunName = "xray0", fwmark = 255)
+        val json = Json.parseToJsonElement(config).jsonObject
+        val proxy = json["outbounds"]!!.jsonArray.first {
+            it.jsonObject["tag"]?.jsonPrimitive?.content == "proxy"
+        }.jsonObject
+        assertEquals("vless", proxy["protocol"]?.jsonPrimitive?.content)
+        val vnext = proxy["settings"]!!.jsonObject["vnext"]!!.jsonArray[0].jsonObject
+        assertEquals("1.2.3.4", vnext["address"]?.jsonPrimitive?.content)
+        assertEquals(443, vnext["port"]?.jsonPrimitive?.int)
+        val user = vnext["users"]!!.jsonArray[0].jsonObject
+        assertEquals("test-uuid", user["id"]?.jsonPrimitive?.content)
+        assertEquals("xtls-rprx-vision", user["flow"]?.jsonPrimitive?.content)
+        val stream = proxy["streamSettings"]!!.jsonObject
+        assertEquals("reality", stream["security"]?.jsonPrimitive?.content)
+        val reality = stream["realitySettings"]!!.jsonObject
+        assertEquals("example.com", reality["serverName"]?.jsonPrimitive?.content)
+        assertEquals("testpbk", reality["publicKey"]?.jsonPrimitive?.content)
+    }
+
+    @Test
+    fun `includes DNS routing rule for port 53`() {
+        val config = generator.generate(vlessReality, tunName = "xray0", fwmark = 255, dnsServers = "1.1.1.1,8.8.8.8")
+        val json = Json.parseToJsonElement(config).jsonObject
+        assertNotNull(json["dns"])
+        val rules = json["routing"]!!.jsonObject["rules"]!!.jsonArray
+        val dnsRule = rules.firstOrNull { it.jsonObject["port"]?.jsonPrimitive?.content == "53" }
+        assertNotNull("Should have DNS port 53 routing rule", dnsRule)
+        val inboundTags = dnsRule!!.jsonObject["inboundTag"]!!.jsonArray.map { it.jsonPrimitive.content }
+        assertEquals(listOf("tun-in"), inboundTags)
+    }
+}

@@ -1,0 +1,16 @@
+# Gradle
+build/
+.gradle/
+.kotlin/
+local.properties
+
+# IDE
+*.iml
+.idea/
+
+# xray binaries (downloaded via scripts/download-xray.sh)
+app/src/main/jniLibs/
+
+# Brainstorm artifacts
+.superpowers/
+handoff.md

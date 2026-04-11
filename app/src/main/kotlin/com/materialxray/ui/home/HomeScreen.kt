@@ -1,0 +1,467 @@
+package com.materialxray.ui.home
+
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.materialxray.data.db.entity.ServerEntity
+import com.materialxray.data.db.entity.SubscriptionEntity
+import com.materialxray.model.ConnectionState
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun HomeScreen(viewModel: HomeViewModel = hiltViewModel()) {
+    val connectionState by viewModel.connectionState.collectAsState()
+    val selectedServer by viewModel.selectedServer.collectAsState()
+    val selectedServerId by viewModel.selectedServerId.collectAsState()
+    val subscriptions by viewModel.subscriptions.collectAsState()
+    val serversBySubscription by viewModel.serversBySubscription.collectAsState()
+    val isRefreshing by viewModel.isRefreshing.collectAsState()
+
+    val isConnected = connectionState is ConnectionState.Connected
+    val isTransitioning = connectionState is ConnectionState.Connecting ||
+        connectionState is ConnectionState.Disconnecting
+
+    val buttonColor by animateColorAsState(
+        targetValue = when {
+            isConnected -> MaterialTheme.colorScheme.error
+            isTransitioning -> MaterialTheme.colorScheme.tertiary
+            else -> MaterialTheme.colorScheme.primary
+        },
+        label = "buttonColor",
+    )
+
+    var showAddDialog by remember { mutableStateOf(false) }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("MaterialXray") },
+                windowInsets = WindowInsets(0.dp),
+            )
+        },
+    ) { padding ->
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding),
+            contentPadding = PaddingValues(start = 16.dp, top = 6.dp, end = 16.dp, bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            item {
+                ConnectionPanel(
+                    connectionState = connectionState,
+                    selectedServerName = selectedServer?.name ?: "No server selected",
+                    selectedServerDetail = selectedServer?.let {
+                        "${it.protocol.displayName.uppercase()} | ${it.transport.type.uppercase()} | ${it.security.type.uppercase()}"
+                    } ?: "Select a server below",
+                    buttonColor = buttonColor,
+                    isConnected = isConnected,
+                    isTransitioning = isTransitioning,
+                    canStart = selectedServer != null,
+                    onClick = {
+                        if (isConnected) viewModel.disconnect()
+                        else if (!isTransitioning) viewModel.connect()
+                    },
+                )
+            }
+
+            if (isRefreshing) {
+                item {
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                }
+            }
+
+            if (connectionState is ConnectionState.Error) {
+                item {
+                    ErrorCard(message = (connectionState as ConnectionState.Error).message)
+                }
+            }
+
+            if (subscriptions.isEmpty()) {
+                item {
+                    EmptySubscriptionsCard(onAddSubscription = { showAddDialog = true })
+                }
+            } else {
+                subscriptions.forEach { subscription ->
+                    item(key = "sub_${subscription.id}") {
+                        SubscriptionCard(
+                            subscription = subscription,
+                            servers = serversBySubscription[subscription.id].orEmpty(),
+                            selectedServerId = selectedServerId,
+                            onDelete = { viewModel.deleteSubscription(subscription) },
+                            onRefresh = { viewModel.refreshSubscription(subscription) },
+                            onTestAll = { viewModel.testSubscriptionLatencies(subscription) },
+                            onServerSelected = { viewModel.selectServer(it) },
+                            onTestLatency = { viewModel.testLatency(it) },
+                        )
+                    }
+                }
+                item {
+                    OutlinedButton(
+                        onClick = { showAddDialog = true },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text("Add new subscription")
+                    }
+                }
+            }
+        }
+    }
+
+    if (showAddDialog) {
+        AddSubscriptionDialog(
+            onDismiss = { showAddDialog = false },
+            onConfirm = { name, url ->
+                viewModel.addSubscription(name, url)
+                showAddDialog = false
+            },
+        )
+    }
+}
+
+@Composable
+private fun ConnectionPanel(
+    connectionState: ConnectionState,
+    selectedServerName: String,
+    selectedServerDetail: String,
+    buttonColor: androidx.compose.ui.graphics.Color,
+    isConnected: Boolean,
+    isTransitioning: Boolean,
+    canStart: Boolean,
+    onClick: () -> Unit,
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            text = when (connectionState) {
+                is ConnectionState.Connected -> "Connected"
+                is ConnectionState.Connecting -> "Connecting..."
+                is ConnectionState.Disconnecting -> "Disconnecting..."
+                is ConnectionState.Error -> "Error"
+                ConnectionState.Disconnected -> "Disconnected"
+            },
+            style = MaterialTheme.typography.titleLarge,
+            color = when {
+                isConnected -> MaterialTheme.colorScheme.primary
+                connectionState is ConnectionState.Error -> MaterialTheme.colorScheme.error
+                else -> MaterialTheme.colorScheme.onSurface
+            },
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Text(
+            text = selectedServerName,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Text(
+            text = selectedServerDetail,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        FilledTonalButton(
+            onClick = onClick,
+            enabled = (canStart || isConnected) && !isTransitioning,
+            modifier = Modifier.size(124.dp),
+            shape = CircleShape,
+            colors = ButtonDefaults.filledTonalButtonColors(
+                containerColor = buttonColor.copy(alpha = 0.15f),
+                contentColor = buttonColor,
+                disabledContainerColor = buttonColor.copy(alpha = 0.10f),
+                disabledContentColor = buttonColor.copy(alpha = 0.75f),
+            ),
+            contentPadding = PaddingValues(0.dp),
+        ) {
+            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                if (isTransitioning) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(54.dp),
+                        strokeWidth = 4.dp,
+                        color = buttonColor,
+                    )
+                } else {
+                    Text(
+                        text = if (isConnected) "Stop" else "Start",
+                        style = MaterialTheme.typography.titleLarge,
+                        textAlign = TextAlign.Center,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ErrorCard(message: String) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Text(
+            text = message,
+            modifier = Modifier.padding(16.dp),
+            color = MaterialTheme.colorScheme.onErrorContainer,
+        )
+    }
+}
+
+@Composable
+private fun EmptySubscriptionsCard(onAddSubscription: () -> Unit) {
+    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text("No subscriptions yet", style = MaterialTheme.typography.titleMedium)
+            Text(
+                "Add a subscription to show servers here.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            OutlinedButton(onClick = onAddSubscription) {
+                Text("Add subscription")
+            }
+        }
+    }
+}
+
+@Composable
+private fun SubscriptionCard(
+    subscription: SubscriptionEntity,
+    servers: List<ServerListItem>,
+    selectedServerId: Long,
+    onDelete: () -> Unit,
+    onRefresh: () -> Unit,
+    onTestAll: () -> Unit,
+    onServerSelected: (Long) -> Unit,
+    onTestLatency: (ServerEntity) -> Unit,
+) {
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            SubscriptionHeader(
+                subscription = subscription,
+                serverCount = servers.size,
+                onRefresh = onRefresh,
+                onTestAll = onTestAll,
+                onDelete = onDelete,
+            )
+
+            if (servers.isEmpty()) {
+                Text(
+                    "No servers in this subscription.",
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            } else {
+                servers.forEachIndexed { index, server ->
+                    if (index > 0) {
+                        HorizontalDivider(
+                            modifier = Modifier.padding(start = 16.dp, end = 16.dp),
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f),
+                        )
+                    }
+                    key(server.entity.id) {
+                        ServerRow(
+                            server = server,
+                            isSelected = server.entity.id == selectedServerId,
+                            onClick = { onServerSelected(server.entity.id) },
+                            onTestLatency = { onTestLatency(server.entity) },
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SubscriptionHeader(
+    subscription: SubscriptionEntity,
+    serverCount: Int,
+    onRefresh: () -> Unit,
+    onTestAll: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    var showMenu by remember { mutableStateOf(false) }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 16.dp, top = 14.dp, end = 8.dp, bottom = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = subscription.name,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = "$serverCount servers",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        IconButton(onClick = onRefresh) {
+            Icon(Icons.Default.Refresh, contentDescription = "Refresh ${subscription.name}")
+        }
+        IconButton(onClick = onTestAll) {
+            Icon(Icons.Default.Speed, contentDescription = "Test ${subscription.name}")
+        }
+        Box {
+            IconButton(onClick = { showMenu = true }) {
+                Icon(Icons.Default.MoreVert, contentDescription = "Subscription menu")
+            }
+            DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
+                DropdownMenuItem(
+                    text = { Text("Delete") },
+                    onClick = {
+                        showMenu = false
+                        onDelete()
+                    },
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun ServerRow(
+    server: ServerListItem,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    onTestLatency: () -> Unit,
+) {
+    val latencyText = if (server.entity.latencyMs < 0) "---" else "${server.entity.latencyMs}ms"
+    val latencyColor = when {
+        server.entity.latencyMs < 0 -> MaterialTheme.colorScheme.onSurfaceVariant
+        server.entity.latencyMs < 200 -> MaterialTheme.colorScheme.primary
+        server.entity.latencyMs < 500 -> MaterialTheme.colorScheme.tertiary
+        else -> MaterialTheme.colorScheme.error
+    }
+
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .combinedClickable(onClick = onClick, onLongClick = onTestLatency),
+        color = if (isSelected) {
+            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f)
+        } else {
+            MaterialTheme.colorScheme.surfaceContainer
+        },
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            RadioButton(selected = isSelected, onClick = onClick)
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = server.entity.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = server.endpointSummary,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Surface(
+                shape = MaterialTheme.shapes.small,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                color = MaterialTheme.colorScheme.surface,
+            ) {
+                Text(
+                    text = latencyText,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                    color = latencyColor,
+                    style = MaterialTheme.typography.labelMedium,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AddSubscriptionDialog(onDismiss: () -> Unit, onConfirm: (String, String) -> Unit) {
+    var name by remember { mutableStateOf("") }
+    var url by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Add Subscription") },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Name") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = url,
+                    onValueChange = { url = it },
+                    label = { Text("URL") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onConfirm(name.trim(), url.trim()) },
+                enabled = name.isNotBlank() && url.isNotBlank(),
+            ) {
+                Text("Add")
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
+}
