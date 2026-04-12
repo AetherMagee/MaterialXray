@@ -38,6 +38,23 @@ class ConfigGeneratorTest {
     }
 
     @Test
+    fun `enables sniffing on the TUN inbound for routing`() {
+        val config = generator.generate(vlessReality, tunName = "xray0", fwmark = 255)
+        val json = Json.parseToJsonElement(config).jsonObject
+        val tun = json["inbounds"]!!.jsonArray.first {
+            it.jsonObject["protocol"]?.jsonPrimitive?.content == "tun"
+        }.jsonObject
+        val sniffing = tun["sniffing"]!!.jsonObject
+
+        assertTrue(sniffing["enabled"]!!.jsonPrimitive.boolean)
+        assertTrue(sniffing["routeOnly"]!!.jsonPrimitive.boolean)
+        assertEquals(
+            listOf("http", "tls", "quic"),
+            sniffing["destOverride"]!!.jsonArray.map { it.jsonPrimitive.content },
+        )
+    }
+
+    @Test
     fun `sets fwmark on all outbounds`() {
         val config = generator.generate(vlessReality, tunName = "xray0", fwmark = 255)
         val json = Json.parseToJsonElement(config).jsonObject

@@ -55,6 +55,15 @@ class ConfigGenerator {
             put("name", tunName)
             put("MTU", 1500)
         })
+        put("sniffing", buildJsonObject {
+            put("enabled", true)
+            put("routeOnly", true)
+            put("destOverride", buildJsonArray {
+                add("http")
+                add("tls")
+                add("quic")
+            })
+        })
         put("tag", "tun-in")
     }
 
