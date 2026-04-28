@@ -7,17 +7,17 @@ enum class XrayOutbound(
 ) {
     Proxy(
         tag = "proxy",
-        label = "Proxy",
+        label = "proxy",
         description = "Send traffic through the selected proxy server.",
     ),
     Direct(
         tag = "direct",
-        label = "Direct",
+        label = "direct",
         description = "Bypass the proxy and connect directly.",
     ),
     Block(
         tag = "block",
-        label = "Block",
+        label = "block",
         description = "Drop traffic with a blackhole outbound.",
     );
 

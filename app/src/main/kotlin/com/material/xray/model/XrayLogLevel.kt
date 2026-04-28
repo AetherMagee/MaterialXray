@@ -4,11 +4,11 @@ enum class XrayLogLevel(
     val value: String,
     val label: String,
 ) {
-    Debug("debug", "Debug"),
-    Info("info", "Info"),
-    Warning("warning", "Warning"),
-    Error("error", "Error"),
-    None("none", "None");
+    Debug("debug", "debug"),
+    Info("info", "info"),
+    Warning("warning", "warning"),
+    Error("error", "error"),
+    None("none", "none");
 
     companion object {
         val default: XrayLogLevel = Error

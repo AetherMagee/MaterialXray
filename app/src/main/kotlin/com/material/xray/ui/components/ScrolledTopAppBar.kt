@@ -1,5 +1,8 @@
 package com.material.xray.ui.components
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
@@ -13,12 +16,18 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
+import androidx.core.view.WindowCompat
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -32,8 +41,33 @@ fun ScrolledTopAppBar(
         derivedStateOf { scrollBehavior.state.overlappedFraction.coerceIn(0f, 1f) }
     }
     val containerColor = lerp(surface, scrolledSurface, overlappedFraction)
+    val view = LocalView.current
+    val window = remember(view) { view.context.findActivity()?.window }
+
+    if (window != null && !view.isInEditMode) {
+        val statusBarColor = containerColor.toArgb()
+        val useDarkIcons = containerColor.luminance() > 0.5f
+        SideEffect {
+            window.statusBarColor = statusBarColor
+            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = useDarkIcons
+        }
+        DisposableEffect(window, view) {
+            val previousStatusBarColor = window.statusBarColor
+            val previousLightStatusBars = WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars
+            onDispose {
+                window.statusBarColor = previousStatusBarColor
+                WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = previousLightStatusBars
+            }
+        }
+    }
 
     Box {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .windowInsetsTopHeight(WindowInsets.statusBars)
+                .background(containerColor),
+        )
         TopAppBar(
             title = { Text(title) },
             colors = TopAppBarDefaults.topAppBarColors(
@@ -43,11 +77,11 @@ fun ScrolledTopAppBar(
             scrollBehavior = scrollBehavior,
             windowInsets = WindowInsets(0.dp),
         )
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .windowInsetsTopHeight(WindowInsets.statusBars)
-                .background(containerColor),
-        )
     }
+}
+
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
 }
