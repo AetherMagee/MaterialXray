@@ -1,8 +1,9 @@
 package com.materialxray.core.xray
 
 import android.net.DnsResolver
-import android.net.InetAddresses
 import android.os.CancellationSignal
+import android.os.Build
+import androidx.annotation.RequiresApi
 import com.materialxray.model.ServerConfig
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -28,12 +29,18 @@ class ServerAddressResolver {
 
     suspend fun resolve(server: ServerConfig): Result = withContext(Dispatchers.IO) {
         val host = server.address.trim()
-        if (host.isEmpty() || InetAddresses.isNumericAddress(host.trim('[', ']'))) {
+        if (host.isEmpty() || isNumericAddress(host)) {
             return@withContext Result(server, attempted = false, selectedAddress = null, candidates = emptyList())
         }
 
         val candidates = coroutineScope {
-            val androidDns = async { withTimeoutOrNull(RESOLVE_TIMEOUT_MS) { resolveWithAndroidDns(host) } ?: emptyList() }
+            val androidDns = async {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    withTimeoutOrNull(RESOLVE_TIMEOUT_MS) { resolveWithAndroidDns(host) } ?: emptyList()
+                } else {
+                    emptyList()
+                }
+            }
             val okHttpDns = async { resolveWithOkHttpDns(host) }
             (androidDns.await() + okHttpDns.await()).distinct()
         }
@@ -66,6 +73,15 @@ class ServerAddressResolver {
         return copy(address = address, security = resolvedSecurity, transport = resolvedTransport)
     }
 
+    private fun isNumericAddress(host: String): Boolean {
+        val value = host.trim('[', ']')
+        if (value.contains(':')) {
+            return runCatching { InetAddress.getByName(value) }.isSuccess
+        }
+        return ipv4Pattern.matches(value) && value.split('.').all { it.toIntOrNull() in 0..255 }
+    }
+
+    @RequiresApi(Build.VERSION_CODES.Q)
     private suspend fun resolveWithAndroidDns(host: String): List<String> = suspendCancellableCoroutine { continuation ->
         val cancellation = CancellationSignal()
         continuation.invokeOnCancellation { cancellation.cancel() }
@@ -98,5 +114,6 @@ class ServerAddressResolver {
 
     private companion object {
         const val RESOLVE_TIMEOUT_MS = 3000L
+        val ipv4Pattern = Regex("""\d{1,3}(?:\.\d{1,3}){3}""")
     }
 }
