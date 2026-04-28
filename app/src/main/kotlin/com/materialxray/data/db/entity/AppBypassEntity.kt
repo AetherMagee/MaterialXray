@@ -9,4 +9,5 @@ data class AppBypassEntity(
     val uid: Int,
     val excluded: Boolean = true,
     val serverId: Long? = null,
+    val manual: Boolean = true,
 )

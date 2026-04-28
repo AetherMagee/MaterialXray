@@ -10,6 +10,7 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Deselect
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -34,22 +35,57 @@ fun AppBypassContent(viewModel: AppsViewModel = hiltViewModel()) {
     val apps by viewModel.apps.collectAsStateWithLifecycle()
     val routeOptions by viewModel.routeOptions.collectAsStateWithLifecycle()
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
+    val showSystemApps by viewModel.showSystemApps.collectAsStateWithLifecycle()
     val density = LocalDensity.current
     val iconSize = 40.dp
     val iconPixelSize = remember(density) { with(density) { iconSize.roundToPx() } }
     var editingApp by remember { mutableStateOf<AppItem?>(null) }
     var pendingBulkAction by remember { mutableStateOf<BulkAppRouteAction?>(null) }
+    var appRoutingMenuExpanded by remember { mutableStateOf(false) }
 
     Column(modifier = Modifier.fillMaxSize()) {
         TopAppBar(
             title = { Text("App Routing") },
             windowInsets = WindowInsets(0.dp),
             actions = {
-                IconButton(onClick = { pendingBulkAction = BulkAppRouteAction.ClearProxiedApps }) {
-                    Icon(Icons.Default.Deselect, contentDescription = "Route all apps direct")
-                }
-                IconButton(onClick = { pendingBulkAction = BulkAppRouteAction.ProxyAllApps }) {
-                    Icon(Icons.Default.SelectAll, contentDescription = "Reset all apps to default")
+                Box {
+                    IconButton(onClick = { appRoutingMenuExpanded = true }) {
+                        Icon(Icons.Default.MoreVert, contentDescription = "App routing menu")
+                    }
+                    DropdownMenu(
+                        expanded = appRoutingMenuExpanded,
+                        onDismissRequest = { appRoutingMenuExpanded = false },
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("Clear proxied apps list") },
+                            leadingIcon = { Icon(Icons.Default.Deselect, contentDescription = null) },
+                            onClick = {
+                                appRoutingMenuExpanded = false
+                                pendingBulkAction = BulkAppRouteAction.ClearProxiedApps
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Proxy all apps") },
+                            leadingIcon = { Icon(Icons.Default.SelectAll, contentDescription = null) },
+                            onClick = {
+                                appRoutingMenuExpanded = false
+                                pendingBulkAction = BulkAppRouteAction.ProxyAllApps
+                            },
+                        )
+                        HorizontalDivider()
+                        DropdownMenuItem(
+                            text = { Text("Show system apps") },
+                            trailingIcon = {
+                                Checkbox(
+                                    checked = showSystemApps,
+                                    onCheckedChange = null,
+                                )
+                            },
+                            onClick = {
+                                viewModel.setShowSystemApps(!showSystemApps)
+                            },
+                        )
+                    }
                 }
             },
         )

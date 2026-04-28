@@ -25,8 +25,10 @@ data class AppItem(
     val name: String,
     val uid: Int,
     val icon: Drawable?,
+    val systemApp: Boolean,
     val routeKey: String,
     val routeKind: AppRouteKind,
+    val manuallyRouted: Boolean,
     val routeTitle: String,
     val routeDescription: String,
 )
@@ -56,6 +58,9 @@ class AppsViewModel @Inject constructor(
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery
 
+    private val _showSystemApps = MutableStateFlow(false)
+    val showSystemApps: StateFlow<Boolean> = _showSystemApps
+
     private val bypassedApps = appBypassDao.observeAll()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -75,27 +80,31 @@ class AppsViewModel @Inject constructor(
         _installedApps,
         bypassedApps,
         _searchQuery,
+        _showSystemApps,
         routeOptions,
-    ) { installed, assignments, query, options ->
+    ) { installed, assignments, query, showSystemApps, options ->
         val assignmentByPackage = assignments.associateBy { it.packageName }
         val serverOptionsById = options
             .filter { it.kind == AppRouteKind.SERVER && it.serverId != null }
             .associateBy { requireNotNull(it.serverId) }
         installed
             .map { app ->
-                val option = app.resolveRouteOption(assignmentByPackage[app.packageName], serverOptionsById)
+                val assignment = assignmentByPackage[app.packageName]
+                val option = app.resolveRouteOption(assignment, serverOptionsById)
                 app.copy(
                     routeKey = option.key,
                     routeKind = option.kind,
+                    manuallyRouted = assignment?.manual == true,
                     routeTitle = option.title,
                     routeDescription = option.description,
                 )
             }
+            .filter { showSystemApps || !it.systemApp }
             .filter {
                 query.isEmpty() || it.name.contains(query, ignoreCase = true) || it.packageName.contains(query, ignoreCase = true)
             }
             .sortedWith(
-                compareBy<AppItem> { it.routeKind == AppRouteKind.DEFAULT }
+                compareBy<AppItem> { !it.manuallyRouted }
                     .thenBy { it.name.lowercase() }
                     .thenBy { it.packageName },
             )
@@ -108,15 +117,17 @@ class AppsViewModel @Inject constructor(
             val apps = withContext(Dispatchers.IO) {
                 val pm = context.packageManager
                 pm.getInstalledApplications(PackageManager.GET_META_DATA)
-                    .filter { it.flags and ApplicationInfo.FLAG_SYSTEM == 0 }
+                    .filterNot { it.packageName == context.packageName }
                     .map { info ->
                         AppItem(
                             packageName = info.packageName,
                             name = info.loadLabel(pm).toString(),
                             uid = info.uid,
                             icon = runCatching { info.loadIcon(pm) }.getOrNull(),
+                            systemApp = info.flags and ApplicationInfo.FLAG_SYSTEM != 0,
                             routeKey = DEFAULT_ROUTE_OPTION.key,
                             routeKind = DEFAULT_ROUTE_OPTION.kind,
+                            manuallyRouted = false,
                             routeTitle = DEFAULT_ROUTE_OPTION.title,
                             routeDescription = DEFAULT_ROUTE_OPTION.description,
                         )
@@ -137,6 +148,7 @@ class AppsViewModel @Inject constructor(
                         uid = app.uid,
                         excluded = true,
                         serverId = null,
+                        manual = true,
                     )
                 )
                 AppRouteKind.SERVER -> {
@@ -147,6 +159,7 @@ class AppsViewModel @Inject constructor(
                             uid = app.uid,
                             excluded = false,
                             serverId = serverId,
+                            manual = true,
                         )
                     )
                 }
@@ -157,6 +170,10 @@ class AppsViewModel @Inject constructor(
 
     fun setSearchQuery(query: String) { _searchQuery.value = query }
 
+    fun setShowSystemApps(show: Boolean) {
+        _showSystemApps.value = show
+    }
+
     fun routeAllDirect() {
         viewModelScope.launch {
             _installedApps.value.forEach {
@@ -166,6 +183,7 @@ class AppsViewModel @Inject constructor(
                         uid = it.uid,
                         excluded = true,
                         serverId = null,
+                        manual = false,
                     )
                 )
             }
