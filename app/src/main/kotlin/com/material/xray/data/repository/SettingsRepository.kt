@@ -38,6 +38,7 @@ class SettingsRepository @Inject constructor(
         val GEOSITE_URL = stringPreferencesKey("geosite_url")
         val XRAY_LOG_LEVEL = stringPreferencesKey("xray_log_level")
         val DEFAULT_OUTBOUND = stringPreferencesKey("default_outbound")
+        val APP_SPECIFIC_SERVER_NOTE_SHOWN = booleanPreferencesKey("app_specific_server_note_shown")
         val ROUTING_RULES = stringPreferencesKey("routing_rules")
         val ROUTING_RULES_VERSION = intPreferencesKey("routing_rules_version")
         val ROUTING_RULE_STATES = stringPreferencesKey("routing_rule_states")
@@ -62,6 +63,9 @@ class SettingsRepository @Inject constructor(
     }
     val defaultOutbound: Flow<XrayOutbound> = store.data.map { prefs ->
         XrayOutbound.fromTag(prefs[DEFAULT_OUTBOUND])
+    }
+    val appSpecificServerNoteShown: Flow<Boolean> = store.data.map { prefs ->
+        prefs[APP_SPECIFIC_SERVER_NOTE_SHOWN] ?: false
     }
     val geoipUrl: Flow<String> = store.data.map { prefs ->
         prefs[GEOIP_URL]
@@ -93,6 +97,9 @@ class SettingsRepository @Inject constructor(
     }
     suspend fun setDefaultOutbound(outbound: XrayOutbound) = store.edit { prefs ->
         prefs[DEFAULT_OUTBOUND] = outbound.tag
+    }
+    suspend fun setAppSpecificServerNoteShown(shown: Boolean) = store.edit { prefs ->
+        prefs[APP_SPECIFIC_SERVER_NOTE_SHOWN] = shown
     }
     suspend fun setGeoipUrl(url: String) = store.edit { prefs ->
         prefs.remove(LEGACY_GEO_DATA_BASE_URL)
@@ -139,6 +146,8 @@ class SettingsRepository @Inject constructor(
             map["last_server_id"]?.let { prefs[LAST_SERVER_ID] = it.toLongOrNull() ?: -1L }
             prefs[XRAY_LOG_LEVEL] = XrayLogLevel.fromValue(map["xray_log_level"]).value
             prefs[DEFAULT_OUTBOUND] = XrayOutbound.fromTag(map["default_outbound"]).tag
+            prefs[APP_SPECIFIC_SERVER_NOTE_SHOWN] =
+                map["app_specific_server_note_shown"]?.toBooleanStrictOrNull() ?: false
             map["geoip_url"]?.takeIf { it.isNotBlank() }?.let { prefs[GEOIP_URL] = it }
             map["geosite_url"]?.takeIf { it.isNotBlank() }?.let { prefs[GEOSITE_URL] = it }
             map["routing_rules"]?.takeIf { it.isNotBlank() }?.let { prefs[ROUTING_RULES] = it }

@@ -37,6 +37,7 @@ fun AppBypassContent(viewModel: AppsViewModel = hiltViewModel()) {
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
     val showSystemApps by viewModel.showSystemApps.collectAsStateWithLifecycle()
     val isLoadingApps by viewModel.isLoadingApps.collectAsStateWithLifecycle()
+    val appSpecificServerNoteShown by viewModel.appSpecificServerNoteShown.collectAsStateWithLifecycle()
     val density = LocalDensity.current
     val iconSize = 40.dp
     val iconPixelSize = remember(density) { with(density) { iconSize.roundToPx() } }
@@ -50,6 +51,7 @@ fun AppBypassContent(viewModel: AppsViewModel = hiltViewModel()) {
         }
     }
     var editingApp by remember { mutableStateOf<AppItem?>(null) }
+    var pendingSpecificServerRoute by remember { mutableStateOf<AppRouteSelection?>(null) }
     var pendingBulkAction by remember { mutableStateOf<BulkAppRouteAction?>(null) }
     var appRoutingMenuExpanded by remember { mutableStateOf(false) }
 
@@ -176,8 +178,23 @@ fun AppBypassContent(viewModel: AppsViewModel = hiltViewModel()) {
             singleServerRouteHidden = visibleRouteOptions.size != routeOptions.size,
             onDismiss = { editingApp = null },
             onSelected = { option ->
-                viewModel.setAppRoute(app, option)
                 editingApp = null
+                if (option.kind == AppRouteKind.SERVER && !appSpecificServerNoteShown) {
+                    pendingSpecificServerRoute = AppRouteSelection(app, option)
+                } else {
+                    viewModel.setAppRoute(app, option)
+                }
+            },
+        )
+    }
+
+    pendingSpecificServerRoute?.let { selection ->
+        SpecificServerRouteNoteDialog(
+            onDismiss = { pendingSpecificServerRoute = null },
+            onConfirm = {
+                viewModel.setAppSpecificServerNoteShown()
+                viewModel.setAppRoute(selection.app, selection.option)
+                pendingSpecificServerRoute = null
             },
         )
     }
@@ -200,6 +217,38 @@ fun AppBypassContent(viewModel: AppsViewModel = hiltViewModel()) {
 private enum class BulkAppRouteAction {
     ClearProxiedApps,
     ProxyAllApps,
+}
+
+private data class AppRouteSelection(
+    val app: AppItem,
+    val option: AppRouteOption,
+)
+
+@Composable
+private fun SpecificServerRouteNoteDialog(
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Specific server routing") },
+        text = {
+            Text(
+                "Custom routing rules are not applied when an app is routed to a specific server. " +
+                    "Use Default outbound or Default selected config to keep Routing rules active.",
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text("OK")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        },
+    )
 }
 
 @Composable

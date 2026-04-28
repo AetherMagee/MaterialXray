@@ -10,6 +10,7 @@ import com.material.xray.data.db.dao.AppBypassDao
 import com.material.xray.data.db.entity.AppBypassEntity
 import com.material.xray.data.db.entity.ServerEntity
 import com.material.xray.data.repository.ServerRepository
+import com.material.xray.data.repository.SettingsRepository
 import com.material.xray.service.PendingRoutingChange
 import com.material.xray.service.RoutingChangeManager
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -53,6 +54,7 @@ class AppsViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val appBypassDao: AppBypassDao,
     private val serverRepository: ServerRepository,
+    private val settingsRepository: SettingsRepository,
     private val routingChangeManager: RoutingChangeManager,
 ) : ViewModel() {
 
@@ -64,6 +66,9 @@ class AppsViewModel @Inject constructor(
 
     private val _isLoadingApps = MutableStateFlow(true)
     val isLoadingApps: StateFlow<Boolean> = _isLoadingApps
+
+    val appSpecificServerNoteShown: StateFlow<Boolean> = settingsRepository.appSpecificServerNoteShown
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
     private val bypassedApps = appBypassDao.observeAll()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -194,6 +199,12 @@ class AppsViewModel @Inject constructor(
 
     fun setShowSystemApps(show: Boolean) {
         _showSystemApps.value = show
+    }
+
+    fun setAppSpecificServerNoteShown() {
+        viewModelScope.launch {
+            settingsRepository.setAppSpecificServerNoteShown(true)
+        }
     }
 
     fun routeAllDirect() {
