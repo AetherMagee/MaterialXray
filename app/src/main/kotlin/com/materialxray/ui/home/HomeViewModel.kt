@@ -27,6 +27,7 @@ import javax.inject.Inject
 data class ServerListItem(
     val entity: ServerEntity,
     val endpointSummary: String,
+    val latencyMs: Int?,
 )
 
 @HiltViewModel
@@ -49,9 +50,11 @@ class HomeViewModel @Inject constructor(
 
     private val allServers: StateFlow<List<ServerEntity>> = serverRepo.observeAll()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    private val latencyByServerId = MutableStateFlow<Map<Long, Int>>(emptyMap())
 
-    val serverItems: StateFlow<List<ServerListItem>> = allServers
-        .map { servers -> servers.map { it.toListItem() } }
+    val serverItems: StateFlow<List<ServerListItem>> = combine(allServers, latencyByServerId) { servers, latencies ->
+        servers.map { it.toListItem(latencies[it.id]) }
+    }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val serversBySubscription: StateFlow<Map<Long, List<ServerListItem>>> = serverItems
@@ -139,7 +142,7 @@ class HomeViewModel @Inject constructor(
     fun testLatency(server: ServerEntity) {
         viewModelScope.launch {
             val latency = withContext(Dispatchers.IO) { measureLatency(server.address, server.port) }
-            serverRepo.updateLatency(server.id, latency)
+            latencyByServerId.update { it + (server.id to latency) }
         }
     }
 
@@ -150,7 +153,7 @@ class HomeViewModel @Inject constructor(
                 .forEach { server ->
                     launch {
                         val latency = withContext(Dispatchers.IO) { measureLatency(server.address, server.port) }
-                        serverRepo.updateLatency(server.id, latency)
+                        latencyByServerId.update { it + (server.id to latency) }
                     }
                 }
         }
@@ -161,13 +164,13 @@ class HomeViewModel @Inject constructor(
             allServers.value.forEach { server ->
                 launch {
                     val latency = withContext(Dispatchers.IO) { measureLatency(server.address, server.port) }
-                    serverRepo.updateLatency(server.id, latency)
+                    latencyByServerId.update { it + (server.id to latency) }
                 }
             }
         }
     }
 
-    private fun ServerEntity.toListItem(): ServerListItem {
+    private fun ServerEntity.toListItem(latencyMs: Int?): ServerListItem {
         val summary = endpointSummaryCache.getOrPut(configJson) {
             runCatching {
                 val config = json.decodeFromString<ServerConfig>(configJson)
@@ -176,7 +179,7 @@ class HomeViewModel @Inject constructor(
                 "$protocol | UNKNOWN | UNKNOWN"
             }
         }
-        return ServerListItem(entity = this, endpointSummary = summary)
+        return ServerListItem(entity = this, endpointSummary = summary, latencyMs = latencyMs)
     }
 
     private fun measureLatency(address: String, port: Int): Int = runCatching {

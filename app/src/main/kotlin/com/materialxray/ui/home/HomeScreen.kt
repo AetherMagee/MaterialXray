@@ -566,11 +566,13 @@ private fun ServerRow(
     onClick: () -> Unit,
     onTestLatency: () -> Unit,
 ) {
-    val latencyText = if (server.entity.latencyMs < 0) "---" else "${server.entity.latencyMs}ms"
+    val latencyMs = server.latencyMs
+    val latencyText = latencyMs?.let { if (it < 0) "Failed" else "${it}ms" }
     val latencyColor = when {
-        server.entity.latencyMs < 0 -> MaterialTheme.colorScheme.onSurfaceVariant
-        server.entity.latencyMs < 200 -> MaterialTheme.colorScheme.primary
-        server.entity.latencyMs < 500 -> MaterialTheme.colorScheme.tertiary
+        latencyMs == null -> MaterialTheme.colorScheme.onSurfaceVariant
+        latencyMs < 0 -> MaterialTheme.colorScheme.error
+        latencyMs < 200 -> MaterialTheme.colorScheme.primary
+        latencyMs < 500 -> MaterialTheme.colorScheme.tertiary
         else -> MaterialTheme.colorScheme.error
     }
 
@@ -607,17 +609,19 @@ private fun ServerRow(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            Surface(
-                shape = MaterialTheme.shapes.small,
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                color = MaterialTheme.colorScheme.surface,
-            ) {
-                Text(
-                    text = latencyText,
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                    color = latencyColor,
-                    style = MaterialTheme.typography.labelMedium,
-                )
+            if (latencyText != null) {
+                Surface(
+                    shape = MaterialTheme.shapes.small,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                    color = MaterialTheme.colorScheme.surface,
+                ) {
+                    Text(
+                        text = latencyText,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        color = latencyColor,
+                        style = MaterialTheme.typography.labelMedium,
+                    )
+                }
             }
         }
     }
