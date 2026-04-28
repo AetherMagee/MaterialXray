@@ -36,17 +36,18 @@ fun AppBypassContent(viewModel: AppsViewModel = hiltViewModel()) {
     val iconSize = 40.dp
     val iconPixelSize = remember(density) { with(density) { iconSize.roundToPx() } }
     var editingApp by remember { mutableStateOf<AppItem?>(null) }
+    var pendingBulkAction by remember { mutableStateOf<BulkAppRouteAction?>(null) }
 
     Column(modifier = Modifier.fillMaxSize()) {
         TopAppBar(
             title = { Text("App Routing") },
             windowInsets = WindowInsets(0.dp),
             actions = {
-                IconButton(onClick = { viewModel.routeAllDirect() }) {
-                    Icon(Icons.Default.SelectAll, contentDescription = "Route all apps direct")
+                IconButton(onClick = { pendingBulkAction = BulkAppRouteAction.ClearProxiedApps }) {
+                    Icon(Icons.Default.Deselect, contentDescription = "Route all apps direct")
                 }
-                IconButton(onClick = { viewModel.resetAllToDefault() }) {
-                    Icon(Icons.Default.Deselect, contentDescription = "Reset all apps to default")
+                IconButton(onClick = { pendingBulkAction = BulkAppRouteAction.ProxyAllApps }) {
+                    Icon(Icons.Default.SelectAll, contentDescription = "Reset all apps to default")
                 }
             },
         )
@@ -121,6 +122,57 @@ fun AppBypassContent(viewModel: AppsViewModel = hiltViewModel()) {
             },
         )
     }
+
+    pendingBulkAction?.let { action ->
+        BulkAppRouteConfirmationDialog(
+            action = action,
+            onDismiss = { pendingBulkAction = null },
+            onConfirm = {
+                when (action) {
+                    BulkAppRouteAction.ClearProxiedApps -> viewModel.routeAllDirect()
+                    BulkAppRouteAction.ProxyAllApps -> viewModel.resetAllToDefault()
+                }
+                pendingBulkAction = null
+            },
+        )
+    }
+}
+
+private enum class BulkAppRouteAction {
+    ClearProxiedApps,
+    ProxyAllApps,
+}
+
+@Composable
+private fun BulkAppRouteConfirmationDialog(
+    action: BulkAppRouteAction,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    val title = when (action) {
+        BulkAppRouteAction.ClearProxiedApps -> "Clear proxied apps list?"
+        BulkAppRouteAction.ProxyAllApps -> "Proxy all apps?"
+    }
+    val description = when (action) {
+        BulkAppRouteAction.ClearProxiedApps -> "Manual settings for all apps will be overridden to \"Not proxied\""
+        BulkAppRouteAction.ProxyAllApps -> "Manual settings for all apps will be overridden to default selected config."
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = { Text(description) },
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text("OK")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        },
+    )
 }
 
 @Composable
