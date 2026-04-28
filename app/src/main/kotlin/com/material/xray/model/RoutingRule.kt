@@ -62,6 +62,19 @@ object RoutingRuleCatalog {
             name = "Block Ads",
             outboundTag = "block",
             domains = listOf("geosite:category-ads-all"),
+            enabled = false,
+        ),
+        RoutingRule(
+            id = "lan-ip-direct",
+            name = "Route LAN IP through direct",
+            outboundTag = "direct",
+            ips = listOf("geoip:private"),
+        ),
+        RoutingRule(
+            id = "lan-domain-direct",
+            name = "Route LAN domain through direct",
+            outboundTag = "direct",
+            domains = listOf("geosite:private"),
         ),
         RoutingRule(
             id = "default-proxy",
@@ -72,12 +85,24 @@ object RoutingRuleCatalog {
     )
 
     fun mergeWithDefaults(savedRules: List<RoutingRule>): List<RoutingRule> {
-        return savedRules.map { rule ->
+        val normalizedRules = savedRules.map { rule ->
             if (rule.id == "ru-direct" && rule.domains == listOf("domain:ru", "geosite:ru")) {
                 rule.copy(domains = listOf("domain:ru"))
             } else {
                 rule
             }
+        }
+        val existingIds = normalizedRules.mapTo(mutableSetOf()) { it.id }
+        val missingDefaultRules = defaults().filterNot { it.id in existingIds }
+        if (missingDefaultRules.isEmpty()) return normalizedRules
+
+        val defaultProxyIndex = normalizedRules.indexOfFirst { it.id == "default-proxy" }
+        return if (defaultProxyIndex == -1) {
+            normalizedRules + missingDefaultRules
+        } else {
+            normalizedRules.take(defaultProxyIndex) +
+                missingDefaultRules +
+                normalizedRules.drop(defaultProxyIndex)
         }
     }
 }

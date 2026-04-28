@@ -138,14 +138,25 @@ class ConfigGeneratorTest {
         val json = Json.parseToJsonElement(config).jsonObject
         val rules = json["routing"]!!.jsonObject["rules"]!!.jsonArray
 
-        val adsRule = rules.firstOrNull {
-            it.jsonObject["outboundTag"]?.jsonPrimitive?.content == "block"
+        val lanIpRule = rules.firstOrNull {
+            it.jsonObject["ip"]?.jsonArray?.any { ip ->
+                ip.jsonPrimitive.content == "geoip:private"
+            } == true
         }
-        assertNotNull("Should include enabled block outbound rule", adsRule)
-        assertEquals(
-            "geosite:category-ads-all",
-            adsRule!!.jsonObject["domain"]!!.jsonArray.single().jsonPrimitive.content,
-        )
+        val lanDomainRule = rules.firstOrNull {
+            it.jsonObject["domain"]?.jsonArray?.any { domain ->
+                domain.jsonPrimitive.content == "geosite:private"
+            } == true
+        }
+        val adsRule = rules.firstOrNull {
+            it.jsonObject["domain"]?.jsonArray?.any { domain ->
+                domain.jsonPrimitive.content == "geosite:category-ads-all"
+            } == true
+        }
+
+        assertNotNull("Should include enabled LAN IP direct rule", lanIpRule)
+        assertNotNull("Should include enabled LAN domain direct rule", lanDomainRule)
+        assertNull("Block Ads should be disabled by default", adsRule)
     }
 
     @Test
