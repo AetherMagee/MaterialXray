@@ -8,6 +8,7 @@ import com.materialxray.core.root.RootShell
 import com.materialxray.core.root.RootShell.NetworkNamespace
 import com.materialxray.core.xray.*
 import com.materialxray.data.db.dao.AppBypassDao
+import com.materialxray.data.repository.ServerRepository
 import com.materialxray.model.ConnectionState
 import com.materialxray.model.RoutingRule
 import com.materialxray.model.ServerConfig
@@ -20,6 +21,7 @@ class ConnectionManager(
     private val configGenerator: ConfigGenerator,
     private val geoDataManager: GeoDataManager,
     private val appBypassDao: AppBypassDao,
+    private val serverRepository: ServerRepository,
     private val stateHolder: ConnectionStateHolder,
     private val log: LogBuffer,
     private val onXrayLogReady: () -> Unit = {},
@@ -30,6 +32,12 @@ class ConnectionManager(
     private val cleanupManager = CleanupManager(context, shell)
     private val stateFile = StateFile(context)
     private val logFile get() = "${context.filesDir.absolutePath}/xray.log"
+
+    private data class AppRoutingPlan(
+        val directUids: Set<Int>,
+        val proxyRoutes: List<ConfigGenerator.AppProxyRoute>,
+        val tunRoutes: List<TunManager.AppTunRoute>,
+    )
 
     suspend fun connect(
         server: ServerConfig,
@@ -139,6 +147,16 @@ class ConnectionManager(
                 )
             }
 
+            val appRoutingPlan = buildAppRoutingPlan(tunName, routeTable)
+            if (appRoutingPlan.proxyRoutes.isNotEmpty() || appRoutingPlan.directUids.isNotEmpty()) {
+                log.append(
+                    LogSource.APP,
+                    "App routing: ${appRoutingPlan.proxyRoutes.sumOf { route ->
+                        appRoutingPlan.tunRoutes.firstOrNull { it.tunName == route.tunName }?.uids?.size ?: 0
+                    }} apps assigned to ${appRoutingPlan.proxyRoutes.size} proxy route(s), ${appRoutingPlan.directUids.size} apps direct",
+                )
+            }
+
             val configJson = configGenerator.generate(
                 xrayServer,
                 tunName,
@@ -146,6 +164,7 @@ class ConnectionManager(
                 dnsServers,
                 logLevel,
                 routingRules,
+                appProxyRoutes = appRoutingPlan.proxyRoutes,
                 physicalInterface = physicalRoute.dev,
             )
             xrayBinary.writeConfig(configJson)
@@ -188,13 +207,42 @@ class ConnectionManager(
             }
             log.append(LogSource.APP, "TUN interface $tunName is up")
 
-            val bypassUids = appBypassDao.getExcluded().map { it.uid }.toSet()
+            appRoutingPlan.tunRoutes.forEachIndexed { index, route ->
+                log.append(LogSource.APP, "Waiting for app TUN interface '${route.tunName}'...")
+                val appTunSetup = timedStep("App TUN setup ${index + 1}") {
+                    tunManager.configureTun(
+                        tunName = route.tunName,
+                        addressCidr = TunManager.appTunAddressCidr(index + 1),
+                    ) { isProcessAlive(pid) }
+                }
+                if (!appTunSetup.success) {
+                    val diagnosticsStage = if (appTunSetup.processExited) "app-tun-exit" else "app-tun-failure"
+                    logNamespaceDiagnostics(stage = diagnosticsStage, tunName = route.tunName, xrayPid = pid)
+                    if (appTunSetup.processExited) {
+                        fail("xray crashed: ${readCrashReason()}")
+                    } else {
+                        fail(appTunSetup.error ?: "TUN interface ${route.tunName} did not come up within timeout")
+                    }
+                    return
+                }
+                log.append(LogSource.APP, "App TUN interface ${route.tunName} is up")
+            }
+
+            val bypassUids = appRoutingPlan.directUids
             log.append(
                 LogSource.APP,
-                "Applying IP routing (tunTable=$routeTable, bypassTable=$bypassTable, fwmark=$fwmark, ${bypassUids.size} apps bypassed)...",
+                "Applying IP routing (tunTable=$routeTable, bypassTable=$bypassTable, fwmark=$fwmark, ${bypassUids.size} apps direct, ${appRoutingPlan.tunRoutes.size} app proxy route(s))...",
             )
             val routingResult = timedStep("IP routing setup") {
-                tunManager.applyRouting(tunName, fwmark, routeTable, bypassTable, physicalRoute, bypassUids)
+                tunManager.applyRouting(
+                    tunName = tunName,
+                    fwmark = fwmark,
+                    routeTable = routeTable,
+                    bypassTable = bypassTable,
+                    physicalRoute = physicalRoute,
+                    bypassUids = bypassUids,
+                    appTunRoutes = appRoutingPlan.tunRoutes,
+                )
             }
             if (!routingResult.success) {
                 fail("Failed to apply IP routing: ${routingResult.error ?: "unknown error"}")
@@ -278,6 +326,89 @@ class ConnectionManager(
     suspend fun killProcess(pid: Int, signal: Int = 15): Boolean {
         if (pid <= 0) return false
         return shell.execute("kill -$signal $pid 2>/dev/null").isSuccess
+    }
+
+    private suspend fun buildAppRoutingPlan(
+        baseTunName: String,
+        baseRouteTable: Int,
+    ): AppRoutingPlan {
+        val directUids = appBypassDao.getExcluded()
+            .map { it.uid }
+            .filter { it > 0 }
+            .toSet()
+
+        val proxyAssignments = appBypassDao.getProxyAssignments()
+            .filter { it.uid > 0 && it.serverId != null }
+            .groupBy { requireNotNull(it.serverId) }
+            .toSortedMap()
+
+        if (proxyAssignments.isEmpty()) {
+            return AppRoutingPlan(directUids = directUids, proxyRoutes = emptyList(), tunRoutes = emptyList())
+        }
+
+        if (proxyAssignments.size > MAX_APP_PROXY_ROUTES) {
+            log.append(
+                LogSource.APP,
+                "Only the first $MAX_APP_PROXY_ROUTES app proxy server groups can be active at once; extra groups are ignored",
+            )
+        }
+
+        val proxyRoutes = mutableListOf<ConfigGenerator.AppProxyRoute>()
+        val tunRoutes = mutableListOf<TunManager.AppTunRoute>()
+
+        proxyAssignments.entries.take(MAX_APP_PROXY_ROUTES).forEachIndexed { index, (serverId, assignments) ->
+            val serverEntity = serverRepository.getById(serverId)
+            if (serverEntity == null) {
+                log.append(LogSource.APP, "Skipping app route for missing server id=$serverId")
+                return@forEachIndexed
+            }
+
+            val parsedServerResult = runCatching { serverRepository.parseConfig(serverEntity) }
+            if (parsedServerResult.isFailure) {
+                log.append(
+                    LogSource.APP,
+                    "Skipping app route for ${serverEntity.name}: ${parsedServerResult.exceptionOrNull()?.message}",
+                )
+                return@forEachIndexed
+            }
+            val parsedServer = parsedServerResult.getOrThrow()
+
+            val routedServer = if (parsedServer.rawConfigJson.isNotBlank()) {
+                log.append(LogSource.APP, "Using raw outbound from ${parsedServer.name} for app routing")
+                parsedServer
+            } else {
+                val resolvedServer = serverAddressResolver.resolve(parsedServer)
+                if (resolvedServer.attempted && resolvedServer.selectedAddress == null) {
+                    error("Could not resolve ${parsedServer.address} for app route ${parsedServer.name}")
+                }
+                resolvedServer.server
+            }
+
+            val routeIndex = index + 1
+            val routeTunName = TunManager.appTunName(baseTunName, routeIndex)
+            val inboundTag = "app-in-$serverId"
+            val outboundTag = "app-proxy-$serverId"
+            val uids = assignments.map { it.uid }.filter { it > 0 }.toSet()
+            if (uids.isEmpty()) return@forEachIndexed
+
+            proxyRoutes += ConfigGenerator.AppProxyRoute(
+                inboundTag = inboundTag,
+                tunName = routeTunName,
+                outboundTag = outboundTag,
+                server = routedServer,
+            )
+            tunRoutes += TunManager.AppTunRoute(
+                tunName = routeTunName,
+                routeTable = TunManager.appRouteTable(baseRouteTable, routeIndex),
+                uids = uids,
+            )
+        }
+
+        return AppRoutingPlan(
+            directUids = directUids,
+            proxyRoutes = proxyRoutes,
+            tunRoutes = tunRoutes,
+        )
     }
 
     suspend fun readProcessResidentMemoryMb(pid: Int): Long? {
@@ -446,5 +577,6 @@ class ConnectionManager(
     companion object {
         private const val DEFAULT_MEMORY_PAGE_KB = 4L
         private const val KILOBYTES_PER_MEGABYTE = 1024L
+        private const val MAX_APP_PROXY_ROUTES = 64
     }
 }

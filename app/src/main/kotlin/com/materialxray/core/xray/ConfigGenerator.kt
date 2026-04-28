@@ -10,6 +10,13 @@ import kotlinx.serialization.json.*
 class ConfigGenerator {
     private val json = Json { prettyPrint = true }
 
+    data class AppProxyRoute(
+        val inboundTag: String,
+        val tunName: String,
+        val outboundTag: String,
+        val server: ServerConfig,
+    )
+
     fun generate(
         server: ServerConfig,
         tunName: String = "xray0",
@@ -17,6 +24,7 @@ class ConfigGenerator {
         dnsServers: String = "1.1.1.1,8.8.8.8",
         logLevel: XrayLogLevel = XrayLogLevel.default,
         routingRules: List<RoutingRule> = emptyList(),
+        appProxyRoutes: List<AppProxyRoute> = emptyList(),
         physicalInterface: String? = null,
     ): String {
         if (server.rawConfigJson.isNotBlank()) {
@@ -27,6 +35,7 @@ class ConfigGenerator {
                 dnsServers = dnsServers,
                 logLevel = logLevel,
                 routingRules = routingRules,
+                appProxyRoutes = appProxyRoutes,
                 physicalInterface = physicalInterface,
             )
         }
@@ -37,14 +46,22 @@ class ConfigGenerator {
                 put("loglevel", logLevel.value)
             })
             put("dns", buildDns(dnsServers))
-            put("inbounds", buildJsonArray { add(buildTunInbound(tunName)) })
+            put("inbounds", buildJsonArray {
+                add(buildTunInbound(tunName, "tun-in"))
+                appProxyRoutes.forEach { route ->
+                    add(buildTunInbound(route.tunName, route.inboundTag))
+                }
+            })
             put("outbounds", buildJsonArray {
-                add(buildProxyOutbound(server, fwmark, physicalInterface))
+                add(buildProxyOutbound(server, fwmark, physicalInterface, tag = "proxy"))
+                appProxyRoutes.forEach { route ->
+                    add(buildProxyOutbound(route.server, fwmark, physicalInterface, tag = route.outboundTag))
+                }
                 add(buildDirectOutbound(fwmark, physicalInterface))
                 add(buildDnsOutbound(fwmark, physicalInterface))
                 add(buildBlockOutbound())
             })
-            put("routing", buildRouting(routingRules))
+            put("routing", buildRouting(routingRules, appProxyRoutes))
         }
         return json.encodeToString(JsonObject.serializer(), config)
     }
@@ -56,6 +73,7 @@ class ConfigGenerator {
         dnsServers: String = "1.1.1.1,8.8.8.8",
         logLevel: XrayLogLevel = XrayLogLevel.default,
         routingRules: List<RoutingRule> = emptyList(),
+        appProxyRoutes: List<AppProxyRoute> = emptyList(),
         physicalInterface: String? = null,
     ): String {
         val original = Json.parseToJsonElement(rawJson).jsonObject.toMutableMap()
@@ -66,7 +84,16 @@ class ConfigGenerator {
             inboundObject["protocol"]?.jsonPrimitive?.contentOrNull?.equals("tun", ignoreCase = true) == true
         }
         if (!hasTunInbound) {
-            existingInbounds.add(0, buildTunInbound(tunName))
+            existingInbounds.add(0, buildTunInbound(tunName, "tun-in"))
+        }
+        appProxyRoutes.forEach { route ->
+            val hasAppInbound = existingInbounds.any { inbound ->
+                val inboundObject = inbound as? JsonObject ?: return@any false
+                inboundObject["tag"]?.jsonPrimitive?.contentOrNull.equals(route.inboundTag, ignoreCase = true)
+            }
+            if (!hasAppInbound) {
+                existingInbounds.add(buildTunInbound(route.tunName, route.inboundTag))
+            }
         }
         original["inbounds"] = JsonArray(existingInbounds)
 
@@ -86,7 +113,7 @@ class ConfigGenerator {
                 outbound["protocol"]
                     ?.jsonPrimitive
                     ?.contentOrNull
-                    ?.lowercase() !in setOf("freedom", "dns", "blackhole")
+                    ?.lowercase() !in SPECIAL_OUTBOUND_PROTOCOLS
             }
         }
 
@@ -114,6 +141,9 @@ class ConfigGenerator {
             }
         }
 
+        appProxyRoutes.forEach { route ->
+            upsertOutbound(route.outboundTag, buildProxyOutbound(route.server, fwmark, physicalInterface, route.outboundTag))
+        }
         upsertOutbound("direct", buildDirectOutbound(fwmark, physicalInterface))
         upsertOutbound("dns-out", buildDnsOutbound(fwmark, physicalInterface))
         upsertOutbound("block", buildBlockOutbound())
@@ -124,12 +154,12 @@ class ConfigGenerator {
             put("loglevel", logLevel.value)
         }
         original["dns"] = buildDns(dnsServers)
-        original["routing"] = buildRouting(routingRules)
+        original["routing"] = buildRouting(routingRules, appProxyRoutes)
 
         return json.encodeToString(JsonObject.serializer(), JsonObject(original))
     }
 
-    private fun buildTunInbound(tunName: String) = buildJsonObject {
+    private fun buildTunInbound(tunName: String, tag: String) = buildJsonObject {
         put("port", 0)
         put("protocol", "tun")
         put("settings", buildJsonObject {
@@ -145,14 +175,48 @@ class ConfigGenerator {
                 add("quic")
             })
         })
-        put("tag", "tun-in")
+        put("tag", tag)
     }
 
-    private fun buildProxyOutbound(server: ServerConfig, fwmark: Int, physicalInterface: String?) = buildJsonObject {
-        put("tag", "proxy")
-        put("protocol", server.protocol.scheme)
-        put("settings", buildOutboundSettings(server))
-        put("streamSettings", buildStreamSettings(server, fwmark, physicalInterface))
+    private fun buildProxyOutbound(
+        server: ServerConfig,
+        fwmark: Int,
+        physicalInterface: String?,
+        tag: String,
+    ): JsonObject {
+        if (server.rawConfigJson.isNotBlank()) {
+            return buildRawProxyOutbound(server.rawConfigJson, fwmark, physicalInterface, tag)
+        }
+
+        return buildJsonObject {
+            put("tag", tag)
+            put("protocol", server.protocol.scheme)
+            put("settings", buildOutboundSettings(server))
+            put("streamSettings", buildStreamSettings(server, fwmark, physicalInterface))
+        }
+    }
+
+    private fun buildRawProxyOutbound(
+        rawJson: String,
+        fwmark: Int,
+        physicalInterface: String?,
+        tag: String,
+    ): JsonObject {
+        val rawObject = Json.parseToJsonElement(rawJson).jsonObject
+        val outbounds = rawObject["outbounds"]?.jsonArray?.mapNotNull { it as? JsonObject }.orEmpty()
+        val candidate = outbounds.firstOrNull { outbound ->
+            outbound["tag"]?.jsonPrimitive?.contentOrNull.equals("proxy", ignoreCase = true)
+        } ?: outbounds.firstOrNull { outbound ->
+            val protocol = outbound["protocol"]?.jsonPrimitive?.contentOrNull?.lowercase()
+            protocol !in SPECIAL_OUTBOUND_PROTOCOLS
+        } ?: error("Raw JSON config has no proxy outbound")
+
+        val outbound = candidate.toMutableMap()
+        val stream = (outbound["streamSettings"] as? JsonObject)?.toMutableMap() ?: mutableMapOf()
+        stream["sockopt"] = buildSockopt(fwmark, physicalInterface)
+        outbound["tag"] = JsonPrimitive(tag)
+        outbound["streamSettings"] = JsonObject(stream)
+        return JsonObject(outbound)
     }
 
     private fun buildOutboundSettings(server: ServerConfig): JsonObject = when (server.protocol) {
@@ -292,15 +356,28 @@ class ConfigGenerator {
         })
     }
 
-    private fun buildRouting(routingRules: List<RoutingRule>) = buildJsonObject {
+    private fun buildRouting(
+        routingRules: List<RoutingRule>,
+        appProxyRoutes: List<AppProxyRoute> = emptyList(),
+    ) = buildJsonObject {
         put("domainStrategy", "IPOnDemand")
         put("rules", buildJsonArray {
             add(buildJsonObject {
                 put("type", "field")
-                put("inboundTag", buildJsonArray { add("tun-in") })
+                put("inboundTag", buildJsonArray {
+                    add("tun-in")
+                    appProxyRoutes.forEach { add(it.inboundTag) }
+                })
                 put("port", "53")
                 put("outboundTag", "dns-out")
             })
+            appProxyRoutes.forEach { route ->
+                add(buildJsonObject {
+                    put("type", "field")
+                    put("inboundTag", buildJsonArray { add(route.inboundTag) })
+                    put("outboundTag", route.outboundTag)
+                })
+            }
             routingRules.filter { it.enabled }.forEach { rule ->
                 if (rule.operator == RoutingRuleOperator.OR) {
                     buildOrRules(rule).forEach { add(it) }
@@ -345,5 +422,9 @@ class ConfigGenerator {
         }
 
         return rules
+    }
+
+    private companion object {
+        val SPECIAL_OUTBOUND_PROTOCOLS = setOf("freedom", "dns", "blackhole")
     }
 }

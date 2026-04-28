@@ -169,4 +169,36 @@ class ConfigGeneratorTest {
         assertNotNull("RU direct OR rule should emit a domain-based rule", ruDomainRule)
         assertNotNull("RU direct OR rule should emit an IP-based rule", ruIpRule)
     }
+
+    @Test
+    fun `adds app specific tun inbound outbound and route`() {
+        val appServer = vlessReality.copy(name = "Apps", address = "5.6.7.8")
+        val config = generator.generate(
+            vlessReality,
+            appProxyRoutes = listOf(
+                ConfigGenerator.AppProxyRoute(
+                    inboundTag = "app-in-42",
+                    tunName = "xray0a1",
+                    outboundTag = "app-proxy-42",
+                    server = appServer,
+                )
+            ),
+        )
+        val json = Json.parseToJsonElement(config).jsonObject
+
+        val appInbound = json["inbounds"]!!.jsonArray.first {
+            it.jsonObject["tag"]?.jsonPrimitive?.content == "app-in-42"
+        }.jsonObject
+        assertEquals("xray0a1", appInbound["settings"]!!.jsonObject["name"]!!.jsonPrimitive.content)
+
+        val appOutbound = json["outbounds"]!!.jsonArray.first {
+            it.jsonObject["tag"]?.jsonPrimitive?.content == "app-proxy-42"
+        }.jsonObject
+        assertEquals("5.6.7.8", appOutbound["settings"]!!.jsonObject["vnext"]!!.jsonArray[0].jsonObject["address"]!!.jsonPrimitive.content)
+
+        val appRoute = json["routing"]!!.jsonObject["rules"]!!.jsonArray.first {
+            it.jsonObject["outboundTag"]?.jsonPrimitive?.content == "app-proxy-42"
+        }.jsonObject
+        assertEquals("app-in-42", appRoute["inboundTag"]!!.jsonArray.single().jsonPrimitive.content)
+    }
 }

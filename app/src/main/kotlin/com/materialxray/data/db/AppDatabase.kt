@@ -13,7 +13,7 @@ import com.materialxray.data.db.entity.SubscriptionEntity
 
 @Database(
     entities = [ServerEntity::class, SubscriptionEntity::class, AppBypassEntity::class],
-    version = 2,
+    version = 3,
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun serverDao(): ServerDao
@@ -34,6 +34,12 @@ abstract class AppDatabase : RoomDatabase() {
                 database.execSQL("ALTER TABLE subscriptions ADD COLUMN profileWebPageUrl TEXT")
                 database.execSQL("ALTER TABLE subscriptions ADD COLUMN announce TEXT")
                 database.execSQL("ALTER TABLE subscriptions ADD COLUMN supportUrl TEXT")
+            }
+        }
+
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE app_bypass ADD COLUMN serverId INTEGER")
             }
         }
     }

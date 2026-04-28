@@ -1,4 +1,5 @@
 import java.io.File
+import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
@@ -8,18 +9,32 @@ plugins {
     alias(libs.plugins.compose.compiler)
 }
 
+val localProperties = Properties().apply {
+    val file = rootProject.file("local.properties")
+    if (file.isFile) {
+        file.inputStream().use(::load)
+    }
+}
+
+fun localProperty(name: String): String? =
+    localProperties.getProperty(name)?.takeIf { it.isNotBlank() }
+
 val releaseKeystorePath = providers.environmentVariable("RELEASE_KEYSTORE_PATH")
     .orElse(providers.gradleProperty("releaseKeystorePath"))
     .orNull
+    ?: localProperty("releaseKeystorePath")
 val releaseKeyAlias = providers.environmentVariable("RELEASE_KEY_ALIAS")
     .orElse(providers.gradleProperty("releaseKeyAlias"))
     .orNull
+    ?: localProperty("releaseKeyAlias")
 val releaseKeyPassword = providers.environmentVariable("RELEASE_KEY_PASSWORD")
     .orElse(providers.gradleProperty("releaseKeyPassword"))
     .orNull
+    ?: localProperty("releaseKeyPassword")
 val releaseStorePassword = providers.environmentVariable("RELEASE_STORE_PASSWORD")
     .orElse(providers.gradleProperty("releaseStorePassword"))
     .orNull
+    ?: localProperty("releaseStorePassword")
 val hasReleaseSigning = listOf(
     releaseKeystorePath,
     releaseKeyAlias,

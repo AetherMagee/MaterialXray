@@ -18,6 +18,7 @@ import com.materialxray.core.root.RootShell
 import com.materialxray.core.xray.ConfigGenerator
 import com.materialxray.core.xray.GeoDataManager
 import com.materialxray.data.db.dao.AppBypassDao
+import com.materialxray.data.repository.ServerRepository
 import com.materialxray.data.repository.SettingsRepository
 import com.materialxray.model.ConnectionState
 import com.materialxray.model.ServerConfig
@@ -35,6 +36,7 @@ class XrayService : Service() {
 
     @Inject lateinit var rootShell: RootShell
     @Inject lateinit var appBypassDao: AppBypassDao
+    @Inject lateinit var serverRepository: ServerRepository
     @Inject lateinit var settingsRepo: SettingsRepository
     @Inject lateinit var connectionStateHolder: ConnectionStateHolder
     @Inject lateinit var logBuffer: LogBuffer
@@ -60,6 +62,7 @@ class XrayService : Service() {
             configGenerator = ConfigGenerator(),
             geoDataManager = geoDataManager,
             appBypassDao = appBypassDao,
+            serverRepository = serverRepository,
             stateHolder = connectionStateHolder,
             log = logBuffer,
             onXrayLogReady = { startLogTail() },

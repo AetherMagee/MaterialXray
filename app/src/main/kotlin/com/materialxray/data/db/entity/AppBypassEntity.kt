@@ -8,4 +8,5 @@ data class AppBypassEntity(
     @PrimaryKey val packageName: String,
     val uid: Int,
     val excluded: Boolean = true,
+    val serverId: Long? = null,
 )
