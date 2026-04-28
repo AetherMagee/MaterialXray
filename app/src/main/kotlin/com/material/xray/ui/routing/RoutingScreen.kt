@@ -41,6 +41,7 @@ import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -132,7 +133,7 @@ fun RoutingScreen(viewModel: RoutingViewModel = hiltViewModel()) {
                         }
                     )
                 },
-                windowInsets = androidx.compose.foundation.layout.WindowInsets(0.dp),
+                windowInsets = TopAppBarDefaults.windowInsets,
                 actions = {
                     if (selectedTab == RoutingTab.Rules.ordinal) {
                         if (selectionMode) {

@@ -3,12 +3,8 @@ package com.material.xray.ui.components
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
+import android.graphics.Color
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.layout.windowInsetsTopHeight
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -24,9 +20,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.luminance
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -45,10 +39,9 @@ fun ScrolledTopAppBar(
     val window = remember(view) { view.context.findActivity()?.window }
 
     if (window != null && !view.isInEditMode) {
-        val statusBarColor = containerColor.toArgb()
         val useDarkIcons = containerColor.luminance() > 0.5f
         SideEffect {
-            window.statusBarColor = statusBarColor
+            window.statusBarColor = Color.TRANSPARENT
             WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = useDarkIcons
         }
         DisposableEffect(window, view) {
@@ -61,23 +54,15 @@ fun ScrolledTopAppBar(
         }
     }
 
-    Box {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .windowInsetsTopHeight(WindowInsets.statusBars)
-                .background(containerColor),
-        )
-        TopAppBar(
-            title = { Text(title) },
-            colors = TopAppBarDefaults.topAppBarColors(
-                containerColor = containerColor,
-                scrolledContainerColor = containerColor,
-            ),
-            scrollBehavior = scrollBehavior,
-            windowInsets = WindowInsets(0.dp),
-        )
-    }
+    TopAppBar(
+        title = { Text(title) },
+        colors = TopAppBarDefaults.topAppBarColors(
+            containerColor = containerColor,
+            scrolledContainerColor = containerColor,
+        ),
+        scrollBehavior = scrollBehavior,
+        windowInsets = TopAppBarDefaults.windowInsets,
+    )
 }
 
 private tailrec fun Context.findActivity(): Activity? = when (this) {

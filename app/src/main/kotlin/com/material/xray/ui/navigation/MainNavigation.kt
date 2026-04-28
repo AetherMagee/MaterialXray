@@ -1,5 +1,6 @@
 package com.material.xray.ui.navigation
 
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.material3.*
@@ -10,6 +11,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -54,6 +56,7 @@ fun MainNavigation() {
     }
 
     Scaffold(
+        contentWindowInsets = WindowInsets(0.dp),
         bottomBar = {
             NavigationBar {
                 Screen.entries.forEach { screen ->

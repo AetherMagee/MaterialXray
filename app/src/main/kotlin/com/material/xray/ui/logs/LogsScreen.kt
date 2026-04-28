@@ -53,7 +53,7 @@ fun LogsScreen(viewModel: LogsViewModel = hiltViewModel()) {
         topBar = {
             TopAppBar(
                 title = { Text("Logs") },
-                windowInsets = WindowInsets(0.dp),
+                windowInsets = TopAppBarDefaults.windowInsets,
                 actions = {
                     IconButton(onClick = {
                         viewModel.copyAll()
