@@ -17,5 +17,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "MaterialXray"
+rootProject.name = "Material Xray"
 include(":app")

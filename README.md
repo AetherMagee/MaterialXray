@@ -1,6 +1,6 @@
-# MaterialXray
+# Material Xray
 
-MaterialXray is an Android proxy client for rooted devices. It runs xray-core with a native TUN inbound, manages the root-side process lifecycle, and routes device traffic through the selected outbound server using Linux policy routing.
+Material Xray is an Android proxy client for rooted devices. It runs xray-core with a native TUN inbound, manages the root-side process lifecycle, and routes device traffic through the selected outbound server using Linux policy routing.
 
 The current app mode is native/root mode. A rootless `VpnService` mode is planned, but is not implemented yet.
 
@@ -68,7 +68,7 @@ When the pushed ref is a tag that starts with `v` such as `v1.3.2`, the workflow
 
 ## Runtime Notes
 
-MaterialXray starts a root shell, extracts Xray into the app files directory, downloads `geoip.dat` and `geosite.dat` into the same runtime directory when needed, writes an Xray config, starts the Xray process, waits for the TUN interface, and then applies Android policy routing.
+Material Xray starts a root shell, extracts Xray into the app files directory, downloads `geoip.dat` and `geosite.dat` into the same runtime directory when needed, writes an Xray config, starts the Xray process, waits for the TUN interface, and then applies Android policy routing.
 
 Xray's own outbound traffic is marked and bound to the detected physical interface so it does not get captured by the TUN route. When Android switches between Wi-Fi and cellular, the service debounces network callbacks, checks the live physical route, and reconnects Xray if the outbound interface changed.
 
@@ -78,7 +78,7 @@ The routing data download URLs are configurable in settings as direct file URLs 
 ## Project Layout
 
 ```text
-app/src/main/kotlin/com/materialxray/
+app/src/main/kotlin/com/material/xray/
   core/root/      Root shell execution
   core/xray/      Xray asset extraction, config, TUN and routing
   data/           Room database, repositories, subscription parsing

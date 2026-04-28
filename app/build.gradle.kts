@@ -43,11 +43,11 @@ val hasReleaseSigning = listOf(
 ).all { !it.isNullOrBlank() }
 
 android {
-    namespace = "com.materialxray"
+    namespace = "com.material.xray"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.materialxray"
+        applicationId = "com.material.xray"
         minSdk = 26
         targetSdk = 36
         versionCode = 4
