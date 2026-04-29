@@ -1,5 +1,6 @@
 package com.material.xray.ui.settings
 
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
@@ -29,6 +30,8 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
     val defaultOutbound by viewModel.defaultOutbound.collectAsStateWithLifecycle()
     val geoipUrl by viewModel.geoipUrl.collectAsStateWithLifecycle()
     val geositeUrl by viewModel.geositeUrl.collectAsStateWithLifecycle()
+    val geoipUpdating by viewModel.geoipUpdating.collectAsStateWithLifecycle()
+    val geositeUpdating by viewModel.geositeUpdating.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val scrollState = rememberScrollState()
     var defaultOutboundExpanded by remember { mutableStateOf(false) }
@@ -61,6 +64,12 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
     val importLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument(),
     ) { uri -> uri?.let { viewModel.importBackup(it) } }
+
+    LaunchedEffect(viewModel, context) {
+        viewModel.assetUpdateEvents.collect { message ->
+            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+        }
+    }
 
     Scaffold(
         modifier = Modifier.nestedScroll(topAppBarScrollBehavior.nestedScrollConnection),
@@ -189,6 +198,12 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
             if (hasGeoipUrlChanges) {
                 TextButton(onClick = { viewModel.setGeoipUrl(editingGeoipUrl) }) { Text("Save") }
             }
+            OutlinedButton(
+                onClick = { viewModel.updateGeoipAsset(editingGeoipUrl) },
+                enabled = !geoipUpdating,
+            ) {
+                Text(if (geoipUpdating) "Updating..." else "Update")
+            }
 
             OutlinedTextField(
                 value = editingGeositeUrl,
@@ -202,6 +217,12 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
             )
             if (hasGeositeUrlChanges) {
                 TextButton(onClick = { viewModel.setGeositeUrl(editingGeositeUrl) }) { Text("Save") }
+            }
+            OutlinedButton(
+                onClick = { viewModel.updateGeositeAsset(editingGeositeUrl) },
+                enabled = !geositeUpdating,
+            ) {
+                Text(if (geositeUpdating) "Updating..." else "Update")
             }
 
             Row(

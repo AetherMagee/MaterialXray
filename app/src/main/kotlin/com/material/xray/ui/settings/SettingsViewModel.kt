@@ -4,6 +4,8 @@ import android.content.Context
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.material.xray.core.xray.GeoDataAsset
+import com.material.xray.core.xray.GeoDataManager
 import com.material.xray.data.db.dao.AppBypassDao
 import com.material.xray.data.db.dao.ServerDao
 import com.material.xray.data.db.dao.SubscriptionDao
@@ -36,9 +38,13 @@ class SettingsViewModel @Inject constructor(
     private val serverDao: ServerDao,
     private val appBypassDao: AppBypassDao,
     private val connectionStateHolder: ConnectionStateHolder,
+    private val geoDataManager: GeoDataManager,
 ) : ViewModel() {
 
     private val json = Json { ignoreUnknownKeys = true; prettyPrint = true }
+    private val _geoipUpdating = MutableStateFlow(false)
+    private val _geositeUpdating = MutableStateFlow(false)
+    private val _assetUpdateEvents = MutableSharedFlow<String>()
 
     val tunName = settingsRepo.tunName.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "xray0")
     val dnsServers =
@@ -65,6 +71,9 @@ class SettingsViewModel @Inject constructor(
         SharingStarted.WhileSubscribed(5000),
         SettingsRepository.DEFAULT_GEOSITE_URL,
     )
+    val geoipUpdating: StateFlow<Boolean> = _geoipUpdating.asStateFlow()
+    val geositeUpdating: StateFlow<Boolean> = _geositeUpdating.asStateFlow()
+    val assetUpdateEvents: SharedFlow<String> = _assetUpdateEvents.asSharedFlow()
 
     fun setTunName(name: String) = viewModelScope.launch { settingsRepo.setTunName(name) }
     fun setDnsServers(servers: String) = viewModelScope.launch { settingsRepo.setDnsServers(servers) }
@@ -93,6 +102,26 @@ class SettingsViewModel @Inject constructor(
 
     fun setGeoipUrl(url: String) = viewModelScope.launch { settingsRepo.setGeoipUrl(url) }
     fun setGeositeUrl(url: String) = viewModelScope.launch { settingsRepo.setGeositeUrl(url) }
+
+    fun updateGeoipAsset(url: String) {
+        updateGeoDataAsset(
+            asset = GeoDataAsset.GEOIP,
+            url = url,
+            setUrl = settingsRepo::setGeoipUrl,
+            updating = _geoipUpdating,
+            successMessage = "GeoIP updated",
+        )
+    }
+
+    fun updateGeositeAsset(url: String) {
+        updateGeoDataAsset(
+            asset = GeoDataAsset.GEOSITE,
+            url = url,
+            setUrl = settingsRepo::setGeositeUrl,
+            updating = _geositeUpdating,
+            successMessage = "GeoSite updated",
+        )
+    }
 
     fun exportBackup(uri: Uri) {
         viewModelScope.launch {
@@ -149,6 +178,28 @@ class SettingsViewModel @Inject constructor(
                 }
                 settingsRepo.restoreFromMap(backup.settings)
             }
+        }
+    }
+
+    private fun updateGeoDataAsset(
+        asset: GeoDataAsset,
+        url: String,
+        setUrl: suspend (String) -> Unit,
+        updating: MutableStateFlow<Boolean>,
+        successMessage: String,
+    ) {
+        if (updating.value) return
+        viewModelScope.launch {
+            updating.value = true
+            runCatching {
+                setUrl(url)
+                geoDataManager.refresh(asset)
+            }.onSuccess {
+                _assetUpdateEvents.emit(successMessage)
+            }.onFailure { error ->
+                _assetUpdateEvents.emit(error.message ?: "Update failed")
+            }
+            updating.value = false
         }
     }
 }

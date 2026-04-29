@@ -27,6 +27,11 @@ data class GeoDataStatus(
     val downloaded: Boolean,
 )
 
+enum class GeoDataAsset {
+    GEOIP,
+    GEOSITE,
+}
+
 @Singleton
 class GeoDataManager @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -61,6 +66,21 @@ class GeoDataManager @Inject constructor(
             geositeUrl = state.geositeUrl,
             downloaded = state.needsDownload,
         )
+    }
+
+    suspend fun refresh(asset: GeoDataAsset) = withContext(Dispatchers.IO) {
+        binaryDir.mkdirs()
+        val state = resolveState()
+        when (asset) {
+            GeoDataAsset.GEOIP -> {
+                download(state.geoipUrl, state.geoipFile)
+                geoipSourceFile.writeText(state.geoipUrl)
+            }
+            GeoDataAsset.GEOSITE -> {
+                download(state.geositeUrl, state.geositeFile)
+                geositeSourceFile.writeText(state.geositeUrl)
+            }
+        }
     }
 
     private fun download(sourceUrl: String, targetFile: File) {
