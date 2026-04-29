@@ -56,41 +56,55 @@ fun LogsScreen(viewModel: LogsViewModel = hiltViewModel()) {
                 },
             )
         },
+        bottomBar = {
+            LogFilterSelector(
+                selectedFilter = filter,
+                onSelected = { index ->
+                    coroutineScope.launch {
+                        pagerState.animateScrollToPage(index)
+                    }
+                },
+            )
+        },
     ) { padding ->
-        Column(modifier = Modifier.padding(padding)) {
-            SingleChoiceSegmentedButtonRow(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-            ) {
-                LogFilter.entries.forEachIndexed { index, f ->
-                    SegmentedButton(
-                        selected = filter == f,
-                        onClick = {
-                            coroutineScope.launch {
-                                pagerState.animateScrollToPage(index)
-                            }
-                        },
-                        shape = SegmentedButtonDefaults.itemShape(index, LogFilter.entries.size),
-                    ) { Text(f.label) }
-                }
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding),
+        ) { page ->
+            val pageFilter = LogFilter.entries[page]
+            val entries = remember(allEntries, pageFilter) {
+                allEntries.filterBy(pageFilter)
             }
+            LogEntriesList(
+                entries = entries,
+                onCopy = { entry ->
+                    viewModel.copyEntry(entry)
+                    Toast.makeText(context, "Copied", Toast.LENGTH_SHORT).show()
+                },
+            )
+        }
+    }
+}
 
-            HorizontalPager(
-                state = pagerState,
-                modifier = Modifier.fillMaxSize(),
-            ) { page ->
-                val pageFilter = LogFilter.entries[page]
-                val entries = remember(allEntries, pageFilter) {
-                    allEntries.filterBy(pageFilter)
-                }
-                LogEntriesList(
-                    entries = entries,
-                    onCopy = { entry ->
-                        viewModel.copyEntry(entry)
-                        Toast.makeText(context, "Copied", Toast.LENGTH_SHORT).show()
-                    },
-                )
+@Composable
+private fun LogFilterSelector(
+    selectedFilter: LogFilter,
+    onSelected: (Int) -> Unit,
+) {
+    SingleChoiceSegmentedButtonRow(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+    ) {
+        LogFilter.entries.forEachIndexed { index, filter ->
+            SegmentedButton(
+                selected = selectedFilter == filter,
+                onClick = { onSelected(index) },
+                shape = SegmentedButtonDefaults.itemShape(index, LogFilter.entries.size),
+            ) {
+                Text(filter.label)
             }
         }
     }

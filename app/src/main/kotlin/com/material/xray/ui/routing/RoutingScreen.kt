@@ -38,11 +38,12 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
-import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -180,49 +181,41 @@ fun RoutingScreen(viewModel: RoutingViewModel = hiltViewModel()) {
                 },
             )
         },
+        bottomBar = {
+            RoutingTabSelector(
+                selectedTab = selectedTab,
+                onSelected = { index ->
+                    coroutineScope.launch {
+                        pagerState.animateScrollToPage(index)
+                    }
+                },
+            )
+        },
     ) { padding ->
-        Column(
+        HorizontalPager(
+            state = pagerState,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding),
-        ) {
-            PrimaryTabRow(selectedTabIndex = selectedTab) {
-                RoutingTab.entries.forEachIndexed { index, tab ->
-                    Tab(
-                        selected = selectedTab == index,
-                        onClick = {
-                            coroutineScope.launch {
-                                pagerState.animateScrollToPage(index)
-                            }
-                        },
-                        text = { Text(tab.title) },
-                    )
-                }
-            }
-
-            HorizontalPager(
-                state = pagerState,
-                modifier = Modifier.fillMaxSize(),
-            ) { page ->
-                when (RoutingTab.entries[page]) {
-                    RoutingTab.Rules -> RoutingRulesTab(
-                        rules = rules,
-                        selectionMode = selectionMode,
-                        selectedRuleIds = selectedRuleIds,
-                        onRuleToggled = { rule, enabled -> viewModel.updateRule(rule.copy(enabled = enabled)) },
-                        onRuleClick = { rule ->
-                            if (selectionMode) {
-                                selectedRuleIds = selectedRuleIds.toggle(rule.id)
-                            } else {
-                                editingRule = EditableRoutingRule(rule = rule, isNew = false)
-                            }
-                        },
-                        onRuleLongClick = { rule ->
+        ) { page ->
+            when (RoutingTab.entries[page]) {
+                RoutingTab.Rules -> RoutingRulesTab(
+                    rules = rules,
+                    selectionMode = selectionMode,
+                    selectedRuleIds = selectedRuleIds,
+                    onRuleToggled = { rule, enabled -> viewModel.updateRule(rule.copy(enabled = enabled)) },
+                    onRuleClick = { rule ->
+                        if (selectionMode) {
                             selectedRuleIds = selectedRuleIds.toggle(rule.id)
-                        },
-                    )
-                    RoutingTab.Apps -> AppBypassContent()
-                }
+                        } else {
+                            editingRule = EditableRoutingRule(rule = rule, isNew = false)
+                        }
+                    },
+                    onRuleLongClick = { rule ->
+                        selectedRuleIds = selectedRuleIds.toggle(rule.id)
+                    },
+                )
+                RoutingTab.Apps -> AppBypassContent()
             }
         }
     }
@@ -236,6 +229,28 @@ fun RoutingScreen(viewModel: RoutingViewModel = hiltViewModel()) {
                 editingRule = null
             },
         )
+    }
+}
+
+@Composable
+private fun RoutingTabSelector(
+    selectedTab: Int,
+    onSelected: (Int) -> Unit,
+) {
+    SingleChoiceSegmentedButtonRow(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+    ) {
+        RoutingTab.entries.forEachIndexed { index, tab ->
+            SegmentedButton(
+                selected = selectedTab == index,
+                onClick = { onSelected(index) },
+                shape = SegmentedButtonDefaults.itemShape(index, RoutingTab.entries.size),
+            ) {
+                Text(tab.title)
+            }
+        }
     }
 }
 
