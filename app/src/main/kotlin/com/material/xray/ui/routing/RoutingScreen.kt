@@ -4,6 +4,7 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -14,6 +15,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.width
@@ -64,6 +66,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
@@ -268,82 +271,107 @@ private fun RoutingRulesTab(
     onRuleClick: (RoutingRule) -> Unit,
     onRuleLongClick: (RoutingRule) -> Unit,
 ) {
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 12.dp, top = 8.dp, end = 12.dp, bottom = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        items(items = rules, key = { it.id }, contentType = { "routingRule" }) { rule ->
-            val selected = rule.id in selectedRuleIds
-            val containerColor by animateColorAsState(
-                targetValue = if (selected) {
-                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
-                } else {
-                    MaterialTheme.colorScheme.surfaceContainer
-                },
-                label = "routingRuleContainerColor",
-            )
-            val borderColor by animateColorAsState(
-                targetValue = if (selected) {
-                    MaterialTheme.colorScheme.primary
-                } else {
-                    MaterialTheme.colorScheme.outlineVariant
-                },
-                label = "routingRuleBorderColor",
-            )
-            val contentText = remember(rule) { rule.contentText().ifBlank { "No match content" } }
+    val fadeColor = MaterialTheme.colorScheme.surface
+    Box(modifier = Modifier.fillMaxSize()) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(start = 12.dp, top = 8.dp, end = 12.dp, bottom = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            items(items = rules, key = { it.id }, contentType = { "routingRule" }) { rule ->
+                val selected = rule.id in selectedRuleIds
+                val containerColor by animateColorAsState(
+                    targetValue = if (selected) {
+                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
+                    } else {
+                        MaterialTheme.colorScheme.surfaceContainer
+                    },
+                    label = "routingRuleContainerColor",
+                )
+                val borderColor by animateColorAsState(
+                    targetValue = if (selected) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.outlineVariant
+                    },
+                    label = "routingRuleBorderColor",
+                )
+                val contentText = remember(rule) { rule.contentText().ifBlank { "No match content" } }
 
-            Surface(
-                color = containerColor,
-                shape = MaterialTheme.shapes.medium,
-                border = BorderStroke(1.dp, borderColor),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .combinedClickable(
-                        onClick = { onRuleClick(rule) },
-                        onLongClick = { onRuleLongClick(rule) },
-                    ),
-            ) {
-                Row(
+                Surface(
+                    color = containerColor,
+                    shape = MaterialTheme.shapes.medium,
+                    border = BorderStroke(1.dp, borderColor),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 14.dp, vertical = 12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
+                        .combinedClickable(
+                            onClick = { onRuleClick(rule) },
+                            onLongClick = { onRuleLongClick(rule) },
+                        ),
                 ) {
-                    if (selectionMode) {
-                        Checkbox(
-                            checked = selected,
-                            onCheckedChange = null,
-                        )
-                    }
-
-                    Column(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp, vertical = 12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text(
-                            text = rule.name,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        Text(
-                            text = contentText,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        if (selectionMode) {
+                            Checkbox(
+                                checked = selected,
+                                onCheckedChange = null,
+                            )
+                        }
+
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            Text(
+                                text = rule.name,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            Text(
+                                text = contentText,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+
+                        Switch(
+                            checked = rule.enabled,
+                            enabled = !selectionMode,
+                            onCheckedChange = { enabled -> onRuleToggled(rule, enabled) },
                         )
                     }
-
-                    Switch(
-                        checked = rule.enabled,
-                        enabled = !selectionMode,
-                        onCheckedChange = { enabled -> onRuleToggled(rule, enabled) },
-                    )
                 }
             }
         }
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .fillMaxWidth()
+                .height(8.dp)
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(fadeColor, fadeColor.copy(alpha = 0f)),
+                    ),
+                ),
+        )
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .height(12.dp)
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(fadeColor.copy(alpha = 0f), fadeColor),
+                    ),
+                ),
+        )
     }
 }
 
