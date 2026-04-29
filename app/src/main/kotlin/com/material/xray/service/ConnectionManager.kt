@@ -72,7 +72,10 @@ class ConnectionManager(
                 }
             }
 
-            if (!verifyCaptivePortalAccess()) return
+            val captivePortalAccess = timedStep("Captive portal check") {
+                verifyCaptivePortalAccess()
+            }
+            if (!captivePortalAccess) return
 
             log.append(LogSource.APP, "Requesting root access...")
             val rootGranted = timedStep("Root shell setup") {
@@ -87,7 +90,6 @@ class ConnectionManager(
                 "Root access granted (namespace=${shell.defaultNetworkNamespace().name.lowercase()})",
             )
             ensureNativeRuntimeExemptions()
-            logNamespaceDiagnostics(stage = "shell")
 
             prepareLogFile()
             onXrayLogReady()
@@ -201,7 +203,6 @@ class ConnectionManager(
             }
 
             log.append(LogSource.APP, "xray running with PID $pid")
-            logNamespaceDiagnostics(stage = "xray-start", tunName = tunName, xrayPid = pid)
 
             stateFile.write(
                 XrayState(

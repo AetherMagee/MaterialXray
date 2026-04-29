@@ -118,8 +118,8 @@ class CaptivePortalDetector @Inject constructor(
         const val DEFAULT_TEST_URL = "http://neverssl.com/"
         const val NEVERSSL_MARKER = "NeverSSL"
         const val HTTP_NETWORK_AUTHENTICATION_REQUIRED = 511
-        const val CHECK_TIMEOUT_SECONDS = 5L
-        const val CHECK_CALL_TIMEOUT_SECONDS = 8L
+        const val CHECK_TIMEOUT_SECONDS = 2L
+        const val CHECK_CALL_TIMEOUT_SECONDS = 3L
         const val MAX_RESPONSE_BYTES = 64L * 1024L
     }
 }

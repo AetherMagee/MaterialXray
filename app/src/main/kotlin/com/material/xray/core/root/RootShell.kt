@@ -152,7 +152,7 @@ class RootShell {
     }
 
     private companion object {
-        const val DEFAULT_COMMAND_TIMEOUT_MS = 30_000L
+        const val DEFAULT_COMMAND_TIMEOUT_MS = 10_000L
         const val COMMAND_POLL_INTERVAL_MS = 10L
         const val NANOS_PER_MILLI = 1_000_000L
     }
