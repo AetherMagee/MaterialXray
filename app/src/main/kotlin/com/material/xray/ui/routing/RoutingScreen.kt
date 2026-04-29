@@ -462,7 +462,7 @@ private fun EditRoutingRuleDialog(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    protocolOptions.forEach { (protocol, description) ->
+                    protocolOptions.forEach { (protocol, _) ->
                         val checked = protocol in selectedProtocols
                         Surface(
                             modifier = Modifier.fillMaxWidth(),
@@ -503,11 +503,6 @@ private fun EditRoutingRuleDialog(
                                         text = protocol.uppercase(),
                                         style = MaterialTheme.typography.bodyMedium,
                                         fontWeight = FontWeight.SemiBold,
-                                    )
-                                    Text(
-                                        text = description,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
                                 }
                             }
