@@ -284,8 +284,8 @@ class AppsViewModel @Inject constructor(
         )
         val DEFAULT_ROUTE_OPTION = AppRouteOption(
             key = DEFAULT_ROUTE_KEY,
-            title = "Default selected config",
-            description = "Use the configuration selected on Home.",
+            title = "Default selected server",
+            description = "Use the server selected on Home.",
             kind = AppRouteKind.DEFAULT,
         )
         val DIRECT_ROUTE_OPTION = AppRouteOption(

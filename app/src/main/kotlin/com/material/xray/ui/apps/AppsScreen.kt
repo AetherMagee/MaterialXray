@@ -262,7 +262,7 @@ private fun SpecificServerRouteNoteDialog(
         text = {
             Text(
                 "Custom routing rules are not applied when an app is routed to a specific server. " +
-                    "Use Default outbound or Default selected config to keep Routing rules active.",
+                    "Use Default outbound or Default selected server to keep Routing rules active.",
             )
         },
         confirmButton = {
@@ -349,6 +349,12 @@ private fun AppRoutePickerDialog(
             }
         }
     }
+    val presetOptions by remember(filteredOptions) {
+        derivedStateOf { filteredOptions.filter { it.kind != AppRouteKind.SERVER } }
+    }
+    val serverOptions by remember(filteredOptions) {
+        derivedStateOf { filteredOptions.filter { it.kind == AppRouteKind.SERVER } }
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -375,7 +381,24 @@ private fun AppRoutePickerDialog(
                         .heightIn(max = 420.dp),
                 ) {
                     items(
-                        items = filteredOptions,
+                        items = presetOptions,
+                        key = { it.key },
+                        contentType = { "routeOption" },
+                    ) { option ->
+                        RouteOptionRow(
+                            option = option,
+                            selected = option.key == app.routeKey ||
+                                (singleServerRouteHidden && app.routeKind == AppRouteKind.SERVER && option.kind == AppRouteKind.DEFAULT),
+                            onSelected = { onSelected(option) },
+                        )
+                    }
+                    if (presetOptions.isNotEmpty() && serverOptions.isNotEmpty()) {
+                        item(contentType = "routeOptionDivider") {
+                            HorizontalDivider(modifier = Modifier.padding(vertical = 6.dp))
+                        }
+                    }
+                    items(
+                        items = serverOptions,
                         key = { it.key },
                         contentType = { "routeOption" },
                     ) { option ->
