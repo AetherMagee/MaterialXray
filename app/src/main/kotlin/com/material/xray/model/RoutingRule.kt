@@ -82,7 +82,9 @@ object RoutingRuleCatalog {
         ),
     )
 
-    fun mergeWithDefaults(savedRules: List<RoutingRule>): List<RoutingRule> {
+    fun defaultIds(): Set<String> = defaults().mapTo(mutableSetOf()) { it.id }
+
+    fun mergeWithDefaults(savedRules: List<RoutingRule>, deletedDefaultRuleIds: Set<String> = emptySet()): List<RoutingRule> {
         val normalizedRules = savedRules.map { rule ->
             if (rule.isUntouchedLegacyRuDirect()) {
                 rule.copy(domains = ruDirectDomains, ips = ruDirectIps)
@@ -95,7 +97,7 @@ object RoutingRuleCatalog {
                 rule.id == "lan-domain-direct"
         }
         val existingIds = normalizedRules.mapTo(mutableSetOf()) { it.id }
-        val missingDefaultRules = defaults().filterNot { it.id in existingIds }
+        val missingDefaultRules = defaults().filterNot { it.id in existingIds || it.id in deletedDefaultRuleIds }
         if (missingDefaultRules.isEmpty()) return normalizedRules
         return normalizedRules + missingDefaultRules
     }

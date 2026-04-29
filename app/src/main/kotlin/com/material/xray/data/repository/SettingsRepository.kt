@@ -42,6 +42,7 @@ class SettingsRepository @Inject constructor(
         val ROUTING_RULES = stringPreferencesKey("routing_rules")
         val ROUTING_RULES_VERSION = intPreferencesKey("routing_rules_version")
         val ROUTING_RULE_STATES = stringPreferencesKey("routing_rule_states")
+        val DELETED_DEFAULT_ROUTING_RULE_IDS = stringSetPreferencesKey("deleted_default_routing_rule_ids")
         private val LEGACY_GEO_DATA_BASE_URL = stringPreferencesKey("geo_data_base_url")
         private const val CURRENT_ROUTING_RULES_VERSION = 2
 
@@ -82,6 +83,7 @@ class SettingsRepository @Inject constructor(
             rulesEncoded = prefs[ROUTING_RULES],
             rulesVersion = prefs[ROUTING_RULES_VERSION],
             statesEncoded = prefs[ROUTING_RULE_STATES],
+            deletedDefaultRuleIds = prefs[DELETED_DEFAULT_ROUTING_RULE_IDS].orEmpty(),
         )
     }
 
@@ -116,16 +118,19 @@ class SettingsRepository @Inject constructor(
             rulesEncoded = prefs[ROUTING_RULES],
             rulesVersion = prefs[ROUTING_RULES_VERSION],
             statesEncoded = prefs[ROUTING_RULE_STATES],
+            deletedDefaultRuleIds = prefs[DELETED_DEFAULT_ROUTING_RULE_IDS].orEmpty(),
         ).map { existing ->
             if (existing.id == rule.id) rule else existing
         }
         prefs[ROUTING_RULES] = encodeRoutingRules(updatedRules)
         prefs[ROUTING_RULES_VERSION] = CURRENT_ROUTING_RULES_VERSION
+        prefs[DELETED_DEFAULT_ROUTING_RULE_IDS] = deletedDefaultRuleIds(updatedRules)
         prefs.remove(ROUTING_RULE_STATES)
     }
     suspend fun setRoutingRules(rules: List<RoutingRule>) = store.edit { prefs ->
         prefs[ROUTING_RULES] = encodeRoutingRules(rules)
         prefs[ROUTING_RULES_VERSION] = CURRENT_ROUTING_RULES_VERSION
+        prefs[DELETED_DEFAULT_ROUTING_RULE_IDS] = deletedDefaultRuleIds(rules)
         prefs.remove(ROUTING_RULE_STATES)
     }
 
@@ -153,6 +158,13 @@ class SettingsRepository @Inject constructor(
             map["routing_rules"]?.takeIf { it.isNotBlank() }?.let { prefs[ROUTING_RULES] = it }
             map["routing_rules_version"]?.let { prefs[ROUTING_RULES_VERSION] = it.toIntOrNull() ?: CURRENT_ROUTING_RULES_VERSION }
             map["routing_rule_states"]?.takeIf { it.isNotBlank() }?.let { prefs[ROUTING_RULE_STATES] = it }
+            map["deleted_default_routing_rule_ids"]
+                ?.split(",")
+                ?.map { it.trim().trim('[', ']') }
+                ?.filter { it.isNotEmpty() }
+                ?.toSet()
+                ?.takeIf { it.isNotEmpty() }
+                ?.let { prefs[DELETED_DEFAULT_ROUTING_RULE_IDS] = it }
             map["geo_data_base_url"]?.takeIf { it.isNotBlank() }?.let { legacyBaseUrl ->
                 prefs[GEOIP_URL] = appendLegacyFileName(legacyBaseUrl, "geoip.dat")
                 prefs[GEOSITE_URL] = appendLegacyFileName(legacyBaseUrl, "geosite.dat")
@@ -179,6 +191,7 @@ class SettingsRepository @Inject constructor(
         rulesEncoded: String?,
         rulesVersion: Int?,
         statesEncoded: String?,
+        deletedDefaultRuleIds: Set<String>,
     ): List<RoutingRule> {
         val savedRules = runCatching {
             if (rulesEncoded.isNullOrBlank() || rulesVersion != CURRENT_ROUTING_RULES_VERSION) {
@@ -189,7 +202,7 @@ class SettingsRepository @Inject constructor(
         }.getOrNull()
 
         if (savedRules != null) {
-            return RoutingRuleCatalog.mergeWithDefaults(savedRules)
+            return RoutingRuleCatalog.mergeWithDefaults(savedRules, deletedDefaultRuleIds)
         }
 
         val stateOverrides = decodeRoutingRuleStates(statesEncoded)
@@ -200,4 +213,9 @@ class SettingsRepository @Inject constructor(
 
     private fun encodeRoutingRules(rules: List<RoutingRule>): String =
         json.encodeToString(ListSerializer(RoutingRule.serializer()), rules)
+
+    private fun deletedDefaultRuleIds(rules: List<RoutingRule>): Set<String> {
+        val presentRuleIds = rules.mapTo(mutableSetOf()) { it.id }
+        return RoutingRuleCatalog.defaultIds().filterNotTo(mutableSetOf()) { it in presentRuleIds }
+    }
 }
