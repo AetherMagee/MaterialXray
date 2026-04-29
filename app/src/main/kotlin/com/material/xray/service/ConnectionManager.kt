@@ -5,6 +5,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.PowerManager
 import android.os.SystemClock
+import com.material.xray.core.network.CaptivePortalDetector
 import com.material.xray.core.root.RootShell
 import com.material.xray.core.root.RootShell.NetworkNamespace
 import com.material.xray.core.xray.*
@@ -20,6 +21,7 @@ import java.io.FileOutputStream
 class ConnectionManager(
     private val context: Context,
     private val shell: RootShell,
+    private val captivePortalDetector: CaptivePortalDetector,
     private val configGenerator: ConfigGenerator,
     private val geoDataManager: GeoDataManager,
     private val appBypassDao: AppBypassDao,
@@ -69,6 +71,8 @@ class ConnectionManager(
                     cleanupManager.ensureCleanState()
                 }
             }
+
+            if (!verifyCaptivePortalAccess()) return
 
             log.append(LogSource.APP, "Requesting root access...")
             val rootGranted = timedStep("Root shell setup") {
@@ -400,9 +404,32 @@ class ConnectionManager(
         }
     }
 
-    private suspend fun fail(message: String) {
+    private suspend fun verifyCaptivePortalAccess(): Boolean {
+        log.append(LogSource.APP, "Checking for captive portal...")
+        return when (val result = captivePortalDetector.check()) {
+            CaptivePortalDetector.Result.Clear -> {
+                log.append(LogSource.APP, "Captive portal check passed")
+                true
+            }
+            is CaptivePortalDetector.Result.Captive -> {
+                fail(
+                    "Captive portal detected. Sign in to the network before starting VPN. ${result.reason}",
+                    cleanState = false,
+                )
+                false
+            }
+            is CaptivePortalDetector.Result.Unavailable -> {
+                log.append(LogSource.APP, "Captive portal check skipped: ${result.reason}")
+                true
+            }
+        }
+    }
+
+    private suspend fun fail(message: String, cleanState: Boolean = true) {
         log.append(LogSource.APP, "ERROR: $message")
-        cleanupManager.ensureCleanState()
+        if (cleanState) {
+            cleanupManager.ensureCleanState()
+        }
         stateHolder.update(ConnectionState.Error(message))
     }
 
