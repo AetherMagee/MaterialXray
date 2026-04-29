@@ -66,6 +66,12 @@ class SubscriptionRepository @Inject constructor(
         subscriptionDao.delete(sub)
     }
 
+    suspend fun updateUrl(sub: SubscriptionEntity, url: String) {
+        val updated = sub.copy(url = url.trim())
+        subscriptionDao.update(updated)
+        refresh(updated.id, updated.url)
+    }
+
     private fun SubscriptionEntity.applyFetchedData(fetched: FetchedSubscription): SubscriptionEntity =
         withSubscriptionMetadata(
             metadata = fetched.metadata,

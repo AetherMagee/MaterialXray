@@ -17,6 +17,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Speed
@@ -67,6 +68,7 @@ fun HomeScreen(viewModel: HomeViewModel = hiltViewModel()) {
     )
 
     var showAddDialog by remember { mutableStateOf(false) }
+    var editingSubscription by remember { mutableStateOf<SubscriptionEntity?>(null) }
     val selectedServerName = remember(selectedServer) { selectedServer?.name ?: "No server selected" }
     val selectedServerDetail = remember(selectedServer) {
         selectedServer?.let {
@@ -137,6 +139,7 @@ fun HomeScreen(viewModel: HomeViewModel = hiltViewModel()) {
                         servers = serversBySubscription[subscription.id].orEmpty(),
                         selectedServerId = selectedServerId,
                         onDelete = { viewModel.deleteSubscription(subscription) },
+                        onEdit = { editingSubscription = subscription },
                         onRefresh = { viewModel.refreshSubscription(subscription) },
                         onTestAll = { viewModel.testSubscriptionLatencies(subscription) },
                         onServerSelected = { viewModel.selectServer(it) },
@@ -161,6 +164,17 @@ fun HomeScreen(viewModel: HomeViewModel = hiltViewModel()) {
             onConfirm = { name, url ->
                 viewModel.addSubscription(name, url)
                 showAddDialog = false
+            },
+        )
+    }
+
+    editingSubscription?.let { subscription ->
+        EditSubscriptionDialog(
+            subscription = subscription,
+            onDismiss = { editingSubscription = null },
+            onConfirm = { url ->
+                viewModel.updateSubscriptionUrl(subscription, url)
+                editingSubscription = null
             },
         )
     }
@@ -361,6 +375,7 @@ private fun SubscriptionCard(
     servers: List<ServerListItem>,
     selectedServerId: Long,
     onDelete: () -> Unit,
+    onEdit: () -> Unit,
     onRefresh: () -> Unit,
     onTestAll: () -> Unit,
     onServerSelected: (Long) -> Unit,
@@ -377,6 +392,7 @@ private fun SubscriptionCard(
                 onRefresh = onRefresh,
                 onTestAll = onTestAll,
                 onDelete = onDelete,
+                onEdit = onEdit,
             )
             SubscriptionMetadataSection(subscription = subscription)
 
@@ -492,6 +508,7 @@ private fun SubscriptionHeader(
     onRefresh: () -> Unit,
     onTestAll: () -> Unit,
     onDelete: () -> Unit,
+    onEdit: () -> Unit,
 ) {
     var showMenu by remember { mutableStateOf(false) }
     val uriHandler = LocalUriHandler.current
@@ -550,6 +567,14 @@ private fun SubscriptionHeader(
                         },
                     )
                 }
+                DropdownMenuItem(
+                    text = { Text("Edit") },
+                    leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) },
+                    onClick = {
+                        showMenu = false
+                        onEdit()
+                    },
+                )
                 DropdownMenuItem(
                     text = { Text("Delete") },
                     onClick = {
@@ -742,6 +767,38 @@ private fun formatByteCount(bytes: Long): String {
     }
 
     return "$formatted ${units[unitIndex]}"
+}
+
+@Composable
+private fun EditSubscriptionDialog(
+    subscription: SubscriptionEntity,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit,
+) {
+    var url by remember(subscription.id) { mutableStateOf(subscription.url) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Edit Subscription") },
+        text = {
+            OutlinedTextField(
+                value = url,
+                onValueChange = { url = it },
+                label = { Text("URL") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onConfirm(url.trim()) },
+                enabled = url.isNotBlank() && url.trim() != subscription.url,
+            ) {
+                Text("Save")
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
 }
 
 @Composable

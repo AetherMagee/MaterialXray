@@ -123,6 +123,14 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch { subscriptionRepo.delete(sub) }
     }
 
+    fun updateSubscriptionUrl(sub: SubscriptionEntity, url: String) {
+        viewModelScope.launch {
+            withRefreshTracking {
+                runCatching { subscriptionRepo.updateUrl(sub, url) }
+            }
+        }
+    }
+
     fun refreshAll() {
         viewModelScope.launch {
             withRefreshTracking {
