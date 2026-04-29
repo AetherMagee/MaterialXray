@@ -55,6 +55,9 @@ class XrayService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        createNotificationChannel()
+        startAsForeground("Material Xray", "Starting...", showDisconnectAction = false)
+
         xrayLogStreamer = XrayLogStreamer(filesDir.resolve("xray.log"), logBuffer)
         connectionManager = ConnectionManager(
             context = this,
@@ -66,15 +69,6 @@ class XrayService : Service() {
             stateHolder = connectionStateHolder,
             log = logBuffer,
             onXrayLogReady = { startLogTail() },
-        )
-        createNotificationChannel()
-        startForeground(
-            NOTIFICATION_ID,
-            buildNotification(
-                title = "Material Xray",
-                text = "Starting...",
-                showDisconnectAction = false,
-            ),
         )
 
         scope.launch {
@@ -90,6 +84,7 @@ class XrayService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_CONNECT -> {
+                startAsForeground("Material Xray", "Starting...", showDisconnectAction = false)
                 val configJson = intent.getStringExtra(EXTRA_SERVER_CONFIG) ?: return START_NOT_STICKY
                 launchConnectionCommand {
                     val config = Json.decodeFromString<ServerConfig>(configJson)
@@ -393,6 +388,10 @@ class XrayService : Service() {
 
     private fun connectedNotificationText(state: ConnectionState.Connected): String =
         "Pinned ${state.tunName} to ${state.physicalInterface}"
+
+    private fun startAsForeground(title: String, text: String, showDisconnectAction: Boolean) {
+        startForeground(NOTIFICATION_ID, buildNotification(title, text, showDisconnectAction))
+    }
 
     private fun buildNotification(title: String, text: String, showDisconnectAction: Boolean): Notification {
         val openIntent = PendingIntent.getActivity(
