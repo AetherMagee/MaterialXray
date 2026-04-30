@@ -12,6 +12,8 @@ sealed interface ConnectionState {
         val corePid: Int,
         val tunName: String,
         val physicalInterface: String,
+        val physicalGateway: String? = null,
+        val physicalTable: String? = null,
         val startTime: Long = System.currentTimeMillis(),
     ) : ConnectionState
     data object Disconnecting : ConnectionState

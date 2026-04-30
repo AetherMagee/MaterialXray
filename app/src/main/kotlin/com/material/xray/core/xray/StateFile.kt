@@ -18,6 +18,9 @@ data class XrayState(
     val bypassTable: Int = 101,
     val fwmark: Int = 255,
     val routeMark: Int = 100,
+    val physicalInterface: String? = null,
+    val physicalGateway: String? = null,
+    val physicalTable: String? = null,
     val timestamp: Long = System.currentTimeMillis(),
 )
 

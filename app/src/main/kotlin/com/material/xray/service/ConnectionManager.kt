@@ -56,6 +56,7 @@ class ConnectionManager(
         routingRules: List<RoutingRule>,
         transitionState: ConnectionState = ConnectionState.Connecting,
         cleanStateFirst: Boolean = true,
+        fastReconnect: Boolean = false,
     ) {
         stateHolder.update(transitionState)
         val connectStartedAt = SystemClock.elapsedRealtime()
@@ -72,10 +73,14 @@ class ConnectionManager(
                 }
             }
 
-            val captivePortalAccess = timedStep("Captive portal check") {
-                verifyCaptivePortalAccess()
+            if (fastReconnect) {
+                log.append(LogSource.APP, "Captive portal check skipped for fast reconnect")
+            } else {
+                val captivePortalAccess = timedStep("Captive portal check") {
+                    verifyCaptivePortalAccess()
+                }
+                if (!captivePortalAccess) return
             }
-            if (!captivePortalAccess) return
 
             log.append(LogSource.APP, "Requesting root access...")
             val rootGranted = timedStep("Root shell setup") {
@@ -89,37 +94,49 @@ class ConnectionManager(
                 LogSource.APP,
                 "Root access granted (namespace=${shell.defaultNetworkNamespace().name.lowercase()})",
             )
-            ensureNativeRuntimeExemptions()
+            if (fastReconnect) {
+                log.append(LogSource.APP, "Runtime exemption check skipped for fast reconnect")
+            } else {
+                ensureNativeRuntimeExemptions()
+            }
 
             prepareLogFile()
             onXrayLogReady()
 
-            log.append(LogSource.APP, "Extracting xray binary...")
-            val xrayReady = timedStep("xray binary extraction") {
-                xrayBinary.ensureExtracted()
-            }
-            if (!xrayReady) {
-                fail("xray binary not found — check assets")
-                return
+            if (fastReconnect) {
+                log.append(LogSource.APP, "xray binary extraction skipped for fast reconnect")
+            } else {
+                log.append(LogSource.APP, "Extracting xray binary...")
+                val xrayReady = timedStep("xray binary extraction") {
+                    xrayBinary.ensureExtracted()
+                }
+                if (!xrayReady) {
+                    fail("xray binary not found — check assets")
+                    return
+                }
             }
             log.append(LogSource.APP, "xray binary ready at ${xrayBinary.binaryPath}")
 
-            log.append(LogSource.APP, "Checking routing data...")
-            if (geoDataManager.needsRefresh()) {
-                stateHolder.update(ConnectionState.UpdatingRoutingData)
-                log.append(LogSource.APP, "Updating routing data...")
-            }
-            val geoDataStatus = timedStep("Routing data setup") {
-                geoDataManager.ensureReady()
-            }
-            stateHolder.update(transitionState)
-            if (geoDataStatus.downloaded) {
-                log.append(
-                    LogSource.APP,
-                    "Routing data updated (geoip=${geoDataStatus.geoipUrl}, geosite=${geoDataStatus.geositeUrl})",
-                )
+            if (fastReconnect) {
+                log.append(LogSource.APP, "Routing data check skipped for fast reconnect")
             } else {
-                log.append(LogSource.APP, "Routing data already up to date")
+                log.append(LogSource.APP, "Checking routing data...")
+                if (geoDataManager.needsRefresh()) {
+                    stateHolder.update(ConnectionState.UpdatingRoutingData)
+                    log.append(LogSource.APP, "Updating routing data...")
+                }
+                val geoDataStatus = timedStep("Routing data setup") {
+                    geoDataManager.ensureReady()
+                }
+                stateHolder.update(transitionState)
+                if (geoDataStatus.downloaded) {
+                    log.append(
+                        LogSource.APP,
+                        "Routing data updated (geoip=${geoDataStatus.geoipUrl}, geosite=${geoDataStatus.geositeUrl})",
+                    )
+                } else {
+                    log.append(LogSource.APP, "Routing data already up to date")
+                }
             }
 
             val physicalRoute = timedStep("Physical route detection") {
@@ -210,6 +227,9 @@ class ConnectionManager(
                     serverName = server.name,
                     fwmark = fwmark, routeMark = routeMark, routeTable = routeTable, bypassTable = bypassTable,
                     appProxyServerIds = appRoutingPlan.proxyServerIds,
+                    physicalInterface = physicalRoute.dev,
+                    physicalGateway = physicalRoute.gateway,
+                    physicalTable = physicalRoute.table,
                 )
             )
 
@@ -279,6 +299,9 @@ class ConnectionManager(
                     nftTableCreated = false, ipRulesApplied = true,
                     fwmark = fwmark, routeMark = routeMark, routeTable = routeTable, bypassTable = bypassTable,
                     appProxyServerIds = appRoutingPlan.proxyServerIds,
+                    physicalInterface = physicalRoute.dev,
+                    physicalGateway = physicalRoute.gateway,
+                    physicalTable = physicalRoute.table,
                 )
             )
 
@@ -293,6 +316,8 @@ class ConnectionManager(
                     corePid = pid,
                     tunName = tunName,
                     physicalInterface = physicalRoute.dev,
+                    physicalGateway = physicalRoute.gateway,
+                    physicalTable = physicalRoute.table,
                 )
             )
         } catch (e: Exception) {
@@ -380,16 +405,112 @@ class ConnectionManager(
             persistedState.copy(
                 ipRulesApplied = true,
                 appProxyServerIds = appRoutingPlan.proxyServerIds,
+                physicalInterface = physicalRoute.dev,
+                physicalGateway = physicalRoute.gateway,
+                physicalTable = physicalRoute.table,
             )
         )
         log.append(LogSource.APP, "App routing changes applied in ${SystemClock.elapsedRealtime() - startedAt} ms")
         return true
     }
 
-    suspend fun detectPhysicalInterface(tunName: String): String? {
-        if (!shell.open()) return null
-        return tunManager.detectPhysicalRoute(tunName)?.dev
+    sealed interface PhysicalRouteUpdateResult {
+        data class Applied(val route: TunManager.PhysicalRoute) : PhysicalRouteUpdateResult
+        data object RouteUnavailable : PhysicalRouteUpdateResult
+        data object RequiresReconnect : PhysicalRouteUpdateResult
     }
+
+    suspend fun reapplyPhysicalRoutingForNetworkChange(
+        connectedState: ConnectionState.Connected,
+        tunName: String,
+        fwmark: Int,
+        routeTable: Int,
+    ): PhysicalRouteUpdateResult {
+        val startedAt = SystemClock.elapsedRealtime()
+        val persistedState = stateFile.read()
+        if (persistedState == null) {
+            log.append(LogSource.APP, "Physical routing refresh requires reconnect: active state file is missing")
+            return PhysicalRouteUpdateResult.RequiresReconnect
+        }
+        if (persistedState.tunName != tunName || persistedState.routeTable != routeTable || persistedState.fwmark != fwmark) {
+            log.append(LogSource.APP, "Physical routing refresh requires reconnect: active routing settings changed")
+            return PhysicalRouteUpdateResult.RequiresReconnect
+        }
+        if (!isProcessAlive(connectedState.corePid)) {
+            log.append(LogSource.APP, "Physical routing refresh requires reconnect: xray process is not running")
+            return PhysicalRouteUpdateResult.RequiresReconnect
+        }
+
+        val appRoutingPlan = try {
+            buildAppRoutingPlan(tunName, routeTable, includeProxyRoutes = false)
+        } catch (error: Exception) {
+            log.append(LogSource.APP, "Physical routing refresh requires reconnect: ${error.message ?: "could not build app routing plan"}")
+            return PhysicalRouteUpdateResult.RequiresReconnect
+        }
+
+        if (appRoutingPlan.proxyServerIds != persistedState.appProxyServerIds) {
+            log.append(LogSource.APP, "Physical routing refresh requires reconnect: app proxy routes changed")
+            return PhysicalRouteUpdateResult.RequiresReconnect
+        }
+
+        val physicalRoute = timedStep("Physical route detection") {
+            tunManager.detectPhysicalRoute(tunName)
+        } ?: return PhysicalRouteUpdateResult.RouteUnavailable
+
+        appRoutingPlan.tunRoutes.forEachIndexed { index, route ->
+            val appTunSetup = timedStep("App TUN check ${index + 1}") {
+                tunManager.configureTun(
+                    tunName = route.tunName,
+                    addressCidr = TunManager.appTunAddressCidr(index + 1),
+                ) { isProcessAlive(connectedState.corePid) }
+            }
+            if (!appTunSetup.success) {
+                log.append(
+                    LogSource.APP,
+                    "Physical routing refresh requires reconnect: ${appTunSetup.error ?: "app TUN ${route.tunName} is unavailable"}",
+                )
+                return PhysicalRouteUpdateResult.RequiresReconnect
+            }
+        }
+
+        val bypassTable = routeTable + 1
+        val routingResult = timedStep("IP routing refresh") {
+            tunManager.applyRouting(
+                tunName = tunName,
+                fwmark = fwmark,
+                routeTable = routeTable,
+                bypassTable = bypassTable,
+                physicalRoute = physicalRoute,
+                bypassUids = runtimeBypassUids(appRoutingPlan.directUids),
+                appTunRoutes = appRoutingPlan.tunRoutes,
+                managedAppRouteCount = persistedState.appProxyServerIds.size,
+            )
+        }
+        if (!routingResult.success) {
+            log.append(LogSource.APP, "Physical routing refresh requires reconnect: ${routingResult.error ?: "unknown routing error"}")
+            return PhysicalRouteUpdateResult.RequiresReconnect
+        }
+
+        stateFile.write(
+            persistedState.copy(
+                ipRulesApplied = true,
+                appProxyServerIds = appRoutingPlan.proxyServerIds,
+                physicalInterface = physicalRoute.dev,
+                physicalGateway = physicalRoute.gateway,
+                physicalTable = physicalRoute.table,
+            )
+        )
+        log.append(LogSource.APP, "Physical routing refreshed in ${SystemClock.elapsedRealtime() - startedAt} ms")
+        return PhysicalRouteUpdateResult.Applied(physicalRoute)
+    }
+
+    suspend fun detectPhysicalRoute(tunName: String): TunManager.PhysicalRoute? {
+        if (!shell.open()) return null
+        return tunManager.detectPhysicalRoute(tunName)
+    }
+
+    suspend fun detectPhysicalInterface(tunName: String): String? =
+        detectPhysicalRoute(tunName)?.dev
 
     suspend fun disconnect() {
         disconnect(updateState = true)

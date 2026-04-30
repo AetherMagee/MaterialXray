@@ -10,18 +10,18 @@ import com.material.xray.data.db.entity.ServerEntity
 import com.material.xray.data.db.entity.SubscriptionEntity
 import com.material.xray.data.repository.ServerRepository
 import com.material.xray.data.repository.SettingsRepository
+import com.material.xray.data.repository.SubscriptionRefreshCoordinator
 import com.material.xray.data.repository.SubscriptionRepository
 import com.material.xray.model.ConnectionState
 import com.material.xray.model.ServerConfig
 import com.material.xray.service.ConnectionStateHolder
 import com.material.xray.service.RoutingChangeManager
+import com.material.xray.service.SubscriptionUpdateScheduler
 import com.material.xray.service.XrayService
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
@@ -43,6 +43,8 @@ class HomeViewModel @Inject constructor(
     private val settingsRepo: SettingsRepository,
     private val serverRepo: ServerRepository,
     private val subscriptionRepo: SubscriptionRepository,
+    private val subscriptionRefreshCoordinator: SubscriptionRefreshCoordinator,
+    private val subscriptionUpdateScheduler: SubscriptionUpdateScheduler,
     private val connectionStateHolder: ConnectionStateHolder,
     private val routingChangeManager: RoutingChangeManager,
     private val serverLatencyTester: ServerLatencyTester,
@@ -87,13 +89,6 @@ class HomeViewModel @Inject constructor(
 
     init {
         refreshTunnelInterfaceState()
-        viewModelScope.launch {
-            runDueSubscriptionUpdates()
-            while (isActive) {
-                delay(AUTO_UPDATE_CHECK_INTERVAL_MS)
-                runDueSubscriptionUpdates()
-            }
-        }
     }
 
     fun connect() {
@@ -116,6 +111,9 @@ class HomeViewModel @Inject constructor(
                 }
                 detectedState is ConnectionState.Connected && currentState is ConnectionState.Disconnected -> {
                     connectionStateHolder.update(detectedState)
+                    if (detectedState.corePid > 0) {
+                        XrayService.restoreStatus(context)
+                    }
                 }
                 detectedState == null && (currentState is ConnectionState.InterfaceBusy ||
                     currentState is ConnectionState.RestartRequired ||
@@ -152,7 +150,9 @@ class HomeViewModel @Inject constructor(
             serverName = persistedServerName ?: selectedServerName ?: "Selected server",
             corePid = persistedState?.xrayPid ?: -1,
             tunName = activeTunName,
-            physicalInterface = "unknown",
+            physicalInterface = persistedState?.physicalInterface ?: "unknown",
+            physicalGateway = persistedState?.physicalGateway,
+            physicalTable = persistedState?.physicalTable,
             startTime = persistedState?.timestamp ?: System.currentTimeMillis(),
         )
     }
@@ -182,7 +182,11 @@ class HomeViewModel @Inject constructor(
                 val serverEntity = allServers.value.find { it.id == serverId } ?: return@launch
                 val config = runCatching { serverRepo.parseConfig(serverEntity) }.getOrNull() ?: return@launch
                 routingChangeManager.clearPendingChanges()
-                XrayService.connect(context, config)
+                if (state is ConnectionState.Connected) {
+                    XrayService.switchServer(context, config)
+                } else {
+                    XrayService.connect(context, config)
+                }
             }
         }
     }
@@ -198,15 +202,7 @@ class HomeViewModel @Inject constructor(
     fun updateSubscription(sub: SubscriptionEntity, name: String, url: String) {
         viewModelScope.launch {
             withRefreshTracking {
-                val selectedBeforeRefresh = selectedServerEntity()
-                runCatching { subscriptionRepo.update(sub, name, url) }
-                    .onSuccess { refreshResult ->
-                        syncSelectedServerAfterRefresh(
-                            selectedBeforeRefresh = selectedBeforeRefresh,
-                            refreshedSubscriptionId = sub.id,
-                            refreshResult = refreshResult,
-                        )
-                    }
+                runCatching { subscriptionRefreshCoordinator.updateSubscription(sub, name, url) }
             }
         }
     }
@@ -214,11 +210,7 @@ class HomeViewModel @Inject constructor(
     fun refreshAll() {
         viewModelScope.launch {
             withRefreshTracking {
-                val selectedBeforeRefresh = selectedServerEntity()
-                runCatching { subscriptionRepo.refreshAll() }
-                    .onSuccess { refreshResults ->
-                        syncSelectedServerAfterRefreshResults(selectedBeforeRefresh, refreshResults)
-                    }
+                runCatching { subscriptionRefreshCoordinator.refreshAll() }
             }
         }
     }
@@ -226,15 +218,7 @@ class HomeViewModel @Inject constructor(
     fun refreshSubscription(sub: SubscriptionEntity) {
         viewModelScope.launch {
             withRefreshTracking {
-                val selectedBeforeRefresh = selectedServerEntity()
-                runCatching { subscriptionRepo.refresh(sub.id, sub.url) }
-                    .onSuccess { refreshResult ->
-                        syncSelectedServerAfterRefresh(
-                            selectedBeforeRefresh = selectedBeforeRefresh,
-                            refreshedSubscriptionId = sub.id,
-                            refreshResult = refreshResult,
-                        )
-                    }
+                runCatching { subscriptionRefreshCoordinator.refreshSubscription(sub.id, sub.url) }
             }
         }
     }
@@ -242,6 +226,7 @@ class HomeViewModel @Inject constructor(
     fun setSubscriptionAutoUpdateInterval(subId: Long, intervalHours: Int) {
         viewModelScope.launch {
             subscriptionRepo.setAutoUpdateInterval(subId, intervalHours)
+            subscriptionUpdateScheduler.enqueueDueCheckNow()
         }
     }
 
@@ -300,53 +285,6 @@ class HomeViewModel @Inject constructor(
     private suspend fun measureLatency(server: ServerEntity): Int =
         serverLatencyTester.tcping(server.address, server.port)
 
-    private fun selectedServerEntity(): ServerEntity? {
-        val id = selectedServerId.value
-        return allServers.value.find { it.id == id }
-    }
-
-    private suspend fun syncSelectedServerAfterRefresh(
-        selectedBeforeRefresh: ServerEntity?,
-        refreshedSubscriptionId: Long,
-        refreshResult: SubscriptionRepository.RefreshResult?,
-    ) {
-        if (selectedBeforeRefresh?.subscriptionId != refreshedSubscriptionId) return
-
-        val replacementId = refreshResult
-            ?.serverIdByConfigJson
-            ?.get(selectedBeforeRefresh.configJson)
-            ?: -1L
-
-        if (replacementId != selectedServerId.value) {
-            settingsRepo.setLastServerId(replacementId)
-        }
-    }
-
-    private suspend fun syncSelectedServerAfterRefreshResults(
-        selectedBeforeRefresh: ServerEntity?,
-        refreshResults: Map<Long, SubscriptionRepository.RefreshResult>,
-    ) {
-        selectedBeforeRefresh?.let { previousServer ->
-            refreshResults[previousServer.subscriptionId]?.let { refreshResult ->
-                syncSelectedServerAfterRefresh(
-                    selectedBeforeRefresh = previousServer,
-                    refreshedSubscriptionId = previousServer.subscriptionId,
-                    refreshResult = refreshResult,
-                )
-            }
-        }
-    }
-
-    private suspend fun runDueSubscriptionUpdates() {
-        withRefreshTracking {
-            val selectedBeforeRefresh = selectedServerEntity()
-            runCatching { subscriptionRepo.refreshDueSubscriptions() }
-                .onSuccess { refreshResults ->
-                    syncSelectedServerAfterRefreshResults(selectedBeforeRefresh, refreshResults)
-                }
-        }
-    }
-
     private suspend fun withRefreshTracking(block: suspend () -> Unit) {
         refreshOperations.update { it + 1 }
         try {
@@ -359,7 +297,6 @@ class HomeViewModel @Inject constructor(
     private companion object {
         const val DEFAULT_TUN_NAME = "xray0"
         const val AMBIGUOUS_TUN_NAME = "tun0"
-        const val AUTO_UPDATE_CHECK_INTERVAL_MS = 15L * 60L * 1000L
         const val MAX_PARALLEL_LATENCY_TESTS = 8
     }
 }
