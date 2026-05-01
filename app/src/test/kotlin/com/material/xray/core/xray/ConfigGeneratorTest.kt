@@ -152,6 +152,15 @@ class ConfigGeneratorTest {
     }
 
     @Test
+    fun `uses system DNS when DNS servers are empty`() {
+        val config = generator.generate(vlessReality, dnsServers = "")
+        val json = Json.parseToJsonElement(config).jsonObject
+        val servers = json["dns"]!!.jsonObject["servers"]!!.jsonArray
+
+        assertEquals(listOf("localhost"), servers.map { it.jsonPrimitive.content })
+    }
+
+    @Test
     fun `adds domestic DNS for direct domains and routes it directly`() {
         val config = generator.generate(
             vlessReality,

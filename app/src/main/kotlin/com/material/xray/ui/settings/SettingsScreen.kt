@@ -160,9 +160,10 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
                 value = editingDns,
                 onValueChange = { editingDns = it },
                 label = { Text("DNS Servers") },
+                placeholder = { Text("Leave empty to use system DNS") },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
-                supportingText = { Text("Comma-separated, e.g. 1.1.1.1,8.8.8.8") },
+                supportingText = { Text("Comma-separated, e.g. 1.1.1.1,1.0.0.1") },
             )
             if (hasDnsChanges) {
                 Button(onClick = { viewModel.setDnsServers(editingDns) }) { Text("Save") }
@@ -172,6 +173,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
                 value = editingDomesticDns,
                 onValueChange = { editingDomesticDns = it },
                 label = { Text("Domestic DNS") },
+                placeholder = { Text("Leave empty to use system DNS") },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
                 supportingText = { Text("Used for direct domestic domains, e.g. 77.88.8.8,77.88.8.1") },
@@ -184,6 +186,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
                 value = editingLatencyDns,
                 onValueChange = { editingLatencyDns = it },
                 label = { Text("Latency DNS Servers") },
+                placeholder = { Text("Leave empty to use system DNS") },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
                 supportingText = { Text("Used only for node latency checks, e.g. 77.88.8.8,77.88.8.1") },

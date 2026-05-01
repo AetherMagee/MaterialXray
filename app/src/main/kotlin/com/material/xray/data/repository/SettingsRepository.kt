@@ -55,7 +55,7 @@ class SettingsRepository @Inject constructor(
             "https://github.com/v2fly/geoip/releases/latest/download/geoip.dat"
         const val DEFAULT_GEOSITE_URL =
             "https://github.com/v2fly/domain-list-community/releases/latest/download/dlc.dat"
-        const val DEFAULT_DNS_SERVERS = "1.1.1.1,8.8.8.8"
+        const val DEFAULT_DNS_SERVERS = "1.1.1.1,1.0.0.1"
         const val DEFAULT_DOMESTIC_DNS_SERVERS = "77.88.8.8,77.88.8.1"
         const val DEFAULT_LATENCY_DNS_SERVERS = "77.88.8.8,77.88.8.1"
     }

@@ -23,7 +23,7 @@ class ConfigGenerator {
         server: ServerConfig,
         tunName: String = "xray0",
         fwmark: Int = 255,
-        dnsServers: String = "1.1.1.1,8.8.8.8",
+        dnsServers: String = "1.1.1.1,1.0.0.1",
         domesticDnsServers: String = "",
         logLevel: XrayLogLevel = XrayLogLevel.default,
         defaultOutbound: XrayOutbound = XrayOutbound.default,
@@ -81,7 +81,7 @@ class ConfigGenerator {
         rawJson: String,
         tunName: String = "xray0",
         fwmark: Int = 255,
-        dnsServers: String = "1.1.1.1,8.8.8.8",
+        dnsServers: String = "1.1.1.1,1.0.0.1",
         domesticDnsServers: String = "",
         logLevel: XrayLogLevel = XrayLogLevel.default,
         defaultOutbound: XrayOutbound = XrayOutbound.default,
@@ -405,8 +405,13 @@ class ConfigGenerator {
         bypassLan: Boolean = false,
     ) = buildJsonObject {
         val domesticDomains = directDomains(routingRules, bypassLan)
+        val defaultServers = servers.split(",").map { it.trim() }.filter { it.isNotEmpty() }
         put("servers", buildJsonArray {
-            servers.split(",").map { it.trim() }.filter { it.isNotEmpty() }.forEach { add(it) }
+            if (defaultServers.isEmpty()) {
+                add(SYSTEM_DNS_SERVER)
+            } else {
+                defaultServers.forEach { add(it) }
+            }
             if (domesticDomains.isNotEmpty()) {
                 domesticServers.split(",").map { it.trim() }.filter { it.isNotEmpty() }.forEach { domesticServer ->
                     add(buildJsonObject {
@@ -532,6 +537,7 @@ class ConfigGenerator {
 
     private companion object {
         const val DOMESTIC_DNS_TAG = "domestic-dns"
+        const val SYSTEM_DNS_SERVER = "localhost"
         val SPECIAL_OUTBOUND_PROTOCOLS = setOf("freedom", "dns", "blackhole")
     }
 }
