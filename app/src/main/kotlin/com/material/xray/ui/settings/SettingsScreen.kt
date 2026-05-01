@@ -116,42 +116,44 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
                 Button(onClick = { viewModel.setTunName(editingTunName) }) { Text("Save") }
             }
 
-            ExposedDropdownMenuBox(
-                expanded = defaultOutboundExpanded,
-                onExpandedChange = { defaultOutboundExpanded = it },
-            ) {
-                OutlinedTextField(
-                    value = defaultOutbound.label,
-                    onValueChange = {},
-                    readOnly = true,
-                    label = { Text("Default Outbound") },
-                    supportingText = { Text(defaultOutbound.description) },
-                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = defaultOutboundExpanded) },
-                    modifier = Modifier
-                        .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
-                        .fillMaxWidth(),
-                )
-                ExposedDropdownMenu(
+            if (showAdvancedOptions) {
+                ExposedDropdownMenuBox(
                     expanded = defaultOutboundExpanded,
-                    onDismissRequest = { defaultOutboundExpanded = false },
+                    onExpandedChange = { defaultOutboundExpanded = it },
                 ) {
-                    XrayOutbound.entries.forEach { outbound ->
-                        DropdownMenuItem(
-                            text = {
-                                Column {
-                                    Text(outbound.label)
-                                    Text(
-                                        outbound.description,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                }
-                            },
-                            onClick = {
-                                defaultOutboundExpanded = false
-                                viewModel.setDefaultOutbound(outbound)
-                            },
-                        )
+                    OutlinedTextField(
+                        value = defaultOutbound.label,
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Default Outbound") },
+                        supportingText = { Text(defaultOutbound.description) },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = defaultOutboundExpanded) },
+                        modifier = Modifier
+                            .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
+                            .fillMaxWidth(),
+                    )
+                    ExposedDropdownMenu(
+                        expanded = defaultOutboundExpanded,
+                        onDismissRequest = { defaultOutboundExpanded = false },
+                    ) {
+                        XrayOutbound.entries.forEach { outbound ->
+                            DropdownMenuItem(
+                                text = {
+                                    Column {
+                                        Text(outbound.label)
+                                        Text(
+                                            outbound.description,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+                                },
+                                onClick = {
+                                    defaultOutboundExpanded = false
+                                    viewModel.setDefaultOutbound(outbound)
+                                },
+                            )
+                        }
                     }
                 }
             }
@@ -195,33 +197,35 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
                 Button(onClick = { viewModel.setLatencyDnsServers(editingLatencyDns) }) { Text("Save") }
             }
 
-            ExposedDropdownMenuBox(
-                expanded = logLevelExpanded,
-                onExpandedChange = { logLevelExpanded = it },
-            ) {
-                OutlinedTextField(
-                    value = xrayLogLevel.label,
-                    onValueChange = {},
-                    readOnly = true,
-                    label = { Text("Xray Log Level") },
-                    supportingText = { Text("Default: error") },
-                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = logLevelExpanded) },
-                    modifier = Modifier
-                        .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
-                        .fillMaxWidth(),
-                )
-                ExposedDropdownMenu(
+            if (showAdvancedOptions) {
+                ExposedDropdownMenuBox(
                     expanded = logLevelExpanded,
-                    onDismissRequest = { logLevelExpanded = false },
+                    onExpandedChange = { logLevelExpanded = it },
                 ) {
-                    XrayLogLevel.entries.forEach { level ->
-                        DropdownMenuItem(
-                            text = { Text(level.label) },
-                            onClick = {
-                                logLevelExpanded = false
-                                viewModel.setXrayLogLevel(level)
-                            },
-                        )
+                    OutlinedTextField(
+                        value = xrayLogLevel.label,
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Xray Log Level") },
+                        supportingText = { Text("Default: error") },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = logLevelExpanded) },
+                        modifier = Modifier
+                            .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
+                            .fillMaxWidth(),
+                    )
+                    ExposedDropdownMenu(
+                        expanded = logLevelExpanded,
+                        onDismissRequest = { logLevelExpanded = false },
+                    ) {
+                        XrayLogLevel.entries.forEach { level ->
+                            DropdownMenuItem(
+                                text = { Text(level.label) },
+                                onClick = {
+                                    logLevelExpanded = false
+                                    viewModel.setXrayLogLevel(level)
+                                },
+                            )
+                        }
                     }
                 }
             }
@@ -317,11 +321,6 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text("Show advanced options", style = MaterialTheme.typography.bodyLarge)
-                    Text(
-                        "Show advanced routing options and logs",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
                 }
                 Switch(
                     checked = showAdvancedOptions,

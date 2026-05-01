@@ -40,6 +40,7 @@ class SettingsRepository @Inject constructor(
         val GEOIP_URL = stringPreferencesKey("geoip_url")
         val GEOSITE_URL = stringPreferencesKey("geosite_url")
         val XRAY_LOG_LEVEL = stringPreferencesKey("xray_log_level")
+        val LAST_XRAY_LOG_LEVEL = stringPreferencesKey("last_xray_log_level")
         val DEFAULT_OUTBOUND = stringPreferencesKey("default_outbound")
         val LAUNCHER_ICON = stringPreferencesKey("launcher_icon")
         val SHOW_ADVANCED_OPTIONS = booleanPreferencesKey("show_advanced_options")
@@ -72,7 +73,11 @@ class SettingsRepository @Inject constructor(
     val bypassLan: Flow<Boolean> = store.data.map { it[BYPASS_LAN] ?: true }
     val lastServerId: Flow<Long> = store.data.map { it[LAST_SERVER_ID] ?: -1L }
     val xrayLogLevel: Flow<XrayLogLevel> = store.data.map { prefs ->
-        XrayLogLevel.fromValue(prefs[XRAY_LOG_LEVEL])
+        if (prefs[SHOW_ADVANCED_OPTIONS] == true) {
+            XrayLogLevel.fromValue(prefs[XRAY_LOG_LEVEL] ?: prefs[LAST_XRAY_LOG_LEVEL])
+        } else {
+            XrayLogLevel.None
+        }
     }
     val defaultOutbound: Flow<XrayOutbound> = store.data.map { prefs ->
         XrayOutbound.fromTag(prefs[DEFAULT_OUTBOUND])
@@ -116,6 +121,7 @@ class SettingsRepository @Inject constructor(
     suspend fun setLastServerId(id: Long) = store.edit { it[LAST_SERVER_ID] = id }
     suspend fun setXrayLogLevel(level: XrayLogLevel) = store.edit { prefs ->
         prefs[XRAY_LOG_LEVEL] = level.value
+        prefs[LAST_XRAY_LOG_LEVEL] = level.value
     }
     suspend fun setDefaultOutbound(outbound: XrayOutbound) = store.edit { prefs ->
         prefs[DEFAULT_OUTBOUND] = outbound.tag
@@ -124,6 +130,15 @@ class SettingsRepository @Inject constructor(
         prefs[LAUNCHER_ICON] = icon.value
     }
     suspend fun setShowAdvancedOptions(enabled: Boolean) = store.edit { prefs ->
+        val wasEnabled = prefs[SHOW_ADVANCED_OPTIONS] ?: false
+        if (enabled) {
+            prefs[XRAY_LOG_LEVEL] = prefs[LAST_XRAY_LOG_LEVEL] ?: XrayLogLevel.default.value
+        } else {
+            if (wasEnabled) {
+                prefs[LAST_XRAY_LOG_LEVEL] = XrayLogLevel.fromValue(prefs[XRAY_LOG_LEVEL]).value
+            }
+            prefs[XRAY_LOG_LEVEL] = XrayLogLevel.None.value
+        }
         prefs[SHOW_ADVANCED_OPTIONS] = enabled
     }
     suspend fun setAppSpecificServerNoteShown(shown: Boolean) = store.edit { prefs ->
@@ -177,10 +192,13 @@ class SettingsRepository @Inject constructor(
             map["auto_connect"]?.let { prefs[AUTO_CONNECT] = it.toBooleanStrictOrNull() ?: false }
             prefs[BYPASS_LAN] = map["bypass_lan"]?.toBooleanStrictOrNull() ?: true
             map["last_server_id"]?.let { prefs[LAST_SERVER_ID] = it.toLongOrNull() ?: -1L }
-            prefs[XRAY_LOG_LEVEL] = XrayLogLevel.fromValue(map["xray_log_level"]).value
+            val showAdvancedOptions = map["show_advanced_options"]?.toBooleanStrictOrNull() ?: false
+            val lastXrayLogLevel = XrayLogLevel.fromValue(map["last_xray_log_level"] ?: map["xray_log_level"])
+            prefs[LAST_XRAY_LOG_LEVEL] = lastXrayLogLevel.value
+            prefs[XRAY_LOG_LEVEL] = if (showAdvancedOptions) lastXrayLogLevel.value else XrayLogLevel.None.value
             prefs[DEFAULT_OUTBOUND] = XrayOutbound.fromTag(map["default_outbound"]).tag
             prefs[LAUNCHER_ICON] = LauncherIcon.fromValue(map["launcher_icon"]).value
-            prefs[SHOW_ADVANCED_OPTIONS] = map["show_advanced_options"]?.toBooleanStrictOrNull() ?: false
+            prefs[SHOW_ADVANCED_OPTIONS] = showAdvancedOptions
             prefs[APP_SPECIFIC_SERVER_NOTE_SHOWN] =
                 map["app_specific_server_note_shown"]?.toBooleanStrictOrNull() ?: false
             map["geoip_url"]?.takeIf { it.isNotBlank() }?.let { prefs[GEOIP_URL] = it }

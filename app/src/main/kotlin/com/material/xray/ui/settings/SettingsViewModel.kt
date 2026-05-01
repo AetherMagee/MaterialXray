@@ -134,7 +134,9 @@ class SettingsViewModel @Inject constructor(
         launcherIconManager.apply(icon)
     }
     fun setShowAdvancedOptions(enabled: Boolean) = viewModelScope.launch {
+        if (enabled == showAdvancedOptions.value) return@launch
         settingsRepo.setShowAdvancedOptions(enabled)
+        reloadActiveConnectionIfConnected()
     }
 
     fun setGeoipUrl(url: String) = viewModelScope.launch { settingsRepo.setGeoipUrl(url) }
