@@ -152,6 +152,34 @@ class ConfigGeneratorTest {
     }
 
     @Test
+    fun `adds domestic DNS for direct domains and routes it directly`() {
+        val config = generator.generate(
+            vlessReality,
+            dnsServers = "1.1.1.1",
+            domesticDnsServers = "77.88.8.8,77.88.8.1",
+            routingRules = RoutingRuleCatalog.defaults(),
+        )
+        val json = Json.parseToJsonElement(config).jsonObject
+
+        val servers = json["dns"]!!.jsonObject["servers"]!!.jsonArray
+        val domesticServers = servers.mapNotNull { it as? JsonObject }
+            .filter { it["tag"]?.jsonPrimitive?.content == "domestic-dns" }
+        assertEquals(2, domesticServers.size)
+        assertEquals("77.88.8.8", domesticServers.first()["address"]!!.jsonPrimitive.content)
+        val domesticDomains = domesticServers.first()["domains"]!!.jsonArray.map { it.jsonPrimitive.content }
+        assertTrue(domesticDomains.contains("geosite:private"))
+        assertTrue(domesticDomains.contains("domain:ru"))
+        assertTrue(domesticDomains.contains("geosite:category-ru"))
+        assertTrue(domesticServers.first()["skipFallback"]!!.jsonPrimitive.boolean)
+
+        val domesticDnsRoute = json["routing"]!!.jsonObject["rules"]!!.jsonArray.firstOrNull {
+            it.jsonObject["inboundTag"]?.jsonArray?.singleOrNull()?.jsonPrimitive?.content == "domestic-dns"
+        }
+        assertNotNull("Domestic DNS queries should be routed directly", domesticDnsRoute)
+        assertEquals("direct", domesticDnsRoute!!.jsonObject["outboundTag"]!!.jsonPrimitive.content)
+    }
+
+    @Test
     fun `includes enabled built in routing rules`() {
         val routingRules = RoutingRuleCatalog.defaults()
         val config = generator.generate(vlessReality, routingRules = routingRules)
@@ -295,4 +323,5 @@ class ConfigGeneratorTest {
 
         assertTrue("User routing rules should be emitted before default selected proxy fallback", ruRuleIndex in 0 until fallbackIndex)
     }
+
 }

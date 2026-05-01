@@ -34,3 +34,10 @@ data class ServerConfig(
         val shortId: String = "",
     )
 }
+
+fun ServerConfig.endpointSummary(): String =
+    listOf(
+        protocol.displayName.lowercase(),
+        transport.type.lowercase(),
+        security.type.lowercase(),
+    ).joinToString(" • ")

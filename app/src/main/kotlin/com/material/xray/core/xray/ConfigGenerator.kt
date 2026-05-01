@@ -24,6 +24,7 @@ class ConfigGenerator {
         tunName: String = "xray0",
         fwmark: Int = 255,
         dnsServers: String = "1.1.1.1,8.8.8.8",
+        domesticDnsServers: String = "",
         logLevel: XrayLogLevel = XrayLogLevel.default,
         defaultOutbound: XrayOutbound = XrayOutbound.default,
         bypassLan: Boolean = true,
@@ -37,6 +38,7 @@ class ConfigGenerator {
                 tunName = tunName,
                 fwmark = fwmark,
                 dnsServers = dnsServers,
+                domesticDnsServers = domesticDnsServers,
                 logLevel = logLevel,
                 defaultOutbound = defaultOutbound,
                 bypassLan = bypassLan,
@@ -51,7 +53,7 @@ class ConfigGenerator {
                 put("access", "none")
                 put("loglevel", logLevel.value)
             })
-            put("dns", buildDns(dnsServers))
+            put("dns", buildDns(dnsServers, domesticDnsServers, routingRules, bypassLan))
             put("inbounds", buildJsonArray {
                 add(buildTunInbound(tunName, "tun-in"))
                 appProxyRoutes.forEach { route ->
@@ -70,7 +72,7 @@ class ConfigGenerator {
                     },
                 ).forEach { add(it) }
             })
-            put("routing", buildRouting(routingRules, appProxyRoutes, bypassLan))
+            put("routing", buildRouting(routingRules, appProxyRoutes, bypassLan, domesticDnsServers))
         }
         return json.encodeToString(JsonObject.serializer(), config)
     }
@@ -80,6 +82,7 @@ class ConfigGenerator {
         tunName: String = "xray0",
         fwmark: Int = 255,
         dnsServers: String = "1.1.1.1,8.8.8.8",
+        domesticDnsServers: String = "",
         logLevel: XrayLogLevel = XrayLogLevel.default,
         defaultOutbound: XrayOutbound = XrayOutbound.default,
         bypassLan: Boolean = true,
@@ -175,8 +178,8 @@ class ConfigGenerator {
             put("access", "none")
             put("loglevel", logLevel.value)
         }
-        original["dns"] = buildDns(dnsServers)
-        original["routing"] = buildRouting(routingRules, appProxyRoutes, bypassLan)
+        original["dns"] = buildDns(dnsServers, domesticDnsServers, routingRules, bypassLan)
+        original["routing"] = buildRouting(routingRules, appProxyRoutes, bypassLan, domesticDnsServers)
 
         return json.encodeToString(JsonObject.serializer(), JsonObject(original))
     }
@@ -395,16 +398,45 @@ class ConfigGenerator {
         }
     }
 
-    private fun buildDns(servers: String) = buildJsonObject {
+    private fun buildDns(
+        servers: String,
+        domesticServers: String = "",
+        routingRules: List<RoutingRule> = emptyList(),
+        bypassLan: Boolean = false,
+    ) = buildJsonObject {
+        val domesticDomains = directDomains(routingRules, bypassLan)
         put("servers", buildJsonArray {
             servers.split(",").map { it.trim() }.filter { it.isNotEmpty() }.forEach { add(it) }
+            if (domesticDomains.isNotEmpty()) {
+                domesticServers.split(",").map { it.trim() }.filter { it.isNotEmpty() }.forEach { domesticServer ->
+                    add(buildJsonObject {
+                        put("address", domesticServer)
+                        put("domains", buildJsonArray { domesticDomains.forEach { add(it) } })
+                        put("skipFallback", true)
+                        put("tag", DOMESTIC_DNS_TAG)
+                    })
+                }
+            }
         })
     }
+
+    private fun directDomains(routingRules: List<RoutingRule>, bypassLan: Boolean): List<String> =
+        buildSet {
+            if (bypassLan) add("geosite:private")
+            routingRules
+                .asSequence()
+                .filter { it.enabled && it.outboundTag == "direct" }
+                .flatMap { it.domains.asSequence() }
+                .map { it.trim() }
+                .filter { it.isNotEmpty() }
+                .forEach(::add)
+        }.toList()
 
     private fun buildRouting(
         routingRules: List<RoutingRule>,
         appProxyRoutes: List<AppProxyRoute> = emptyList(),
         bypassLan: Boolean = true,
+        domesticDnsServers: String = "",
     ) = buildJsonObject {
         put("domainStrategy", "IPOnDemand")
         put("rules", buildJsonArray {
@@ -417,6 +449,13 @@ class ConfigGenerator {
                 put("port", "53")
                 put("outboundTag", "dns-out")
             })
+            if (domesticDnsServers.isNotBlank()) {
+                add(buildJsonObject {
+                    put("type", "field")
+                    put("inboundTag", buildJsonArray { add(DOMESTIC_DNS_TAG) })
+                    put("outboundTag", "direct")
+                })
+            }
             appProxyRoutes.filterNot { it.applyRoutingRules }.forEach { route ->
                 add(buildJsonObject {
                     put("type", "field")
@@ -492,6 +531,7 @@ class ConfigGenerator {
     }
 
     private companion object {
+        const val DOMESTIC_DNS_TAG = "domestic-dns"
         val SPECIAL_OUTBOUND_PROTOCOLS = setOf("freedom", "dns", "blackhole")
     }
 }

@@ -49,6 +49,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.material.xray.data.db.entity.ServerEntity
 import com.material.xray.data.db.entity.SubscriptionEntity
 import com.material.xray.model.ConnectionState
+import com.material.xray.model.endpointSummary
 import com.material.xray.ui.components.ScrolledTopAppBar
 import java.time.Duration
 import java.time.Instant
@@ -88,9 +89,7 @@ fun HomeScreen(viewModel: HomeViewModel = hiltViewModel()) {
     var autoUpdateSubscription by remember { mutableStateOf<SubscriptionEntity?>(null) }
     val selectedServerName = remember(selectedServer) { selectedServer?.name ?: "No server selected" }
     val selectedServerDetail = remember(selectedServer) {
-        selectedServer?.let {
-            "${it.protocol.displayName.uppercase()} | ${it.transport.type.uppercase()} | ${it.security.type.uppercase()}"
-        } ?: "Select a server below"
+        selectedServer?.endpointSummary() ?: "Select a server below"
     }
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -117,6 +116,7 @@ fun HomeScreen(viewModel: HomeViewModel = hiltViewModel()) {
 
     Scaffold(
         modifier = Modifier.nestedScroll(topAppBarScrollBehavior.nestedScrollConnection),
+        contentWindowInsets = WindowInsets(0.dp),
         topBar = {
             ScrolledTopAppBar(
                 title = "Material Xray",

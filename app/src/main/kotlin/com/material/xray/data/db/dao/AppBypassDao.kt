@@ -6,10 +6,10 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface AppBypassDao {
-    @Query("SELECT * FROM app_bypass ORDER BY packageName")
+    @Query("SELECT * FROM app_bypass ORDER BY profileId, packageName")
     fun observeAll(): Flow<List<AppBypassEntity>>
 
-    @Query("SELECT * FROM app_bypass ORDER BY packageName")
+    @Query("SELECT * FROM app_bypass ORDER BY profileId, packageName")
     suspend fun getAll(): List<AppBypassEntity>
 
     @Query("SELECT * FROM app_bypass WHERE excluded = 1")
@@ -24,8 +24,8 @@ interface AppBypassDao {
     @Upsert
     suspend fun upsert(entity: AppBypassEntity)
 
-    @Query("DELETE FROM app_bypass WHERE packageName = :packageName")
-    suspend fun delete(packageName: String)
+    @Query("DELETE FROM app_bypass WHERE profileId = :profileId AND packageName = :packageName")
+    suspend fun delete(profileId: Int, packageName: String)
 
     @Query("DELETE FROM app_bypass")
     suspend fun deleteAll()

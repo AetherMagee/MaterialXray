@@ -1,6 +1,9 @@
 package com.material.xray.core.xray
 
 import com.material.xray.core.root.RootShell
+import com.material.xray.core.app.appUidRangeForProfile
+import com.material.xray.core.app.isApplicationUid
+import com.material.xray.core.app.profileIdForUid
 import kotlinx.coroutines.delay
 
 class TunManager(private val shell: RootShell) {
@@ -99,6 +102,7 @@ class TunManager(private val shell: RootShell) {
         bypassUids: Set<Int>,
         appTunRoutes: List<AppTunRoute> = emptyList(),
         managedAppRouteCount: Int = appTunRoutes.size,
+        routeProfileIds: Set<Int> = setOf(0),
     ): RoutingResult {
         val managedAppTables = appRouteTables(routeTable, managedAppRouteCount)
             .plus(appTunRoutes.map { it.routeTable })
@@ -130,7 +134,15 @@ class TunManager(private val shell: RootShell) {
         }
 
         val appUids = appTunRoutes.flatMap { it.uids }.toSet()
-        val defaultRoutingResult = addUidRoutingRules(routeTable, bypassUids + appUids)
+        val routedProfileIds = (routeProfileIds + (bypassUids + appUids).map(::profileIdForUid))
+            .filter { it >= 0 }
+            .toSet()
+            .ifEmpty { setOf(0) }
+        val defaultRoutingResult = addUidRoutingRules(
+            routeTable = routeTable,
+            bypassUids = bypassUids + appUids,
+            profileIds = routedProfileIds,
+        )
         if (!defaultRoutingResult.success) return defaultRoutingResult
 
         appTunRoutes.forEach { route ->
@@ -172,18 +184,27 @@ class TunManager(private val shell: RootShell) {
         shell.execute(linkDeleteCommands.joinToString("; "))
     }
 
-    private suspend fun addUidRoutingRules(routeTable: Int, bypassUids: Set<Int>): RoutingResult {
-        val excluded = bypassUids.filter { it in APP_UID_MIN..APP_UID_MAX }.toSortedSet()
+    private suspend fun addUidRoutingRules(
+        routeTable: Int,
+        bypassUids: Set<Int>,
+        profileIds: Set<Int>,
+    ): RoutingResult {
         val commands = mutableListOf<String>()
-        var start = APP_UID_MIN
-        for (uid in excluded) {
-            if (start < uid) {
-                commands += uidRoutingRuleCommand(start, uid - 1, routeTable)
+        profileIds.toSortedSet().forEach { profileId ->
+            val profileRange = appUidRangeForProfile(profileId)
+            val excluded = bypassUids
+                .filter { it in profileRange }
+                .toSortedSet()
+            var start = profileRange.first
+            for (uid in excluded) {
+                if (start < uid) {
+                    commands += uidRoutingRuleCommand(start, uid - 1, routeTable)
+                }
+                start = uid + 1
             }
-            start = uid + 1
-        }
-        if (start <= APP_UID_MAX) {
-            commands += uidRoutingRuleCommand(start, APP_UID_MAX, routeTable)
+            if (start <= profileRange.last) {
+                commands += uidRoutingRuleCommand(start, profileRange.last, routeTable)
+            }
         }
         return executeRoutingCommands(commands)
     }
@@ -193,7 +214,7 @@ class TunManager(private val shell: RootShell) {
         uids: Set<Int>,
         priority: Int,
     ): RoutingResult {
-        val included = uids.filter { it in APP_UID_MIN..APP_UID_MAX }.toSortedSet()
+        val included = uids.filter(::isApplicationUid).toSortedSet()
         if (included.isEmpty()) return RoutingResult(success = true)
 
         return executeRoutingCommands(
@@ -308,8 +329,6 @@ class TunManager(private val shell: RootShell) {
     }
 
     companion object {
-        private const val APP_UID_MIN = 10000
-        private const val APP_UID_MAX = 99999
         private const val APP_ROUTE_TABLE_OFFSET = 10
         private const val MAX_APP_TUN_ROUTES = 64
         private const val APP_UID_RULE_PRIORITY = 12000

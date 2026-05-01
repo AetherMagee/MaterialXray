@@ -1,10 +1,12 @@
 package com.material.xray.service
 
 import android.content.Context
-import android.content.pm.PackageManager
 import android.os.Build
 import android.os.PowerManager
 import android.os.SystemClock
+import com.material.xray.core.app.AppInventory
+import com.material.xray.core.app.appKey
+import com.material.xray.core.app.profileIdForUid
 import com.material.xray.core.network.CaptivePortalDetector
 import com.material.xray.core.root.RootShell
 import com.material.xray.core.root.RootShell.NetworkNamespace
@@ -26,6 +28,7 @@ class ConnectionManager(
     private val geoDataManager: GeoDataManager,
     private val appBypassDao: AppBypassDao,
     private val serverRepository: ServerRepository,
+    private val appInventory: AppInventory,
     private val stateHolder: ConnectionStateHolder,
     private val log: LogBuffer,
     private val onXrayLogReady: () -> Unit = {},
@@ -42,6 +45,7 @@ class ConnectionManager(
         val proxyRoutes: List<ConfigGenerator.AppProxyRoute>,
         val tunRoutes: List<TunManager.AppTunRoute>,
         val proxyServerIds: List<Long>,
+        val routeProfileIds: Set<Int>,
     )
 
     suspend fun connect(
@@ -50,6 +54,7 @@ class ConnectionManager(
         fwmark: Int,
         routeTable: Int,
         dnsServers: String,
+        domesticDnsServers: String,
         logLevel: XrayLogLevel,
         defaultOutbound: XrayOutbound,
         bypassLan: Boolean,
@@ -194,14 +199,15 @@ class ConnectionManager(
             }
 
             val configJson = configGenerator.generate(
-                xrayServer,
-                tunName,
-                fwmark,
-                dnsServers,
-                logLevel,
-                defaultOutbound,
-                bypassLan,
-                routingRules,
+                server = xrayServer,
+                tunName = tunName,
+                fwmark = fwmark,
+                dnsServers = dnsServers,
+                domesticDnsServers = domesticDnsServers,
+                logLevel = logLevel,
+                defaultOutbound = defaultOutbound,
+                bypassLan = bypassLan,
+                routingRules = routingRules,
                 appProxyRoutes = appRoutingPlan.proxyRoutes,
                 physicalInterface = physicalRoute.dev,
             )
@@ -284,6 +290,7 @@ class ConnectionManager(
                     physicalRoute = physicalRoute,
                     bypassUids = bypassUids,
                     appTunRoutes = appRoutingPlan.tunRoutes,
+                    routeProfileIds = appRoutingPlan.routeProfileIds,
                 )
             }
             if (!routingResult.success) {
@@ -394,6 +401,7 @@ class ConnectionManager(
                 bypassUids = runtimeBypassUids(appRoutingPlan.directUids),
                 appTunRoutes = appRoutingPlan.tunRoutes,
                 managedAppRouteCount = persistedState.appProxyServerIds.size,
+                routeProfileIds = appRoutingPlan.routeProfileIds,
             )
         }
         if (!routingResult.success) {
@@ -484,6 +492,7 @@ class ConnectionManager(
                 bypassUids = runtimeBypassUids(appRoutingPlan.directUids),
                 appTunRoutes = appRoutingPlan.tunRoutes,
                 managedAppRouteCount = persistedState.appProxyServerIds.size,
+                routeProfileIds = appRoutingPlan.routeProfileIds,
             )
         }
         if (!routingResult.success) {
@@ -589,31 +598,39 @@ class ConnectionManager(
         defaultProxyServer: ServerConfig? = null,
     ): AppRoutingPlan {
         val assignments = appBypassDao.getAll()
-        val assignmentUids = assignments
-            .map { it.uid }
+        val appSnapshot = appInventory.loadSnapshot()
+        val installedAppsByKey = appSnapshot.apps.associateBy { it.appKey }
+        val assignmentsWithUid = assignments.mapNotNull { assignment ->
+            val currentUid = installedAppsByKey[appKey(assignment.profileId, assignment.packageName)]?.uid
+            val uid = currentUid?.takeIf { it > 0 } ?: assignment.uid
+            if (uid > 0) assignment to uid else null
+        }
+        val assignmentUids = assignmentsWithUid
+            .map { (_, uid) -> uid }
             .filter { it > 0 }
             .toSet()
 
-        val directUids = assignments
-            .filter { it.excluded }
-            .map { it.uid }
+        val directUids = assignmentsWithUid
+            .filter { (assignment, _) -> assignment.excluded }
+            .map { (_, uid) -> uid }
             .filter { it > 0 }
             .toSet()
 
-        val defaultProxyUids = assignments
-            .filter {
-                !it.excluded &&
-                    it.serverId == null &&
-                    it.routeMode != ROUTE_MODE_DEFAULT_OUTBOUND
+        val defaultProxyUids = assignmentsWithUid
+            .filter { (assignment, _) ->
+                !assignment.excluded &&
+                    assignment.serverId == null &&
+                    assignment.routeMode != ROUTE_MODE_DEFAULT_OUTBOUND
             }
-            .map { it.uid }
+            .map { (_, uid) -> uid }
             .filter { it > 0 }
-            .toSet() + defaultSelectedUidsForUnassignedApps(assignmentUids)
+            .toSet() + defaultSelectedUidsForUnassignedApps(appSnapshot.apps.map { it.uid }, assignmentUids)
 
-        val proxyAssignments = assignments
-            .filter { it.uid > 0 && it.serverId != null }
-            .groupBy { requireNotNull(it.serverId) }
+        val proxyAssignments = assignmentsWithUid
+            .filter { (assignment, uid) -> uid > 0 && assignment.serverId != null }
+            .groupBy { (assignment, _) -> requireNotNull(assignment.serverId) }
             .toSortedMap()
+        val routeProfileIds = (appSnapshot.profileIds + assignmentUids.map(::profileIdForUid)).ifEmpty { setOf(0) }
 
         if (defaultProxyUids.isEmpty() && proxyAssignments.isEmpty()) {
             return AppRoutingPlan(
@@ -621,6 +638,7 @@ class ConnectionManager(
                 proxyRoutes = emptyList(),
                 tunRoutes = emptyList(),
                 proxyServerIds = emptyList(),
+                routeProfileIds = routeProfileIds,
             )
         }
 
@@ -673,7 +691,7 @@ class ConnectionManager(
         }
 
         proxyAssignments.entries.take(MAX_APP_PROXY_ROUTES - tunRoutes.size).forEach { (serverId, assignments) ->
-            val uids = assignments.map { it.uid }.filter { it > 0 }.toSet()
+            val uids = assignments.map { (_, uid) -> uid }.filter { it > 0 }.toSet()
             if (uids.isEmpty()) return@forEach
             val routeTunName = addTunRoute(serverId, uids)
 
@@ -727,6 +745,7 @@ class ConnectionManager(
             proxyRoutes = proxyRoutes,
             tunRoutes = tunRoutes,
             proxyServerIds = proxyServerIds,
+            routeProfileIds = routeProfileIds,
         )
     }
 
@@ -898,16 +917,13 @@ class ConnectionManager(
         }
     }
 
-    private fun defaultSelectedUidsForUnassignedApps(assignmentUids: Set<Int>): Set<Int> =
-        runCatching {
-            context.packageManager
-                .getInstalledApplications(PackageManager.GET_META_DATA)
-                .asSequence()
-                .filterNot { it.packageName == context.packageName }
-                .map { it.uid }
-                .filter { it > 0 && it !in assignmentUids }
-                .toSet()
-        }.getOrDefault(emptySet())
+    private fun defaultSelectedUidsForUnassignedApps(
+        installedUids: List<Int>,
+        assignmentUids: Set<Int>,
+    ): Set<Int> = installedUids
+        .asSequence()
+        .filter { it > 0 && it !in assignmentUids }
+        .toSet()
 
     companion object {
         private const val DEFAULT_MEMORY_PAGE_KB = 4L

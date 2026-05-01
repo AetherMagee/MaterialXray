@@ -81,16 +81,23 @@ fun AppBypassContent(viewModel: AppsViewModel = hiltViewModel()) {
             LazyColumn(modifier = Modifier.fillMaxSize()) {
                 items(
                     items = apps,
-                    key = { it.packageName },
+                    key = { it.appKey },
                     contentType = { "app" },
                 ) { app ->
                     ListItem(
                         headlineContent = { Text(app.name) },
                         supportingContent = {
-                            Text(app.packageName, style = MaterialTheme.typography.bodySmall)
+                            Text(
+                                text = if (app.workProfile) {
+                                    "${app.packageName} • ${app.profileLabel}"
+                                } else {
+                                    app.packageName
+                                },
+                                style = MaterialTheme.typography.bodySmall,
+                            )
                         },
                         leadingContent = {
-                            val iconBitmap = remember(app.packageName, app.icon, iconPixelSize) {
+                            val iconBitmap = remember(app.appKey, app.icon, iconPixelSize) {
                                 app.icon?.toBitmap(iconPixelSize, iconPixelSize)?.asImageBitmap()
                             }
                             iconBitmap?.let { bitmap ->
@@ -335,7 +342,7 @@ private fun AppRoutePickerDialog(
     onDismiss: () -> Unit,
     onSelected: (AppRouteOption) -> Unit,
 ) {
-    var query by remember(app.packageName) { mutableStateOf("") }
+    var query by remember(app.appKey) { mutableStateOf("") }
     val filteredOptions by remember(routeOptions, query) {
         derivedStateOf {
             val trimmed = query.trim()

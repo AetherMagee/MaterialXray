@@ -8,6 +8,7 @@ import com.material.xray.model.RoutingRule
 import com.material.xray.model.RoutingRuleCatalog
 import com.material.xray.model.XrayOutbound
 import com.material.xray.model.XrayLogLevel
+import com.material.xray.model.LauncherIcon
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -21,7 +22,7 @@ private val Context.dataStore by preferencesDataStore(name = "settings")
 
 @Singleton
 class SettingsRepository @Inject constructor(
-    @ApplicationContext private val context: Context,
+    @param:ApplicationContext private val context: Context,
 ) {
     private val store get() = context.dataStore
     private val json = Json { ignoreUnknownKeys = true }
@@ -29,6 +30,8 @@ class SettingsRepository @Inject constructor(
     companion object {
         val TUN_NAME = stringPreferencesKey("tun_name")
         val DNS_SERVERS = stringPreferencesKey("dns_servers")
+        val DOMESTIC_DNS_SERVERS = stringPreferencesKey("domestic_dns_servers")
+        val LATENCY_DNS_SERVERS = stringPreferencesKey("latency_dns_servers")
         val FWMARK = intPreferencesKey("fwmark")
         val ROUTE_TABLE = intPreferencesKey("route_table")
         val AUTO_CONNECT = booleanPreferencesKey("auto_connect")
@@ -38,6 +41,7 @@ class SettingsRepository @Inject constructor(
         val GEOSITE_URL = stringPreferencesKey("geosite_url")
         val XRAY_LOG_LEVEL = stringPreferencesKey("xray_log_level")
         val DEFAULT_OUTBOUND = stringPreferencesKey("default_outbound")
+        val LAUNCHER_ICON = stringPreferencesKey("launcher_icon")
         val APP_SPECIFIC_SERVER_NOTE_SHOWN = booleanPreferencesKey("app_specific_server_note_shown")
         val ROUTING_RULES = stringPreferencesKey("routing_rules")
         val ROUTING_RULES_VERSION = intPreferencesKey("routing_rules_version")
@@ -50,10 +54,17 @@ class SettingsRepository @Inject constructor(
             "https://github.com/v2fly/geoip/releases/latest/download/geoip.dat"
         const val DEFAULT_GEOSITE_URL =
             "https://github.com/v2fly/domain-list-community/releases/latest/download/dlc.dat"
+        const val DEFAULT_DNS_SERVERS = "1.1.1.1,8.8.8.8"
+        const val DEFAULT_DOMESTIC_DNS_SERVERS = "77.88.8.8,77.88.8.1"
+        const val DEFAULT_LATENCY_DNS_SERVERS = "77.88.8.8,77.88.8.1"
     }
 
     val tunName: Flow<String> = store.data.map { it[TUN_NAME] ?: "xray0" }
-    val dnsServers: Flow<String> = store.data.map { it[DNS_SERVERS] ?: "1.1.1.1,8.8.8.8" }
+    val dnsServers: Flow<String> = store.data.map { it[DNS_SERVERS] ?: DEFAULT_DNS_SERVERS }
+    val domesticDnsServers: Flow<String> = store.data.map {
+        it[DOMESTIC_DNS_SERVERS] ?: DEFAULT_DOMESTIC_DNS_SERVERS
+    }
+    val latencyDnsServers: Flow<String> = store.data.map { it[LATENCY_DNS_SERVERS] ?: DEFAULT_LATENCY_DNS_SERVERS }
     val fwmark: Flow<Int> = store.data.map { it[FWMARK] ?: 255 }
     val routeTable: Flow<Int> = store.data.map { it[ROUTE_TABLE] ?: 100 }
     val autoConnect: Flow<Boolean> = store.data.map { it[AUTO_CONNECT] ?: false }
@@ -64,6 +75,9 @@ class SettingsRepository @Inject constructor(
     }
     val defaultOutbound: Flow<XrayOutbound> = store.data.map { prefs ->
         XrayOutbound.fromTag(prefs[DEFAULT_OUTBOUND])
+    }
+    val launcherIcon: Flow<LauncherIcon> = store.data.map { prefs ->
+        LauncherIcon.fromValue(prefs[LAUNCHER_ICON])
     }
     val appSpecificServerNoteShown: Flow<Boolean> = store.data.map { prefs ->
         prefs[APP_SPECIFIC_SERVER_NOTE_SHOWN] ?: false
@@ -89,6 +103,8 @@ class SettingsRepository @Inject constructor(
 
     suspend fun setTunName(name: String) = store.edit { it[TUN_NAME] = name }
     suspend fun setDnsServers(servers: String) = store.edit { it[DNS_SERVERS] = servers }
+    suspend fun setDomesticDnsServers(servers: String) = store.edit { it[DOMESTIC_DNS_SERVERS] = servers }
+    suspend fun setLatencyDnsServers(servers: String) = store.edit { it[LATENCY_DNS_SERVERS] = servers }
     suspend fun setFwmark(mark: Int) = store.edit { it[FWMARK] = mark }
     suspend fun setRouteTable(table: Int) = store.edit { it[ROUTE_TABLE] = table }
     suspend fun setAutoConnect(enabled: Boolean) = store.edit { it[AUTO_CONNECT] = enabled }
@@ -99,6 +115,9 @@ class SettingsRepository @Inject constructor(
     }
     suspend fun setDefaultOutbound(outbound: XrayOutbound) = store.edit { prefs ->
         prefs[DEFAULT_OUTBOUND] = outbound.tag
+    }
+    suspend fun setLauncherIcon(icon: LauncherIcon) = store.edit { prefs ->
+        prefs[LAUNCHER_ICON] = icon.value
     }
     suspend fun setAppSpecificServerNoteShown(shown: Boolean) = store.edit { prefs ->
         prefs[APP_SPECIFIC_SERVER_NOTE_SHOWN] = shown
@@ -144,6 +163,8 @@ class SettingsRepository @Inject constructor(
             prefs.clear()
             map["tun_name"]?.let { prefs[TUN_NAME] = it }
             map["dns_servers"]?.let { prefs[DNS_SERVERS] = it }
+            map["domestic_dns_servers"]?.let { prefs[DOMESTIC_DNS_SERVERS] = it }
+            map["latency_dns_servers"]?.let { prefs[LATENCY_DNS_SERVERS] = it }
             map["fwmark"]?.let { prefs[FWMARK] = it.toIntOrNull() ?: 255 }
             map["route_table"]?.let { prefs[ROUTE_TABLE] = it.toIntOrNull() ?: 100 }
             map["auto_connect"]?.let { prefs[AUTO_CONNECT] = it.toBooleanStrictOrNull() ?: false }
@@ -151,6 +172,7 @@ class SettingsRepository @Inject constructor(
             map["last_server_id"]?.let { prefs[LAST_SERVER_ID] = it.toLongOrNull() ?: -1L }
             prefs[XRAY_LOG_LEVEL] = XrayLogLevel.fromValue(map["xray_log_level"]).value
             prefs[DEFAULT_OUTBOUND] = XrayOutbound.fromTag(map["default_outbound"]).tag
+            prefs[LAUNCHER_ICON] = LauncherIcon.fromValue(map["launcher_icon"]).value
             prefs[APP_SPECIFIC_SERVER_NOTE_SHOWN] =
                 map["app_specific_server_note_shown"]?.toBooleanStrictOrNull() ?: false
             map["geoip_url"]?.takeIf { it.isNotBlank() }?.let { prefs[GEOIP_URL] = it }

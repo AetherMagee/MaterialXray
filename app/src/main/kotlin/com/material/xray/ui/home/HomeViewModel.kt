@@ -14,6 +14,7 @@ import com.material.xray.data.repository.SubscriptionRefreshCoordinator
 import com.material.xray.data.repository.SubscriptionRepository
 import com.material.xray.model.ConnectionState
 import com.material.xray.model.ServerConfig
+import com.material.xray.model.endpointSummary
 import com.material.xray.service.ConnectionStateHolder
 import com.material.xray.service.RoutingChangeManager
 import com.material.xray.service.SubscriptionUpdateScheduler
@@ -274,9 +275,9 @@ class HomeViewModel @Inject constructor(
         val summary = endpointSummaryCache.getOrPut(configJson) {
             runCatching {
                 val config = json.decodeFromString<ServerConfig>(configJson)
-                "${config.protocol.displayName.uppercase()} | ${config.transport.type.uppercase()} | ${config.security.type.uppercase()}"
+                config.endpointSummary()
             }.getOrElse {
-                "$protocol | UNKNOWN | UNKNOWN"
+                "${protocol.lowercase()} • unknown • unknown"
             }
         }
         return ServerListItem(entity = this, endpointSummary = summary, latencyMs = latencyMs)

@@ -15,6 +15,7 @@ import android.net.NetworkRequest
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import com.material.xray.MainActivity
+import com.material.xray.core.app.AppInventory
 import com.material.xray.core.network.CaptivePortalDetector
 import com.material.xray.core.root.RootShell
 import com.material.xray.core.xray.ConfigGenerator
@@ -47,6 +48,7 @@ class XrayService : Service() {
     @Inject lateinit var connectionStateHolder: ConnectionStateHolder
     @Inject lateinit var logBuffer: LogBuffer
     @Inject lateinit var geoDataManager: GeoDataManager
+    @Inject lateinit var appInventory: AppInventory
 
     private lateinit var connectionManager: ConnectionManager
     private lateinit var xrayLogStreamer: XrayLogStreamer
@@ -75,6 +77,7 @@ class XrayService : Service() {
             geoDataManager = geoDataManager,
             appBypassDao = appBypassDao,
             serverRepository = serverRepository,
+            appInventory = appInventory,
             stateHolder = connectionStateHolder,
             log = logBuffer,
             onXrayLogReady = { startLogTail() },
@@ -190,6 +193,7 @@ class XrayService : Service() {
         val fwmark = settingsRepo.fwmark.first()
         val routeTable = settingsRepo.routeTable.first()
         val dns = settingsRepo.dnsServers.first()
+        val domesticDns = settingsRepo.domesticDnsServers.first()
         val logLevel = settingsRepo.xrayLogLevel.first()
         val defaultOutbound = settingsRepo.defaultOutbound.first()
         val bypassLan = settingsRepo.bypassLan.first()
@@ -200,6 +204,7 @@ class XrayService : Service() {
             fwmark = fwmark,
             routeTable = routeTable,
             dnsServers = dns,
+            domesticDnsServers = domesticDns,
             logLevel = logLevel,
             defaultOutbound = defaultOutbound,
             bypassLan = bypassLan,

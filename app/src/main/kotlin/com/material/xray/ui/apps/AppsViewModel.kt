@@ -1,16 +1,17 @@
 package com.material.xray.ui.apps
 
 import android.content.Context
-import android.content.pm.ApplicationInfo
-import android.content.pm.PackageManager
 import android.graphics.drawable.Drawable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.material.xray.core.app.AppInventory
+import com.material.xray.core.app.appKey
 import com.material.xray.data.db.dao.AppBypassDao
 import com.material.xray.data.db.entity.AppBypassEntity
 import com.material.xray.data.db.entity.ServerEntity
 import com.material.xray.data.repository.ServerRepository
 import com.material.xray.data.repository.SettingsRepository
+import com.material.xray.model.endpointSummary
 import com.material.xray.service.PendingRoutingChange
 import com.material.xray.service.RoutingChangeManager
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -22,11 +23,15 @@ import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 data class AppItem(
+    val appKey: String,
     val packageName: String,
     val name: String,
     val uid: Int,
     val icon: Drawable?,
     val systemApp: Boolean,
+    val profileId: Int,
+    val profileLabel: String,
+    val workProfile: Boolean,
     val routeKey: String,
     val routeKind: AppRouteKind,
     val manuallyRouted: Boolean,
@@ -51,11 +56,12 @@ data class AppRouteOption(
 
 @HiltViewModel
 class AppsViewModel @Inject constructor(
-    @ApplicationContext private val context: Context,
+    @param:ApplicationContext private val context: Context,
     private val appBypassDao: AppBypassDao,
     private val serverRepository: ServerRepository,
     private val settingsRepository: SettingsRepository,
     private val routingChangeManager: RoutingChangeManager,
+    private val appInventory: AppInventory,
 ) : ViewModel() {
 
     private val _searchQuery = MutableStateFlow("")
@@ -97,13 +103,13 @@ class AppsViewModel @Inject constructor(
         _showSystemApps,
         routeOptions,
     ) { installed, assignments, query, showSystemApps, options ->
-        val assignmentByPackage = assignments.associateBy { it.packageName }
+        val assignmentByApp = assignments.associateBy { appKey(it.profileId, it.packageName) }
         val serverOptionsById = options
             .filter { it.kind == AppRouteKind.SERVER && it.serverId != null }
             .associateBy { requireNotNull(it.serverId) }
         installed
             .map { app ->
-                val assignment = assignmentByPackage[app.packageName]
+                val assignment = assignmentByApp[app.appKey]
                 val option = app.resolveRouteOption(assignment, serverOptionsById)
                 app.copy(
                     routeKey = option.key,
@@ -115,11 +121,15 @@ class AppsViewModel @Inject constructor(
             }
             .filter { showSystemApps || !it.systemApp }
             .filter {
-                query.isEmpty() || it.name.contains(query, ignoreCase = true) || it.packageName.contains(query, ignoreCase = true)
+                query.isEmpty() ||
+                    it.name.contains(query, ignoreCase = true) ||
+                    it.packageName.contains(query, ignoreCase = true) ||
+                    it.profileLabel.contains(query, ignoreCase = true)
             }
             .sortedWith(
                 compareBy<AppItem> { !it.manuallyRouted }
                     .thenBy { it.name.lowercase() }
+                    .thenBy { it.profileId }
                     .thenBy { it.packageName },
             )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -131,16 +141,19 @@ class AppsViewModel @Inject constructor(
             _isLoadingApps.value = true
             val apps = runCatching {
                 withContext(Dispatchers.IO) {
-                    val pm = context.packageManager
-                    pm.getInstalledApplications(PackageManager.GET_META_DATA)
+                    appInventory.loadInstalledApps()
                         .filterNot { it.packageName == context.packageName }
-                        .map { info ->
+                        .map { app ->
                             AppItem(
-                                packageName = info.packageName,
-                                name = info.loadLabel(pm).toString(),
-                                uid = info.uid,
-                                icon = runCatching { info.loadIcon(pm) }.getOrNull(),
-                                systemApp = info.flags and ApplicationInfo.FLAG_SYSTEM != 0,
+                                appKey = app.appKey,
+                                packageName = app.packageName,
+                                name = app.name,
+                                uid = app.uid,
+                                icon = app.icon,
+                                systemApp = app.systemApp,
+                                profileId = app.profileId,
+                                profileLabel = app.profileLabel,
+                                workProfile = app.workProfile,
                                 routeKey = DEFAULT_ROUTE_OPTION.key,
                                 routeKind = DEFAULT_ROUTE_OPTION.kind,
                                 manuallyRouted = false,
@@ -162,6 +175,7 @@ class AppsViewModel @Inject constructor(
                 AppRouteKind.INHERIT -> appBypassDao.upsert(
                     AppBypassEntity(
                         packageName = app.packageName,
+                        profileId = app.profileId,
                         uid = app.uid,
                         excluded = false,
                         serverId = null,
@@ -172,6 +186,7 @@ class AppsViewModel @Inject constructor(
                 AppRouteKind.DEFAULT -> appBypassDao.upsert(
                     AppBypassEntity(
                         packageName = app.packageName,
+                        profileId = app.profileId,
                         uid = app.uid,
                         excluded = false,
                         serverId = null,
@@ -182,6 +197,7 @@ class AppsViewModel @Inject constructor(
                 AppRouteKind.DIRECT -> appBypassDao.upsert(
                     AppBypassEntity(
                         packageName = app.packageName,
+                        profileId = app.profileId,
                         uid = app.uid,
                         excluded = true,
                         serverId = null,
@@ -194,6 +210,7 @@ class AppsViewModel @Inject constructor(
                     appBypassDao.upsert(
                         AppBypassEntity(
                             packageName = app.packageName,
+                            profileId = app.profileId,
                             uid = app.uid,
                             excluded = false,
                             serverId = serverId,
@@ -225,6 +242,7 @@ class AppsViewModel @Inject constructor(
                 appBypassDao.upsert(
                     AppBypassEntity(
                         packageName = it.packageName,
+                        profileId = it.profileId,
                         uid = it.uid,
                         excluded = true,
                         serverId = null,
@@ -243,6 +261,7 @@ class AppsViewModel @Inject constructor(
                 appBypassDao.upsert(
                     AppBypassEntity(
                         packageName = it.packageName,
+                        profileId = it.profileId,
                         uid = it.uid,
                         excluded = false,
                         serverId = null,
@@ -274,9 +293,7 @@ class AppsViewModel @Inject constructor(
 
     private fun ServerEntity.toRouteOption(): AppRouteOption {
         val config = runCatching { serverRepository.parseConfig(this) }.getOrNull()
-        val description = config?.let {
-            "${it.protocol.displayName.uppercase()} | ${it.transport.type.uppercase()} | ${it.security.type.uppercase()}"
-        } ?: "$protocol | UNKNOWN"
+        val description = config?.endpointSummary() ?: "${protocol.lowercase()} • unknown"
         return AppRouteOption(
             key = serverRouteKey(id),
             title = name,

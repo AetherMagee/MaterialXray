@@ -1,11 +1,11 @@
 package com.material.xray.data.db.entity
 
 import androidx.room.Entity
-import androidx.room.PrimaryKey
 
-@Entity(tableName = "app_bypass")
+@Entity(tableName = "app_bypass", primaryKeys = ["profileId", "packageName"])
 data class AppBypassEntity(
-    @PrimaryKey val packageName: String,
+    val packageName: String,
+    val profileId: Int = 0,
     val uid: Int,
     val excluded: Boolean = true,
     val serverId: Long? = null,

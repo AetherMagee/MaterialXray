@@ -13,7 +13,7 @@ import com.material.xray.data.db.entity.SubscriptionEntity
 
 @Database(
     entities = [ServerEntity::class, SubscriptionEntity::class, AppBypassEntity::class],
-    version = 7,
+    version = 8,
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun serverDao(): ServerDao
@@ -65,6 +65,40 @@ abstract class AppDatabase : RoomDatabase() {
         val MIGRATION_6_7 = object : Migration(6, 7) {
             override fun migrate(database: SupportSQLiteDatabase) {
                 database.execSQL("ALTER TABLE subscriptions ADD COLUMN descriptionHidden INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
+        val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    """
+                    CREATE TABLE app_bypass_new (
+                        packageName TEXT NOT NULL,
+                        profileId INTEGER NOT NULL,
+                        uid INTEGER NOT NULL,
+                        excluded INTEGER NOT NULL,
+                        serverId INTEGER,
+                        manual INTEGER NOT NULL,
+                        routeMode TEXT,
+                        PRIMARY KEY(profileId, packageName)
+                    )
+                    """.trimIndent()
+                )
+                database.execSQL(
+                    """
+                    INSERT INTO app_bypass_new (packageName, profileId, uid, excluded, serverId, manual, routeMode)
+                    SELECT packageName,
+                        CASE WHEN uid >= 100000 THEN uid / 100000 ELSE 0 END,
+                        uid,
+                        excluded,
+                        serverId,
+                        manual,
+                        routeMode
+                    FROM app_bypass
+                    """.trimIndent()
+                )
+                database.execSQL("DROP TABLE app_bypass")
+                database.execSQL("ALTER TABLE app_bypass_new RENAME TO app_bypass")
             }
         }
     }

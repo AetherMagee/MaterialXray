@@ -44,6 +44,7 @@ fun LogsScreen(viewModel: LogsViewModel = hiltViewModel()) {
     }
 
     Scaffold(
+        contentWindowInsets = WindowInsets(0.dp),
         topBar = {
             TopAppBar(
                 title = { Text("Logs") },

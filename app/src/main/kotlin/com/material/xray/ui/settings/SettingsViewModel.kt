@@ -4,6 +4,9 @@ import android.content.Context
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.material.xray.core.app.appKey
+import com.material.xray.core.app.parseAppKey
+import com.material.xray.core.launcher.LauncherIconManager
 import com.material.xray.core.xray.GeoDataAsset
 import com.material.xray.core.xray.GeoDataManager
 import com.material.xray.data.db.dao.AppBypassDao
@@ -14,6 +17,7 @@ import com.material.xray.data.db.entity.SubscriptionEntity
 import com.material.xray.data.repository.SettingsRepository
 import com.material.xray.model.BackupData
 import com.material.xray.model.ConnectionState
+import com.material.xray.model.LauncherIcon
 import com.material.xray.model.XrayLogLevel
 import com.material.xray.model.XrayOutbound
 import com.material.xray.model.toSubscriptionMetadata
@@ -39,6 +43,7 @@ class SettingsViewModel @Inject constructor(
     private val appBypassDao: AppBypassDao,
     private val connectionStateHolder: ConnectionStateHolder,
     private val geoDataManager: GeoDataManager,
+    private val launcherIconManager: LauncherIconManager,
 ) : ViewModel() {
 
     private val json = Json { ignoreUnknownKeys = true; prettyPrint = true }
@@ -48,7 +53,23 @@ class SettingsViewModel @Inject constructor(
 
     val tunName = settingsRepo.tunName.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "xray0")
     val dnsServers =
-        settingsRepo.dnsServers.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "1.1.1.1,8.8.8.8")
+        settingsRepo.dnsServers.stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5000),
+            SettingsRepository.DEFAULT_DNS_SERVERS,
+        )
+    val domesticDnsServers =
+        settingsRepo.domesticDnsServers.stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5000),
+            SettingsRepository.DEFAULT_DOMESTIC_DNS_SERVERS,
+        )
+    val latencyDnsServers =
+        settingsRepo.latencyDnsServers.stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5000),
+            SettingsRepository.DEFAULT_LATENCY_DNS_SERVERS,
+        )
     val autoConnect = settingsRepo.autoConnect.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
     val bypassLan = settingsRepo.bypassLan.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
     val xrayLogLevel = settingsRepo.xrayLogLevel.stateIn(
@@ -60,6 +81,11 @@ class SettingsViewModel @Inject constructor(
         viewModelScope,
         SharingStarted.WhileSubscribed(5000),
         XrayOutbound.default,
+    )
+    val launcherIcon = settingsRepo.launcherIcon.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5000),
+        LauncherIcon.default,
     )
     val geoipUrl = settingsRepo.geoipUrl.stateIn(
         viewModelScope,
@@ -77,6 +103,8 @@ class SettingsViewModel @Inject constructor(
 
     fun setTunName(name: String) = viewModelScope.launch { settingsRepo.setTunName(name) }
     fun setDnsServers(servers: String) = viewModelScope.launch { settingsRepo.setDnsServers(servers) }
+    fun setDomesticDnsServers(servers: String) = viewModelScope.launch { settingsRepo.setDomesticDnsServers(servers) }
+    fun setLatencyDnsServers(servers: String) = viewModelScope.launch { settingsRepo.setLatencyDnsServers(servers) }
     fun setAutoConnect(enabled: Boolean) = viewModelScope.launch { settingsRepo.setAutoConnect(enabled) }
     fun setBypassLan(enabled: Boolean) = viewModelScope.launch {
         if (enabled == bypassLan.value) return@launch
@@ -98,6 +126,11 @@ class SettingsViewModel @Inject constructor(
         if (connectionStateHolder.state.value is ConnectionState.Connected) {
             XrayService.reload(context)
         }
+    }
+    fun setLauncherIcon(icon: LauncherIcon) = viewModelScope.launch {
+        if (icon == launcherIcon.value) return@launch
+        settingsRepo.setLauncherIcon(icon)
+        launcherIconManager.apply(icon)
     }
 
     fun setGeoipUrl(url: String) = viewModelScope.launch { settingsRepo.setGeoipUrl(url) }
@@ -127,7 +160,9 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             withContext(Dispatchers.IO) {
                 val subs = subscriptionDao.getAll()
-                val bypassed = appBypassDao.getExcluded().map { it.packageName }
+                val bypassed = appBypassDao.getExcluded().map {
+                    if (it.profileId == 0) it.packageName else appKey(it.profileId, it.packageName)
+                }
                 val settings = settingsRepo.getAllAsMap()
 
                 val backup = BackupData(
@@ -173,10 +208,19 @@ class SettingsViewModel @Inject constructor(
                         ).withSubscriptionMetadata(sub.metadata)
                     )
                 }
-                backup.bypassedApps.forEach { pkg ->
-                    appBypassDao.upsert(AppBypassEntity(packageName = pkg, uid = 0, excluded = true))
+                backup.bypassedApps.forEach { value ->
+                    val app = parseAppKey(value)
+                    appBypassDao.upsert(
+                        AppBypassEntity(
+                            packageName = app.packageName,
+                            profileId = app.profileId,
+                            uid = 0,
+                            excluded = true,
+                        )
+                    )
                 }
                 settingsRepo.restoreFromMap(backup.settings)
+                launcherIconManager.apply(settingsRepo.launcherIcon.first())
             }
         }
     }

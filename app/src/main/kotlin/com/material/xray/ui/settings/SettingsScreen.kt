@@ -15,6 +15,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.material.xray.model.LauncherIcon
 import com.material.xray.model.XrayLogLevel
 import com.material.xray.model.XrayOutbound
 import com.material.xray.ui.components.ScrolledTopAppBar
@@ -24,10 +25,13 @@ import com.material.xray.ui.components.ScrolledTopAppBar
 fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
     val tunName by viewModel.tunName.collectAsStateWithLifecycle()
     val dnsServers by viewModel.dnsServers.collectAsStateWithLifecycle()
+    val domesticDnsServers by viewModel.domesticDnsServers.collectAsStateWithLifecycle()
+    val latencyDnsServers by viewModel.latencyDnsServers.collectAsStateWithLifecycle()
     val autoConnect by viewModel.autoConnect.collectAsStateWithLifecycle()
     val bypassLan by viewModel.bypassLan.collectAsStateWithLifecycle()
     val xrayLogLevel by viewModel.xrayLogLevel.collectAsStateWithLifecycle()
     val defaultOutbound by viewModel.defaultOutbound.collectAsStateWithLifecycle()
+    val launcherIcon by viewModel.launcherIcon.collectAsStateWithLifecycle()
     val geoipUrl by viewModel.geoipUrl.collectAsStateWithLifecycle()
     val geositeUrl by viewModel.geositeUrl.collectAsStateWithLifecycle()
     val geoipUpdating by viewModel.geoipUpdating.collectAsStateWithLifecycle()
@@ -45,11 +49,19 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
 
     var editingTunName by remember(tunName) { mutableStateOf(tunName) }
     var editingDns by remember(dnsServers) { mutableStateOf(dnsServers) }
+    var editingDomesticDns by remember(domesticDnsServers) { mutableStateOf(domesticDnsServers) }
+    var editingLatencyDns by remember(latencyDnsServers) { mutableStateOf(latencyDnsServers) }
     var editingGeoipUrl by remember(geoipUrl) { mutableStateOf(geoipUrl) }
     var editingGeositeUrl by remember(geositeUrl) { mutableStateOf(geositeUrl) }
     val topAppBarScrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
     val hasTunNameChanges by remember(editingTunName, tunName) { derivedStateOf { editingTunName != tunName } }
     val hasDnsChanges by remember(editingDns, dnsServers) { derivedStateOf { editingDns != dnsServers } }
+    val hasDomesticDnsChanges by remember(editingDomesticDns, domesticDnsServers) {
+        derivedStateOf { editingDomesticDns != domesticDnsServers }
+    }
+    val hasLatencyDnsChanges by remember(editingLatencyDns, latencyDnsServers) {
+        derivedStateOf { editingLatencyDns != latencyDnsServers }
+    }
     val hasGeoipUrlChanges by remember(editingGeoipUrl, geoipUrl) {
         derivedStateOf { editingGeoipUrl.trim() != geoipUrl }
     }
@@ -73,6 +85,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
 
     Scaffold(
         modifier = Modifier.nestedScroll(topAppBarScrollBehavior.nestedScrollConnection),
+        contentWindowInsets = WindowInsets(0.dp),
         topBar = {
             ScrolledTopAppBar(
                 title = "Settings",
@@ -152,6 +165,30 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
             )
             if (hasDnsChanges) {
                 TextButton(onClick = { viewModel.setDnsServers(editingDns) }) { Text("Save") }
+            }
+
+            OutlinedTextField(
+                value = editingDomesticDns,
+                onValueChange = { editingDomesticDns = it },
+                label = { Text("Domestic DNS") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+                supportingText = { Text("Used for direct domestic domains, e.g. 77.88.8.8,77.88.8.1") },
+            )
+            if (hasDomesticDnsChanges) {
+                TextButton(onClick = { viewModel.setDomesticDnsServers(editingDomesticDns) }) { Text("Save") }
+            }
+
+            OutlinedTextField(
+                value = editingLatencyDns,
+                onValueChange = { editingLatencyDns = it },
+                label = { Text("Latency DNS Servers") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+                supportingText = { Text("Used only for node latency checks, e.g. 77.88.8.8,77.88.8.1") },
+            )
+            if (hasLatencyDnsChanges) {
+                TextButton(onClick = { viewModel.setLatencyDnsServers(editingLatencyDns) }) { Text("Save") }
             }
 
             ExposedDropdownMenuBox(
@@ -270,6 +307,29 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = { exportLauncher.launch("material-xray-backup.json") }) { Text("Export") }
                 OutlinedButton(onClick = { importLauncher.launch(arrayOf("application/json")) }) { Text("Import") }
+            }
+
+            HorizontalDivider()
+            Text("Appearance", style = MaterialTheme.typography.titleMedium)
+
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                LauncherIcon.entries.forEach { icon ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(icon.label, style = MaterialTheme.typography.bodyLarge)
+                        }
+                        RadioButton(
+                            selected = icon == launcherIcon,
+                            onClick = { viewModel.setLauncherIcon(icon) },
+                        )
+                    }
+                }
             }
 
             HorizontalDivider()
