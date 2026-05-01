@@ -25,6 +25,7 @@ class SubscriptionRepository @Inject constructor(
 
     data class RefreshResult(
         val serverIdByConfigJson: Map<String, Long>,
+        val serverIdReplacements: Map<Long, Long>,
     )
 
     suspend fun add(name: String, url: String): Long {
@@ -42,6 +43,7 @@ class SubscriptionRepository @Inject constructor(
 
     suspend fun refresh(subId: Long, url: String): RefreshResult? {
         val existing = subscriptionDao.getById(subId) ?: return null
+        val existingServers = serverDao.getBySubscription(subId)
         val fetched = fetcher.fetchWithMetadata(url)
         val servers = fetched.configs.mapIndexed { index, config ->
             ServerEntity(
@@ -59,10 +61,11 @@ class SubscriptionRepository @Inject constructor(
         val insertedIds = serverDao.insertAll(servers)
 
         subscriptionDao.update(existing.applyFetchedData(fetched))
+        val insertedServers = servers.zip(insertedIds).map { (server, id) -> server.copy(id = id) }
         return RefreshResult(
-            serverIdByConfigJson = servers
-                .zip(insertedIds)
-                .associate { (server, id) -> server.configJson to id },
+            serverIdByConfigJson = insertedServers
+                .associate { server -> server.configJson to server.id },
+            serverIdReplacements = buildServerIdReplacements(existingServers, insertedServers),
         )
     }
 
@@ -150,6 +153,42 @@ class SubscriptionRepository @Inject constructor(
 
     private fun String.isFallbackSubscriptionName(): Boolean =
         matches(FALLBACK_NAME_PATTERN)
+
+    private fun buildServerIdReplacements(
+        oldServers: List<ServerEntity>,
+        newServers: List<ServerEntity>,
+    ): Map<Long, Long> {
+        val newServerIdByConfigJson = newServers.associate { it.configJson to it.id }
+        val uniqueNewServerIdByName = newServers.uniqueByTrimmedName()
+        val uniqueOldNames = oldServers.uniqueTrimmedNames()
+
+        return oldServers.mapNotNull { oldServer ->
+            val replacementId = newServerIdByConfigJson[oldServer.configJson]
+                ?: oldServer.name.trim()
+                    .takeIf { it.isNotEmpty() && it in uniqueOldNames }
+                    ?.let(uniqueNewServerIdByName::get)
+                ?: return@mapNotNull null
+
+            oldServer.id to replacementId
+        }.toMap()
+    }
+
+    private fun List<ServerEntity>.uniqueByTrimmedName(): Map<String, Long> =
+        asSequence()
+            .map { it.name.trim() to it.id }
+            .filter { (name, _) -> name.isNotEmpty() }
+            .groupBy({ it.first }, { it.second })
+            .filterValues { it.size == 1 }
+            .mapValues { (_, ids) -> ids.single() }
+
+    private fun List<ServerEntity>.uniqueTrimmedNames(): Set<String> =
+        asSequence()
+            .map { it.name.trim() }
+            .filter { it.isNotEmpty() }
+            .groupingBy { it }
+            .eachCount()
+            .filterValues { it == 1 }
+            .keys
 
     private fun SubscriptionEntity.isDueForAutoUpdate(nowMillis: Long): Boolean {
         val interval = autoUpdateIntervalHours

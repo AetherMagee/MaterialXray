@@ -1,5 +1,6 @@
 package com.material.xray.data.repository
 
+import com.material.xray.data.db.dao.AppBypassDao
 import com.material.xray.data.db.entity.ServerEntity
 import com.material.xray.data.db.entity.SubscriptionEntity
 import kotlinx.coroutines.flow.first
@@ -11,10 +12,12 @@ class SubscriptionRefreshCoordinator @Inject constructor(
     private val subscriptionRepository: SubscriptionRepository,
     private val serverRepository: ServerRepository,
     private val settingsRepository: SettingsRepository,
+    private val appBypassDao: AppBypassDao,
 ) {
     suspend fun refreshAll(): Map<Long, SubscriptionRepository.RefreshResult> {
         val selectedBeforeRefresh = selectedServerEntity()
         val results = subscriptionRepository.refreshAll()
+        syncAppRoutesAfterRefreshResults(results)
         syncSelectedServerAfterRefreshResults(selectedBeforeRefresh, results)
         return results
     }
@@ -24,6 +27,7 @@ class SubscriptionRefreshCoordinator @Inject constructor(
     ): Map<Long, SubscriptionRepository.RefreshResult> {
         val selectedBeforeRefresh = selectedServerEntity()
         val results = subscriptionRepository.refreshDueSubscriptions(nowMillis)
+        syncAppRoutesAfterRefreshResults(results)
         syncSelectedServerAfterRefreshResults(selectedBeforeRefresh, results)
         return results
     }
@@ -34,6 +38,7 @@ class SubscriptionRefreshCoordinator @Inject constructor(
     ): SubscriptionRepository.RefreshResult? {
         val selectedBeforeRefresh = selectedServerEntity()
         val result = subscriptionRepository.refresh(subId, url)
+        syncAppRoutesAfterRefresh(result)
         syncSelectedServerAfterRefresh(selectedBeforeRefresh, subId, result)
         return result
     }
@@ -45,6 +50,7 @@ class SubscriptionRefreshCoordinator @Inject constructor(
     ): SubscriptionRepository.RefreshResult? {
         val selectedBeforeRefresh = selectedServerEntity()
         val result = subscriptionRepository.update(sub, name, url)
+        syncAppRoutesAfterRefresh(result)
         syncSelectedServerAfterRefresh(selectedBeforeRefresh, sub.id, result)
         return result
     }
@@ -70,6 +76,24 @@ class SubscriptionRefreshCoordinator @Inject constructor(
         }
     }
 
+    private suspend fun syncAppRoutesAfterRefreshResults(
+        refreshResults: Map<Long, SubscriptionRepository.RefreshResult>,
+    ) {
+        refreshResults.values.forEach { refreshResult ->
+            syncAppRoutesAfterRefresh(refreshResult)
+        }
+    }
+
+    private suspend fun syncAppRoutesAfterRefresh(
+        refreshResult: SubscriptionRepository.RefreshResult?,
+    ) {
+        refreshResult?.serverIdReplacements.orEmpty().forEach { (oldServerId, newServerId) ->
+            if (oldServerId != newServerId) {
+                appBypassDao.updateServerId(oldServerId, newServerId)
+            }
+        }
+    }
+
     private suspend fun syncSelectedServerAfterRefresh(
         selectedBeforeRefresh: ServerEntity?,
         refreshedSubscriptionId: Long,
@@ -77,10 +101,7 @@ class SubscriptionRefreshCoordinator @Inject constructor(
     ) {
         if (selectedBeforeRefresh?.subscriptionId != refreshedSubscriptionId) return
 
-        val replacementId = refreshResult
-            ?.serverIdByConfigJson
-            ?.get(selectedBeforeRefresh.configJson)
-            ?: -1L
+        val replacementId = refreshResult?.serverIdReplacements?.get(selectedBeforeRefresh.id) ?: -1L
 
         if (replacementId != selectedBeforeRefresh.id) {
             settingsRepository.setLastServerId(replacementId)

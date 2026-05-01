@@ -24,6 +24,9 @@ interface AppBypassDao {
     @Upsert
     suspend fun upsert(entity: AppBypassEntity)
 
+    @Query("UPDATE app_bypass SET serverId = :newServerId WHERE serverId = :oldServerId")
+    suspend fun updateServerId(oldServerId: Long, newServerId: Long)
+
     @Query("DELETE FROM app_bypass WHERE profileId = :profileId AND packageName = :packageName")
     suspend fun delete(profileId: Int, packageName: String)
 
