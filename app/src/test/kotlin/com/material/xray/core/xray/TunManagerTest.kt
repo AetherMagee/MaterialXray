@@ -212,6 +212,8 @@ class TunManagerTest {
         assertTrue(command.indexOf("--dport 53 -j MARK") < command.indexOf("-d 192.168.0.0/16 -j RETURN"))
         assertTrue(command.contains("iptables -w -t nat -A MXTD"))
         assertTrue(command.contains("--to-destination 198.18.0.1"))
+        assertFalse(command.contains("ip6tables -w -t mangle -N MXTP"))
+        assertFalse(command.contains("ip6tables -w -t nat -N MXTD"))
         assertTrue(command.contains("ip6tables -w -t filter -A MXTF -j REJECT --reject-with icmp6-no-route"))
         commands.forEach { generated ->
             assertEquals(0, ProcessBuilder("sh", "-n", "-c", generated).start().waitFor())

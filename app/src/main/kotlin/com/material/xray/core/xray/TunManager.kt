@@ -421,8 +421,8 @@ class TunManager internal constructor(
                     bypassCidrs = ipv4BypassCidrs,
                 ),
             )
-            addAll(tetherMangleSetup("ip6tables -w", tun, upstream, ipv6BypassCidrs))
             if (allowIpv6) {
+                addAll(tetherMangleSetup("ip6tables -w", tun, upstream, ipv6BypassCidrs))
                 addAll(tetherDnsSetup("ip6tables -w", TETHER_DNS_IPV6))
             }
             addAll(tetherForwardSetup("ip6tables -w", tun, upstream, allowIpv6, ipv6BypassCidrs))

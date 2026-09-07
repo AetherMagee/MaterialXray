@@ -8,6 +8,140 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class TproxyManagerTest {
+    private val extensionError = "Warning: Extension addrtype revision 0 not supported, missing kernel module?\n" +
+        "iptables-restore: line 19 failed"
+
+    @Test
+    fun `activation extension fallback preserves startup guard and rechecks route ownership`() = runTest {
+        val commands = mutableListOf<String>()
+        val manager = TproxyManager(APP_UID) { command ->
+            commands += command
+            when (commands.size) {
+                1, 4 -> RootShell.Result(0, "\n__MXRAY_TPROXY_ROUTES__\n", "")
+                2 -> RootShell.Result(1, "", extensionError)
+                else -> RootShell.Result(0, "", "")
+            }
+        }
+
+        assertTrue(manager.activate(plan()).success)
+        assertEquals(5, commands.size)
+        assertFalse(commands[2].contains("-D OUTPUT -j MXG278b"))
+        assertFalse(commands[2].contains("-F MXG278b"))
+        assertEquals(commands[0], commands[3])
+        assertFalse(commands[4].contains("iptables-restore"))
+    }
+
+    @Test
+    fun `activation fallback stops if rollback leaves a conflicting route`() = runTest {
+        var calls = 0
+        val manager = TproxyManager(APP_UID) {
+            calls++
+            when (calls) {
+                1 -> RootShell.Result(0, "\n__MXRAY_TPROXY_ROUTES__\n", "")
+                2 -> RootShell.Result(1, "", extensionError)
+                4 -> RootShell.Result(0, "\n__MXRAY_TPROXY_ROUTES__\nlocal default dev lo", "")
+                else -> RootShell.Result(0, "", "")
+            }
+        }
+
+        assertFalse(manager.activate(plan()).success)
+        assertEquals(4, calls)
+    }
+
+    @Test
+    fun `cleanup rejects failed inspection and orphan chains but permits similarly named chains`() {
+        val command = TproxyManager.guardCleanupCommand(APP_UID)
+        for ((snapshot, expected) in listOf("-N MXG278b" to 1, "-N MXG278b0" to 0, "-N other" to 0)) {
+            val stub = "iptables() { case \"\$*\" in *' -S') printf '%s\\n' '$snapshot';; *) return 1;; esac; }; " +
+                "ip6tables() { iptables \"\$@\"; }; "
+            assertEquals(snapshot, expected, ProcessBuilder("sh", "-c", stub + command).start().waitFor())
+        }
+        val failedInspection = "iptables() { return 1; }; ip6tables() { return 1; }; "
+        assertEquals(1, ProcessBuilder("sh", "-c", failedInspection + command).start().waitFor())
+    }
+
+    @Test
+    fun `non tether cleanup cannot hide a failed IPv4 guard restore`() {
+        val stubs = """
+            iptables-restore() {
+                case "${'$'}*" in *--help*) printf '%s\n' '--noflush --wait';; *) cat >/dev/null; return 1;; esac
+            }
+            ip6tables-restore() { iptables-restore "${'$'}@"; }
+            iptables() { case "${'$'}*" in *' -S') return 0;; *) return 1;; esac; }
+            ip6tables() { iptables "${'$'}@"; }
+        """.trimIndent()
+        val command = TproxyManager.guardRestoreCommand(plan(), APP_UID)
+        // bash permits command-name functions containing hyphens, like the Android tools.
+        assertEquals(1, ProcessBuilder("bash", "-c", "$stubs\n$command").start().waitFor())
+    }
+
+    @Test
+    fun `non tether cleanup cannot hide a failed standalone guard setup`() {
+        val stubs = "iptables() { return 1; }; ip6tables() { return 1; }; "
+        val command = TproxyManager.guardInstallCommand(plan(), APP_UID)
+        assertEquals(1, ProcessBuilder("sh", "-c", stubs + command).start().waitFor())
+    }
+
+    @Test
+    fun `extension restore failure retries after rollback and keeps standalone mode`() = runTest {
+        val commands = mutableListOf<String>()
+        val manager = TproxyManager(APP_UID) { command ->
+            commands += command
+            when {
+                commands.size == 1 -> RootShell.Result(1, "", extensionError)
+                command.startsWith("ip rule show") -> RootShell.Result(0, "\n__MXRAY_TPROXY_ROUTES__\n", "")
+                else -> RootShell.Result(0, "", "")
+            }
+        }
+
+        assertTrue(manager.installGuard(plan()).success)
+        assertTrue(manager.activate(plan()).success)
+        assertEquals(5, commands.size)
+        assertTrue(commands[1].contains("rules=\$(iptables -w 2 -t mangle -S) || exit 1"))
+        assertTrue(commands[2].contains("iptables -w 2 -t mangle -N"))
+        assertFalse(commands[4].contains("iptables-restore"))
+    }
+
+    @Test
+    fun `extension fallback stops when guard rollback fails`() = runTest {
+        val commands = mutableListOf<String>()
+        val manager = TproxyManager(APP_UID) { command ->
+            commands += command
+            RootShell.Result(1, "", if (commands.size == 1) extensionError else "inspection failed")
+        }
+
+        val result = manager.installGuard(plan())
+
+        assertFalse(result.success)
+        assertTrue(result.error.orEmpty().contains("rollback"))
+        assertEquals(2, commands.size)
+    }
+
+    @Test
+    fun `missing extension in standalone setup remains fatal and retains restore diagnostics`() = runTest {
+        var calls = 0
+        val manager = TproxyManager(APP_UID) {
+            calls++
+            if (calls == 1 || calls == 3) RootShell.Result(1, "", extensionError) else RootShell.Result(0, "", "")
+        }
+
+        val result = manager.installGuard(plan())
+
+        assertFalse(result.success)
+        assertTrue(result.error.orEmpty().contains("restore failure:"))
+        assertEquals(4, calls)
+    }
+
+    @Test
+    fun `restore payloads wait for lock without embedding wait flags in rules`() {
+        val command = TproxyManager.guardRestoreCommand(plan(), APP_UID)
+
+        assertTrue(command.contains("iptables-restore --noflush -w 2"))
+        assertTrue(command.contains("ip6tables-restore --noflush -w 2"))
+        assertFalse(command.contains("\n-w 2"))
+        assertTrue(command.contains("\n-A MXG278b"))
+    }
+
     @Test
     fun `activation routes marks locally before hooking output interception`() {
         val plan = plan()
@@ -41,7 +175,7 @@ class TproxyManagerTest {
         assertTrue(command.contains("iptables-restore --noflush"))
         assertTrue(command.contains("ip6tables-restore --noflush"))
         assertTrue(command.contains("status=\$?"))
-        assertTrue(command.contains("iptables -t mangle -D OUTPUT -j MXO278b"))
+        assertTrue(command.contains("iptables -w 2 -t mangle -D OUTPUT -j MXO278b"))
         assertTrue(command.contains("exit \$status"))
     }
 
@@ -51,7 +185,7 @@ class TproxyManagerTest {
         val manager = TproxyManager(APP_UID) { command ->
             commands += command
             when (commands.size) {
-                1 -> RootShell.Result(0, "\n__MXRAY_TPROXY_ROUTES__\n", "")
+                1, 4 -> RootShell.Result(0, "\n__MXRAY_TPROXY_ROUTES__\n", "")
                 2 -> RootShell.Result(127, "", "restore unavailable")
                 else -> RootShell.Result(0, "", "")
             }
@@ -60,9 +194,10 @@ class TproxyManagerTest {
         val result = manager.activate(plan())
 
         assertTrue(result.success)
-        assertEquals(3, commands.size)
+        assertEquals(5, commands.size)
         assertTrue(commands[1].contains("iptables-restore"))
-        assertTrue(commands[2].contains("iptables -t mangle -N"))
+        assertTrue(commands[2].contains("rules=\$(iptables"))
+        assertTrue(commands[4].contains("iptables -w 2 -t mangle -N"))
     }
 
     @Test
@@ -117,10 +252,10 @@ class TproxyManagerTest {
     fun `disabled IPv6 rejects managed apps instead of blackholing them`() {
         val command = TproxyManager.activationCommand(plan(), APP_UID)
 
-        assertTrue(command.contains("ip6tables -t filter -I OUTPUT 1"))
+        assertTrue(command.contains("ip6tables -w 2 -t filter -I OUTPUT 1"))
         assertTrue(command.contains("-j REJECT --reject-with icmp6-no-route"))
-        assertFalse(command.contains("ip6tables -t mangle -I OUTPUT 1"))
-        assertFalse(command.contains("ip6tables -t mangle -I PREROUTING 1"))
+        assertFalse(command.contains("ip6tables -w 2 -t mangle -I OUTPUT 1"))
+        assertFalse(command.contains("ip6tables -w 2 -t mangle -I PREROUTING 1"))
         assertFalse(command.contains("ip -6 rule add"))
         assertFalse(command.contains("ip -6 route replace"))
     }
@@ -128,8 +263,8 @@ class TproxyManagerTest {
     @Test
     fun `disabled IPv6 keeps bypassed apps and xray itself on IPv6`() {
         val command = TproxyManager.activationCommand(plan(), APP_UID)
-        val appExempt = command.indexOf("ip6tables -t filter -A MXOA278b -m owner --uid-owner $APP_UID -j RETURN")
-        val bypassExempt = command.indexOf("ip6tables -t filter -A MXOA278b -m owner --uid-owner 10020 -j RETURN")
+        val appExempt = command.indexOf("ip6tables -w 2 -t filter -A MXOA278b -m owner --uid-owner $APP_UID -j RETURN")
+        val bypassExempt = command.indexOf("ip6tables -w 2 -t filter -A MXOA278b -m owner --uid-owner 10020 -j RETURN")
         val reject = command.indexOf("-j REJECT --reject-with icmp6-no-route")
 
         assertTrue(appExempt in 0..<reject)
@@ -140,17 +275,17 @@ class TproxyManagerTest {
     fun `startup guard always covers IPv6`() {
         val command = TproxyManager.guardInstallCommand(plan(), APP_UID)
 
-        assertTrue(command.contains("ip6tables -t mangle -I OUTPUT 1"))
+        assertTrue(command.contains("ip6tables -w 2 -t mangle -I OUTPUT 1"))
     }
 
     @Test
     fun `tether guard verification covers both families and forwarding hooks`() {
         val command = TproxyManager.guardVerifyCommand(APP_UID, plan(tetherUpstreamInterface = "wlan0").runtimeState)
 
-        assertTrue(command.contains("iptables -t mangle -C OUTPUT -j MXG278b"))
-        assertTrue(command.contains("ip6tables -t mangle -C OUTPUT -j MXG278b"))
-        assertTrue(command.contains("iptables -t filter -C INPUT -j MXG278b"))
-        assertTrue(command.contains("ip6tables -t filter -C FORWARD -j MXG278b"))
+        assertTrue(command.contains("iptables -w 2 -t mangle -C OUTPUT -j MXG278b"))
+        assertTrue(command.contains("ip6tables -w 2 -t mangle -C OUTPUT -j MXG278b"))
+        assertTrue(command.contains("iptables -w 2 -t filter -C INPUT -j MXG278b"))
+        assertTrue(command.contains("ip6tables -w 2 -t filter -C FORWARD -j MXG278b"))
     }
 
     @Test
@@ -161,7 +296,7 @@ class TproxyManagerTest {
         assertTrue(command.contains("command -v ip6tables-restore"))
         assertTrue(command.contains("iptables-restore --noflush"))
         assertTrue(command.contains("ip6tables-restore --noflush"))
-        assertTrue(command.contains("iptables -t mangle -D OUTPUT -j MXG278b"))
+        assertTrue(command.contains("iptables -w 2 -t mangle -D OUTPUT -j MXG278b"))
     }
 
     @Test
@@ -170,10 +305,10 @@ class TproxyManagerTest {
         val fallback = TproxyManager.guardInstallCommand(plan(), APP_UID)
 
         for (command in listOf(restore, fallback)) {
-            assertTrue(command.contains("iptables -t filter -D INPUT -j MXG278b"))
-            assertTrue(command.contains("iptables -t filter -D FORWARD -j MXG278b"))
-            assertTrue(command.contains("ip6tables -t filter -D INPUT -j MXG278b"))
-            assertTrue(command.contains("ip6tables -t filter -D FORWARD -j MXG278b"))
+            assertTrue(command.contains("iptables -w 2 -t filter -D INPUT -j MXG278b"))
+            assertTrue(command.contains("iptables -w 2 -t filter -D FORWARD -j MXG278b"))
+            assertTrue(command.contains("ip6tables -w 2 -t filter -D INPUT -j MXG278b"))
+            assertTrue(command.contains("ip6tables -w 2 -t filter -D FORWARD -j MXG278b"))
         }
     }
 
@@ -184,7 +319,7 @@ class TproxyManagerTest {
             commands += command
             when (commands.size) {
                 1 -> RootShell.Result(127, "", "restore unavailable")
-                2 -> RootShell.Result(1, "", "IPv6 setup failed")
+                3 -> RootShell.Result(1, "", "IPv6 setup failed")
                 else -> RootShell.Result(0, "", "")
             }
         }
@@ -192,9 +327,9 @@ class TproxyManagerTest {
         val result = manager.installGuard(plan())
 
         assertFalse(result.success)
-        assertEquals(3, commands.size)
-        assertTrue(commands[2].contains("iptables -t mangle -D OUTPUT -j MXG278b"))
-        assertTrue(commands[2].contains("ip6tables -t mangle -D OUTPUT -j MXG278b"))
+        assertEquals(4, commands.size)
+        assertTrue(commands[3].contains("iptables -w 2 -t mangle -D OUTPUT -j MXG278b"))
+        assertTrue(commands[3].contains("ip6tables -w 2 -t mangle -D OUTPUT -j MXG278b"))
     }
 
     @Test
@@ -211,7 +346,7 @@ class TproxyManagerTest {
 
         assertTrue(command.contains("MXO${APP_UID.toString(16)}"))
         assertTrue(command.contains("fwmark 0xa000000/0xf000000"))
-        assertTrue(command.contains("ip6tables -t filter -D OUTPUT -j MXO278b"))
+        assertTrue(command.contains("ip6tables -w 2 -t filter -D OUTPUT -j MXO278b"))
         assertFalse(command.contains("iptables-save"))
         assertFalse(command.contains("-F OUTPUT"))
         assertFalse(command.contains("route flush table"))
@@ -222,12 +357,12 @@ class TproxyManagerTest {
         val command = TproxyManager.activationCommand(plan(allowIpv6 = true), APP_UID)
 
         assertTrue(command.contains("ip -6 route replace local ::/0 dev lo table 300"))
-        assertTrue(command.contains("ip6tables -t mangle -I PREROUTING 1"))
+        assertTrue(command.contains("ip6tables -w 2 -t mangle -I PREROUTING 1"))
         assertTrue(command.contains("--on-ip 0.0.0.0"))
         assertTrue(command.contains("--on-ip ::"))
         assertTrue(command.contains("-m addrtype --dst-type LOCAL"))
         assertEquals(2, command.split("-p udp --dport 53 -j MARK --set-xmark 0xa000001/0xffffffff").size - 1)
-        assertFalse(command.contains("ip6tables -t filter"))
+        assertFalse(command.contains("ip6tables -w 2 -t filter"))
         assertFalse(command.contains("icmp6-no-route"))
     }
 
@@ -242,19 +377,19 @@ class TproxyManagerTest {
         assertTrue(upstreamReturn in 0..<dnsCapture)
         assertTrue(dnsCapture < lanReturn)
         assertTrue(lanReturn < publicCapture)
-        assertTrue(command.contains("ip6tables -t filter -I INPUT 1 -j MXP278b"))
-        assertTrue(command.contains("ip6tables -t filter -I FORWARD 1 -j MXP278b"))
-        assertTrue(command.contains("ip6tables -t filter -A MXP278b -j REJECT --reject-with icmp6-no-route"))
+        assertTrue(command.contains("ip6tables -w 2 -t filter -I INPUT 1 -j MXP278b"))
+        assertTrue(command.contains("ip6tables -w 2 -t filter -I FORWARD 1 -j MXP278b"))
+        assertTrue(command.contains("ip6tables -w 2 -t filter -A MXP278b -j REJECT --reject-with icmp6-no-route"))
     }
 
     @Test
     fun `tether startup guard blocks public forwarding until activation`() {
         val command = TproxyManager.guardInstallCommand(plan(tetherUpstreamInterface = "wlan0"), APP_UID)
 
-        assertTrue(command.contains("iptables -t filter -I INPUT 1 -j MXG278b"))
-        assertTrue(command.contains("iptables -t filter -I FORWARD 1 -j MXG278b"))
-        assertTrue(command.contains("iptables -t filter -A MXG278b -i wlan0 -j RETURN"))
-        assertTrue(command.contains("iptables -t filter -A MXG278b -j DROP"))
+        assertTrue(command.contains("iptables -w 2 -t filter -I INPUT 1 -j MXG278b"))
+        assertTrue(command.contains("iptables -w 2 -t filter -I FORWARD 1 -j MXG278b"))
+        assertTrue(command.contains("iptables -w 2 -t filter -A MXG278b -i wlan0 -j RETURN"))
+        assertTrue(command.contains("iptables -w 2 -t filter -A MXG278b -j DROP"))
     }
 
     @Test
@@ -295,12 +430,12 @@ class TproxyManagerTest {
         assertTrue(command.contains("ss -lnu"))
         assertEquals(1, command.split("ss -lnt").size - 1)
         assertEquals(1, command.split("ss -lnu").size - 1)
-        assertEquals(2, command.split("iptables -t mangle -S").size - 1)
-        assertTrue(command.contains("v4_slot_rules=\$(iptables -t mangle -S MXOA278b)"))
+        assertEquals(2, command.split("iptables -w 2 -t mangle -S").size - 1)
+        assertTrue(command.contains("v4_slot_rules=\$(iptables -w 2 -t mangle -S MXOA278b)"))
         assertTrue(command.contains("has_v6 '-A OUTPUT"))
         assertTrue(command.contains("--reject-with icmp6-no-route"))
-        assertTrue(command.contains("v6_slot_rules=\$(ip6tables -t filter -S MXOA278b)"))
-        assertFalse(command.contains("ip6tables -t mangle -S"))
+        assertTrue(command.contains("v6_slot_rules=\$(ip6tables -w 2 -t filter -S MXOA278b)"))
+        assertFalse(command.contains("ip6tables -w 2 -t mangle -S"))
         assertFalse(command.contains("ip -6 rule show"))
     }
 
