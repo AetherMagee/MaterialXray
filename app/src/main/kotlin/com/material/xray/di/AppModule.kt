@@ -1,5 +1,7 @@
 package com.material.xray.di
 
+import com.material.xray.core.network.AppHttpClient
+import com.material.xray.core.network.TunnelAwareHttpClient
 import com.material.xray.core.root.RootShell
 import com.material.xray.data.parser.SubscriptionFetcher
 import dagger.Module
@@ -35,5 +37,9 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideSubscriptionFetcher(client: OkHttpClient): SubscriptionFetcher = SubscriptionFetcher(client)
+    fun provideAppHttpClient(impl: TunnelAwareHttpClient): AppHttpClient = impl
+
+    @Provides
+    @Singleton
+    fun provideSubscriptionFetcher(client: AppHttpClient): SubscriptionFetcher = SubscriptionFetcher(client)
 }

@@ -1,5 +1,6 @@
 package com.material.xray.data.repository
 
+import com.material.xray.core.network.DirectHttpClient
 import com.material.xray.model.AppUpdateCheckStatus
 import java.io.IOException
 import java.net.URI
@@ -30,7 +31,7 @@ class GitHubReleaseFetcherTest {
             )
             .build()
 
-        val release = GitHubReleaseFetcher(client).fetchLatestRelease("0.5.0")
+        val release = GitHubReleaseFetcher(DirectHttpClient(client)).fetchLatestRelease("0.5.0")
 
         assertEquals("v0.6.0", release.tagName)
         assertEquals(APK_URL, release.apkDownloadUrl)
@@ -57,7 +58,7 @@ class GitHubReleaseFetcherTest {
         var failure: IOException? = null
 
         try {
-            GitHubReleaseFetcher(client).fetchLatestRelease("0.5.0")
+            GitHubReleaseFetcher(DirectHttpClient(client)).fetchLatestRelease("0.5.0")
         } catch (error: IOException) {
             failure = error
         }
@@ -81,7 +82,7 @@ class GitHubReleaseFetcherTest {
         var failure: IOException? = null
 
         try {
-            GitHubReleaseFetcher(client).fetchLatestRelease("0.5.0")
+            GitHubReleaseFetcher(DirectHttpClient(client)).fetchLatestRelease("0.5.0")
         } catch (error: IOException) {
             failure = error
         }
@@ -112,7 +113,7 @@ class GitHubReleaseFetcherTest {
             .build()
         val statuses = mutableListOf<AppUpdateCheckStatus>()
 
-        val release = GitHubReleaseFetcher(client).fetchLatestRelease("0.5.0") { statuses += it }
+        val release = GitHubReleaseFetcher(DirectHttpClient(client)).fetchLatestRelease("0.5.0") { statuses += it }
 
         assertEquals("v0.6.0", release.tagName)
         assertEquals(APK_URL, release.apkDownloadUrl)
@@ -152,7 +153,7 @@ class GitHubReleaseFetcherTest {
             .build()
         val statuses = mutableListOf<AppUpdateCheckStatus>()
 
-        GitHubReleaseFetcher(client).fetchLatestRelease("0.5.0") { statuses += it }
+        GitHubReleaseFetcher(DirectHttpClient(client)).fetchLatestRelease("0.5.0") { statuses += it }
 
         assertEquals(
             listOf(
@@ -189,7 +190,7 @@ class GitHubReleaseFetcherTest {
             .build()
         val statuses = mutableListOf<AppUpdateCheckStatus>()
 
-        GitHubReleaseFetcher(client).fetchLatestRelease("0.5.0") { statuses += it }
+        GitHubReleaseFetcher(DirectHttpClient(client)).fetchLatestRelease("0.5.0") { statuses += it }
 
         assertEquals(
             listOf(

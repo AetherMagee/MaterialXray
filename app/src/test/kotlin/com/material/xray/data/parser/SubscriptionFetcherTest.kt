@@ -1,5 +1,6 @@
 package com.material.xray.data.parser
 
+import com.material.xray.core.network.DirectHttpClient
 import com.material.xray.model.HAPP_USER_AGENT
 import com.material.xray.model.Protocol
 import com.material.xray.model.SERVER_EXTRA_HYSTERIA_INSECURE
@@ -527,7 +528,7 @@ class SubscriptionFetcherTest {
                     .build()
             }
             .build()
-        val fetcher = SubscriptionFetcher(client)
+        val fetcher = SubscriptionFetcher(DirectHttpClient(client))
 
         val error = runCatching {
             fetcher.fetchWithMetadata("https://subscriptions.example/sub")
@@ -557,7 +558,7 @@ class SubscriptionFetcherTest {
                     .build()
             }
             .build()
-        return SubscriptionFetcher(client)
+        return SubscriptionFetcher(DirectHttpClient(client))
     }
 
     @Test
@@ -869,7 +870,7 @@ class SubscriptionFetcherTest {
             }
             .build()
 
-        val fetched = SubscriptionFetcher(client).fetchWithMetadata("https://subscriptions.example/precedence")
+        val fetched = SubscriptionFetcher(DirectHttpClient(client)).fetchWithMetadata("https://subscriptions.example/precedence")
 
         assertEquals("Header Title", fetched.metadata.profileTitle)
     }
@@ -903,7 +904,7 @@ class SubscriptionFetcherTest {
                     .build()
             }
             .build()
-        return SubscriptionFetcher(client)
+        return SubscriptionFetcher(DirectHttpClient(client))
     }
 
     private fun capturingFetcher(
@@ -924,6 +925,6 @@ class SubscriptionFetcherTest {
                     .build()
             }
             .build()
-        return SubscriptionFetcher(client)
+        return SubscriptionFetcher(DirectHttpClient(client))
     }
 }

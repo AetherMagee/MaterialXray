@@ -1,6 +1,7 @@
 package com.material.xray.core.xray
 
 import android.content.Context
+import com.material.xray.core.network.AppHttpClient
 import com.material.xray.data.repository.SettingsRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
@@ -40,7 +41,7 @@ enum class GeoDataAsset {
 @Singleton
 class GeoDataManager @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val client: OkHttpClient,
+    private val httpClient: AppHttpClient,
     private val settingsRepository: SettingsRepository,
 ) {
     private val binaryDir get() = File(context.filesDir, "bin")
@@ -58,11 +59,13 @@ class GeoDataManager @Inject constructor(
         val state = resolveState()
 
         if (state.needsDownload) {
-            coroutineScope {
-                val geoipDownload = async { download(state.geoipUrl, state.geoipFile) }
-                val geositeDownload = async { download(state.geositeUrl, state.geositeFile) }
-                geoipDownload.await()
-                geositeDownload.await()
+            httpClient.use { client ->
+                coroutineScope {
+                    val geoipDownload = async { download(client, state.geoipUrl, state.geoipFile) }
+                    val geositeDownload = async { download(client, state.geositeUrl, state.geositeFile) }
+                    geoipDownload.await()
+                    geositeDownload.await()
+                }
             }
             geoipSourceFile.writeText(state.geoipUrl)
             geositeSourceFile.writeText(state.geositeUrl)
@@ -80,16 +83,18 @@ class GeoDataManager @Inject constructor(
     suspend fun refresh(asset: GeoDataAsset) = withContext(Dispatchers.IO) {
         binaryDir.mkdirs()
         val state = resolveState()
-        when (asset) {
-            GeoDataAsset.GEOIP -> {
-                download(state.geoipUrl, state.geoipFile)
-                geoipSourceFile.writeText(state.geoipUrl)
-                markUpdated(geoipUpdatedAtFile)
-            }
-            GeoDataAsset.GEOSITE -> {
-                download(state.geositeUrl, state.geositeFile)
-                geositeSourceFile.writeText(state.geositeUrl)
-                markUpdated(geositeUpdatedAtFile)
+        httpClient.use { client ->
+            when (asset) {
+                GeoDataAsset.GEOIP -> {
+                    download(client, state.geoipUrl, state.geoipFile)
+                    geoipSourceFile.writeText(state.geoipUrl)
+                    markUpdated(geoipUpdatedAtFile)
+                }
+                GeoDataAsset.GEOSITE -> {
+                    download(client, state.geositeUrl, state.geositeFile)
+                    geositeSourceFile.writeText(state.geositeUrl)
+                    markUpdated(geositeUpdatedAtFile)
+                }
             }
         }
     }
@@ -102,29 +107,36 @@ class GeoDataManager @Inject constructor(
     suspend fun refreshIfStale() = withContext(Dispatchers.IO) {
         binaryDir.mkdirs()
         val state = resolveState()
-        coroutineScope {
-            val geoip = async {
-                runCatching {
-                    refreshIfDue(state.geoipUrl, state.geoipFile, geoipSourceFile, geoipUpdatedAtFile)
+        val geoipDue = isRefreshDue(state.geoipUrl, state.geoipFile, geoipSourceFile, geoipUpdatedAtFile)
+        val geositeDue = isRefreshDue(state.geositeUrl, state.geositeFile, geositeSourceFile, geositeUpdatedAtFile)
+        if (!geoipDue && !geositeDue) return@withContext
+        httpClient.use { client ->
+            coroutineScope {
+                val geoip = async {
+                    runCatching {
+                        if (geoipDue) refreshAsset(client, state.geoipUrl, state.geoipFile, geoipSourceFile, geoipUpdatedAtFile)
+                    }
                 }
-            }
-            val geosite = async {
-                runCatching {
-                    refreshIfDue(state.geositeUrl, state.geositeFile, geositeSourceFile, geositeUpdatedAtFile)
+                val geosite = async {
+                    runCatching {
+                        if (geositeDue) refreshAsset(client, state.geositeUrl, state.geositeFile, geositeSourceFile, geositeUpdatedAtFile)
+                    }
                 }
+                val failures = listOfNotNull(geoip.await().exceptionOrNull(), geosite.await().exceptionOrNull())
+                if (failures.isNotEmpty()) throw failures.first()
             }
-            val failures = listOfNotNull(geoip.await().exceptionOrNull(), geosite.await().exceptionOrNull())
-            if (failures.isNotEmpty()) throw failures.first()
         }
     }
 
-    private fun refreshIfDue(url: String, targetFile: File, sourceMarkerFile: File, updatedAtFile: File) {
+    private fun isRefreshDue(url: String, targetFile: File, sourceMarkerFile: File, updatedAtFile: File): Boolean {
         val updatedAt = updatedAtFile.readTextOrNull()?.toLongOrNull()
-        val isDue = sourceMarkerFile.readTextOrNull() != url ||
+        return sourceMarkerFile.readTextOrNull() != url ||
             !targetFile.exists() ||
             isGeoDataStale(updatedAt, System.currentTimeMillis())
-        if (!isDue) return
-        download(url, targetFile)
+    }
+
+    private fun refreshAsset(client: OkHttpClient, url: String, targetFile: File, sourceMarkerFile: File, updatedAtFile: File) {
+        download(client, url, targetFile)
         sourceMarkerFile.writeText(url)
         markUpdated(updatedAtFile)
     }
@@ -133,7 +145,7 @@ class GeoDataManager @Inject constructor(
         updatedAtFile.writeText(System.currentTimeMillis().toString())
     }
 
-    private fun download(sourceUrl: String, targetFile: File) {
+    private fun download(client: OkHttpClient, sourceUrl: String, targetFile: File) {
         val normalizedUrl = normalizeGeoDataUrl(sourceUrl)
         normalizedUrl.toHttpUrlOrNull() ?: throw IOException("Invalid geo data URL: $normalizedUrl")
         val tempFile = File(targetFile.parentFile, "${targetFile.name}.download")

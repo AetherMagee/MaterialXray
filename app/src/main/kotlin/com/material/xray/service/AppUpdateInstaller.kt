@@ -5,6 +5,7 @@ import android.content.Intent
 import android.provider.Settings
 import androidx.core.content.FileProvider
 import androidx.core.net.toUri
+import com.material.xray.core.network.AppHttpClient
 import com.material.xray.core.root.RootShell
 import com.material.xray.data.repository.GitHubReleaseFetcher
 import com.material.xray.data.repository.SettingsRepository
@@ -46,7 +47,7 @@ data class AppUpdateInstallProgress(
 @Singleton
 class AppUpdateInstaller @Inject constructor(
     @param:ApplicationContext private val context: Context,
-    private val client: OkHttpClient,
+    private val httpClient: AppHttpClient,
     private val releaseFetcher: GitHubReleaseFetcher,
     private val settingsRepository: SettingsRepository,
     private val rootShell: RootShell,
@@ -80,7 +81,7 @@ class AppUpdateInstaller @Inject constructor(
             val downloadUrl = update.apkDownloadUrl ?: releaseFetcher
                 .fetchLatestRelease(currentVersionName)
                 .apkDownloadUrl
-            val apk = withContext(Dispatchers.IO) { downloadApk(downloadUrl) }
+            val apk = httpClient.use { client -> withContext(Dispatchers.IO) { downloadApk(client, downloadUrl) } }
             _installProgress.value = AppUpdateInstallProgress(
                 stage = AppUpdateInstallStage.PreparingInstallation,
                 fraction = null,
@@ -112,11 +113,11 @@ class AppUpdateInstaller @Inject constructor(
         waitingForInstallPermission = false
     }
 
-    private fun downloadApk(officialUrl: String): File {
+    private fun downloadApk(client: OkHttpClient, officialUrl: String): File {
         var lastFailure: IOException? = null
         for (url in githubMirrorUrls(officialUrl)) {
             try {
-                return downloadApkFrom(url)
+                return downloadApkFrom(client, url)
             } catch (error: IOException) {
                 lastFailure = error
             }
@@ -124,7 +125,7 @@ class AppUpdateInstaller @Inject constructor(
         throw IOException("All app update download endpoints failed", lastFailure)
     }
 
-    private fun downloadApkFrom(url: String): File {
+    private fun downloadApkFrom(client: OkHttpClient, url: String): File {
         _installProgress.value = AppUpdateInstallProgress(
             stage = AppUpdateInstallStage.Connecting,
             fraction = null,

@@ -1,5 +1,6 @@
 package com.material.xray.data.repository
 
+import com.material.xray.core.network.AppHttpClient
 import com.material.xray.model.AppUpdateCheckStatus
 import java.io.IOException
 import javax.inject.Inject
@@ -24,23 +25,33 @@ internal data class GitHubRelease(
 
 @Singleton
 class GitHubReleaseFetcher @Inject constructor(
-    private val client: OkHttpClient,
+    private val httpClient: AppHttpClient,
 ) {
     private val json = Json { ignoreUnknownKeys = true }
 
     internal suspend fun fetchLatestRelease(
         currentVersionName: String,
         onStatus: suspend (AppUpdateCheckStatus) -> Unit = {},
-    ): GitHubRelease = withContext(Dispatchers.IO) {
-        val repository = resolveRepository(currentVersionName)
+    ): GitHubRelease = httpClient.use { client ->
+        withContext(Dispatchers.IO) {
+            fetchLatestRelease(client, currentVersionName, onStatus)
+        }
+    }
+
+    private suspend fun fetchLatestRelease(
+        client: OkHttpClient,
+        currentVersionName: String,
+        onStatus: suspend (AppUpdateCheckStatus) -> Unit,
+    ): GitHubRelease {
+        val repository = fetchRepository(client, REPOSITORY_API_URL, currentVersionName)
         var lastFailure: Exception? = null
         val urls = githubMirrorUrls("https://api.github.com/repos/${repository.fullName}/releases/latest")
         onStatus(AppUpdateCheckStatus.Fetching(urls.first()))
         for ((index, url) in urls.withIndex()) {
             try {
-                val response = fetchRelease(url, currentVersionName, repository.fullName)
+                val response = fetchRelease(client, url, currentVersionName, repository.fullName)
                 onStatus(AppUpdateCheckStatus.ReleaseReceived(url, response.statusCode))
-                return@withContext response.release
+                return response.release
             } catch (error: CancellationException) {
                 throw error
             } catch (error: HttpStatusException) {
@@ -69,9 +80,7 @@ class GitHubReleaseFetcher @Inject constructor(
         throw IOException("All GitHub release endpoints failed", lastFailure)
     }
 
-    private fun resolveRepository(currentVersionName: String): GitHubRepository = fetchRepository(REPOSITORY_API_URL, currentVersionName)
-
-    private fun fetchRepository(url: String, currentVersionName: String): GitHubRepository {
+    private fun fetchRepository(client: OkHttpClient, url: String, currentVersionName: String): GitHubRepository {
         val request = githubRequest(url, currentVersionName)
         return client.newCall(request).execute().use { response ->
             if (!response.isSuccessful) throw IOException("GitHub repository request failed with HTTP ${response.code}")
@@ -95,6 +104,7 @@ class GitHubReleaseFetcher @Inject constructor(
     }
 
     private fun fetchRelease(
+        client: OkHttpClient,
         url: String,
         currentVersionName: String,
         repositoryFullName: String,

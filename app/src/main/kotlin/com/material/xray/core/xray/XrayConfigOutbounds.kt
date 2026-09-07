@@ -132,6 +132,56 @@ internal fun buildTproxyInbound(
     put("tag", tag)
 }
 
+/**
+ * Loopback-only, password-protected HTTP proxy inbound. Used by short-lived helper cores so
+ * that the app's own HTTP traffic can be pushed through the active server's routing without
+ * exposing an open listener to other apps on the device.
+ */
+internal fun buildHttpInbound(
+    port: Int,
+    tag: String,
+    username: String,
+    password: String,
+) = buildJsonObject {
+    require(port in 1..65_535) { "Invalid HTTP inbound port: $port" }
+    require(username.isNotBlank() && password.isNotBlank()) { "HTTP inbound requires credentials" }
+    put("listen", XRAY_API_LOOPBACK_ADDRESS)
+    put("port", port)
+    put("protocol", "http")
+    put(
+        "settings",
+        buildJsonObject {
+            put(
+                "accounts",
+                buildJsonArray {
+                    add(
+                        buildJsonObject {
+                            put("user", username)
+                            put("pass", password)
+                        },
+                    )
+                },
+            )
+            put("allowTransparent", false)
+        },
+    )
+    put(
+        "sniffing",
+        buildJsonObject {
+            put("enabled", true)
+            put("routeOnly", true)
+            put(
+                "destOverride",
+                buildJsonArray {
+                    add("http")
+                    add("tls")
+                },
+            )
+        },
+    )
+    put("tag", tag)
+}
+
 internal fun buildProxyOutbound(
     server: ServerConfig,
     fwmark: Int,

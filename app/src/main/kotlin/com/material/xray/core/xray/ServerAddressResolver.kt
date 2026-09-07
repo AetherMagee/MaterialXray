@@ -73,6 +73,18 @@ class ServerAddressResolver(
         )
     }
 
+    /**
+     * Resolves [server] for a standalone helper core, or returns null when the address was looked up
+     * and nothing usable came back. Raw configs are returned as-is because the core resolves the
+     * hosts inside them itself.
+     */
+    suspend fun resolveOrNull(server: ServerConfig, allowIpv6: Boolean): ServerConfig? {
+        if (server.rawConfigJson.isNotBlank()) return server
+        val resolved = resolve(server, allowIpv6)
+        if (resolved.attempted && resolved.selectedAddress == null) return null
+        return resolved.server
+    }
+
     private suspend fun resolveRawConfig(server: ServerConfig, allowIpv6: Boolean): Result {
         val endpoints = rawProxyEndpoints(server.rawConfigJson)
         if (!allowIpv6 && endpoints.ipv6Addresses.isNotEmpty()) {

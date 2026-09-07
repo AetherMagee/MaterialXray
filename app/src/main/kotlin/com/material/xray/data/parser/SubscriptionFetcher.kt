@@ -2,6 +2,7 @@ package com.material.xray.data.parser
 
 import android.content.Context
 import android.os.Build
+import com.material.xray.core.network.AppHttpClient
 import com.material.xray.model.HAPP_USER_AGENT
 import com.material.xray.model.Protocol
 import com.material.xray.model.SERVER_EXTRA_HYSTERIA_CONGESTION
@@ -81,14 +82,8 @@ class SubscriptionFetchException(
 }
 
 class SubscriptionFetcher @Inject constructor(
-    client: OkHttpClient,
+    private val httpClient: AppHttpClient,
 ) {
-    // Subscription requests carry the subscription token plus the identity headers, so no hop may
-    // ever leave the device in cleartext. The caller cannot inspect redirect hops, because OkHttp
-    // follows them internally, so cross-protocol redirects are refused at the client level instead.
-    private val client = client.newBuilder()
-        .followSslRedirects(false)
-        .build()
     private val parser = ShareLinkParser()
     private val json = Json {
         ignoreUnknownKeys = true
@@ -108,33 +103,54 @@ class SubscriptionFetcher @Inject constructor(
         url: String,
         identity: SubscriptionRequestIdentity = SubscriptionRequestIdentity(),
         preferJson: Boolean = false,
-    ): FetchedSubscription = withContext(Dispatchers.IO) {
+    ): FetchedSubscription {
         val normalizedUrl = url.trim()
         val httpUrl = normalizedUrl.toHttpUrlOrNull()
             ?: throw SubscriptionFetchException(SubscriptionFetchException.Reason.INVALID_URL)
         if (!httpUrl.isHttps) {
             throw SubscriptionFetchException(SubscriptionFetchException.Reason.INSECURE_TRANSPORT)
         }
+        return httpClient.use { baseClient ->
+            withContext(Dispatchers.IO) {
+                // Subscription requests carry the subscription token plus the identity headers, so no hop
+                // may ever leave the device in cleartext. The caller cannot inspect redirect hops, because
+                // OkHttp follows them internally, so cross-protocol redirects are refused at the client
+                // level instead.
+                val client = baseClient.newBuilder()
+                    .followSslRedirects(false)
+                    .build()
+                fetchWithMetadata(client, httpUrl, normalizedUrl, identity, preferJson)
+            }
+        }
+    }
 
+    private fun fetchWithMetadata(
+        client: OkHttpClient,
+        httpUrl: HttpUrl,
+        normalizedUrl: String,
+        identity: SubscriptionRequestIdentity,
+        preferJson: Boolean,
+    ): FetchedSubscription {
         if (preferJson) {
             httpUrl.jsonEndpointOrNull()?.let { jsonUrl ->
                 val jsonSubscription = try {
-                    fetchUrl(jsonUrl, identity, originalUrl = jsonUrl.toString())
+                    fetchUrl(client, jsonUrl, identity, originalUrl = jsonUrl.toString())
                 } catch (error: CancellationException) {
                     throw error
                 } catch (_: Exception) {
                     null
                 }
                 if (jsonSubscription != null && jsonSubscription.configs.isNotEmpty()) {
-                    return@withContext jsonSubscription.copy(permanentRedirectUrl = null)
+                    return jsonSubscription.copy(permanentRedirectUrl = null)
                 }
             }
         }
 
-        fetchUrl(httpUrl, identity, originalUrl = normalizedUrl)
+        return fetchUrl(client, httpUrl, identity, originalUrl = normalizedUrl)
     }
 
     private fun fetchUrl(
+        client: OkHttpClient,
         httpUrl: HttpUrl,
         identity: SubscriptionRequestIdentity,
         originalUrl: String,

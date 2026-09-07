@@ -19,9 +19,20 @@ sealed interface XrayInbound {
         val allowIpv6: Boolean,
         val acceptNonLoopback: Boolean = false,
     ) : XrayInbound
+
+    /** Loopback-only, authenticated HTTP proxy used by short-lived helper cores. */
+    data class Http(
+        val port: Int,
+        override val tag: String,
+        val username: String,
+        val password: String,
+    ) : XrayInbound {
+        override fun toString(): String = "Http(port=$port, tag=$tag, username=$username, password=***)"
+    }
 }
 
 internal fun XrayInbound.toJson(): JsonObject = when (this) {
     is XrayInbound.Tun -> buildTunInbound(name, tag, mtu)
     is XrayInbound.Tproxy -> buildTproxyInbound(port, tag, outboundMark, allowIpv6, acceptNonLoopback)
+    is XrayInbound.Http -> buildHttpInbound(port, tag, username, password)
 }
