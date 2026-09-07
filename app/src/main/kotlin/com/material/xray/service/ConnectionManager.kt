@@ -1129,6 +1129,8 @@ internal class ConnectionManager(
 
     private enum class XrayApiReadiness { Ready, ProcessExited, TimedOut }
 
+    suspend fun localAddressesChanged(backend: RootConnectionBackend): Boolean = if (backend == RootConnectionBackend.Tproxy) tproxyGateway.localAddressesChanged() else tunGateway.localAddressesChanged()
+
     suspend fun applyAppRoutingChanges(
         connectedState: ConnectionState.Connected,
         runtimeSettings: XrayRuntimeSettings,

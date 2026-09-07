@@ -4,11 +4,17 @@ import com.material.xray.core.app.appUidRangeForProfile
 import com.material.xray.core.app.isApplicationUid
 import com.material.xray.core.app.profileIdForUid
 import com.material.xray.core.root.RootShell
+import com.material.xray.core.xray.FirewallCommands.IPV4
+import com.material.xray.core.xray.FirewallCommands.IPV6
 
 class TunManager internal constructor(
     private val executeCommand: suspend (String) -> RootShell.Result,
 ) {
     constructor(shell: RootShell) : this(executeCommand = { command -> shell.execute(command) })
+
+    private var installedLocalAddresses: List<String>? = null
+
+    suspend fun localAddressesChanged(): Boolean = LocalAddresses.read(executeCommand) != installedLocalAddresses
 
     data class PhysicalRoute(
         val dev: String,
@@ -59,7 +65,7 @@ class TunManager internal constructor(
                 add("ip -6 addr replace ${shellQuote(it)} dev $quotedTunName nodad")
             }
             add("ip link set $quotedTunName up")
-        }.joinToString(" && ")
+        }.shellAnd()
         if (processId != null) {
             val setupCommand = "i=0; while [ \$i -lt $TUN_WAIT_ATTEMPTS ]; do " +
                 "kill -0 $processId 2>/dev/null || exit $TUN_PROCESS_EXIT_CODE; " +
@@ -236,7 +242,7 @@ class TunManager internal constructor(
                 add(removeManagedRoutingTablesCommand(routeTables, "ip -6 rule"))
                 add(flushRouteTablesCommand(routeTables, "ip route"))
                 add(flushRouteTablesCommand(routeTables, "ip -6 route"))
-            }.joinToString(" && ")
+            }.shellAnd()
             val cleanupResult = executeCommand(setupCommands)
             if (!cleanupResult.isSuccess) return cleanupResult.toRoutingError("stale IP routing cleanup")
         }
@@ -259,9 +265,11 @@ class TunManager internal constructor(
         if (!setupResult.isSuccess) return setupResult.toRoutingError("IP routing setup")
 
         if (tunnelTetheredClients) {
-            val tetherCommand = tetherSetupCommand(tunName, physicalRoute.dev, allowIpv6, bypassLan)
+            val addresses = LocalAddresses.read(executeCommand)
+            val tetherCommand = tetherSetupCommand(tunName, physicalRoute.dev, allowIpv6, bypassLan, addresses)
             val tetherResult = executeCommand(tetherCommand)
             if (!tetherResult.isSuccess) return tetherResult.toRoutingError("tether routing setup")
+            installedLocalAddresses = addresses
         }
 
         return removeRoutingUpdateGuard(updateGuardTable, routedProfileIds, bypassUids)
@@ -403,6 +411,7 @@ class TunManager internal constructor(
         upstreamInterface: String,
         allowIpv6: Boolean,
         bypassLan: Boolean,
+        localAddresses: List<String>,
     ): String {
         val tun = shellQuote(tunName)
         val upstream = shellQuote(upstreamInterface)
@@ -410,11 +419,11 @@ class TunManager internal constructor(
         val ipv6BypassCidrs = IPV6_ALWAYS_BYPASS_CIDRS + IPV6_LAN_CIDRS.takeIf { bypassLan }.orEmpty()
         return buildList {
             add("echo 0 > ${shellQuote("/proc/sys/net/ipv4/conf/$tunName/rp_filter")} 2>/dev/null || true")
-            addAll(tetherMangleSetup("iptables -w", tun, upstream, ipv4BypassCidrs))
-            addAll(tetherDnsSetup("iptables -w", TETHER_DNS_IPV4))
+            addAll(tetherMangleSetup(IPV4, tun, upstream, ipv4BypassCidrs, localAddresses))
+            addAll(tetherDnsSetup(IPV4, TETHER_DNS_IPV4, localAddresses))
             addAll(
                 tetherForwardSetup(
-                    "iptables -w",
+                    IPV4,
                     tun,
                     upstream,
                     allowTraffic = true,
@@ -422,11 +431,11 @@ class TunManager internal constructor(
                 ),
             )
             if (allowIpv6) {
-                addAll(tetherMangleSetup("ip6tables -w", tun, upstream, ipv6BypassCidrs))
-                addAll(tetherDnsSetup("ip6tables -w", TETHER_DNS_IPV6))
+                addAll(tetherMangleSetup(IPV6, tun, upstream, ipv6BypassCidrs, localAddresses))
+                addAll(tetherDnsSetup(IPV6, TETHER_DNS_IPV6, localAddresses))
             }
-            addAll(tetherForwardSetup("ip6tables -w", tun, upstream, allowIpv6, ipv6BypassCidrs))
-        }.joinToString(" && ")
+            addAll(tetherForwardSetup(IPV6, tun, upstream, allowIpv6, ipv6BypassCidrs))
+        }.shellAnd()
     }
 
     private fun tetherMangleSetup(
@@ -434,6 +443,7 @@ class TunManager internal constructor(
         tunName: String,
         upstreamInterface: String,
         bypassCidrs: List<String>,
+        localAddresses: List<String>,
     ): List<String> = buildList {
         add("$tool -t mangle -N $TETHER_PREROUTING_CHAIN")
         add("$tool -t mangle -A $TETHER_PREROUTING_CHAIN -i $tunName -j RETURN")
@@ -444,7 +454,9 @@ class TunManager internal constructor(
                     "-j MARK --set-xmark $TETHER_MARK_HEX/$TETHER_MARK_HEX",
             )
         }
-        add("$tool -t mangle -A $TETHER_PREROUTING_CHAIN -m addrtype --dst-type LOCAL -j RETURN")
+        LocalAddresses.forTool(localAddresses, tool).forEach { address ->
+            add("$tool -t mangle -A $TETHER_PREROUTING_CHAIN -d $address -j RETURN")
+        }
         bypassCidrs.forEach { cidr ->
             add("$tool -t mangle -A $TETHER_PREROUTING_CHAIN -d $cidr -j RETURN")
         }
@@ -455,13 +467,15 @@ class TunManager internal constructor(
         add("$tool -t mangle -I PREROUTING 1 -j $TETHER_PREROUTING_CHAIN")
     }
 
-    private fun tetherDnsSetup(tool: String, destination: String): List<String> = buildList {
+    private fun tetherDnsSetup(tool: String, destination: String, localAddresses: List<String>): List<String> = buildList {
         add("$tool -t nat -N $TETHER_DNS_CHAIN")
-        for (protocol in listOf("tcp", "udp")) {
-            add(
-                "$tool -t nat -A $TETHER_DNS_CHAIN -m mark --mark $TETHER_MARK_HEX/$TETHER_MARK_HEX " +
-                    "-m addrtype --dst-type LOCAL -p $protocol --dport 53 -j DNAT --to-destination $destination",
-            )
+        LocalAddresses.forTool(localAddresses, tool).forEach { address ->
+            for (protocol in listOf("tcp", "udp")) {
+                add(
+                    "$tool -t nat -A $TETHER_DNS_CHAIN -m mark --mark $TETHER_MARK_HEX/$TETHER_MARK_HEX " +
+                        "-d $address -p $protocol --dport 53 -j DNAT --to-destination $destination",
+                )
+            }
         }
         add("$tool -t nat -I PREROUTING 1 -j $TETHER_DNS_CHAIN")
     }
@@ -494,7 +508,7 @@ class TunManager internal constructor(
                         "-j REJECT --reject-with icmp6-no-route",
                 )
             }
-            add("$tool -t filter -A $TETHER_FORWARD_CHAIN -m addrtype --dst-type LOCAL -j RETURN")
+
             bypassCidrs.forEach { cidr ->
                 add("$tool -t filter -A $TETHER_FORWARD_CHAIN -d $cidr -j RETURN")
             }
@@ -502,12 +516,18 @@ class TunManager internal constructor(
         }
         add("$tool -t filter -I FORWARD 1 -j $TETHER_FORWARD_CHAIN")
         if (!allowTraffic) {
-            add("$tool -t filter -I INPUT 1 -j $TETHER_FORWARD_CHAIN")
+            add("$tool -t filter -N $TETHER_INPUT_CHAIN")
+            add("$tool -t filter -A $TETHER_INPUT_CHAIN -i $upstreamInterface -j RETURN")
+            add("$tool -t filter -A $TETHER_INPUT_CHAIN -i $tunName -j RETURN")
+            for (protocol in listOf("tcp", "udp")) {
+                add("$tool -t filter -A $TETHER_INPUT_CHAIN -p $protocol --dport 53 -j REJECT --reject-with icmp6-no-route")
+            }
+            add("$tool -t filter -I INPUT 1 -j $TETHER_INPUT_CHAIN")
         }
     }
 
     private fun tetherCleanupCommand(): String = buildList {
-        for (tool in listOf("iptables -w", "ip6tables -w")) {
+        for (tool in listOf(IPV4, IPV6)) {
             val saveTool = tool.substringBefore(' ') + "-save"
             val cleanup = listOf(
                 "while $tool -t mangle -D PREROUTING -j $TETHER_PREROUTING_CHAIN 2>/dev/null; do :; done",
@@ -516,22 +536,27 @@ class TunManager internal constructor(
                 "while $tool -t nat -D PREROUTING -j $TETHER_DNS_CHAIN 2>/dev/null; do :; done",
                 "$tool -t nat -F $TETHER_DNS_CHAIN 2>/dev/null || true",
                 "$tool -t nat -X $TETHER_DNS_CHAIN 2>/dev/null || true",
+                "while $tool -t filter -D INPUT -j $TETHER_INPUT_CHAIN 2>/dev/null; do :; done",
+                "$tool -t filter -F $TETHER_INPUT_CHAIN 2>/dev/null || true",
+                "$tool -t filter -X $TETHER_INPUT_CHAIN 2>/dev/null || true",
                 "while $tool -t filter -D INPUT -j $TETHER_FORWARD_CHAIN 2>/dev/null; do :; done",
                 "while $tool -t filter -D FORWARD -j $TETHER_FORWARD_CHAIN 2>/dev/null; do :; done",
                 "$tool -t filter -F $TETHER_FORWARD_CHAIN 2>/dev/null || true",
                 "$tool -t filter -X $TETHER_FORWARD_CHAIN 2>/dev/null || true",
-                "! $tool -t mangle -C PREROUTING -j $TETHER_PREROUTING_CHAIN 2>/dev/null",
-                "! $tool -t nat -C PREROUTING -j $TETHER_DNS_CHAIN 2>/dev/null",
-                "! $tool -t filter -C INPUT -j $TETHER_FORWARD_CHAIN 2>/dev/null",
-                "! $tool -t filter -C FORWARD -j $TETHER_FORWARD_CHAIN 2>/dev/null",
+                FirewallCommands.absentChains(listOf(TETHER_INPUT_CHAIN, TETHER_FORWARD_CHAIN), tables = listOf("filter"), tools = listOf(tool)),
+                "! $tool -t filter -C INPUT -j $TETHER_INPUT_CHAIN 2>/dev/null && " +
+                    "! $tool -t mangle -C PREROUTING -j $TETHER_PREROUTING_CHAIN 2>/dev/null && " +
+                    "! $tool -t nat -C PREROUTING -j $TETHER_DNS_CHAIN 2>/dev/null && " +
+                    "! $tool -t filter -C INPUT -j $TETHER_FORWARD_CHAIN 2>/dev/null && " +
+                    "! $tool -t filter -C FORWARD -j $TETHER_FORWARD_CHAIN 2>/dev/null",
             ).joinToString("; ")
             add(
                 "if rules=\$($saveTool 2>/dev/null); then " +
                     "case \"\$rules\" in *$TETHER_PREROUTING_CHAIN*|*$TETHER_DNS_CHAIN*|" +
-                    "*$TETHER_FORWARD_CHAIN*) $cleanup;; esac; else $cleanup; fi",
+                    "*$TETHER_FORWARD_CHAIN*|*$TETHER_INPUT_CHAIN*) $cleanup;; esac; else $cleanup; fi",
             )
         }
-    }.joinToString("; ")
+    }.shellAnd()
 
     private fun physicalBypassRouteCommand(
         bypassTable: Int,
@@ -563,14 +588,14 @@ class TunManager internal constructor(
         val command = if (continueOnFailure) {
             "status=0; ${batches.joinToString("; ") { batch -> "( $batch ) || status=1" }}; exit \$status"
         } else {
-            batches.joinToString(" && ")
+            batches.shellAnd()
         }
         val result = executeCommand(command)
         return if (result.isSuccess) RoutingResult(success = true) else result.toRoutingError(command)
     }
 
     private fun flushRouteTablesCommand(routeTables: List<Int>, routeCommand: String): String = routeTables.distinct()
-        .joinToString(" && ") { table -> "$routeCommand flush table $table 2>/dev/null" }
+        .map { table -> "$routeCommand flush table $table 2>/dev/null" }.shellAnd()
 
     private fun removeManagedRoutingTablesCommand(routeTables: List<Int>, ruleCommand: String): String {
         val tables = routeTables.distinct().joinToString(" ")
@@ -613,7 +638,7 @@ class TunManager internal constructor(
         val flushCommand = listOf(
             flushRouteTablesCommand(listOf(guardTable), "ip route"),
             flushRouteTablesCommand(listOf(guardTable), "ip -6 route"),
-        ).joinToString(" && ")
+        ).shellAnd()
         val ipv4Deletion = updateGuardRuleCommands(guardTable, profileIds, bypassUids, "ip rule", operation = "del")
             .map { it.removePrefix("ip ") }
         val ipv6Deletion = updateGuardRuleCommands(guardTable, profileIds, bypassUids, "ip -6 rule", operation = "del")
@@ -662,8 +687,6 @@ class TunManager internal constructor(
         val forceOption = if (force) " -force" else ""
         return "printf '%s\\n' $arguments | $ipCommand$forceOption -batch -"
     }
-
-    private fun shellQuote(value: String): String = "'${value.replace("'", "'\\''")}'"
 
     private fun parseDefaultRoute(line: String): PhysicalRoute? {
         val fields = line.trim().split(Regex("\\s+"))
@@ -719,6 +742,7 @@ class TunManager internal constructor(
         private const val TETHER_PREROUTING_CHAIN = "MXTP"
         private const val TETHER_DNS_CHAIN = "MXTD"
         private const val TETHER_FORWARD_CHAIN = "MXTF"
+        private const val TETHER_INPUT_CHAIN = "MXTI"
         private const val TETHER_DNS_IPV4 = "198.18.0.1"
         private const val TETHER_DNS_IPV6 = "2001:db8::1"
         private const val IPV4_RULE_COMMAND_PREFIX = "ip rule "

@@ -997,7 +997,7 @@ class ConnectionManagerTest {
         var activationResult = TunManager.RoutingResult(success = true)
         var verificationResult = TunManager.RoutingResult(success = true)
 
-        override fun createPlan(
+        override suspend fun createPlan(
             appRoutingPlan: AppRoutingPlan,
             routeTable: Int,
             outboundMark: Int,

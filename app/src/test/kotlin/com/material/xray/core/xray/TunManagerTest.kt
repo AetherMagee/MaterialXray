@@ -150,7 +150,11 @@ class TunManagerTest {
         val commands = mutableListOf<String>()
         val manager = TunManager { command ->
             commands += command
-            successfulCommand()
+            if (command == LocalAddresses.COMMAND) {
+                successfulCommand("1: lo inet 127.0.0.1/8 scope host lo\n2: ap0 inet 192.168.43.1/24 scope global ap0")
+            } else {
+                successfulCommand()
+            }
         }
 
         val result = manager.applyRouting(
@@ -191,7 +195,11 @@ class TunManagerTest {
         val commands = mutableListOf<String>()
         val manager = TunManager { command ->
             commands += command
-            successfulCommand()
+            if (command == LocalAddresses.COMMAND) {
+                successfulCommand("1: lo inet 127.0.0.1/8 scope host lo\n2: ap0 inet 192.168.43.1/24 scope global ap0")
+            } else {
+                successfulCommand()
+            }
         }
 
         val result = manager.applyRouting(
@@ -208,13 +216,13 @@ class TunManagerTest {
         assertTrue(result.success)
         val command = commands.joinToString("\n")
         assertTrue(command.contains("fwmark 0x10000000/0x10000000 table 100 prio 11998"))
-        assertTrue(command.contains("iptables -w -t mangle -A MXTP -i 'wlan0' -j RETURN"))
+        assertTrue(command.contains("iptables -w 2 -t mangle -A MXTP -i 'wlan0' -j RETURN"))
         assertTrue(command.indexOf("--dport 53 -j MARK") < command.indexOf("-d 192.168.0.0/16 -j RETURN"))
-        assertTrue(command.contains("iptables -w -t nat -A MXTD"))
+        assertTrue(command.contains("iptables -w 2 -t nat -A MXTD"))
         assertTrue(command.contains("--to-destination 198.18.0.1"))
-        assertFalse(command.contains("ip6tables -w -t mangle -N MXTP"))
-        assertFalse(command.contains("ip6tables -w -t nat -N MXTD"))
-        assertTrue(command.contains("ip6tables -w -t filter -A MXTF -j REJECT --reject-with icmp6-no-route"))
+        assertFalse(command.contains("ip6tables -w 2 -t mangle -N MXTP"))
+        assertFalse(command.contains("ip6tables -w 2 -t nat -N MXTD"))
+        assertTrue(command.contains("ip6tables -w 2 -t filter -A MXTF -j REJECT --reject-with icmp6-no-route"))
         commands.forEach { generated ->
             assertEquals(0, ProcessBuilder("sh", "-n", "-c", generated).start().waitFor())
         }
@@ -225,7 +233,11 @@ class TunManagerTest {
         val commands = mutableListOf<String>()
         val manager = TunManager { command ->
             commands += command
-            successfulCommand()
+            if (command == LocalAddresses.COMMAND) {
+                successfulCommand("1: lo inet 127.0.0.1/8 scope host lo\n2: ap0 inet 192.168.43.1/24 scope global ap0")
+            } else {
+                successfulCommand()
+            }
         }
 
         val result = manager.applyRouting(
@@ -251,7 +263,11 @@ class TunManagerTest {
         val commands = mutableListOf<String>()
         val manager = TunManager { command ->
             commands += command
-            successfulCommand()
+            if (command == LocalAddresses.COMMAND) {
+                successfulCommand("1: lo inet 127.0.0.1/8 scope host lo\n2: ap0 inet 192.168.43.1/24 scope global ap0")
+            } else {
+                successfulCommand()
+            }
         }
 
         val result = manager.applyRouting(
@@ -363,7 +379,11 @@ class TunManagerTest {
         val commands = mutableListOf<String>()
         val manager = TunManager { command ->
             commands += command
-            successfulCommand()
+            if (command == LocalAddresses.COMMAND) {
+                successfulCommand("1: lo inet 127.0.0.1/8 scope host lo\n2: ap0 inet 192.168.43.1/24 scope global ap0")
+            } else {
+                successfulCommand()
+            }
         }
 
         val result = manager.applyRouting(
@@ -385,7 +405,11 @@ class TunManagerTest {
         val commands = mutableListOf<String>()
         val manager = TunManager { command ->
             commands += command
-            successfulCommand()
+            if (command == LocalAddresses.COMMAND) {
+                successfulCommand("1: lo inet 127.0.0.1/8 scope host lo\n2: ap0 inet 192.168.43.1/24 scope global ap0")
+            } else {
+                successfulCommand()
+            }
         }
 
         val result = manager.replacePhysicalBypassRoute(
@@ -482,7 +506,11 @@ class TunManagerTest {
         val commands = mutableListOf<String>()
         val manager = TunManager { command ->
             commands += command
-            successfulCommand()
+            if (command == LocalAddresses.COMMAND) {
+                successfulCommand("1: lo inet 127.0.0.1/8 scope host lo\n2: ap0 inet 192.168.43.1/24 scope global ap0")
+            } else {
+                successfulCommand()
+            }
         }
 
         manager.removeRouting(

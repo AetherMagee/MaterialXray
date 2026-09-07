@@ -20,6 +20,7 @@ data class TproxyRuntimeState(
     val ipv6Enabled: Boolean,
     val tetherUpstreamInterface: String? = null,
     val tetherBypassLan: Boolean = true,
+    val localAddresses: List<String> = emptyList(),
 )
 
 @Serializable

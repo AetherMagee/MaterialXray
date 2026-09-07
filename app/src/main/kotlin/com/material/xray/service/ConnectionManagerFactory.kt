@@ -222,7 +222,7 @@ internal class GeoDataConnectionRoutingData(
 }
 
 internal interface TproxyRoutingGateway {
-    fun createPlan(
+    suspend fun createPlan(
         appRoutingPlan: AppRoutingPlan,
         routeTable: Int,
         outboundMark: Int,
@@ -232,6 +232,7 @@ internal interface TproxyRoutingGateway {
         bypassLan: Boolean = true,
     ): TproxyTrafficPlan
 
+    suspend fun localAddressesChanged(): Boolean = false
     suspend fun installGuard(plan: TproxyTrafficPlan): TunManager.RoutingResult
     suspend fun activate(plan: TproxyTrafficPlan): TunManager.RoutingResult
     suspend fun update(plan: TproxyTrafficPlan, currentSlot: String): TunManager.RoutingResult
@@ -245,7 +246,7 @@ internal class TproxyManagerRoutingGateway(
     private val portAllocator: TproxyPortAllocator,
     private val appUid: Int,
 ) : TproxyRoutingGateway {
-    override fun createPlan(
+    override suspend fun createPlan(
         appRoutingPlan: AppRoutingPlan,
         routeTable: Int,
         outboundMark: Int,
@@ -271,6 +272,7 @@ internal class TproxyManagerRoutingGateway(
             allowIpv6 = allowIpv6,
             tetherUpstreamInterface = tetherUpstreamInterface,
             tetherBypassLan = bypassLan,
+            localAddresses = if (tetherUpstreamInterface != null) manager.readLocalAddresses() else emptyList(),
         )
         require(state.groups.map { it.routeKey } == routeIdentities.map { it.first }) {
             "TPROXY traffic group topology changed"
@@ -289,6 +291,8 @@ internal class TproxyManagerRoutingGateway(
             outboundMark = outboundMark,
         )
     }
+
+    override suspend fun localAddressesChanged(): Boolean = manager.localAddressesChanged()
 
     override suspend fun installGuard(plan: TproxyTrafficPlan): TunManager.RoutingResult = manager.installGuard(plan)
     override suspend fun activate(plan: TproxyTrafficPlan): TunManager.RoutingResult = manager.activate(plan)

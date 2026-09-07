@@ -1,6 +1,7 @@
 package com.material.xray.core.xray
 
 import com.material.xray.core.root.RootShell
+import com.material.xray.core.xray.FirewallCommands.IPV4 as IPTABLES
 
 internal class XrayApiFirewall(
     private val execute: suspend (String) -> RootShell.Result,
@@ -34,19 +35,13 @@ internal class XrayApiFirewall(
         append("; elif has_jump $chainB; then active=$chainB; replacement=$chainA")
         append("; else active=''; replacement=$chainA; fi")
         append("; remove_chain \"\$replacement\" || exit 1")
-        append("; bulk_setup() { printf '*filter\\n:%s - [0:0]\\n")
-        append("-A %s -p tcp -d $XRAY_API_LOOPBACK_ADDRESS --dport $port -m owner --uid-owner $appUid -j ACCEPT\\n")
-        append("-A %s -p tcp -d $XRAY_API_LOOPBACK_ADDRESS --dport $port -j REJECT\\n")
-        append("-A %s -j RETURN\\n-I OUTPUT 1 -j %s\\nCOMMIT\\n' ")
-        append("\"\$replacement\" \"\$replacement\" \"\$replacement\" \"\$replacement\" \"\$replacement\" | ")
-        append("iptables-restore --noflush; }")
-        append("; fallback_setup() { if ! $IPTABLES -N \"\$replacement\"")
+        append("; setup_replacement() { if ! $IPTABLES -N \"\$replacement\"")
         append(" || ! $IPTABLES -A \"\$replacement\" -p tcp -d $XRAY_API_LOOPBACK_ADDRESS --dport $port")
         append(" -m owner --uid-owner $appUid -j ACCEPT")
         append(" || ! $IPTABLES -A \"\$replacement\" -p tcp -d $XRAY_API_LOOPBACK_ADDRESS --dport $port -j REJECT")
-        append(" || ! $IPTABLES -A \"\$replacement\" -j RETURN; then")
+        append("; then")
         append(" return 1; fi; $IPTABLES -I OUTPUT 1 -j \"\$replacement\"; }")
-        append("; if ! bulk_setup && ! fallback_setup; then remove_chain \"\$replacement\"; exit 1; fi")
+        append("; if ! setup_replacement; then remove_chain \"\$replacement\"; exit 1; fi")
         append("; [ -z \"\$active\" ] || remove_chain \"\$active\"")
     }
 
@@ -61,8 +56,4 @@ internal class XrayApiFirewall(
         "; refresh_ruleset || return 1; fi; }"
 
     private fun chainName(appUid: Int, slot: String): String = "mxray_api_${appUid}_$slot"
-
-    private companion object {
-        const val IPTABLES = "iptables -w"
-    }
 }

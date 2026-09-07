@@ -95,6 +95,4 @@ internal fun ownedProcessStopCommand(configPath: String, persistedPid: Int?): St
     append("fi; done; true")
 }
 
-private fun shellQuote(value: String): String = "'${value.replace("'", "'\\''")}'"
-
 internal fun shouldRemoveTunRouting(backend: RootConnectionBackend?): Boolean = backend != RootConnectionBackend.Tproxy

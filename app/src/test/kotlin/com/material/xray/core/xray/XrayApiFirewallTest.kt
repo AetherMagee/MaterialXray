@@ -18,12 +18,12 @@ class XrayApiFirewallTest {
         assertTrue(firewall.apply(port = 48_123, appUid = 10_518))
 
         val command = commands.single()
-        assertTrue(command.contains("refresh_ruleset() { ruleset=\$(iptables -w -S) || return 1; }"))
+        assertTrue(command.contains("refresh_ruleset() { ruleset=\$(iptables -w 2 -S) || return 1; }"))
         assertTrue(command.contains("refresh_ruleset || exit 1"))
         assertTrue(command.contains("--dport 48123 -m owner --uid-owner 10518 -j ACCEPT"))
         assertTrue(command.contains("--dport 48123 -j REJECT"))
-        assertTrue(command.contains("iptables -w -I OUTPUT 1 -j \"\$replacement\""))
-        assertTrue(command.contains("iptables-restore --noflush"))
+        assertTrue(command.contains("iptables -w 2 -I OUTPUT 1 -j \"\$replacement\""))
+        assertFalse(command.contains("iptables-restore"))
         assertTrue(ProcessBuilder("sh", "-n", "-c", command).start().waitFor() == 0)
     }
 
@@ -37,7 +37,7 @@ class XrayApiFirewallTest {
 
         assertTrue(firewall.apply(port = 48_123, appUid = 10_518))
 
-        val activationIndex = command.indexOf("-I OUTPUT 1 -j %s")
+        val activationIndex = command.indexOf("-I OUTPUT 1 -j \"\$replacement\"")
         val oldChainRemovalIndex = command.lastIndexOf("remove_chain \"\$active\"")
         assertTrue(activationIndex >= 0)
         assertTrue(oldChainRemovalIndex > activationIndex)
@@ -53,7 +53,7 @@ class XrayApiFirewallTest {
 
         assertFalse(firewall.apply(port = 48_123, appUid = 10_518))
 
-        assertTrue(command.indexOf("refresh_ruleset || exit 1") < command.indexOf("bulk_setup"))
+        assertTrue(command.indexOf("refresh_ruleset || exit 1") < command.indexOf("setup_replacement"))
     }
 
     @Test

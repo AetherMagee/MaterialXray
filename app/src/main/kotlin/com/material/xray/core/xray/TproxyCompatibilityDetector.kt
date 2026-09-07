@@ -3,6 +3,8 @@ package com.material.xray.core.xray
 import android.content.Context
 import android.os.Build
 import com.material.xray.core.root.RootShell
+import com.material.xray.core.xray.FirewallCommands.IPV4 as IPTABLES
+import com.material.xray.core.xray.FirewallCommands.IPV6 as IP6TABLES
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -219,8 +221,6 @@ class TproxyCompatibilityDetector @Inject constructor(
         private const val CACHE_PREFERENCES_NAME = "tproxy-compatibility"
         private const val CACHE_FINGERPRINT_KEY = "build-fingerprint"
         private const val CACHE_RESULT_KEY = "result"
-        private const val IPTABLES = "iptables -w"
-        private const val IP6TABLES = "ip6tables -w"
 
         fun markCollisionCommand(appUid: Int): String {
             require(appUid > 0)
@@ -335,7 +335,7 @@ class TproxyCompatibilityDetector @Inject constructor(
             maskHex: String,
             allowIpv6: Boolean,
         ): List<String> {
-            val localMatch = if (allowIpv6) "-m addrtype --dst-type LOCAL" else "-d 127.0.0.0/8"
+            val localMatch = if (allowIpv6) "-o lo" else "-d 127.0.0.0/8"
             val onIp = if (allowIpv6) "0.0.0.0" else "127.0.0.1"
             return listOf(
                 "$IPTABLES -t mangle -N ${chains.ipv4Prerouting} || fail iptables",
@@ -385,9 +385,9 @@ class TproxyCompatibilityDetector @Inject constructor(
             "$IP6TABLES -t mangle -N ${chains.ipv6Output} || fail tproxy6",
             "$IP6TABLES -t mangle -A ${chains.ipv6Output} -j RETURN || fail tproxy6",
             "$IP6TABLES -t mangle -A ${chains.ipv6Output} -m owner --uid-owner 0-1 -j RETURN || fail tproxy6",
-            "$IP6TABLES -t mangle -A ${chains.ipv6Output} -m addrtype --dst-type LOCAL " +
+            "$IP6TABLES -t mangle -A ${chains.ipv6Output} -o lo " +
                 "-p tcp --dport 9 -j DROP || fail tproxy6",
-            "$IP6TABLES -t mangle -A ${chains.ipv6Output} -m addrtype --dst-type LOCAL " +
+            "$IP6TABLES -t mangle -A ${chains.ipv6Output} -o lo " +
                 "-p udp --dport 9 -j DROP || fail tproxy6",
             "$IP6TABLES -t mangle -A ${chains.ipv6Output} -m owner --uid-owner 0-1 -p tcp " +
                 "-j MARK --set-xmark $groupHex/0xffffffff || fail tproxy6",
@@ -438,7 +438,7 @@ class TproxyCompatibilityDetector @Inject constructor(
     }
 }
 
-private const val TPROXY_CACHE_VERSION = "1"
+private const val TPROXY_CACHE_VERSION = "2"
 
 internal fun encodeCachedTproxyCompatibility(result: TproxyCompatibility): String? = when {
     result is TproxyCompatibility.Supported ->

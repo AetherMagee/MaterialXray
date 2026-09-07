@@ -3,6 +3,8 @@ package com.material.xray.core.xray
 import com.material.xray.core.app.appUidRangeForProfile
 import com.material.xray.core.app.isApplicationUid
 import com.material.xray.core.root.RootShell
+import com.material.xray.core.xray.FirewallCommands.IPV4
+import com.material.xray.core.xray.FirewallCommands.IPV6
 
 data class TproxyTrafficGroup(
     val state: TproxyGroupState,
@@ -27,6 +29,11 @@ class TproxyManager internal constructor(
     private var bulkRestoreSupported = false
     private var useIndividualCommands = false
     private var guardCoversTethering = false
+    private var installedLocalAddresses: List<String>? = null
+
+    internal suspend fun readLocalAddresses(): List<String> = LocalAddresses.read(executeCommand)
+
+    suspend fun localAddressesChanged(): Boolean = readLocalAddresses() != installedLocalAddresses
 
     suspend fun installGuard(plan: TproxyTrafficPlan): TunManager.RoutingResult {
         if (useIndividualCommands) return installGuardIndividually(plan)
@@ -47,6 +54,7 @@ class TproxyManager internal constructor(
 
     suspend fun activate(plan: TproxyTrafficPlan): TunManager.RoutingResult {
         val state = plan.runtimeState
+        installedLocalAddresses = state.localAddresses
         val inspection = executeCommand(activationInspectionCommand(state))
         if (!inspection.isSuccess) return inspection.toRoutingResult("TPROXY namespace inspection")
         val sections = inspection.output.split(ACTIVATION_INSPECTION_SEPARATOR, limit = 2)
@@ -97,10 +105,13 @@ class TproxyManager internal constructor(
         return execute(updateCommand(plan, appUid, currentSlot, nextSlot), "TPROXY app routing update")
     }
 
-    suspend fun verify(state: TproxyRuntimeState): TunManager.RoutingResult = execute(
-        verifyCommand(state, appUid),
-        "TPROXY routing verification",
-    )
+    suspend fun verify(state: TproxyRuntimeState): TunManager.RoutingResult {
+        if (state.tetherUpstreamInterface != null && readLocalAddresses() != state.localAddresses) {
+            return TunManager.RoutingResult(false, "Local interface addresses changed during routing setup")
+        }
+        return execute(verifyCommand(state, appUid), "TPROXY routing verification")
+            .also { if (it.success) installedLocalAddresses = state.localAddresses }
+    }
 
     suspend fun remove(state: TproxyRuntimeState?, preserveGuard: Boolean = false): Boolean = executeCommand(cleanupCommand(state, appUid, preserveGuard)).isSuccess
 
@@ -138,6 +149,7 @@ class TproxyManager internal constructor(
             allowIpv6: Boolean,
             tetherUpstreamInterface: String? = null,
             tetherBypassLan: Boolean = true,
+            localAddresses: List<String> = emptyList(),
         ): TproxyRuntimeState {
             require(groups.isNotEmpty())
             require(groups.size == ports.size)
@@ -162,13 +174,14 @@ class TproxyManager internal constructor(
                 ipv6Enabled = allowIpv6,
                 tetherUpstreamInterface = tetherUpstreamInterface,
                 tetherBypassLan = tetherBypassLan,
+                localAddresses = localAddresses,
             )
         }
 
         fun activationCommand(plan: TproxyTrafficPlan, appUid: Int): String {
             validatePlan(plan, appUid)
             return (routingActivationCommands(plan) + firewallActivationCommands(plan, appUid).flatMap { it.commands })
-                .joinToString(" && ") { "{ $it; }" }
+                .shellAnd()
         }
 
         internal fun activationRestoreCommand(plan: TproxyTrafficPlan, appUid: Int, checkSupport: Boolean = true): String {
@@ -177,16 +190,13 @@ class TproxyManager internal constructor(
             val activation = buildList {
                 addAll(routingActivationCommands(plan))
                 restores.forEach { restore ->
-                    add(
-                        "printf '%s\\n' ${shellQuote(restore.payload())} | " +
-                            "${restore.tool}-restore --noflush -w 2",
-                    )
+                    add(restore.command())
                 }
-            }.joinToString(" && ") { "{ $it; }" }
+            }.shellAnd()
             val rollback = cleanupCommand(plan.runtimeState, appUid, preserveGuard = true)
             val guardedActivation = "if $activation; then true; else status=\$?; $rollback; exit \$status; fi"
             return if (checkSupport) {
-                "if ${restoreAvailableCondition()}; then $guardedActivation; else exit 127; fi"
+                "if ${FirewallCommands.restoreAvailable()}; then $guardedActivation; else exit 127; fi"
             } else {
                 guardedActivation
             }
@@ -199,51 +209,44 @@ class TproxyManager internal constructor(
         fun guardInstallCommand(plan: TproxyTrafficPlan, appUid: Int): String {
             validatePlan(plan, appUid)
             val names = chainNames(appUid)
-            val commands = buildGuardCommands("iptables", names.guard, plan, appUid).toMutableList()
-            commands += buildGuardCommands("ip6tables", names.guard, plan, appUid)
+            val commands = buildGuardCommands(IPV4, names.guard, plan, appUid).toMutableList()
+            commands += buildGuardCommands(IPV6, names.guard, plan, appUid)
             if (plan.runtimeState.tetherUpstreamInterface != null) {
-                commands += buildTetherGuardCommands("iptables", names.guard, plan)
-                commands += buildTetherGuardCommands("ip6tables", names.guard, plan)
+                commands += buildTetherGuardCommands(IPV4, names.guard, plan)
+                commands += buildTetherGuardCommands(IPV6, names.guard, plan)
             } else {
-                commands += tetherGuardCleanupCommands("iptables", names.guard)
-                commands += tetherGuardCleanupCommands("ip6tables", names.guard)
+                commands += tetherGuardCleanupCommands(IPV4, names.guard)
+                commands += tetherGuardCleanupCommands(IPV6, names.guard)
             }
-            return commands.joinToString(" && ") { "{ $it; }" }
+            return commands.shellAnd()
         }
 
         internal fun guardRestoreCommand(plan: TproxyTrafficPlan, appUid: Int): String {
             validatePlan(plan, appUid)
             val guard = chainNames(appUid).guard
-            val restores = listOf("iptables", "ip6tables").flatMap { tool ->
+            val restores = FirewallCommands.tools.flatMap { tool ->
                 buildList {
-                    val restore = RestoreBatch(tool, "mangle", guardSetupCommands(tool, guard, plan, appUid))
+                    val restore = FirewallRestoreBatch(tool, "mangle", guardSetupCommands(tool, guard, plan, appUid))
                     add(
-                        "if $tool -w 2 -t mangle -C OUTPUT -j $guard 2>/dev/null; then true; else " +
-                            "printf '%s\\n' ${shellQuote(restore.payload())} | $tool-restore --noflush -w 2; fi",
+                        "if $tool -t mangle -C OUTPUT -j $guard 2>/dev/null; then true; else " +
+                            "${restore.command()}; fi",
                     )
                     if (plan.runtimeState.tetherUpstreamInterface != null) {
-                        val filterRestore = RestoreBatch(tool, "filter", tetherGuardSetupCommands(tool, guard, plan))
+                        val filterRestore = FirewallRestoreBatch(tool, "filter", tetherGuardSetupCommands(tool, guard, plan))
                         add(
-                            "if $tool -w 2 -t filter -C INPUT -j $guard 2>/dev/null && " +
-                                "$tool -w 2 -t filter -C FORWARD -j $guard 2>/dev/null; then true; else " +
+                            "if $tool -t filter -C INPUT -j ${guard}I 2>/dev/null && " +
+                                "$tool -t filter -C FORWARD -j $guard 2>/dev/null; then true; else " +
                                 "${tetherGuardCleanupCommands(tool, guard).joinToString("; ")}; " +
-                                "printf '%s\\n' ${shellQuote(filterRestore.payload())} | $tool-restore --noflush -w 2; fi",
+                                "${filterRestore.command()}; fi",
                         )
                     } else {
                         add("{ ${tetherGuardCleanupCommands(tool, guard).joinToString("; ")}; }")
                     }
                 }
             }
-            return "if ${restoreAvailableCondition()}; then if ${restores.joinToString(" && ") { "{ $it; }" }}; " +
+            return "if ${FirewallCommands.restoreAvailable()}; then if ${restores.shellAnd()}; " +
                 "then true; else status=\$?; ${guardCleanupCommand(appUid)}; exit \$status; fi; else exit 127; fi"
         }
-
-        private fun restoreAvailableCondition(): String = "command -v iptables-restore >/dev/null 2>&1 && " +
-            "command -v ip6tables-restore >/dev/null 2>&1 && " +
-            "iptables-restore --help 2>&1 | grep -q -- '--noflush' && " +
-            "ip6tables-restore --help 2>&1 | grep -q -- '--noflush' && " +
-            "iptables-restore --help 2>&1 | grep -q -- '--wait' && " +
-            "ip6tables-restore --help 2>&1 | grep -q -- '--wait'"
 
         private fun routingActivationCommands(plan: TproxyTrafficPlan): List<String> {
             val state = plan.runtimeState
@@ -259,26 +262,26 @@ class TproxyManager internal constructor(
             }
         }
 
-        private fun firewallActivationCommands(plan: TproxyTrafficPlan, appUid: Int): List<RestoreBatch> {
+        private fun firewallActivationCommands(plan: TproxyTrafficPlan, appUid: Int): List<FirewallRestoreBatch> {
             val state = plan.runtimeState
             val names = chainNames(appUid)
-            val ipv4 = buildPreroutingCommands("iptables", names.prerouting, plan) +
-                buildOutputActivationCommands("iptables", names, plan, appUid, SLOT_A)
+            val ipv4 = buildPreroutingCommands(IPV4, names.prerouting, plan) +
+                buildOutputActivationCommands(IPV4, names, plan, appUid, SLOT_A)
             val ipv6 = if (state.ipv6Enabled) {
-                RestoreBatch(
-                    tool = "ip6tables",
+                FirewallRestoreBatch(
+                    tool = IPV6,
                     table = "mangle",
-                    commands = buildPreroutingCommands("ip6tables", names.prerouting, plan) +
-                        buildOutputActivationCommands("ip6tables", names, plan, appUid, SLOT_A),
+                    commands = buildPreroutingCommands(IPV6, names.prerouting, plan) +
+                        buildOutputActivationCommands(IPV6, names, plan, appUid, SLOT_A),
                 )
             } else {
-                RestoreBatch(
-                    tool = "ip6tables",
+                FirewallRestoreBatch(
+                    tool = IPV6,
                     table = "filter",
                     commands = buildIpv6RejectActivationCommands(names, plan, appUid, SLOT_A),
                 )
             }
-            return listOf(RestoreBatch("iptables", "mangle", ipv4), ipv6)
+            return listOf(FirewallRestoreBatch(IPV4, "mangle", ipv4), ipv6)
         }
 
         fun updateCommand(
@@ -290,13 +293,13 @@ class TproxyManager internal constructor(
             validatePlan(plan, appUid)
             require(currentSlot in setOf(SLOT_A, SLOT_B) && nextSlot in setOf(SLOT_A, SLOT_B) && currentSlot != nextSlot)
             val names = chainNames(appUid)
-            val commands = buildOutputUpdateCommands("iptables", names, plan, appUid, currentSlot, nextSlot).toMutableList()
+            val commands = buildOutputUpdateCommands(IPV4, names, plan, appUid, currentSlot, nextSlot).toMutableList()
             if (plan.runtimeState.ipv6Enabled) {
-                commands += buildOutputUpdateCommands("ip6tables", names, plan, appUid, currentSlot, nextSlot)
+                commands += buildOutputUpdateCommands(IPV6, names, plan, appUid, currentSlot, nextSlot)
             } else {
                 commands += buildIpv6RejectUpdateCommands(names, plan, appUid, currentSlot, nextSlot)
             }
-            return commands.joinToString(" && ") { "{ $it; }" }
+            return commands.shellAnd()
         }
 
         fun verifyCommand(state: TproxyRuntimeState, appUid: Int): String {
@@ -307,8 +310,8 @@ class TproxyManager internal constructor(
             fun hasV4(rule: String) = "has_v4 ${shellQuote("-A $rule")}"
             fun hasV6(rule: String) = "has_v6 ${shellQuote("-A $rule")}"
             val commands = mutableListOf(
-                "v4_rules=\$(iptables -w 2 -t mangle -S)",
-                "v4_slot_rules=\$(iptables -w 2 -t mangle -S ${names.slot(state.outputChainSlot)})",
+                "v4_rules=\$($IPV4 -t mangle -S)",
+                "v4_slot_rules=\$($IPV4 -t mangle -S ${names.slot(state.outputChainSlot)})",
                 "newline='\n'",
                 "has_v4() { case \"\$newline\$v4_rules\$newline\" in " +
                     "*\"\$newline\$1\$newline\"*) true;; *) " +
@@ -322,6 +325,7 @@ class TproxyManager internal constructor(
                 hasV4("OUTPUT -j ${names.output}"),
                 hasV4("${names.output} -j ${names.slot(state.outputChainSlot)}"),
                 hasV4("PREROUTING -j ${names.prerouting}"),
+                hasV4("INPUT -j ${names.prerouting}L"),
                 "ip rule show | grep -q 'fwmark $prefix/$mask.*lookup ${state.routeTable}'",
                 "ip route show table ${state.routeTable} | grep -q '^local .* dev lo'",
             )
@@ -335,32 +339,30 @@ class TproxyManager internal constructor(
                 val mark = hex(group.mark)
                 commands += "has_v4_fragment ${shellQuote("--set-xmark $mark/0xffffffff")}"
                 for (protocol in listOf("tcp", "udp")) {
+                    commands += hasV4("${names.prerouting}L ${listenerDestinationMatch(state)}-p $protocol -m $protocol --dport ${group.port} -m mark ! --mark $prefix/$mask -j DROP")
                     commands += hasV4(
                         "${names.prerouting} -p $protocol -m mark --mark $mark -j TPROXY --on-port ${group.port} --on-ip ${
-                            tproxyOnIp("iptables", state.ipv6Enabled, state.tetherUpstreamInterface != null)
+                            tproxyOnIp(IPV4, state.ipv6Enabled, state.tetherUpstreamInterface != null)
                         } --tproxy-mark $mark/0xffffffff",
                     )
                     commands += hasV4(
                         "${names.slot(state.outputChainSlot)} " +
-                            "${canonicalLocalDestinationMatch(
-                                "iptables",
-                                state.ipv6Enabled || state.tetherUpstreamInterface != null,
-                                protocol,
-                            )} -m $protocol --dport ${group.port} -j DROP",
+                            "${canonicalLocalDestinationMatch(state, protocol)} -m $protocol --dport ${group.port} -j DROP",
                     )
                 }
                 commands += "has_port \"\$tcp_listeners\" ${group.port}"
                 commands += "has_port \"\$udp_listeners\" ${group.port}"
             }
             if (state.ipv6Enabled) {
-                commands += "v6_rules=\$(ip6tables -w 2 -t mangle -S)"
-                commands += "v6_slot_rules=\$(ip6tables -w 2 -t mangle -S ${names.slot(state.outputChainSlot)})"
+                commands += "v6_rules=\$($IPV6 -t mangle -S)"
+                commands += "v6_slot_rules=\$($IPV6 -t mangle -S ${names.slot(state.outputChainSlot)})"
                 commands += "has_v6() { case \"\$newline\$v6_rules\$newline\" in " +
                     "*\"\$newline\$1\$newline\"*) true;; *) return 1;; esac; }"
                 commands += "has_v6_fragment() { case \"\$v6_slot_rules\" in *\"\$1\"*) true;; *) return 1;; esac; }"
                 commands += hasV6("OUTPUT -j ${names.output}")
                 commands += hasV6("${names.output} -j ${names.slot(state.outputChainSlot)}")
                 commands += hasV6("PREROUTING -j ${names.prerouting}")
+                commands += hasV6("INPUT -j ${names.prerouting}L")
                 commands += "ip -6 rule show | grep -q 'fwmark $prefix/$mask.*lookup ${state.routeTable}'"
                 commands += "ip -6 route show table ${state.routeTable} | grep -q '^local .* dev lo'"
                 for (protocol in listOf("tcp", "udp")) {
@@ -373,21 +375,22 @@ class TproxyManager internal constructor(
                     val mark = hex(group.mark)
                     commands += "has_v6_fragment ${shellQuote("--set-xmark $mark/0xffffffff")}"
                     for (protocol in listOf("tcp", "udp")) {
+                        commands += hasV6("${names.prerouting}L ${listenerDestinationMatch(state)}-p $protocol -m $protocol --dport ${group.port} -m mark ! --mark $prefix/$mask -j DROP")
                         commands += hasV6(
                             "${names.prerouting} -p $protocol -m mark --mark $mark -j TPROXY " +
-                                "--on-port ${group.port} --on-ip ${tproxyOnIp("ip6tables", state.ipv6Enabled)} " +
+                                "--on-port ${group.port} --on-ip ${tproxyOnIp(IPV6, state.ipv6Enabled)} " +
                                 "--tproxy-mark $mark/0xffffffff",
                         )
                         commands += hasV6(
                             "${names.slot(state.outputChainSlot)} " +
-                                "${canonicalLocalDestinationMatch("ip6tables", state.ipv6Enabled, protocol)} " +
+                                "${canonicalLocalDestinationMatch(state, protocol)} " +
                                 "-m $protocol --dport ${group.port} -j DROP",
                         )
                     }
                 }
             } else {
-                commands += "v6_rules=\$(ip6tables -w 2 -t filter -S)"
-                commands += "v6_slot_rules=\$(ip6tables -w 2 -t filter -S ${names.slot(state.outputChainSlot)})"
+                commands += "v6_rules=\$($IPV6 -t filter -S)"
+                commands += "v6_slot_rules=\$($IPV6 -t filter -S ${names.slot(state.outputChainSlot)})"
                 commands += "has_v6() { case \"\$newline\$v6_rules\$newline\" in " +
                     "*\"\$newline\$1\$newline\"*) true;; *) return 1;; esac; }"
                 commands += hasV6("OUTPUT -j ${names.output}")
@@ -408,11 +411,11 @@ class TproxyManager internal constructor(
                     )
                 }
                 if (!state.ipv6Enabled) {
-                    commands += hasV6("INPUT -j ${names.prerouting}")
+                    commands += hasV6("INPUT -j ${names.prerouting}I")
                     commands += hasV6("FORWARD -j ${names.prerouting}")
                 }
             }
-            return commands.joinToString(" && ") { "{ $it; }" }
+            return commands.shellAnd()
         }
 
         fun cleanupCommand(state: TproxyRuntimeState?, appUid: Int, preserveGuard: Boolean = false): String {
@@ -423,32 +426,38 @@ class TproxyManager internal constructor(
             val prefix = hex(state?.markPrefix ?: TproxyCompatibilityDetector.MARK_PREFIX)
             val mask = hex(state?.markMask ?: TproxyCompatibilityDetector.MARK_MASK)
             val commands = mutableListOf<String>()
-            val verificationCommands = mutableListOf<String>()
-            for (tool in listOf("iptables", "ip6tables")) {
+            for (tool in FirewallCommands.tools) {
                 if (!preserveGuard) {
-                    commands += "$tool -w 2 -t mangle -D OUTPUT -j ${names.guard} 2>/dev/null || true"
-                    commands += "$tool -w 2 -t filter -D INPUT -j ${names.guard} 2>/dev/null || true"
-                    commands += "$tool -w 2 -t filter -D FORWARD -j ${names.guard} 2>/dev/null || true"
-                    commands += "$tool -w 2 -t filter -F ${names.guard} 2>/dev/null || true"
-                    commands += "$tool -w 2 -t filter -X ${names.guard} 2>/dev/null || true"
+                    commands += "$tool -t mangle -D OUTPUT -j ${names.guard} 2>/dev/null || true"
+                    commands += "$tool -t filter -D INPUT -j ${names.guard} 2>/dev/null || true"
+                    commands += "$tool -t filter -D INPUT -j ${names.guard}I 2>/dev/null || true"
+                    commands += "$tool -t filter -F ${names.guard}I 2>/dev/null || true"
+                    commands += "$tool -t filter -X ${names.guard}I 2>/dev/null || true"
+                    commands += "$tool -t filter -D FORWARD -j ${names.guard} 2>/dev/null || true"
+                    commands += "$tool -t filter -F ${names.guard} 2>/dev/null || true"
+                    commands += "$tool -t filter -X ${names.guard} 2>/dev/null || true"
                 }
-                commands += "$tool -w 2 -t mangle -D OUTPUT -j ${names.output} 2>/dev/null || true"
-                commands += "$tool -w 2 -t mangle -D PREROUTING -j ${names.prerouting} 2>/dev/null || true"
-                commands += "$tool -w 2 -t filter -D INPUT -j ${names.prerouting} 2>/dev/null || true"
-                commands += "$tool -w 2 -t filter -D FORWARD -j ${names.prerouting} 2>/dev/null || true"
-                val chains = listOf(names.output, names.slotA, names.slotB, names.prerouting) +
+                commands += "$tool -t mangle -D OUTPUT -j ${names.output} 2>/dev/null || true"
+                commands += "$tool -t mangle -D PREROUTING -j ${names.prerouting} 2>/dev/null || true"
+                commands += "$tool -t mangle -D INPUT -j ${names.prerouting}L 2>/dev/null || true"
+                commands += "$tool -t filter -D INPUT -j ${names.prerouting} 2>/dev/null || true"
+                commands += "$tool -t filter -D INPUT -j ${names.prerouting}I 2>/dev/null || true"
+                commands += "$tool -t filter -F ${names.prerouting}I 2>/dev/null || true"
+                commands += "$tool -t filter -X ${names.prerouting}I 2>/dev/null || true"
+                commands += "$tool -t filter -D FORWARD -j ${names.prerouting} 2>/dev/null || true"
+                val chains = listOf(names.output, names.slotA, names.slotB, names.prerouting, names.prerouting + "L") +
                     names.guard.takeUnless { preserveGuard }
                 for (chain in chains.filterNotNull()) {
-                    commands += "$tool -w 2 -t mangle -F $chain 2>/dev/null || true"
-                    commands += "$tool -w 2 -t mangle -X $chain 2>/dev/null || true"
+                    commands += "$tool -t mangle -F $chain 2>/dev/null || true"
+                    commands += "$tool -t mangle -X $chain 2>/dev/null || true"
                 }
-                commands += "$tool -w 2 -t filter -F ${names.prerouting} 2>/dev/null || true"
-                commands += "$tool -w 2 -t filter -X ${names.prerouting} 2>/dev/null || true"
+                commands += "$tool -t filter -F ${names.prerouting} 2>/dev/null || true"
+                commands += "$tool -t filter -X ${names.prerouting} 2>/dev/null || true"
             }
-            commands += "ip6tables -w 2 -t filter -D OUTPUT -j ${names.output} 2>/dev/null || true"
+            commands += "$IPV6 -t filter -D OUTPUT -j ${names.output} 2>/dev/null || true"
             for (chain in listOf(names.output, names.slotA, names.slotB)) {
-                commands += "ip6tables -w 2 -t filter -F $chain 2>/dev/null || true"
-                commands += "ip6tables -w 2 -t filter -X $chain 2>/dev/null || true"
+                commands += "$IPV6 -t filter -F $chain 2>/dev/null || true"
+                commands += "$IPV6 -t filter -X $chain 2>/dev/null || true"
             }
             commands += discoveredRouteTableCleanupCommand("ip", prefix, mask, priority)
             commands += discoveredRouteTableCleanupCommand("ip -6", prefix, mask, priority)
@@ -459,77 +468,48 @@ class TproxyManager internal constructor(
                 commands += "ip -6 route del local ::/0 dev lo table $it 2>/dev/null || true"
                 commands += "ip -6 route del unreachable default table $it 2>/dev/null || true"
             }
-            verificationCommands += "! iptables -w 2 -t mangle -C OUTPUT -j ${names.output} 2>/dev/null"
-            verificationCommands += "! iptables -w 2 -t mangle -C PREROUTING -j ${names.prerouting} 2>/dev/null"
-            verificationCommands += "! ip6tables -w 2 -t filter -C INPUT -j ${names.prerouting} 2>/dev/null"
-            verificationCommands += "! ip6tables -w 2 -t filter -C FORWARD -j ${names.prerouting} 2>/dev/null"
-            if (!preserveGuard) {
-                verificationCommands += "! iptables -w 2 -t filter -C INPUT -j ${names.guard} 2>/dev/null"
-                verificationCommands += "! iptables -w 2 -t filter -C FORWARD -j ${names.guard} 2>/dev/null"
-                verificationCommands += "! ip6tables -w 2 -t filter -C INPUT -j ${names.guard} 2>/dev/null"
-                verificationCommands += "! ip6tables -w 2 -t filter -C FORWARD -j ${names.guard} 2>/dev/null"
-            }
-            val ownedChains = listOf(names.output, names.slotA, names.slotB, names.prerouting) +
-                listOfNotNull(names.guard.takeUnless { preserveGuard })
-            verificationCommands += absentChainsCommand(ownedChains)
-            commands += verificationCommands.joinToString(" && ") { "{ $it; }" }
+            val ownedChains = listOf(names.output, names.slotA, names.slotB, names.prerouting, names.prerouting + "I", names.prerouting + "L") +
+                listOf(names.guard, names.guard + "I").takeUnless { preserveGuard }.orEmpty()
+            commands += FirewallCommands.absentChains(ownedChains)
             return commands.joinToString("; ")
         }
 
         fun guardCleanupCommand(appUid: Int, includeFilterTables: Boolean = true): String {
             require(appUid > 0)
             val guard = chainNames(appUid).guard
-            val tools = listOf("iptables", "ip6tables")
+            val tools = FirewallCommands.tools
             val commands = tools.flatMap { tool ->
                 buildList {
-                    add("$tool -w 2 -t mangle -D OUTPUT -j $guard 2>/dev/null || true")
-                    add("$tool -w 2 -t mangle -F $guard 2>/dev/null || true")
-                    add("$tool -w 2 -t mangle -X $guard 2>/dev/null || true")
+                    add("$tool -t mangle -D OUTPUT -j $guard 2>/dev/null || true")
+                    add("$tool -t mangle -F $guard 2>/dev/null || true")
+                    add("$tool -t mangle -X $guard 2>/dev/null || true")
                     if (includeFilterTables) {
-                        add("$tool -w 2 -t filter -D INPUT -j $guard 2>/dev/null || true")
-                        add("$tool -w 2 -t filter -D FORWARD -j $guard 2>/dev/null || true")
-                        add("$tool -w 2 -t filter -F $guard 2>/dev/null || true")
-                        add("$tool -w 2 -t filter -X $guard 2>/dev/null || true")
+                        add("$tool -t filter -D INPUT -j $guard 2>/dev/null || true")
+                        add("$tool -t filter -D INPUT -j ${guard}I 2>/dev/null || true")
+                        add("$tool -t filter -F ${guard}I 2>/dev/null || true")
+                        add("$tool -t filter -X ${guard}I 2>/dev/null || true")
+                        add("$tool -t filter -D FORWARD -j $guard 2>/dev/null || true")
+                        add("$tool -t filter -F $guard 2>/dev/null || true")
+                        add("$tool -t filter -X $guard 2>/dev/null || true")
                     }
                 }
             }.toMutableList()
-            commands += tools.flatMap { tool ->
-                buildList {
-                    add("! $tool -w 2 -t mangle -C OUTPUT -j $guard 2>/dev/null")
-                    if (includeFilterTables) {
-                        add("! $tool -w 2 -t filter -C INPUT -j $guard 2>/dev/null")
-                        add("! $tool -w 2 -t filter -C FORWARD -j $guard 2>/dev/null")
-                    }
-                }
-            }.joinToString(" && ") { "{ $it; }" }
-            commands += absentChainsCommand(listOf(guard))
+            commands += FirewallCommands.absentChains(listOf(guard, guard + "I"))
             return commands.joinToString("; ")
         }
-
-        private fun absentChainsCommand(chains: List<String>): String = buildList {
-            add("newline='\n'")
-            for (tool in listOf("iptables", "ip6tables")) {
-                for (table in listOf("mangle", "filter")) {
-                    add("rules=\$($tool -w 2 -t $table -S) || exit 1")
-                    val patterns = chains.joinToString("|") { "*\"\$newline-N $it\$newline\"*" }
-                    add("case \"\$newline\$rules\$newline\" in $patterns) exit 1;; esac")
-                }
-            }
-            add("true")
-        }.joinToString("; ")
 
         fun guardVerifyCommand(appUid: Int, state: TproxyRuntimeState? = null): String {
             require(appUid > 0)
             val guard = chainNames(appUid).guard
             return buildList {
-                for (tool in listOf("iptables", "ip6tables")) {
-                    add("$tool -w 2 -t mangle -C OUTPUT -j $guard")
+                for (tool in FirewallCommands.tools) {
+                    add("$tool -t mangle -C OUTPUT -j $guard")
                     if (state?.tetherUpstreamInterface != null) {
-                        add("$tool -w 2 -t filter -C INPUT -j $guard")
-                        add("$tool -w 2 -t filter -C FORWARD -j $guard")
+                        add("$tool -t filter -C INPUT -j ${guard}I")
+                        add("$tool -t filter -C FORWARD -j $guard")
                     }
                 }
-            }.joinToString(" && ") { "{ $it; }" }
+            }.shellAnd()
         }
 
         private fun discoveredRouteTableCleanupCommand(
@@ -551,40 +531,61 @@ class TproxyManager internal constructor(
             plan: TproxyTrafficPlan,
             appUid: Int,
         ): List<String> {
-            val setup = guardSetupCommands(tool, chain, plan, appUid).joinToString(" && ") { "{ $it; }" }
-            return listOf("if $tool -w 2 -t mangle -C OUTPUT -j $chain 2>/dev/null; then true; else $setup; fi")
+            val setup = guardSetupCommands(tool, chain, plan, appUid).shellAnd()
+            return listOf("if $tool -t mangle -C OUTPUT -j $chain 2>/dev/null; then true; else $setup; fi")
         }
 
         private fun buildTetherGuardCommands(tool: String, chain: String, plan: TproxyTrafficPlan): List<String> {
-            val setup = tetherGuardSetupCommands(tool, chain, plan).joinToString(" && ") { "{ $it; }" }
+            val setup = tetherGuardSetupCommands(tool, chain, plan).shellAnd()
             val cleanup = tetherGuardCleanupCommands(tool, chain).joinToString("; ")
             return listOf(
-                "if $tool -w 2 -t filter -C INPUT -j $chain 2>/dev/null && " +
-                    "$tool -w 2 -t filter -C FORWARD -j $chain 2>/dev/null; then true; else $cleanup; $setup; fi",
+                "if $tool -t filter -C INPUT -j ${chain}I 2>/dev/null && " +
+                    "$tool -t filter -C FORWARD -j $chain 2>/dev/null; then true; else $cleanup; $setup; fi",
             )
         }
 
         private fun tetherGuardCleanupCommands(tool: String, chain: String): List<String> = listOf(
-            "$tool -w 2 -t filter -D INPUT -j $chain 2>/dev/null || true",
-            "$tool -w 2 -t filter -D FORWARD -j $chain 2>/dev/null || true",
-            "$tool -w 2 -t filter -F $chain 2>/dev/null || true",
-            "$tool -w 2 -t filter -X $chain 2>/dev/null || true",
+            "$tool -t filter -D INPUT -j $chain 2>/dev/null || true",
+            "$tool -t filter -D INPUT -j ${chain}I 2>/dev/null || true",
+            "$tool -t filter -F ${chain}I 2>/dev/null || true",
+            "$tool -t filter -X ${chain}I 2>/dev/null || true",
+            "$tool -t filter -D FORWARD -j $chain 2>/dev/null || true",
+            "$tool -t filter -F $chain 2>/dev/null || true",
+            "$tool -t filter -X $chain 2>/dev/null || true",
         )
 
         private fun tetherGuardSetupCommands(tool: String, chain: String, plan: TproxyTrafficPlan): List<String> = buildList {
             val upstream = requireNotNull(plan.runtimeState.tetherUpstreamInterface)
-            add("$tool -w 2 -t filter -N $chain")
-            add("$tool -w 2 -t filter -A $chain -i $upstream -j RETURN")
+            add("$tool -t filter -N $chain")
+            add("$tool -t filter -A $chain -i $upstream -j RETURN")
             for (protocol in listOf("tcp", "udp")) {
-                add("$tool -w 2 -t filter -A $chain -p $protocol --dport 53 -j DROP")
+                add("$tool -t filter -A $chain -p $protocol --dport 53 -j DROP")
             }
-            add("$tool -w 2 -t filter -A $chain -m addrtype --dst-type LOCAL -j RETURN")
+
             tetherBypassCidrs(tool, plan.runtimeState.tetherBypassLan).forEach { cidr ->
-                add("$tool -w 2 -t filter -A $chain -d $cidr -j RETURN")
+                add("$tool -t filter -A $chain -d $cidr -j RETURN")
             }
-            add("$tool -w 2 -t filter -A $chain -j DROP")
-            add("$tool -w 2 -t filter -I INPUT 1 -j $chain")
-            add("$tool -w 2 -t filter -I FORWARD 1 -j $chain")
+            add("$tool -t filter -A $chain -j DROP")
+            addAll(tetherInputRules(tool, chain + "I", upstream, "DROP", plan.runtimeState))
+            add("$tool -t filter -I INPUT 1 -j ${chain}I")
+            add("$tool -t filter -I FORWARD 1 -j $chain")
+        }
+
+        private fun tetherInputRules(
+            tool: String,
+            chain: String,
+            upstream: String,
+            target: String,
+            guardedState: TproxyRuntimeState? = null,
+        ): List<String> = buildList {
+            add("$tool -t filter -N $chain")
+            guardedState?.let { state ->
+                add("$tool -t filter -A $chain -m mark --mark ${hex(state.markPrefix)}/${hex(state.markMask)} -j DROP")
+            }
+            add("$tool -t filter -A $chain -i $upstream -j RETURN")
+            for (protocol in listOf("tcp", "udp")) {
+                add("$tool -t filter -A $chain -p $protocol --dport 53 -j $target")
+            }
         }
 
         private fun guardSetupCommands(
@@ -593,26 +594,29 @@ class TproxyManager internal constructor(
             plan: TproxyTrafficPlan,
             appUid: Int,
         ): List<String> = buildList {
-            add("$tool -w 2 -t mangle -N $chain")
-            add("$tool -w 2 -t mangle -A $chain -m owner --uid-owner $appUid -j RETURN")
+            add("$tool -t mangle -N $chain")
+            add("$tool -t mangle -A $chain -m owner --uid-owner $appUid -j RETURN")
             uidRanges(plan.bypassUids - appUid).forEach { range ->
-                add("$tool -w 2 -t mangle -A $chain -m owner --uid-owner ${range.asArgument()} -j RETURN")
+                add("$tool -t mangle -A $chain -m owner --uid-owner ${range.asArgument()} -j RETURN")
             }
             plan.routeProfileIds.toSortedSet().forEach { profileId ->
                 val range = appUidRangeForProfile(profileId)
-                add("$tool -w 2 -t mangle -A $chain -m owner --uid-owner ${range.asArgument()} -j DROP")
+                add("$tool -t mangle -A $chain -m owner --uid-owner ${range.asArgument()} -j DROP")
             }
-            add("$tool -w 2 -t mangle -I OUTPUT 1 -j $chain")
+            add("$tool -t mangle -I OUTPUT 1 -j $chain")
         }
 
         private fun guardCleanupCommands(tool: String, chain: String): List<String> = listOf(
-            "$tool -w 2 -t mangle -D OUTPUT -j $chain 2>/dev/null || true",
-            "$tool -w 2 -t mangle -F $chain 2>/dev/null || true",
-            "$tool -w 2 -t mangle -X $chain 2>/dev/null || true",
-            "$tool -w 2 -t filter -D INPUT -j $chain 2>/dev/null || true",
-            "$tool -w 2 -t filter -D FORWARD -j $chain 2>/dev/null || true",
-            "$tool -w 2 -t filter -F $chain 2>/dev/null || true",
-            "$tool -w 2 -t filter -X $chain 2>/dev/null || true",
+            "$tool -t mangle -D OUTPUT -j $chain 2>/dev/null || true",
+            "$tool -t mangle -F $chain 2>/dev/null || true",
+            "$tool -t mangle -X $chain 2>/dev/null || true",
+            "$tool -t filter -D INPUT -j $chain 2>/dev/null || true",
+            "$tool -t filter -D INPUT -j ${chain}I 2>/dev/null || true",
+            "$tool -t filter -F ${chain}I 2>/dev/null || true",
+            "$tool -t filter -X ${chain}I 2>/dev/null || true",
+            "$tool -t filter -D FORWARD -j $chain 2>/dev/null || true",
+            "$tool -t filter -F $chain 2>/dev/null || true",
+            "$tool -t filter -X $chain 2>/dev/null || true",
         )
 
         private fun buildPreroutingCommands(
@@ -620,7 +624,7 @@ class TproxyManager internal constructor(
             chain: String,
             plan: TproxyTrafficPlan,
         ): List<String> = buildList {
-            add("$tool -w 2 -t mangle -N $chain")
+            add("$tool -t mangle -N $chain")
             plan.groups.forEach { group ->
                 val mark = hex(group.state.mark)
                 val onIp = tproxyOnIp(
@@ -630,7 +634,7 @@ class TproxyManager internal constructor(
                 )
                 for (protocol in listOf("tcp", "udp")) {
                     add(
-                        "$tool -w 2 -t mangle -A $chain -p $protocol -m mark --mark $mark/0xffffffff " +
+                        "$tool -t mangle -A $chain -p $protocol -m mark --mark $mark/0xffffffff " +
                             "-j TPROXY --on-ip $onIp --on-port ${group.state.port} " +
                             "--tproxy-mark $mark/0xffffffff",
                     )
@@ -641,35 +645,43 @@ class TproxyManager internal constructor(
                 val base = plan.groups.single { it.isBase }
                 val mark = hex(base.state.mark)
                 val onIp = tproxyOnIp(tool, plan.runtimeState.ipv6Enabled, acceptNonLoopback = true)
-                plan.groups.forEach { group ->
-                    for (protocol in listOf("tcp", "udp")) {
-                        add(
-                            "$tool -w 2 -t mangle -A $chain ${localDestinationMatch(tool, true)} -p $protocol " +
-                                "--dport ${group.state.port} -j DROP",
-                        )
-                    }
-                }
-                add("$tool -w 2 -t mangle -A $chain -i lo -j RETURN")
-                add("$tool -w 2 -t mangle -A $chain -i $upstream -j RETURN")
+                val localAddresses = LocalAddresses.forTool(plan.runtimeState.localAddresses, tool)
+                add("$tool -t mangle -A $chain -i lo -j RETURN")
+                add("$tool -t mangle -A $chain -i $upstream -j RETURN")
                 for (protocol in listOf("tcp", "udp")) {
                     add(
-                        "$tool -w 2 -t mangle -A $chain -p $protocol --dport 53 -j TPROXY --on-ip $onIp " +
+                        "$tool -t mangle -A $chain -p $protocol --dport 53 -j TPROXY --on-ip $onIp " +
                             "--on-port ${base.state.port} --tproxy-mark $mark/0xffffffff",
                     )
                 }
-                add("$tool -w 2 -t mangle -A $chain -m addrtype --dst-type LOCAL -j RETURN")
+                localAddresses.forEach { address ->
+                    add("$tool -t mangle -A $chain -d $address -j RETURN")
+                }
                 tetherBypassCidrs(tool, plan.runtimeState.tetherBypassLan).forEach { cidr ->
-                    add("$tool -w 2 -t mangle -A $chain -d $cidr -j RETURN")
+                    add("$tool -t mangle -A $chain -d $cidr -j RETURN")
                 }
                 for (protocol in listOf("tcp", "udp")) {
                     add(
-                        "$tool -w 2 -t mangle -A $chain -p $protocol -j TPROXY --on-ip $onIp " +
+                        "$tool -t mangle -A $chain -p $protocol -j TPROXY --on-ip $onIp " +
                             "--on-port ${base.state.port} --tproxy-mark $mark/0xffffffff",
                     )
                 }
-                add("$tool -w 2 -t mangle -A $chain -j DROP")
+                add("$tool -t mangle -A $chain -j DROP")
             }
-            add("$tool -w 2 -t mangle -I PREROUTING 1 -j $chain")
+            // A direct connection to a wildcard listener must not depend on an address snapshot.
+            // Intercepted traffic carries our mark and retains its original destination port.
+            val listenerChain = chain + "L"
+            add("$tool -t mangle -N $listenerChain")
+            plan.groups.forEach { group ->
+                for (protocol in listOf("tcp", "udp")) {
+                    add(
+                        "$tool -t mangle -A $listenerChain ${listenerDestinationMatch(plan.runtimeState)}-p $protocol --dport ${group.state.port} " +
+                            "-m mark ! --mark ${hex(plan.runtimeState.markPrefix)}/${hex(plan.runtimeState.markMask)} -j DROP",
+                    )
+                }
+            }
+            add("$tool -t mangle -I INPUT 1 -j $listenerChain")
+            add("$tool -t mangle -I PREROUTING 1 -j $chain")
         }
 
         private fun buildOutputActivationCommands(
@@ -681,12 +693,12 @@ class TproxyManager internal constructor(
         ): List<String> {
             val slotChain = names.slot(slot)
             return buildList {
-                add("$tool -w 2 -t mangle -N $slotChain")
+                add("$tool -t mangle -N $slotChain")
                 addAll(outputRules(tool, slotChain, plan, appUid))
-                add("$tool -w 2 -t mangle -N ${names.output}")
-                add("$tool -w 2 -t mangle -A ${names.output} -j $slotChain")
+                add("$tool -t mangle -N ${names.output}")
+                add("$tool -t mangle -A ${names.output} -j $slotChain")
                 // The startup guard owns position 1 until listeners and routing verify successfully.
-                add("$tool -w 2 -t mangle -I OUTPUT 2 -j ${names.output}")
+                add("$tool -t mangle -I OUTPUT 2 -j ${names.output}")
             }
         }
 
@@ -701,13 +713,13 @@ class TproxyManager internal constructor(
             val currentChain = names.slot(currentSlot)
             val nextChain = names.slot(nextSlot)
             return buildList {
-                add("$tool -w 2 -t mangle -F $nextChain 2>/dev/null || true")
-                add("$tool -w 2 -t mangle -X $nextChain 2>/dev/null || true")
-                add("$tool -w 2 -t mangle -N $nextChain")
+                add("$tool -t mangle -F $nextChain 2>/dev/null || true")
+                add("$tool -t mangle -X $nextChain 2>/dev/null || true")
+                add("$tool -t mangle -N $nextChain")
                 addAll(outputRules(tool, nextChain, plan, appUid))
-                add("$tool -w 2 -t mangle -R ${names.output} 1 -j $nextChain")
-                add("$tool -w 2 -t mangle -F $currentChain")
-                add("$tool -w 2 -t mangle -X $currentChain")
+                add("$tool -t mangle -R ${names.output} 1 -j $nextChain")
+                add("$tool -t mangle -F $currentChain")
+                add("$tool -t mangle -X $currentChain")
             }
         }
 
@@ -719,16 +731,17 @@ class TproxyManager internal constructor(
         ): List<String> {
             val slotChain = names.slot(slot)
             return buildList {
-                add("ip6tables -w 2 -t filter -N $slotChain")
+                add("$IPV6 -t filter -N $slotChain")
                 addAll(ipv6RejectRules(slotChain, plan, appUid))
-                add("ip6tables -w 2 -t filter -N ${names.output}")
-                add("ip6tables -w 2 -t filter -A ${names.output} -j $slotChain")
-                add("ip6tables -w 2 -t filter -I OUTPUT 1 -j ${names.output}")
+                add("$IPV6 -t filter -N ${names.output}")
+                add("$IPV6 -t filter -A ${names.output} -j $slotChain")
+                add("$IPV6 -t filter -I OUTPUT 1 -j ${names.output}")
                 if (plan.runtimeState.tetherUpstreamInterface != null) {
-                    add("ip6tables -w 2 -t filter -N ${names.prerouting}")
+                    add("$IPV6 -t filter -N ${names.prerouting}")
                     addAll(ipv6TetherRejectRules(names.prerouting, plan))
-                    add("ip6tables -w 2 -t filter -I INPUT 1 -j ${names.prerouting}")
-                    add("ip6tables -w 2 -t filter -I FORWARD 1 -j ${names.prerouting}")
+                    addAll(tetherInputRules(IPV6, names.prerouting + "I", requireNotNull(plan.runtimeState.tetherUpstreamInterface), "REJECT --reject-with icmp6-no-route"))
+                    add("$IPV6 -t filter -I INPUT 1 -j ${names.prerouting}I")
+                    add("$IPV6 -t filter -I FORWARD 1 -j ${names.prerouting}")
                 }
             }
         }
@@ -743,13 +756,13 @@ class TproxyManager internal constructor(
             val currentChain = names.slot(currentSlot)
             val nextChain = names.slot(nextSlot)
             return buildList {
-                add("ip6tables -w 2 -t filter -F $nextChain 2>/dev/null || true")
-                add("ip6tables -w 2 -t filter -X $nextChain 2>/dev/null || true")
-                add("ip6tables -w 2 -t filter -N $nextChain")
+                add("$IPV6 -t filter -F $nextChain 2>/dev/null || true")
+                add("$IPV6 -t filter -X $nextChain 2>/dev/null || true")
+                add("$IPV6 -t filter -N $nextChain")
                 addAll(ipv6RejectRules(nextChain, plan, appUid))
-                add("ip6tables -w 2 -t filter -R ${names.output} 1 -j $nextChain")
-                add("ip6tables -w 2 -t filter -F $currentChain")
-                add("ip6tables -w 2 -t filter -X $currentChain")
+                add("$IPV6 -t filter -R ${names.output} 1 -j $nextChain")
+                add("$IPV6 -t filter -F $currentChain")
+                add("$IPV6 -t filter -X $currentChain")
             }
         }
 
@@ -758,13 +771,13 @@ class TproxyManager internal constructor(
             plan: TproxyTrafficPlan,
             appUid: Int,
         ): List<String> = buildList {
-            add("ip6tables -w 2 -t filter -A $chain -m owner --uid-owner $appUid -j RETURN")
+            add("$IPV6 -t filter -A $chain -m owner --uid-owner $appUid -j RETURN")
             uidRanges(plan.bypassUids - appUid).forEach { range ->
-                add("ip6tables -w 2 -t filter -A $chain -m owner --uid-owner ${range.asArgument()} -j RETURN")
+                add("$IPV6 -t filter -A $chain -m owner --uid-owner ${range.asArgument()} -j RETURN")
             }
             plan.routeProfileIds.toSortedSet().forEach { profileId ->
                 add(
-                    "ip6tables -w 2 -t filter -A $chain -m owner --uid-owner ${appUidRangeForProfile(profileId).asArgument()} " +
+                    "$IPV6 -t filter -A $chain -m owner --uid-owner ${appUidRangeForProfile(profileId).asArgument()} " +
                         "-j REJECT --reject-with icmp6-no-route",
                 )
             }
@@ -772,15 +785,15 @@ class TproxyManager internal constructor(
 
         private fun ipv6TetherRejectRules(chain: String, plan: TproxyTrafficPlan): List<String> = buildList {
             val upstream = requireNotNull(plan.runtimeState.tetherUpstreamInterface)
-            add("ip6tables -w 2 -t filter -A $chain -i $upstream -j RETURN")
+            add("$IPV6 -t filter -A $chain -i $upstream -j RETURN")
             for (protocol in listOf("tcp", "udp")) {
-                add("ip6tables -w 2 -t filter -A $chain -p $protocol --dport 53 -j REJECT --reject-with icmp6-no-route")
+                add("$IPV6 -t filter -A $chain -p $protocol --dport 53 -j REJECT --reject-with icmp6-no-route")
             }
-            add("ip6tables -w 2 -t filter -A $chain -m addrtype --dst-type LOCAL -j RETURN")
-            tetherBypassCidrs("ip6tables", plan.runtimeState.tetherBypassLan).forEach { cidr ->
-                add("ip6tables -w 2 -t filter -A $chain -d $cidr -j RETURN")
+
+            tetherBypassCidrs(IPV6, plan.runtimeState.tetherBypassLan).forEach { cidr ->
+                add("$IPV6 -t filter -A $chain -d $cidr -j RETURN")
             }
-            add("ip6tables -w 2 -t filter -A $chain -j REJECT --reject-with icmp6-no-route")
+            add("$IPV6 -t filter -A $chain -j REJECT --reject-with icmp6-no-route")
         }
 
         private fun outputRules(
@@ -794,43 +807,43 @@ class TproxyManager internal constructor(
             val mask = hex(state.markMask)
             val base = plan.groups.single { it.isBase }
             val baseMark = hex(base.state.mark)
-            add("$tool -w 2 -t mangle -A $chain -m mark --mark ${plan.outboundMark}/0xffffffff -j RETURN")
-            add("$tool -w 2 -t mangle -A $chain -m owner --uid-owner $appUid -j RETURN")
+            add("$tool -t mangle -A $chain -m mark --mark ${plan.outboundMark}/0xffffffff -j RETURN")
+            add("$tool -t mangle -A $chain -m owner --uid-owner $appUid -j RETURN")
             state.groups.forEach { group ->
                 for (protocol in listOf("tcp", "udp")) {
                     add(
-                        "$tool -w 2 -t mangle -A $chain ${
-                            localDestinationMatch(tool, state.ipv6Enabled || state.tetherUpstreamInterface != null)
+                        "$tool -t mangle -A $chain ${
+                            localDestinationMatch(state)
                         } -p $protocol " +
                             "--dport ${group.port} -j DROP",
                     )
                 }
             }
-            val loopback = if (tool == "ip6tables") "::1/128" else "127.0.0.0/8"
-            val multicast = if (tool == "ip6tables") "ff00::/8" else "224.0.0.0/4"
-            add("$tool -w 2 -t mangle -A $chain -d $loopback -j RETURN")
-            add("$tool -w 2 -t mangle -A $chain -d $multicast -j RETURN")
-            if (tool == "iptables") add("$tool -w 2 -t mangle -A $chain -d 255.255.255.255/32 -j RETURN")
+            val loopback = if (tool == IPV6) "::1/128" else "127.0.0.0/8"
+            val multicast = if (tool == IPV6) "ff00::/8" else "224.0.0.0/4"
+            add("$tool -t mangle -A $chain -d $loopback -j RETURN")
+            add("$tool -t mangle -A $chain -d $multicast -j RETURN")
+            if (tool == IPV4) add("$tool -t mangle -A $chain -d 255.255.255.255/32 -j RETURN")
             uidRanges(plan.bypassUids - appUid).forEach { range ->
-                add("$tool -w 2 -t mangle -A $chain -m owner --uid-owner ${range.asArgument()} -j RETURN")
+                add("$tool -t mangle -A $chain -m owner --uid-owner ${range.asArgument()} -j RETURN")
             }
             // Android sends application DNS through a system resolver UID outside the managed app ranges.
             for (protocol in listOf("tcp", "udp")) {
-                add("$tool -w 2 -t mangle -A $chain -p $protocol --dport 53 -j MARK --set-xmark $baseMark/0xffffffff")
+                add("$tool -t mangle -A $chain -p $protocol --dport 53 -j MARK --set-xmark $baseMark/0xffffffff")
             }
             plan.groups.filterNot { it.isBase }.forEach { group ->
                 uidRanges(group.uids).forEach { range ->
                     addMarkRules(tool, chain, range, group.state.mark)
                 }
             }
-            add("$tool -w 2 -t mangle -A $chain -m mark --mark $prefix/$mask -j RETURN")
+            add("$tool -t mangle -A $chain -m mark --mark $prefix/$mask -j RETURN")
             plan.routeProfileIds.toSortedSet().forEach { profileId ->
                 addMarkRules(tool, chain, appUidRangeForProfile(profileId), base.state.mark)
             }
-            add("$tool -w 2 -t mangle -A $chain -m mark --mark $prefix/$mask -j RETURN")
+            add("$tool -t mangle -A $chain -m mark --mark $prefix/$mask -j RETURN")
             plan.routeProfileIds.toSortedSet().forEach { profileId ->
                 val range = appUidRangeForProfile(profileId)
-                add("$tool -w 2 -t mangle -A $chain -m owner --uid-owner ${range.asArgument()} -j DROP")
+                add("$tool -t mangle -A $chain -m owner --uid-owner ${range.asArgument()} -j DROP")
             }
         }
 
@@ -843,34 +856,25 @@ class TproxyManager internal constructor(
             val markHex = hex(mark)
             for (protocol in listOf("tcp", "udp")) {
                 add(
-                    "$tool -w 2 -t mangle -A $chain -m owner --uid-owner ${range.asArgument()} -p $protocol " +
+                    "$tool -t mangle -A $chain -m owner --uid-owner ${range.asArgument()} -p $protocol " +
                         "-j MARK --set-xmark $markHex/0xffffffff",
                 )
             }
         }
 
-        private fun localDestinationMatch(tool: String, ipv6Enabled: Boolean): String = when {
-            tool == "ip6tables" -> "-m addrtype --dst-type LOCAL"
-            ipv6Enabled -> "-m addrtype --dst-type LOCAL"
-            else -> "-d 127.0.0.0/8"
-        }
+        private fun localDestinationMatch(state: TproxyRuntimeState): String = if (state.ipv6Enabled || state.tetherUpstreamInterface != null) "-o lo" else "-d 127.0.0.0/8"
 
-        private fun canonicalLocalDestinationMatch(tool: String, ipv6Enabled: Boolean, protocol: String): String {
-            val destinationMatch = localDestinationMatch(tool, ipv6Enabled)
-            return if (destinationMatch.startsWith("-m ")) {
-                "-p $protocol $destinationMatch"
-            } else {
-                "$destinationMatch -p $protocol"
-            }
-        }
+        private fun canonicalLocalDestinationMatch(state: TproxyRuntimeState, protocol: String): String = "${localDestinationMatch(state)} -p $protocol"
+
+        private fun listenerDestinationMatch(state: TproxyRuntimeState): String = if (state.ipv6Enabled || state.tetherUpstreamInterface != null) "" else "-d 127.0.0.0/8 "
 
         private fun tproxyOnIp(tool: String, ipv6Enabled: Boolean, acceptNonLoopback: Boolean = false): String = when {
-            tool == "ip6tables" -> "::"
+            tool == IPV6 -> "::"
             ipv6Enabled || acceptNonLoopback -> "0.0.0.0"
             else -> "127.0.0.1"
         }
 
-        private fun tetherBypassCidrs(tool: String, bypassLan: Boolean): List<String> = if (tool == "ip6tables") {
+        private fun tetherBypassCidrs(tool: String, bypassLan: Boolean): List<String> = if (tool == IPV6) {
             IPV6_ALWAYS_BYPASS_CIDRS + IPV6_LAN_CIDRS.takeIf { bypassLan }.orEmpty()
         } else {
             IPV4_ALWAYS_BYPASS_CIDRS + IPV4_LAN_CIDRS.takeIf { bypassLan }.orEmpty()
@@ -911,8 +915,6 @@ class TproxyManager internal constructor(
 
         private fun hex(value: Int): String = "0x${value.toUInt().toString(16)}"
 
-        private fun shellQuote(value: String): String = "'${value.replace("'", "'\\''")}'"
-
         private val TETHER_INTERFACE_PATTERN = Regex("[A-Za-z0-9_.:-]{1,15}")
         private val IPV4_ALWAYS_BYPASS_CIDRS = listOf(
             "0.0.0.0/8",
@@ -945,24 +947,6 @@ class TproxyManager internal constructor(
             val prerouting: String,
         ) {
             fun slot(value: String): String = if (value == SLOT_A) slotA else slotB
-        }
-
-        private data class RestoreBatch(
-            val tool: String,
-            val table: String,
-            val commands: List<String>,
-        ) {
-            fun payload(): String {
-                val prefix = "$tool -w 2 -t $table "
-                return buildString {
-                    append("*$table\n")
-                    commands.forEach { command ->
-                        require(command.startsWith(prefix))
-                        append(command.removePrefix(prefix)).append('\n')
-                    }
-                    append("COMMIT")
-                }
-            }
         }
     }
 }

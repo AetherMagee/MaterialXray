@@ -383,6 +383,12 @@ class XrayService : VpnService() {
         )
         screenStateReceiverRegistered = true
         registerNetworkCallback()
+        scope.launch {
+            while (isActive) {
+                delay(LOCAL_ADDRESS_CHECK_INTERVAL_MS)
+                refreshTetherLocalAddresses()
+            }
+        }
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {
@@ -1462,6 +1468,26 @@ class XrayService : VpnService() {
         return currentPid == watchedPid
     }
 
+    // Downstream hotspot/USB/Bluetooth interfaces are not default INTERNET networks. Keep
+    // their exact-address rules current even when passive health monitoring is disabled.
+    private suspend fun refreshTetherLocalAddresses() {
+        if (!connectionManager.isUsingRootRuntime) return
+        if (!settingsRepo.tunnelTetheredClients.first()) return
+        val backend = settingsRepo.rootConnectionBackend.first()
+        runConnectionCommand {
+            val config = activeConfig ?: return@runConnectionCommand
+            if (connectionStateCoordinator.state.value !is ConnectionState.Connected) return@runConnectionCommand
+            try {
+                if (connectionManager.localAddressesChanged(backend)) {
+                    logBuffer.append(LogSource.APP, "Local interface addresses changed; refreshing tether routing")
+                    restartRuntime(config, ConnectionState.ApplyingRoutingChanges)
+                }
+            } catch (error: java.io.IOException) {
+                logBuffer.append(LogSource.APP, "Could not refresh local addresses; retaining installed rules: ${error.message}")
+            }
+        }
+    }
+
     private fun registerNetworkCallback() {
         val connectivityManager = getSystemService(ConnectivityManager::class.java)
         val callbackHandler = Handler(mainLooper)
@@ -2302,6 +2328,7 @@ class XrayService : VpnService() {
         private const val SLOW_NETWORK_STABILIZATION_LOG_THRESHOLD_MS = 500L
         private const val NETWORK_RETARGET_WAKE_LOCK_TIMEOUT_MS = 30_000L
         private const val CONNECTION_COMMAND_WAKE_LOCK_TIMEOUT_MS = 10 * 60_000L
+        private const val LOCAL_ADDRESS_CHECK_INTERVAL_MS = 2_000L
         private const val NETWORK_SAFETY_CHECK_INTERVAL_MS = 60_000L
         private const val PERIODIC_ROOT_ROUTE_VERIFICATION_REASON = "periodic root route verification"
         private val NETWORK_RETARGET_RETRY_DELAYS_MS = listOf(250L, 500L, 1_000L, 2_000L, 4_000L, 8_000L)
