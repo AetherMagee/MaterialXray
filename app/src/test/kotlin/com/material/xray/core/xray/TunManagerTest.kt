@@ -193,10 +193,11 @@ class TunManagerTest {
     @Test
     fun `tether routing captures DNS and public traffic while preserving upstream and LAN`() = runTest {
         val commands = mutableListOf<String>()
+        var localAddresses = "1: lo inet 127.0.0.1/8 scope host lo\n2: ap0 inet 192.168.43.1/24 scope global ap0"
         val manager = TunManager { command ->
             commands += command
             if (command == LocalAddresses.COMMAND) {
-                successfulCommand("1: lo inet 127.0.0.1/8 scope host lo\n2: ap0 inet 192.168.43.1/24 scope global ap0")
+                successfulCommand(localAddresses)
             } else {
                 successfulCommand()
             }
@@ -226,6 +227,13 @@ class TunManagerTest {
         commands.forEach { generated ->
             assertEquals(0, ProcessBuilder("sh", "-n", "-c", generated).start().waitFor())
         }
+
+        localAddresses += "\n2: ap0 inet6 2001:db8::1/64 scope global"
+        assertFalse(manager.localAddressesChanged())
+        assertFalse(manager.localAddressesChanged())
+        localAddresses += "\n3: rndis0 inet 192.168.44.1/24 scope global rndis0"
+        assertFalse(manager.localAddressesChanged())
+        assertTrue(manager.localAddressesChanged())
     }
 
     @Test

@@ -72,6 +72,52 @@ class TproxyManagerTest {
     @Test
     fun `address refresh detects hotspot appearance and IPv6 removal on unchanged upstream`() = runTest {
         var output = "1: lo inet 127.0.0.1/8\n2: rmnet1 inet 198.51.100.2/30"
+        val initial = LocalAddresses.parse(output, includeIpv6 = true)
+        val manager = TproxyManager(APP_UID) { command ->
+            when {
+                command == LocalAddresses.COMMAND -> RootShell.Result(0, output, "")
+                command.startsWith("ip rule show") -> RootShell.Result(0, "\n__MXRAY_TPROXY_ROUTES__\n", "")
+                else -> RootShell.Result(0, "", "")
+            }
+        }
+        val base = plan(allowIpv6 = true, tetherUpstreamInterface = "rmnet1")
+        assertTrue(manager.activate(base.copy(runtimeState = base.runtimeState.copy(localAddresses = initial))).success)
+        assertFalse(manager.localAddressesChanged())
+        output += "\n3: ap0 inet 192.168.43.1/24\n3: ap0 inet6 2001:db8::1/64"
+        assertFalse(manager.localAddressesChanged())
+        assertTrue(manager.localAddressesChanged())
+        assertTrue(
+            manager.activate(
+                base.copy(runtimeState = base.runtimeState.copy(localAddresses = LocalAddresses.parse(output, includeIpv6 = true))),
+            ).success,
+        )
+        output = output.substringBefore("\n3: ap0 inet6")
+        assertFalse(manager.localAddressesChanged())
+        assertTrue(manager.localAddressesChanged())
+    }
+
+    @Test
+    fun `IPv6 changes are ignored when IPv6 routing is disabled`() = runTest {
+        var output = "1: lo inet 127.0.0.1/8\n2: rmnet1 inet 198.51.100.2/30\n2: rmnet1 inet6 2001:db8::1/64"
+        val manager = TproxyManager(APP_UID) { command ->
+            if (command == LocalAddresses.COMMAND) {
+                RootShell.Result(0, output, "")
+            } else {
+                RootShell.Result(0, "\n__MXRAY_TPROXY_ROUTES__\n", "")
+            }
+        }
+        val base = plan(tetherUpstreamInterface = "rmnet1")
+        val state = base.runtimeState.copy(localAddresses = LocalAddresses.parse(output, includeIpv6 = false))
+        assertTrue(manager.activate(base.copy(runtimeState = state)).success)
+
+        output = output.replace("2001:db8::1", "2001:db8::2")
+        assertFalse(manager.localAddressesChanged())
+        assertFalse(manager.localAddressesChanged())
+    }
+
+    @Test
+    fun `verification leaves local address refresh to the stable background monitor`() = runTest {
+        var output = "1: lo inet 127.0.0.1/8\n2: rmnet1 inet 198.51.100.2/30"
         val initial = LocalAddresses.parse(output)
         val manager = TproxyManager(APP_UID) { command ->
             when {
@@ -81,13 +127,34 @@ class TproxyManagerTest {
             }
         }
         val base = plan(tetherUpstreamInterface = "rmnet1")
-        assertTrue(manager.activate(base.copy(runtimeState = base.runtimeState.copy(localAddresses = initial))).success)
+        val state = base.runtimeState.copy(localAddresses = initial)
+        assertTrue(manager.activate(base.copy(runtimeState = state)).success)
+
+        output += "\n3: ap0 inet 192.168.43.1/24"
+        assertTrue(manager.verify(state).success)
+        assertTrue(manager.verify(state).success)
         assertFalse(manager.localAddressesChanged())
-        output += "\n3: ap0 inet 192.168.43.1/24\n3: ap0 inet6 2001:db8::1/64"
         assertTrue(manager.localAddressesChanged())
-        assertTrue(manager.activate(base.copy(runtimeState = base.runtimeState.copy(localAddresses = LocalAddresses.parse(output)))).success)
-        output = output.substringBefore("\n3: ap0 inet6")
-        assertTrue(manager.localAddressesChanged())
+    }
+
+    @Test
+    fun `restored runtime seeds local address tracking from persisted state`() = runTest {
+        var output = "1: lo inet 127.0.0.1/8\n2: rmnet1 inet 198.51.100.2/30\n2: rmnet1 inet6 2001:db8::1/64"
+        val manager = TproxyManager(APP_UID) { command ->
+            if (command == LocalAddresses.COMMAND) {
+                RootShell.Result(0, output, "")
+            } else {
+                RootShell.Result(0, "", "")
+            }
+        }
+        val state = plan(tetherUpstreamInterface = "rmnet1").runtimeState.copy(
+            localAddresses = LocalAddresses.parse(output, includeIpv6 = false),
+        )
+
+        assertTrue(manager.verify(state).success)
+        assertFalse(manager.localAddressesChanged())
+        output = output.replace("2001:db8::1", "2001:db8::2")
+        assertFalse(manager.localAddressesChanged())
     }
 
     @Test

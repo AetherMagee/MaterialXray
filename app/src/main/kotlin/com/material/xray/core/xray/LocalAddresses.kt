@@ -9,18 +9,24 @@ import java.net.InetAddress
 internal object LocalAddresses {
     const val COMMAND = "ip -o address show"
 
-    suspend fun read(execute: suspend (String) -> RootShell.Result): List<String> {
+    suspend fun read(
+        includeIpv6: Boolean,
+        execute: suspend (String) -> RootShell.Result,
+    ): List<String> {
         val result = execute(COMMAND)
         if (!result.isSuccess) throw IOException("Could not inspect local interface addresses: ${result.error}")
-        return parse(result.output)
+        return parse(result.output, includeIpv6)
     }
 
-    fun parse(output: String): List<String> {
+    fun parse(output: String, includeIpv6: Boolean = true): List<String> {
         val addresses = output.lineSequence().filter(String::isNotBlank).map { line ->
             val fields = line.trim().split(Regex("\\s+"))
             val familyIndex = fields.indexOfFirst { it == "inet" || it == "inet6" }
             // ip also prints link-layer entries; they carry no address for our rules.
             if (familyIndex < 0) return@map null
+            if (fields[familyIndex] == "inet6" && (!includeIpv6 || fields.any { it in UNSTABLE_IPV6_FLAGS })) {
+                return@map null
+            }
             val address = fields.getOrNull(familyIndex + 1)?.substringBefore('/')
                 .orEmpty()
             hostCidr(address) ?: throw IOException("Invalid local interface address: $address")
@@ -48,5 +54,38 @@ internal object LocalAddresses {
         } else {
             (listOf("127.0.0.0/8") + addresses.filter { ':' !in it && !it.startsWith("127.") }).distinct()
         }
+    }
+
+    private val UNSTABLE_IPV6_FLAGS = setOf("temporary", "dadfailed")
+}
+
+/** Requires the same changed snapshot twice so an address transition cannot tear down a working tunnel. */
+internal class LocalAddressChangeTracker {
+    private var installed: List<String>? = null
+    private var candidate: List<String>? = null
+
+    var includeIpv6: Boolean = true
+        private set
+
+    fun markInstalled(addresses: List<String>, includeIpv6: Boolean) {
+        installed = addresses
+        candidate = null
+        this.includeIpv6 = includeIpv6
+    }
+
+    fun ensureInstalled(addresses: List<String>, includeIpv6: Boolean) {
+        if (installed == null) markInstalled(addresses, includeIpv6)
+    }
+
+    fun hasStableChange(addresses: List<String>): Boolean {
+        if (addresses == installed) {
+            candidate = null
+            return false
+        }
+        if (addresses != candidate) {
+            candidate = addresses
+            return false
+        }
+        return true
     }
 }

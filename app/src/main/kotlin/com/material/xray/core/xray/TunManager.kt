@@ -12,9 +12,11 @@ class TunManager internal constructor(
 ) {
     constructor(shell: RootShell) : this(executeCommand = { command -> shell.execute(command) })
 
-    private var installedLocalAddresses: List<String>? = null
+    private val localAddressTracker = LocalAddressChangeTracker()
 
-    suspend fun localAddressesChanged(): Boolean = LocalAddresses.read(executeCommand) != installedLocalAddresses
+    suspend fun localAddressesChanged(): Boolean = localAddressTracker.hasStableChange(
+        LocalAddresses.read(localAddressTracker.includeIpv6, executeCommand),
+    )
 
     data class PhysicalRoute(
         val dev: String,
@@ -265,11 +267,11 @@ class TunManager internal constructor(
         if (!setupResult.isSuccess) return setupResult.toRoutingError("IP routing setup")
 
         if (tunnelTetheredClients) {
-            val addresses = LocalAddresses.read(executeCommand)
+            val addresses = LocalAddresses.read(allowIpv6, executeCommand)
             val tetherCommand = tetherSetupCommand(tunName, physicalRoute.dev, allowIpv6, bypassLan, addresses)
             val tetherResult = executeCommand(tetherCommand)
             if (!tetherResult.isSuccess) return tetherResult.toRoutingError("tether routing setup")
-            installedLocalAddresses = addresses
+            localAddressTracker.markInstalled(addresses, allowIpv6)
         }
 
         return removeRoutingUpdateGuard(updateGuardTable, routedProfileIds, bypassUids)

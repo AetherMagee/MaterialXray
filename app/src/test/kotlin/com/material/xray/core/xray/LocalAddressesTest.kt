@@ -40,6 +40,33 @@ class LocalAddressesTest {
     }
 
     @Test
+    fun `unusable IPv6 addresses and disabled IPv6 do not destabilize snapshots`() {
+        val output = """
+            1: lo inet 127.0.0.1/8 scope host lo
+            2: wlan0 inet 192.0.2.2/24 scope global wlan0
+            2: wlan0 inet6 2001:db8::1/64 scope global dynamic mngtmpaddr
+            2: wlan0 inet6 2001:db8::2/64 scope global temporary dynamic
+            2: wlan0 inet6 2001:db8::3/64 scope global deprecated dynamic
+            2: wlan0 inet6 fe80::1/64 scope link tentative
+        """.trimIndent()
+
+        assertEquals(
+            listOf(
+                "127.0.0.1/32",
+                "192.0.2.2/32",
+                "2001:db8:0:0:0:0:0:1/128",
+                "2001:db8:0:0:0:0:0:3/128",
+                "fe80:0:0:0:0:0:0:1/128",
+            ),
+            LocalAddresses.parse(output),
+        )
+        assertEquals(
+            listOf("127.0.0.1/32", "192.0.2.2/32"),
+            LocalAddresses.parse(output, includeIpv6 = false),
+        )
+    }
+
+    @Test
     fun `invalid and empty snapshots cannot silently remove local protection`() {
         for (output in listOf("", "2: ap0 inet hostname/24", "2: ap0 inet 999.1.1.1/24", "2: ap0 inet6 ::1;evil/64")) {
             assertThrows(IOException::class.java) { LocalAddresses.parse(output) }
@@ -50,7 +77,7 @@ class LocalAddressesTest {
     fun `failed root inspection is not treated as an empty address set`() = runTest {
         var failed = false
         try {
-            LocalAddresses.read { RootShell.Result(1, "", "permission denied") }
+            LocalAddresses.read(includeIpv6 = true) { RootShell.Result(1, "", "permission denied") }
         } catch (_: IOException) {
             failed = true
         }

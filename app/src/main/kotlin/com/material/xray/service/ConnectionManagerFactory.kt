@@ -272,7 +272,7 @@ internal class TproxyManagerRoutingGateway(
             allowIpv6 = allowIpv6,
             tetherUpstreamInterface = tetherUpstreamInterface,
             tetherBypassLan = bypassLan,
-            localAddresses = if (tetherUpstreamInterface != null) manager.readLocalAddresses() else emptyList(),
+            localAddresses = if (tetherUpstreamInterface != null) manager.readLocalAddresses(allowIpv6) else emptyList(),
         )
         require(state.groups.map { it.routeKey } == routeIdentities.map { it.first }) {
             "TPROXY traffic group topology changed"

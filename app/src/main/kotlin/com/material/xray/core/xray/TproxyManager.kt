@@ -29,11 +29,13 @@ class TproxyManager internal constructor(
     private var bulkRestoreSupported = false
     private var useIndividualCommands = false
     private var guardCoversTethering = false
-    private var installedLocalAddresses: List<String>? = null
+    private val localAddressTracker = LocalAddressChangeTracker()
 
-    internal suspend fun readLocalAddresses(): List<String> = LocalAddresses.read(executeCommand)
+    internal suspend fun readLocalAddresses(includeIpv6: Boolean): List<String> = LocalAddresses.read(includeIpv6, executeCommand)
 
-    suspend fun localAddressesChanged(): Boolean = readLocalAddresses() != installedLocalAddresses
+    suspend fun localAddressesChanged(): Boolean = localAddressTracker.hasStableChange(
+        readLocalAddresses(localAddressTracker.includeIpv6),
+    )
 
     suspend fun installGuard(plan: TproxyTrafficPlan): TunManager.RoutingResult {
         if (useIndividualCommands) return installGuardIndividually(plan)
@@ -54,7 +56,7 @@ class TproxyManager internal constructor(
 
     suspend fun activate(plan: TproxyTrafficPlan): TunManager.RoutingResult {
         val state = plan.runtimeState
-        installedLocalAddresses = state.localAddresses
+        localAddressTracker.markInstalled(state.localAddresses, state.ipv6Enabled)
         val inspection = executeCommand(activationInspectionCommand(state))
         if (!inspection.isSuccess) return inspection.toRoutingResult("TPROXY namespace inspection")
         val sections = inspection.output.split(ACTIVATION_INSPECTION_SEPARATOR, limit = 2)
@@ -106,11 +108,11 @@ class TproxyManager internal constructor(
     }
 
     suspend fun verify(state: TproxyRuntimeState): TunManager.RoutingResult {
-        if (state.tetherUpstreamInterface != null && readLocalAddresses() != state.localAddresses) {
-            return TunManager.RoutingResult(false, "Local interface addresses changed during routing setup")
+        localAddressTracker.ensureInstalled(state.localAddresses, state.ipv6Enabled)
+        if (state.tetherUpstreamInterface != null && state.localAddresses.isEmpty()) {
+            return TunManager.RoutingResult(false, "Local interface addresses were not captured during routing setup")
         }
         return execute(verifyCommand(state, appUid), "TPROXY routing verification")
-            .also { if (it.success) installedLocalAddresses = state.localAddresses }
     }
 
     suspend fun remove(state: TproxyRuntimeState?, preserveGuard: Boolean = false): Boolean = executeCommand(cleanupCommand(state, appUid, preserveGuard)).isSuccess
