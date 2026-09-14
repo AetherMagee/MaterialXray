@@ -64,6 +64,7 @@ import com.material.xray.model.XrayRuntimeSettings
 import com.material.xray.model.primaryBalancerTag
 import com.material.xray.model.proxyOutboundCount
 import com.material.xray.telemetry.CoreRecoveryCause
+import com.material.xray.telemetry.TelemetryConnectionContext
 import com.material.xray.telemetry.TelemetryReporter
 import com.material.xray.telemetry.TelemetryServiceMode
 import dagger.hilt.android.AndroidEntryPoint
@@ -307,6 +308,7 @@ class XrayService : VpnService() {
 
         scope.launch {
             connectionStateCoordinator.state.drop(1).collect { state ->
+                telemetryReporter.recordConnectionState(state)
                 handleStateSideEffects(state)
                 updateNotification()
             }
@@ -576,12 +578,19 @@ class XrayService : VpnService() {
         terminalFailureNotificationShown = false
         getSystemService(NotificationManager::class.java).cancel(FAILURE_NOTIFICATION_ID)
         val runtimeSettings = settingsRepo.runtimeSettingsSnapshot()
-        val mode = if (runtimeSettings.useRootService && !isRunningAlwaysOnVpn()) {
-            TelemetryServiceMode.Root
-        } else {
-            TelemetryServiceMode.Vpn
-        }
-        telemetryReporter.recordConnectionAttempt(mode, runtimeSettings.rootConnectionBackend)
+        val alwaysOnVpn = isRunningAlwaysOnVpn()
+        val connection = TelemetryConnectionContext(
+            mode = if (runtimeSettings.useRootService && !alwaysOnVpn) {
+                TelemetryServiceMode.Root
+            } else {
+                TelemetryServiceMode.Vpn
+            },
+            backend = runtimeSettings.rootConnectionBackend,
+            alwaysOnVpn = alwaysOnVpn,
+            allowIpv6 = runtimeSettings.allowIpv6,
+            bypassLan = runtimeSettings.bypassLan,
+        )
+        telemetryReporter.recordConnectionAttempt(connection)
         val startedAt = SystemClock.elapsedRealtime()
         var succeeded: Boolean? = null
         try {
@@ -602,8 +611,7 @@ class XrayService : VpnService() {
                 telemetryReporter.recordConnectionResult(
                     succeeded = result,
                     durationMillis = SystemClock.elapsedRealtime() - startedAt,
-                    mode = mode,
-                    backend = runtimeSettings.rootConnectionBackend,
+                    connection = connection,
                 )
             }
         }

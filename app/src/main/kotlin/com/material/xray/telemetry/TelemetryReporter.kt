@@ -4,8 +4,10 @@ import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.os.SystemClock
 import com.material.xray.model.ConnectionProgress
+import com.material.xray.model.ConnectionState
 import com.material.xray.model.RootConnectionBackend
 import dagger.hilt.android.qualifiers.ApplicationContext
+import io.sentry.Breadcrumb
 import io.sentry.Sentry
 import io.sentry.SentryLevel
 import io.sentry.SpanStatus
@@ -33,6 +35,30 @@ enum class CoreRecoveryCause(val value: String) {
 
 internal fun interface TelemetrySpan {
     fun finish(succeeded: Boolean)
+}
+
+/**
+ * Fixed, low-cardinality description of how a connection was requested. Everything in here is an
+ * enum or a boolean so it can safely become a metric attribute, a scope tag, or breadcrumb data.
+ */
+data class TelemetryConnectionContext(
+    val mode: TelemetryServiceMode,
+    val backend: RootConnectionBackend,
+    val alwaysOnVpn: Boolean,
+    val allowIpv6: Boolean,
+    val bypassLan: Boolean,
+) {
+    internal val metricAttributes: Map<String, Any> = mapOf(
+        "service_mode" to mode.value,
+        "root_backend" to if (mode == TelemetryServiceMode.Root) backend.persistedValue else "none",
+    )
+
+    internal val scopeTags: Map<String, String> = metricAttributes.mapValues { it.value.toString() } +
+        mapOf(
+            "always_on_vpn" to alwaysOnVpn.toString(),
+            "allow_ipv6" to allowIpv6.toString(),
+            "bypass_lan" to bypassLan.toString(),
+        )
 }
 
 @Singleton
@@ -64,7 +90,11 @@ class TelemetryReporter @Inject constructor(
                 "production"
             }
             options.isSendDefaultPii = false
-            options.maxBreadcrumbs = 0
+            // Breadcrumbs are only ever added by this class from a fixed vocabulary; every automatic
+            // source (Logcat, network, UI, lifecycle) stays disabled below.
+            options.maxBreadcrumbs = MAX_BREADCRUMBS
+            // Message events carry their own tags; the calling thread's stack is noise.
+            options.isAttachStacktrace = false
             options.tracesSampleRate = if (isDebuggable()) DEBUG_TRACE_SAMPLE_RATE else RELEASE_TRACE_SAMPLE_RATE
             options.profilesSampleRate = 0.0
             options.profileSessionSampleRate = 0.0
@@ -98,12 +128,14 @@ class TelemetryReporter @Inject constructor(
     }
 
     @Synchronized
-    fun recordConnectionAttempt(mode: TelemetryServiceMode, backend: RootConnectionBackend) {
-        count("connection.attempted", attributes(mode, backend))
+    fun recordConnectionAttempt(connection: TelemetryConnectionContext) {
+        count("connection.attempted", connection.metricAttributes)
         if (!enabled) return
+        connection.scopeTags.forEach { (key, value) -> Sentry.setTag(key, value) }
+        addBreadcrumb("connection", "attempt", connection.metricAttributes)
         activeConnectionTrace?.finish(SpanStatus.ABORTED)
         activeConnectionTrace = Sentry.startTransaction("connection.setup", "connection").apply {
-            attributes(mode, backend).forEach { (key, value) -> setTag(key, value.toString()) }
+            connection.metricAttributes.forEach { (key, value) -> setTag(key, value.toString()) }
         }
     }
 
@@ -111,10 +143,9 @@ class TelemetryReporter @Inject constructor(
     fun recordConnectionResult(
         succeeded: Boolean,
         durationMillis: Long,
-        mode: TelemetryServiceMode,
-        backend: RootConnectionBackend,
+        connection: TelemetryConnectionContext,
     ) {
-        val attributes = attributes(mode, backend)
+        val attributes = connection.metricAttributes
         count(if (succeeded) "connection.succeeded" else "connection.failed", attributes)
         if (enabled) {
             Sentry.metrics().distribution(
@@ -123,16 +154,32 @@ class TelemetryReporter @Inject constructor(
                 MetricsUnit.Duration.MILLISECOND,
                 SentryMetricsParameters.create(attributes),
             )
+            addBreadcrumb(
+                "connection",
+                if (succeeded) "succeeded" else "failed",
+                mapOf("duration_ms" to durationMillis),
+            )
             activeConnectionTrace?.finish(if (succeeded) SpanStatus.OK else SpanStatus.INTERNAL_ERROR)
             activeConnectionTrace = null
         }
     }
 
+    fun recordConnectionState(state: ConnectionState) {
+        if (!enabled) return
+        val value = state.telemetryValue()
+        Sentry.setTag("connection_state", value)
+        Sentry.setTag("core_running", (state is ConnectionState.Connected).toString())
+        val data = if (state is ConnectionState.Error) mapOf("retryable" to state.retryable) else emptyMap()
+        addBreadcrumb("connection.state", value, data)
+    }
+
     @Synchronized
     internal fun startConnectionStep(progress: ConnectionProgress): TelemetrySpan? {
         if (!enabled) return null
-        val span = activeConnectionTrace?.startChild("connection.step", progress.telemetryValue()) ?: return null
+        val step = progress.telemetryValue()
+        val span = activeConnectionTrace?.startChild("connection.step", step) ?: return null
         return TelemetrySpan { succeeded ->
+            addBreadcrumb("connection.step", step, mapOf("succeeded" to succeeded))
             span.finish(if (succeeded) SpanStatus.OK else SpanStatus.INTERNAL_ERROR)
         }
     }
@@ -146,8 +193,13 @@ class TelemetryReporter @Inject constructor(
     fun recordCoreRecovery(cause: CoreRecoveryCause, succeeded: Boolean) {
         val attributes = mapOf("cause" to cause.value, "succeeded" to succeeded)
         count("core.recovery", attributes)
+        addBreadcrumb("core.recovery", cause.value, mapOf("succeeded" to succeeded))
         if (cause == CoreRecoveryCause.ProcessExit && shouldReportIssue("core_exit")) {
-            captureSafeMessage("Xray core exited unexpectedly", "core-exit")
+            captureSafeMessage(
+                message = "Xray core exited unexpectedly",
+                fingerprint = "core-exit",
+                tags = mapOf("cause" to cause.value, "recovery_succeeded" to succeeded.toString()),
+            )
         }
     }
 
@@ -164,13 +216,26 @@ class TelemetryReporter @Inject constructor(
         Sentry.metrics().count(name, 1.0, "none", SentryMetricsParameters.create(attributes))
     }
 
-    private fun captureSafeMessage(message: String, fingerprint: String) {
+    private fun addBreadcrumb(category: String, message: String, data: Map<String, Any>) {
+        if (!enabled) return
+        Sentry.addBreadcrumb(
+            Breadcrumb().apply {
+                this.category = category
+                this.message = message
+                level = SentryLevel.INFO
+                data.forEach { (key, value) -> setData(key, value) }
+            },
+        )
+    }
+
+    private fun captureSafeMessage(message: String, fingerprint: String, tags: Map<String, String>) {
         if (!enabled) return
         val event = io.sentry.SentryEvent().apply {
             level = SentryLevel.ERROR
             logger = SAFE_EVENT_LOGGER
             this.message = Message().apply { formatted = message }
             fingerprints = listOf(fingerprint)
+            tags.forEach { (key, value) -> setTag(key, value) }
         }
         Sentry.captureEvent(event)
     }
@@ -185,14 +250,6 @@ class TelemetryReporter @Inject constructor(
         return true
     }
 
-    private fun attributes(
-        mode: TelemetryServiceMode,
-        backend: RootConnectionBackend,
-    ): Map<String, Any> = mapOf(
-        "service_mode" to mode.value,
-        "root_backend" to if (mode == TelemetryServiceMode.Root) backend.persistedValue else "none",
-    )
-
     private fun installationId(): String {
         val file = installationIdFile()
         val existing = runCatching { UUID.fromString(file.readText().trim()).toString() }.getOrNull()
@@ -205,6 +262,18 @@ class TelemetryReporter @Inject constructor(
     private fun installationIdFile(): File = context.noBackupFilesDir.resolve(INSTALLATION_ID_FILE)
 
     private fun isDebuggable(): Boolean = context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0
+
+    private fun ConnectionState.telemetryValue(): String = when (this) {
+        ConnectionState.Disconnected -> "disconnected"
+        ConnectionState.Connecting -> "connecting"
+        ConnectionState.ApplyingRoutingChanges -> "applying_routing_changes"
+        ConnectionState.UpdatingRoutingData -> "updating_routing_data"
+        is ConnectionState.RestartRequired -> "restart_required"
+        is ConnectionState.InterfaceBusy -> "interface_busy"
+        is ConnectionState.Connected -> "connected"
+        ConnectionState.Disconnecting -> "disconnecting"
+        is ConnectionState.Error -> "error"
+    }
 
     private fun ConnectionProgress.telemetryValue(): String = when (this) {
         ConnectionProgress.PreparingRuntime -> "preparing_runtime"
@@ -231,6 +300,7 @@ class TelemetryReporter @Inject constructor(
         const val SAFE_EVENT_LOGGER = "materialxray.telemetry"
         const val INSTALLATION_ID_FILE = "diagnostics-installation-id"
         const val ISSUE_REPORT_INTERVAL_MS = 15 * 60 * 1_000L
+        const val MAX_BREADCRUMBS = 60
         const val DEBUG_TRACE_SAMPLE_RATE = 1.0
         const val RELEASE_TRACE_SAMPLE_RATE = 0.1
     }
