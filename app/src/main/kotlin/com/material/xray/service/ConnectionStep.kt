@@ -1,6 +1,7 @@
 package com.material.xray.service
 
 import com.material.xray.model.ConnectionProgress
+import com.material.xray.telemetry.TelemetrySpan
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
@@ -31,6 +32,7 @@ internal class ConnectionStepExecutor(
     private val log: (String) -> Unit,
     private val onProgressStarted: (ConnectionProgress) -> Long,
     private val onProgressFinished: (Long) -> Unit,
+    private val onTraceStarted: (ConnectionProgress) -> TelemetrySpan? = { null },
     private val waitBeforeRetry: suspend (Long) -> Unit = { delay(it) },
 ) {
     @Suppress("TooGenericExceptionCaught")
@@ -67,6 +69,8 @@ internal class ConnectionStepExecutor(
         maxAttempts: Int,
     ): ConnectionStepOutcome<T> {
         val startedAt = elapsedRealtime()
+        val trace = step.progress?.takeIf { step.reported }?.let(onTraceStarted)
+        var succeeded = false
         if (step.reported && step.slowSuccessLogThresholdMs == null) {
             val attemptSuffix = if (maxAttempts > 1) " (attempt $attempt/$maxAttempts)" else ""
             log("${step.label}$attemptSuffix...")
@@ -74,7 +78,8 @@ internal class ConnectionStepExecutor(
         return try {
             val value = step.action()
             val elapsedMs = elapsedRealtime() - startedAt
-            if (step.isSuccessful(value)) {
+            succeeded = step.isSuccessful(value)
+            if (succeeded) {
                 if (
                     step.reported &&
                     (step.slowSuccessLogThresholdMs == null || elapsedMs > step.slowSuccessLogThresholdMs)
@@ -99,6 +104,8 @@ internal class ConnectionStepExecutor(
                 )
             }
             ConnectionStepOutcome.Error(error)
+        } finally {
+            trace?.finish(succeeded)
         }
     }
 

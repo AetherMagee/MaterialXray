@@ -3,10 +3,12 @@ package com.material.xray.telemetry
 import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.os.SystemClock
+import com.material.xray.model.ConnectionProgress
 import com.material.xray.model.RootConnectionBackend
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.sentry.Sentry
 import io.sentry.SentryLevel
+import io.sentry.SpanStatus
 import io.sentry.android.core.SentryAndroid
 import io.sentry.metrics.MetricsUnit
 import io.sentry.metrics.SentryMetricsParameters
@@ -29,18 +31,25 @@ enum class CoreRecoveryCause(val value: String) {
     RuntimeModeChanged("runtime_mode_changed"),
 }
 
+internal fun interface TelemetrySpan {
+    fun finish(succeeded: Boolean)
+}
+
 @Singleton
 class TelemetryReporter @Inject constructor(
     @param:ApplicationContext private val context: Context,
 ) {
     @Volatile private var enabled = false
     private val lastIssueAt = mutableMapOf<String, Long>()
+    private var activeConnectionTrace: io.sentry.ITransaction? = null
 
     @Synchronized
     fun setEnabled(enable: Boolean) {
         if (enable == enabled) return
         if (!enable) {
             enabled = false
+            activeConnectionTrace?.finish(SpanStatus.CANCELLED)
+            activeConnectionTrace = null
             Sentry.close()
             lastIssueAt.clear()
             installationIdFile().delete()
@@ -56,7 +65,7 @@ class TelemetryReporter @Inject constructor(
             }
             options.isSendDefaultPii = false
             options.maxBreadcrumbs = 0
-            options.tracesSampleRate = 0.0
+            options.tracesSampleRate = if (isDebuggable()) DEBUG_TRACE_SAMPLE_RATE else RELEASE_TRACE_SAMPLE_RATE
             options.profilesSampleRate = 0.0
             options.profileSessionSampleRate = 0.0
             options.isEnableUserInteractionTracing = false
@@ -88,10 +97,17 @@ class TelemetryReporter @Inject constructor(
         enabled = true
     }
 
+    @Synchronized
     fun recordConnectionAttempt(mode: TelemetryServiceMode, backend: RootConnectionBackend) {
         count("connection.attempted", attributes(mode, backend))
+        if (!enabled) return
+        activeConnectionTrace?.finish(SpanStatus.ABORTED)
+        activeConnectionTrace = Sentry.startTransaction("connection.setup", "connection").apply {
+            attributes(mode, backend).forEach { (key, value) -> setTag(key, value.toString()) }
+        }
     }
 
+    @Synchronized
     fun recordConnectionResult(
         succeeded: Boolean,
         durationMillis: Long,
@@ -107,7 +123,24 @@ class TelemetryReporter @Inject constructor(
                 MetricsUnit.Duration.MILLISECOND,
                 SentryMetricsParameters.create(attributes),
             )
+            activeConnectionTrace?.finish(if (succeeded) SpanStatus.OK else SpanStatus.INTERNAL_ERROR)
+            activeConnectionTrace = null
         }
+    }
+
+    @Synchronized
+    internal fun startConnectionStep(progress: ConnectionProgress): TelemetrySpan? {
+        if (!enabled) return null
+        val span = activeConnectionTrace?.startChild("connection.step", progress.telemetryValue()) ?: return null
+        return TelemetrySpan { succeeded ->
+            span.finish(if (succeeded) SpanStatus.OK else SpanStatus.INTERNAL_ERROR)
+        }
+    }
+
+    @Synchronized
+    fun finishInterruptedConnectionTrace() {
+        activeConnectionTrace?.finish(SpanStatus.INTERNAL_ERROR)
+        activeConnectionTrace = null
     }
 
     fun recordCoreRecovery(cause: CoreRecoveryCause, succeeded: Boolean) {
@@ -171,11 +204,34 @@ class TelemetryReporter @Inject constructor(
 
     private fun installationIdFile(): File = context.noBackupFilesDir.resolve(INSTALLATION_ID_FILE)
 
+    private fun isDebuggable(): Boolean = context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0
+
+    private fun ConnectionProgress.telemetryValue(): String = when (this) {
+        ConnectionProgress.PreparingRuntime -> "preparing_runtime"
+        ConnectionProgress.PreparingCore -> "preparing_core"
+        ConnectionProgress.UpdatingRoutingData -> "updating_routing_data"
+        ConnectionProgress.ResolvingEntryServer -> "resolving_entry_server"
+        ConnectionProgress.GeneratingConfiguration -> "generating_configuration"
+        ConnectionProgress.StartingCore -> "starting_core"
+        ConnectionProgress.ConfiguringTunnel -> "configuring_tunnel"
+        ConnectionProgress.ConfiguringRouting -> "configuring_routing"
+        ConnectionProgress.WaitingForCore -> "waiting_for_core"
+        ConnectionProgress.StoppingCore -> "stopping_core"
+        ConnectionProgress.CleaningRuntime -> "cleaning_runtime"
+        ConnectionProgress.InspectingSavedRuntime -> "inspecting_saved_runtime"
+        ConnectionProgress.VerifyingRuntime -> "verifying_runtime"
+        ConnectionProgress.RestoringControlApi -> "restoring_control_api"
+        ConnectionProgress.UpdatingNetworkRoute -> "updating_network_route"
+        ConnectionProgress.UpdatingAppRouting -> "updating_app_routing"
+    }
+
     private companion object {
         const val SENTRY_DSN =
             "https://d061f2516e2af78d352e5b5eed19108e@o4512086151397376.ingest.de.sentry.io/4512086156509264"
         const val SAFE_EVENT_LOGGER = "materialxray.telemetry"
         const val INSTALLATION_ID_FILE = "diagnostics-installation-id"
         const val ISSUE_REPORT_INTERVAL_MS = 15 * 60 * 1_000L
+        const val DEBUG_TRACE_SAMPLE_RATE = 1.0
+        const val RELEASE_TRACE_SAMPLE_RATE = 0.1
     }
 }

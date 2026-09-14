@@ -130,6 +130,7 @@ class XrayService : VpnService() {
             log = { message -> logBuffer.append(LogSource.APP, message) },
             onProgressStarted = connectionStateCoordinator::beginConnectionProgress,
             onProgressFinished = connectionStateCoordinator::endConnectionProgress,
+            onTraceStarted = telemetryReporter::startConnectionStep,
         )
     }
     private val stateFile by lazy { StateFile(this) }
@@ -582,20 +583,30 @@ class XrayService : VpnService() {
         }
         telemetryReporter.recordConnectionAttempt(mode, runtimeSettings.rootConnectionBackend)
         val startedAt = SystemClock.elapsedRealtime()
-        val succeeded = connectionLifecycle.connect(
-            ConnectionRequest(
-                config = config,
-                transitionState = transitionState,
-                preparation = preparation,
-            ),
-        )
-        telemetryReporter.recordConnectionResult(
-            succeeded = succeeded,
-            durationMillis = SystemClock.elapsedRealtime() - startedAt,
-            mode = mode,
-            backend = runtimeSettings.rootConnectionBackend,
-        )
-        return succeeded
+        var succeeded: Boolean? = null
+        try {
+            val result = connectionLifecycle.connect(
+                ConnectionRequest(
+                    config = config,
+                    transitionState = transitionState,
+                    preparation = preparation,
+                ),
+            )
+            succeeded = result
+            return result
+        } finally {
+            val result = succeeded
+            if (result == null) {
+                telemetryReporter.finishInterruptedConnectionTrace()
+            } else {
+                telemetryReporter.recordConnectionResult(
+                    succeeded = result,
+                    durationMillis = SystemClock.elapsedRealtime() - startedAt,
+                    mode = mode,
+                    backend = runtimeSettings.rootConnectionBackend,
+                )
+            }
+        }
     }
 
     /**

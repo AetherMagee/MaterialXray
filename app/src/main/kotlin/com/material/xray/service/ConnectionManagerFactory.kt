@@ -29,7 +29,10 @@ import com.material.xray.core.xray.XraySysStats
 import com.material.xray.data.db.dao.AppBypassDao
 import com.material.xray.data.repository.ServerRepository
 import com.material.xray.model.ActiveBalancerSelection
+import com.material.xray.model.ConnectionProgress
 import com.material.xray.model.ServerConfig
+import com.material.xray.telemetry.TelemetryReporter
+import com.material.xray.telemetry.TelemetrySpan
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.net.InetAddress
 import java.net.ServerSocket
@@ -365,6 +368,7 @@ internal data class ConnectionManagerDependencies(
     val activeRouting: ActiveRoutingController,
     val apiClientFactory: ConnectionApiClientFactory,
     val xrayRoutingUpdater: ConnectionXrayRoutingUpdater,
+    val startTelemetrySpan: (ConnectionProgress) -> TelemetrySpan? = { null },
 )
 
 class ConnectionManagerFactory @Inject constructor(
@@ -376,6 +380,7 @@ class ConnectionManagerFactory @Inject constructor(
     private val appInventory: AppInventory,
     private val stateCoordinator: ConnectionStateCoordinator,
     private val log: LogBuffer,
+    private val telemetryReporter: TelemetryReporter,
 ) {
     private val serverAddressResolver by lazy { ServerAddressResolver(context) }
     private val rootCertificateBundle by lazy { AndroidRootCertificateBundle() }
@@ -439,6 +444,7 @@ class ConnectionManagerFactory @Inject constructor(
                 binaryPath = { xrayBinary.androidBinaryPath },
                 binDir = environment.binDir,
             ),
+            startTelemetrySpan = telemetryReporter::startConnectionStep,
         )
         return ConnectionManager(
             configGenerator = ConfigGenerator(),
