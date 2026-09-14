@@ -20,6 +20,8 @@ protobuf-plugin = "0.10.0"
 zxing = "3.5.4"
 sqlite-jdbc = "3.53.4.0"
 androidx-test = "1.7.0"
+sentry = "8.56.0"
+sentry-gradle = "6.22.0"
 
 [libraries]
 compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "compose-bom" }
@@ -66,6 +68,7 @@ zxing-core = { group = "com.google.zxing", name = "core", version.ref = "zxing" 
 junit = { group = "junit", name = "junit", version = "4.13.2" }
 sqlite-jdbc = { group = "org.xerial", name = "sqlite-jdbc", version.ref = "sqlite-jdbc" }
 androidx-test-runner = { group = "androidx.test", name = "runner", version.ref = "androidx-test" }
+sentry-android = { group = "io.sentry", name = "sentry-android", version.ref = "sentry" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
@@ -74,3 +77,4 @@ hilt = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 protobuf = { id = "com.google.protobuf", version.ref = "protobuf-plugin" }
+sentry-android = { id = "io.sentry.android.gradle", version.ref = "sentry-gradle" }

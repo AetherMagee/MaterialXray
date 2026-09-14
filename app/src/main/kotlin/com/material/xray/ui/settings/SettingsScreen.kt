@@ -217,6 +217,7 @@ private fun SettingsScreenContent(
     val sortOutboundsByLatency = settings.sortOutboundsByLatency
     val showBothLatencyResults = settings.showBothLatencyResults
     val appUpdateChecksEnabled = settings.appUpdateChecksEnabled
+    val diagnosticsEnabled = settings.diagnosticsEnabled
     val context = LocalContext.current
     val resources = LocalResources.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -812,6 +813,12 @@ private fun SettingsScreenContent(
                         checked = subscriptionSendHardwareId,
                         onCheckedChange = viewModel::setSubscriptionSendHardwareId,
                         enabled = !hwidLockedBySubscription,
+                    )
+                    SettingsSwitchRow(
+                        title = stringResource(R.string.settings_diagnostics_title),
+                        description = stringResource(R.string.settings_diagnostics_description),
+                        checked = diagnosticsEnabled,
+                        onCheckedChange = viewModel::setDiagnosticsEnabled,
                     )
                     SettingsSwitchRow(
                         title = stringResource(R.string.settings_show_advanced_options),

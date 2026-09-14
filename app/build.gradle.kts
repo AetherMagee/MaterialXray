@@ -22,6 +22,7 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.compose.compiler)
     alias(libs.plugins.protobuf)
+    alias(libs.plugins.sentry.android)
     id("dev.detekt") version ("2.0.0-alpha.5")
     id("org.jlleitschuh.gradle.ktlint") version ("14.2.0")
 }
@@ -104,6 +105,7 @@ val releaseStorePassword = providers.environmentVariable("RELEASE_STORE_PASSWORD
     .orElse(providers.gradleProperty("releaseStorePassword"))
     .orNull
     ?: localProperty("releaseStorePassword")
+val sentryAuthToken = providers.environmentVariable("SENTRY_AUTH_TOKEN").filter { it.isNotBlank() }
 val hasReleaseSigning = listOf(
     releaseKeystorePath,
     releaseKeyAlias,
@@ -186,6 +188,20 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
+}
+
+sentry {
+    org.set("materialxray")
+    projectName.set("materialxray")
+    authToken.set(sentryAuthToken)
+    autoInstallation {
+        enabled.set(false)
+    }
+    tracingInstrumentation {
+        enabled.set(false)
+    }
+    autoUploadProguardMapping.set(sentryAuthToken.map { true }.orElse(false))
+    includeSourceContext.set(sentryAuthToken.map { true }.orElse(false))
 }
 
 // Room exports one JSON schema per database version. They are committed so that
@@ -298,6 +314,7 @@ dependencies {
     implementation(libs.serialization.json)
     implementation(libs.coroutines.android)
     implementation(libs.zxing.core)
+    implementation(libs.sentry.android)
 
     testImplementation(libs.junit)
     testImplementation(libs.coroutines.test)

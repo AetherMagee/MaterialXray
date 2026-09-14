@@ -2,6 +2,7 @@ package com.material.xray.service
 
 import com.material.xray.core.xray.XraySysStats
 import com.material.xray.model.ConnectionState
+import com.material.xray.telemetry.CoreRecoveryCause
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.NonCancellable
@@ -20,6 +21,7 @@ class XrayHealthWatchdogTest {
         val stateCoordinator = ConnectionStateCoordinator()
         val probe = FakeHealthProbe(processAlive = false)
         val recoveries = mutableListOf<String>()
+        val recoveryCauses = mutableListOf<CoreRecoveryCause>()
         val watchdog = XrayHealthWatchdog(
             scope = backgroundScope,
             stateCoordinator = stateCoordinator,
@@ -32,7 +34,8 @@ class XrayHealthWatchdogTest {
             tunnelAvailable = { true },
             runtimeModeRecoveryReason = { null },
             scheduleNetworkSafetyCheck = {},
-            recover = { reason, _, _ ->
+            recover = { cause, reason, _, _ ->
+                recoveryCauses += cause
                 recoveries += reason
                 true
             },
@@ -48,6 +51,7 @@ class XrayHealthWatchdogTest {
 
         assertEquals(1, probe.aliveChecks)
         assertEquals(1, recoveries.size)
+        assertEquals(listOf(CoreRecoveryCause.ProcessExit), recoveryCauses)
     }
 
     @Test
@@ -67,7 +71,7 @@ class XrayHealthWatchdogTest {
             tunnelAvailable = { true },
             runtimeModeRecoveryReason = { null },
             scheduleNetworkSafetyCheck = {},
-            recover = { _, _, _ ->
+            recover = { _, _, _, _ ->
                 recoveryCount++
                 true
             },
@@ -103,7 +107,7 @@ class XrayHealthWatchdogTest {
                 null
             },
             scheduleNetworkSafetyCheck = {},
-            recover = { _, _, _ -> true },
+            recover = { _, _, _, _ -> true },
             dispatcher = StandardTestDispatcher(testScheduler),
         )
         stateCoordinator.markConnected(connectedState())
@@ -154,7 +158,7 @@ class XrayHealthWatchdogTest {
             tunnelAvailable = { true },
             runtimeModeRecoveryReason = { null },
             scheduleNetworkSafetyCheck = {},
-            recover = { _, _, _ ->
+            recover = { _, _, _, _ ->
                 recoveryCount++
                 true
             },

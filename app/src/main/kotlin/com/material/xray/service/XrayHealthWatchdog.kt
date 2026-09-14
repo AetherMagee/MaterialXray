@@ -3,6 +3,7 @@ package com.material.xray.service
 import com.material.xray.core.xray.XraySysStats
 import com.material.xray.model.ConnectionState
 import com.material.xray.model.XrayRuntimeSettings
+import com.material.xray.telemetry.CoreRecoveryCause
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -41,7 +42,7 @@ internal class XrayHealthWatchdog(
     private val tunnelAvailable: suspend (ConnectionState.Connected) -> Boolean,
     private val runtimeModeRecoveryReason: suspend () -> String?,
     private val scheduleNetworkSafetyCheck: suspend () -> Unit,
-    private val recover: (reason: String, watchedPid: Int, pidToKill: Int?) -> Boolean,
+    private val recover: (cause: CoreRecoveryCause, reason: String, watchedPid: Int, pidToKill: Int?) -> Boolean,
     private val dispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     private var processJob: Job? = null
@@ -142,13 +143,18 @@ internal class XrayHealthWatchdog(
 
         val reason = runtimeModeRecoveryReason()
         if (!isCurrent(session)) return false
-        if (reason != null) return !recover(reason, pid, null)
+        if (reason != null) return !recover(CoreRecoveryCause.RuntimeModeChanged, reason, pid, null)
 
         if (!healthProbe.isProcessAlive(pid)) {
             if (!isCurrent(session)) return false
             val reason = healthProbe.readCrashReason()
             if (!isCurrent(session)) return false
-            return !recover("xray process $pid exited unexpectedly ($reason); reconnecting...", pid, null)
+            return !recover(
+                CoreRecoveryCause.ProcessExit,
+                "xray process $pid exited unexpectedly ($reason); reconnecting...",
+                pid,
+                null,
+            )
         }
         if (!isCurrent(session)) return false
 
@@ -161,6 +167,7 @@ internal class XrayHealthWatchdog(
             val thresholdMiB = memoryRestartThresholdMiB()
             if (XrayRuntimeSettings.shouldRestartForMemory(residentMemoryMb, thresholdMiB)) {
                 return !recover(
+                    CoreRecoveryCause.MemoryLimit,
                     "xray process $pid exceeded $thresholdMiB MiB RSS ($residentMemoryMb MiB); restarting...",
                     pid,
                     pid,
@@ -190,6 +197,7 @@ internal class XrayHealthWatchdog(
         if (transition.consecutiveFailures < config.tunnelFailureThreshold) return true
         if (!isCurrent(session)) return false
         return !recover(
+            CoreRecoveryCause.TunnelUnavailable,
             "xray process ${state.corePid} is alive but tunnel ${state.tunName} is unavailable; reconnecting...",
             state.corePid,
             null,

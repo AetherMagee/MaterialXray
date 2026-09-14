@@ -300,6 +300,10 @@ class SettingsViewModel @Inject constructor(
     fun setSubscriptionSendHardwareId(enabled: Boolean) = viewModelScope.launch {
         settingsRepo.setSubscriptionSendHardwareId(enabled)
     }
+    fun setDiagnosticsEnabled(enabled: Boolean) = viewModelScope.launch {
+        if (enabled == currentSettings().diagnosticsEnabled) return@launch
+        settingsRepo.setDiagnosticsEnabled(enabled)
+    }
     fun setAppUpdateChecksEnabled(enabled: Boolean) = viewModelScope.launch {
         if (enabled == currentSettings().appUpdateChecksEnabled) return@launch
         settingsRuntimeManager.setAppUpdateChecksEnabled(enabled)

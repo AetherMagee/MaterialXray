@@ -9,17 +9,51 @@ import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.material.xray.core.locale.notifyAppLocaleChanged
+import com.material.xray.data.repository.SettingsRepository
 import com.material.xray.ui.home.HomeDataState
 import com.material.xray.ui.navigation.MainNavigation
 import com.material.xray.ui.settings.SettingsDataState
 import com.material.xray.ui.theme.MaterialXrayTheme
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
@@ -27,6 +61,8 @@ class MainActivity : AppCompatActivity() {
     @Inject lateinit var homeDataState: HomeDataState
 
     @Inject lateinit var settingsDataState: SettingsDataState
+
+    @Inject lateinit var settingsRepository: SettingsRepository
 
     private var pendingSubscriptionLink by mutableStateOf<String?>(null)
 
@@ -57,10 +93,34 @@ class MainActivity : AppCompatActivity() {
         }
         setContent {
             MaterialXrayTheme {
-                MainNavigation(
-                    pendingSubscriptionLink = pendingSubscriptionLink,
-                    onSubscriptionLinkHandled = { pendingSubscriptionLink = null },
-                )
+                val settings by settingsDataState.data.collectAsStateWithLifecycle()
+                var diagnosticsNoticeVisible by remember { mutableStateOf(false) }
+                val scope = rememberCoroutineScope()
+                LaunchedEffect(settings?.diagnosticsNoticeShown) {
+                    if (settings?.diagnosticsNoticeShown == false) {
+                        diagnosticsNoticeVisible = true
+                        delay(DIAGNOSTICS_NOTICE_DURATION_MS)
+                        diagnosticsNoticeVisible = false
+                        settingsRepository.markDiagnosticsNoticeShown()
+                    }
+                }
+                Box {
+                    MainNavigation(
+                        pendingSubscriptionLink = pendingSubscriptionLink,
+                        onSubscriptionLinkHandled = { pendingSubscriptionLink = null },
+                    )
+                    DiagnosticsNotice(
+                        visible = diagnosticsNoticeVisible,
+                        onDismiss = {
+                            diagnosticsNoticeVisible = false
+                            scope.launch { settingsRepository.markDiagnosticsNoticeShown() }
+                        },
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .navigationBarsPadding()
+                            .padding(start = 16.dp, end = 16.dp, bottom = 76.dp),
+                    )
+                }
             }
         }
     }
@@ -68,6 +128,54 @@ class MainActivity : AppCompatActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         pendingSubscriptionLink = subscriptionLinkFromDeepLink(intent.dataString)
+    }
+}
+
+@Composable
+private fun DiagnosticsNotice(
+    visible: Boolean,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    AnimatedVisibility(
+        visible = visible,
+        modifier = modifier,
+        enter = fadeIn() + slideInVertically { -it / 2 },
+        exit = fadeOut() + slideOutVertically { -it / 2 },
+    ) {
+        ElevatedCard(
+            modifier = Modifier
+                .widthIn(max = 560.dp)
+                .fillMaxWidth(),
+            colors = CardDefaults.elevatedCardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            ),
+            elevation = CardDefaults.elevatedCardElevation(defaultElevation = 6.dp),
+        ) {
+            Row(
+                modifier = Modifier.padding(start = 16.dp, top = 12.dp, bottom = 12.dp, end = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Info,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+                Spacer(Modifier.width(12.dp))
+                Text(
+                    text = stringResource(R.string.diagnostics_default_notice),
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                IconButton(onClick = onDismiss) {
+                    Icon(
+                        imageVector = Icons.Outlined.Close,
+                        contentDescription = stringResource(R.string.diagnostics_dismiss),
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -85,4 +193,5 @@ internal fun subscriptionLinkFromDeepLink(deepLink: String?): String? {
 internal fun keepSplashOnScreen(initialDataLoaded: Boolean, elapsedMillis: Long): Boolean = !initialDataLoaded && elapsedMillis < SPLASH_SCREEN_TIMEOUT_MS
 
 internal const val SPLASH_SCREEN_TIMEOUT_MS = 2_000L
+private const val DIAGNOSTICS_NOTICE_DURATION_MS = 15_000L
 private const val SUBSCRIPTION_DEEP_LINK_PREFIX = "mxray://add/"

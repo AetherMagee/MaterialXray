@@ -12,12 +12,14 @@ import com.material.xray.service.GeoDataUpdateScheduler
 import com.material.xray.service.OemAutostartManager
 import com.material.xray.service.StartupDiagnosticsLogger
 import com.material.xray.service.SubscriptionUpdateScheduler
+import com.material.xray.telemetry.TelemetryReporter
 import com.material.xray.ui.home.HomeDataState
 import com.material.xray.ui.settings.SettingsDataState
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
@@ -40,6 +42,8 @@ class MaterialXrayApp : Application() {
 
     @Inject lateinit var oemAutostartManager: OemAutostartManager
 
+    @Inject lateinit var telemetryReporter: TelemetryReporter
+
     /**
      * Injected for its construction side effect: building the holder eagerly starts loading the
      * home screen data (Room and DataStore) during application startup, before the first
@@ -60,6 +64,9 @@ class MaterialXrayApp : Application() {
         // summaries. Initializing afterwards would race that first snapshot on API <= 32.
         initializeAppLocales(this)
         super.onCreate()
+        appScope.launch {
+            settingsRepository.diagnosticsEnabled.collectLatest(telemetryReporter::setEnabled)
+        }
         appScope.launch {
             if (settingsRepository.autoConnect.first()) {
                 delay(STARTUP_BACKGROUND_WORK_DELAY_SECONDS * 1_000)

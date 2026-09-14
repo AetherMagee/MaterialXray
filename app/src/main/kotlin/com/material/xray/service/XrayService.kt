@@ -63,6 +63,9 @@ import com.material.xray.model.SessionTrafficMetrics
 import com.material.xray.model.XrayRuntimeSettings
 import com.material.xray.model.primaryBalancerTag
 import com.material.xray.model.proxyOutboundCount
+import com.material.xray.telemetry.CoreRecoveryCause
+import com.material.xray.telemetry.TelemetryReporter
+import com.material.xray.telemetry.TelemetryServiceMode
 import dagger.hilt.android.AndroidEntryPoint
 import java.io.FileDescriptor
 import java.io.PrintWriter
@@ -114,6 +117,8 @@ class XrayService : VpnService() {
     @Inject lateinit var tproxyCompatibilityDetector: TproxyCompatibilityDetector
 
     @Inject lateinit var activeConfigOverrideStore: ActiveConfigOverrideStore
+
+    @Inject lateinit var telemetryReporter: TelemetryReporter
 
     private lateinit var connectionManager: ConnectionManager
     private lateinit var connectionLifecycle: ConnectionLifecycle
@@ -283,8 +288,8 @@ class XrayService : VpnService() {
             },
             runtimeModeRecoveryReason = ::runtimeModeRecoveryReason,
             scheduleNetworkSafetyCheck = ::maybeScheduleNetworkSafetyCheck,
-            recover = { reason, watchedPid, pidToKill ->
-                recoverNativeProcess(reason, watchedPid, pidToKill)
+            recover = { cause, reason, watchedPid, pidToKill ->
+                recoverNativeProcess(cause, reason, watchedPid, pidToKill)
             },
         )
         networkRetargetWorker = NetworkRetargetWorker(
@@ -569,13 +574,28 @@ class XrayService : VpnService() {
         startupDiagnosticsLogger.logIfMissing()
         terminalFailureNotificationShown = false
         getSystemService(NotificationManager::class.java).cancel(FAILURE_NOTIFICATION_ID)
-        return connectionLifecycle.connect(
+        val runtimeSettings = settingsRepo.runtimeSettingsSnapshot()
+        val mode = if (runtimeSettings.useRootService && !isRunningAlwaysOnVpn()) {
+            TelemetryServiceMode.Root
+        } else {
+            TelemetryServiceMode.Vpn
+        }
+        telemetryReporter.recordConnectionAttempt(mode, runtimeSettings.rootConnectionBackend)
+        val startedAt = SystemClock.elapsedRealtime()
+        val succeeded = connectionLifecycle.connect(
             ConnectionRequest(
                 config = config,
                 transitionState = transitionState,
                 preparation = preparation,
             ),
         )
+        telemetryReporter.recordConnectionResult(
+            succeeded = succeeded,
+            durationMillis = SystemClock.elapsedRealtime() - startedAt,
+            mode = mode,
+            backend = runtimeSettings.rootConnectionBackend,
+        )
+        return succeeded
     }
 
     /**
@@ -1428,6 +1448,7 @@ class XrayService : VpnService() {
 
     @Synchronized
     private fun recoverNativeProcess(
+        cause: CoreRecoveryCause,
         reason: String,
         watchedPid: Int,
         pidToKill: Int? = null,
@@ -1454,7 +1475,9 @@ class XrayService : VpnService() {
 
                             connectionStateCoordinator.startConnection(ConnectionState.Connecting)
                             updateNotification(localizedString(R.string.notification_status_recovering_core))
-                            restartRuntime(config, reconnectDelayMs = PROCESS_RESTART_DELAY_MS)
+                            val restarted = restartRuntime(config, reconnectDelayMs = PROCESS_RESTART_DELAY_MS)
+                            telemetryReporter.recordCoreRecovery(cause, restarted)
+                            restarted
                         },
                     ),
                 )
@@ -1869,6 +1892,7 @@ class XrayService : VpnService() {
      * an always-on VPN retrying instead of silently staying down.
      */
     private suspend fun handleUnexpectedCommandFailure(error: Throwable) {
+        telemetryReporter.recordUnexpectedCommandFailure(error)
         val description = error.message?.takeIf { it.isNotBlank() } ?: error.javaClass.simpleName
         logBuffer.append(LogSource.APP, "Connection command failed unexpectedly: $description")
         val message = localizedString(R.string.notification_unknown_connection_error)

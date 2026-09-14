@@ -62,6 +62,8 @@ data class SettingsSnapshot(
     val sortOutboundsByLatency: Boolean,
     val showBothLatencyResults: Boolean,
     val appUpdateChecksEnabled: Boolean,
+    val diagnosticsNoticeShown: Boolean,
+    val diagnosticsEnabled: Boolean,
 )
 
 private val Context.dataStore by preferencesDataStore(
@@ -129,6 +131,8 @@ class SettingsRepository @Inject constructor(
         val SUBSCRIPTION_SEND_HWID = booleanPreferencesKey("subscription_send_hwid")
         val SUBSCRIPTION_PREFER_JSON = booleanPreferencesKey("subscription_prefer_json")
         val APP_UPDATE_CHECKS_ENABLED = booleanPreferencesKey("app_update_checks_enabled")
+        val DIAGNOSTICS_NOTICE_SHOWN = booleanPreferencesKey("diagnostics_notice_shown")
+        val DIAGNOSTICS_ENABLED = booleanPreferencesKey("diagnostics_enabled")
         private val LEGACY_GEO_DATA_BASE_URL = stringPreferencesKey("geo_data_base_url")
         private const val CURRENT_ROUTING_RULES_VERSION = 2
 
@@ -265,6 +269,9 @@ class SettingsRepository @Inject constructor(
     val appUpdateChecksEnabled: Flow<Boolean> = store.data.map { prefs ->
         prefs[APP_UPDATE_CHECKS_ENABLED] ?: true
     }
+    val diagnosticsEnabled: Flow<Boolean> = store.data.map { prefs ->
+        prefs[DIAGNOSTICS_ENABLED] ?: true
+    }
 
     /** All persisted values needed for the Settings screen, emitted as one coherent frame. */
     val settingsSnapshot: Flow<SettingsSnapshot> = store.data.map { prefs ->
@@ -321,6 +328,8 @@ class SettingsRepository @Inject constructor(
             sortOutboundsByLatency = prefs[SORT_OUTBOUNDS_BY_LATENCY] ?: false,
             showBothLatencyResults = prefs[SHOW_BOTH_LATENCY_RESULTS] ?: false,
             appUpdateChecksEnabled = prefs[APP_UPDATE_CHECKS_ENABLED] ?: true,
+            diagnosticsNoticeShown = prefs[DIAGNOSTICS_NOTICE_SHOWN] ?: false,
+            diagnosticsEnabled = prefs[DIAGNOSTICS_ENABLED] ?: true,
         )
     }
 
@@ -458,6 +467,12 @@ class SettingsRepository @Inject constructor(
     suspend fun setAppUpdateChecksEnabled(enabled: Boolean) = store.edit { prefs ->
         prefs[APP_UPDATE_CHECKS_ENABLED] = enabled
     }
+    suspend fun setDiagnosticsEnabled(enabled: Boolean) = store.edit { prefs ->
+        prefs[DIAGNOSTICS_ENABLED] = enabled
+    }
+    suspend fun markDiagnosticsNoticeShown() = store.edit { prefs ->
+        prefs[DIAGNOSTICS_NOTICE_SHOWN] = true
+    }
     suspend fun setGeoipUrl(url: String) = store.edit { prefs ->
         prefs.remove(LEGACY_GEO_DATA_BASE_URL)
         val trimmedUrl = url.trim()
@@ -518,7 +533,9 @@ class SettingsRepository @Inject constructor(
 
     suspend fun getAllAsMap(): Map<String, String> {
         val prefs = store.data.first()
-        return prefs.asMap().entries.associate { (k, v) -> k.name to v.toString() }
+        return prefs.asMap().entries
+            .filterNot { (key, _) -> key == DIAGNOSTICS_NOTICE_SHOWN || key == DIAGNOSTICS_ENABLED }
+            .associate { (key, value) -> key.name to value.toString() }
     }
 
     suspend fun restoreFromMap(map: Map<String, String>, sourceBackupVersion: Int? = null) {
