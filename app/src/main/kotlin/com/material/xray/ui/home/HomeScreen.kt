@@ -25,10 +25,13 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.indication
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -227,6 +230,15 @@ fun HomeScreen(
     var removeSubscriptionRequest by remember { mutableStateOf<Pair<SubscriptionEntity, Int>?>(null) }
     var showRootFallbackDialog by remember { mutableStateOf(false) }
     val context = LocalContext.current
+    val collapsedSubscriptionIds = remember(context) {
+        context.collapsedSubscriptionIds().toMutableStateList()
+    }
+    LaunchedEffect(uiState.subscriptions) {
+        val currentIds = uiState.subscriptions?.mapTo(mutableSetOf()) { it.id } ?: return@LaunchedEffect
+        if (collapsedSubscriptionIds.removeAll { it !in currentIds }) {
+            context.setCollapsedSubscriptionIds(collapsedSubscriptionIds)
+        }
+    }
     val unableToFetchLinkText = stringResource(R.string.home_unable_to_fetch_link)
     val lifecycleOwner = LocalLifecycleOwner.current
     val topAppBarScrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
@@ -345,7 +357,7 @@ fun HomeScreen(
                 .fillMaxSize()
                 .padding(padding),
             contentPadding = homeListContentPadding(floatingConnectButton),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             item {
@@ -417,7 +429,16 @@ fun HomeScreen(
                             selectedServerId = uiState.selectedServerId,
                             defaultPingMethod = uiState.defaultPingMethod,
                             canApplyRouting = manualRouting.appRouting != null || manualRouting.routing != null,
+                            canCollapse = subscriptions.size > 1,
+                            expanded = subscription.id !in collapsedSubscriptionIds,
                             canReorder = subscriptions.size > 1,
+                            onExpandedChange = { expanded ->
+                                context.setSubscriptionExpanded(
+                                    collapsedSubscriptionIds,
+                                    subscription.id,
+                                    expanded,
+                                )
+                            },
                             onDelete = {
                                 if (servers.isEmpty()) {
                                     viewModel.deleteSubscription(subscription)
@@ -738,6 +759,33 @@ private fun Context.wasCameraPermissionRequested(): Boolean = getSharedPreferenc
     CAMERA_PERMISSION_PREFS,
     Context.MODE_PRIVATE,
 ).getBoolean(CAMERA_PERMISSION_REQUESTED, false)
+
+private fun Context.collapsedSubscriptionIds(): List<Long> = getSharedPreferences(
+    HOME_UI_PREFS,
+    Context.MODE_PRIVATE,
+).getStringSet(COLLAPSED_SUBSCRIPTION_IDS, emptySet())
+    .orEmpty()
+    .mapNotNull(String::toLongOrNull)
+
+private fun Context.setCollapsedSubscriptionIds(ids: Collection<Long>) {
+    getSharedPreferences(HOME_UI_PREFS, Context.MODE_PRIVATE)
+        .edit()
+        .putStringSet(COLLAPSED_SUBSCRIPTION_IDS, ids.mapTo(mutableSetOf(), Long::toString))
+        .apply()
+}
+
+private fun Context.setSubscriptionExpanded(
+    collapsedIds: SnapshotStateList<Long>,
+    subscriptionId: Long,
+    expanded: Boolean,
+) {
+    if (expanded) {
+        collapsedIds.remove(subscriptionId)
+    } else if (subscriptionId !in collapsedIds) {
+        collapsedIds.add(subscriptionId)
+    }
+    setCollapsedSubscriptionIds(collapsedIds)
+}
 
 internal enum class CameraPermissionAccess {
     Granted,
@@ -1652,7 +1700,10 @@ private fun SubscriptionCard(
     selectedServerId: Long,
     defaultPingMethod: PingMethod,
     canApplyRouting: Boolean,
+    canCollapse: Boolean,
+    expanded: Boolean,
     canReorder: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
     onDelete: () -> Unit,
     onEdit: () -> Unit,
     onReorder: () -> Unit,
@@ -1689,6 +1740,9 @@ private fun SubscriptionCard(
                 isRefreshing = isRefreshing,
                 metadata = metadata,
                 defaultPingMethod = defaultPingMethod,
+                canCollapse = canCollapse,
+                expanded = expanded,
+                onExpandedChange = onExpandedChange,
                 onRefresh = onRefresh,
                 onTestAll = onTestAll,
                 onDefaultPingMethodSelected = onDefaultPingMethodSelected,
@@ -1700,42 +1754,46 @@ private fun SubscriptionCard(
                 onApplyRouting = onApplyRouting,
                 onDescriptionHiddenChange = onDescriptionHiddenChange,
             )
-            if (metadata.hasVisibleSubscriptionSection()) {
-                Spacer(modifier = Modifier.height(SubscriptionBlockGap))
-            }
-            SubscriptionMetadataSection(
-                subscription = subscription,
-                metadata = metadata,
-            )
+            AnimatedVisibility(visible = !canCollapse || expanded) {
+                Column {
+                    if (metadata.hasVisibleSubscriptionSection()) {
+                        Spacer(modifier = Modifier.height(SubscriptionBlockGap))
+                    }
+                    SubscriptionMetadataSection(
+                        subscription = subscription,
+                        metadata = metadata,
+                    )
 
-            if (servers.isEmpty()) {
-                Text(
-                    stringResource(R.string.home_no_servers_in_subscription),
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            } else {
-                LookaheadScope {
-                    Column {
-                        servers.forEachIndexed { index, server ->
-                            key(server.entity.id) {
-                                Column(modifier = Modifier.animateBounds(this@LookaheadScope)) {
-                                    if (index > 0) {
-                                        HorizontalDivider(
-                                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f),
-                                        )
+                    if (servers.isEmpty()) {
+                        Text(
+                            stringResource(R.string.home_no_servers_in_subscription),
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    } else {
+                        LookaheadScope {
+                            Column {
+                                servers.forEachIndexed { index, server ->
+                                    key(server.entity.id) {
+                                        Column(modifier = Modifier.animateBounds(this@LookaheadScope)) {
+                                            if (index > 0) {
+                                                HorizontalDivider(
+                                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f),
+                                                )
+                                            }
+                                            ServerRow(
+                                                server = server,
+                                                isSelected = server.entity.id == selectedServerId,
+                                                onClick = { onServerSelected(server.entity.id) },
+                                                onTestLatency = { onTestLatency(server.entity) },
+                                                onOpenConfig = {
+                                                    onOpenServerConfig(server.entity.id, server.entity.name)
+                                                },
+                                                contentPadding = ServerRowDefaults.contentPadding,
+                                            )
+                                        }
                                     }
-                                    ServerRow(
-                                        server = server,
-                                        isSelected = server.entity.id == selectedServerId,
-                                        onClick = { onServerSelected(server.entity.id) },
-                                        onTestLatency = { onTestLatency(server.entity) },
-                                        onOpenConfig = {
-                                            onOpenServerConfig(server.entity.id, server.entity.name)
-                                        },
-                                        contentPadding = ServerRowDefaults.contentPadding,
-                                    )
                                 }
                             }
                         }
@@ -1828,6 +1886,9 @@ private fun SubscriptionHeader(
     isRefreshing: Boolean,
     metadata: SubscriptionMetadataUiState,
     defaultPingMethod: PingMethod,
+    canCollapse: Boolean,
+    expanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
     onRefresh: () -> Unit,
     onTestAll: () -> Unit,
     onDefaultPingMethodSelected: (PingMethod) -> Unit,
@@ -1847,16 +1908,68 @@ private fun SubscriptionHeader(
     val hasDescription = subscription.announce?.trim()?.isNotEmpty() == true
     val headerDetailText = metadata.headerDetailText(resources)
     val expiredStatusText = stringResource(R.string.home_subscription_expired_inline)
+    val expansionActionDescription = if (canCollapse) {
+        stringResource(
+            if (expanded) R.string.home_subscription_collapse else R.string.home_subscription_expand,
+            subscription.name,
+        )
+    } else {
+        null
+    }
+    val arrowInteractionSource = remember { MutableInteractionSource() }
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = 16.dp, top = 12.dp, end = 8.dp, bottom = 0.dp),
+            .padding(start = if (canCollapse) 0.dp else 16.dp, top = 6.dp, end = 8.dp, bottom = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(0.dp),
     ) {
+        if (canCollapse) {
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clickable(
+                        interactionSource = arrowInteractionSource,
+                        indication = null,
+                        role = Role.Button,
+                        onClickLabel = expansionActionDescription,
+                    ) { onExpandedChange(!expanded) },
+                contentAlignment = Alignment.Center,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .indication(arrowInteractionSource, LocalIndication.current),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                        contentDescription = expansionActionDescription,
+                        modifier = Modifier.size(24.dp),
+                    )
+                }
+            }
+        }
+        val titleInteractionSource = remember { MutableInteractionSource() }
         Column(
-            modifier = Modifier.weight(1f),
+            modifier = Modifier
+                .weight(1f)
+                .heightIn(min = 48.dp)
+                .then(
+                    if (canCollapse) {
+                        Modifier.clickable(
+                            interactionSource = titleInteractionSource,
+                            indication = null,
+                            role = Role.Button,
+                            onClickLabel = expansionActionDescription,
+                        ) { onExpandedChange(!expanded) }
+                    } else {
+                        Modifier
+                    },
+                ),
+            verticalArrangement = Arrangement.Center,
         ) {
             Text(
                 text = subscription.name,
@@ -2458,6 +2571,8 @@ private const val QR_SCANNER_TRANSITION_MS = 180
 private const val CORE_UPTIME_REFRESH_INTERVAL_MS = 1_000L
 private const val CAMERA_PERMISSION_PREFS = "camera_permission"
 private const val CAMERA_PERMISSION_REQUESTED = "requested"
+private const val HOME_UI_PREFS = "home_ui"
+private const val COLLAPSED_SUBSCRIPTION_IDS = "collapsed_subscription_ids"
 
 private fun Context.clipboardText(): String? {
     val clipboard = getSystemService(ClipboardManager::class.java) ?: return null

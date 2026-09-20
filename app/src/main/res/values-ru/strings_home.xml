@@ -126,6 +126,8 @@
     <string name="home_subscription_updating_content_description">Обновление %1$s</string>
     <string name="home_subscription_test_content_description">Проверить %1$s с помощью %2$s</string>
     <string name="home_subscription_menu_content_description">Меню подписки</string>
+    <string name="home_subscription_expand">Развернуть %1$s</string>
+    <string name="home_subscription_collapse">Свернуть %1$s</string>
     <string name="home_subscription_show_description">Показать описание</string>
     <string name="home_subscription_hide_description">Скрыть описание</string>
     <string name="home_subscription_apply_routing">Применить маршрутизацию</string>
