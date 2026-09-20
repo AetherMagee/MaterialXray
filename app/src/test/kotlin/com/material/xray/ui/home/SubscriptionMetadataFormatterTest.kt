@@ -37,7 +37,7 @@ class SubscriptionMetadataFormatterTest {
         assertEquals("5.0 GB of 10 GB", state.traffic?.summary)
         assertEquals("10 GB", state.traffic?.quotaText)
         assertEquals(0.5f, state.traffic?.progress)
-        assertEquals("expires in 8 days", state.expiry?.inlineText)
+        assertEquals("8 days left", state.expiry?.inlineText)
         assertNull(state.headerDetailText(EnglishSubscriptionMetadataText))
         assertEquals("Auto update every day", state.updateIntervalText)
     }
@@ -60,7 +60,7 @@ class SubscriptionMetadataFormatterTest {
         assertEquals("∞ traffic, ↓ 5.0 GB", state.traffic?.summary)
         assertNull(state.traffic?.quotaText)
         assertEquals(
-            "↓ 5.0 GB, expires in 8 days",
+            "↓ 5.0 GB\n8 days left",
             state.headerDetailText(EnglishSubscriptionMetadataText),
         )
     }
@@ -112,8 +112,8 @@ class SubscriptionMetadataFormatterTest {
                 R.string.home_subscription_unlimited_traffic_downloaded -> "∞ traffic, ↓ %1\$s"
                 R.string.home_subscription_used_of_total -> "%1\$s of %2\$s"
                 R.string.home_subscription_downloaded -> "↓ %1\$s"
-                R.string.home_subscription_downloaded_with_expiry -> "↓ %1\$s, %2\$s"
-                R.string.home_subscription_downloaded_expired -> "↓ %1\$s, expired"
+                R.string.home_subscription_downloaded_with_expiry -> "↓ %1\$s\n%2\$s"
+                R.string.home_subscription_downloaded_expired -> "↓ %1\$s\nexpired"
                 R.string.home_subscription_expired_inline -> "expired"
                 R.string.home_subscription_expired_standalone -> "Expired"
                 R.string.home_subscription_expires_today_inline -> "expires today"
@@ -138,14 +138,14 @@ class SubscriptionMetadataFormatterTest {
                     "Auto update every %1\$d days"
                 }
                 R.plurals.home_subscription_expires_in_days_inline -> if (quantity == 1) {
-                    "expires in %1\$d day"
+                    "%1\$d day left"
                 } else {
-                    "expires in %1\$d days"
+                    "%1\$d days left"
                 }
                 R.plurals.home_subscription_expires_in_days_standalone -> if (quantity == 1) {
-                    "Expires in %1\$d day"
+                    "%1\$d day left"
                 } else {
-                    "Expires in %1\$d days"
+                    "%1\$d days left"
                 }
                 else -> error("Unexpected plurals resource: $resourceId")
             }
