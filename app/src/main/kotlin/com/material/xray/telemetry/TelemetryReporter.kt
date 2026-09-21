@@ -19,6 +19,34 @@ enum class ConnectionOutcome(val value: String) {
     Interrupted("interrupted"),
 }
 
+enum class ConnectionTelemetryStep(val value: String) {
+    RefreshServerRouting("routing.server.refresh"),
+    LoadRuntimeSettings("runtime.settings.load"),
+    RootAccess("root.access"),
+    VpnInterface("vpn.interface.establish"),
+    CleanupPreviousRuntime("runtime.cleanup"),
+    DetectTunInterface("tun.interface.detect"),
+    PrepareLog("runtime.log.prepare"),
+    InstallTproxyGuard("tproxy.guard.install"),
+    PrepareApiAccess("api.access.prepare"),
+    PrepareCoreBinary("core.binary.prepare"),
+    PrepareRoutingData("routing.data.prepare"),
+    DetectPhysicalRoute("network.route.detect"),
+    ResolveServer("server.resolve"),
+    BuildAppRouting("routing.app.plan"),
+    CreateApiClients("api.clients.create"),
+    GenerateConfig("config.generate"),
+    WriteConfig("config.write"),
+    LaunchCore("core.process.launch"),
+    ConfigureTun("tun.root.configure"),
+    ActivateTproxy("tproxy.activate"),
+    WaitForApi("api.ready"),
+    VerifyTproxy("tproxy.verify"),
+    RemoveTproxyGuard("tproxy.guard.remove"),
+    ConfigureAppTun("tun.app.configure"),
+    ApplyRootRouting("routing.root.apply"),
+}
+
 enum class CoreRecoveryCause(val value: String) {
     ProcessExit("process_exit"),
     MemoryLimit("memory_limit"),
@@ -160,9 +188,12 @@ class TelemetryReporter internal constructor(
     }
 
     @Synchronized
-    internal fun startConnectionStep(progress: ConnectionProgress): TelemetrySpan? {
+    internal fun startConnectionStep(
+        progress: ConnectionProgress,
+        telemetryStep: ConnectionTelemetryStep?,
+    ): TelemetrySpan? {
         if (!enabled) return null
-        val step = progress.telemetryValue()
+        val step = telemetryStep?.value ?: progress.telemetryValue()
         val span = activeConnectionTrace?.startChild("connection.step", step) ?: return null
         return TelemetrySpan { succeeded ->
             addBreadcrumb("connection.step", step, mapOf("succeeded" to succeeded))

@@ -1,6 +1,7 @@
 package com.material.xray.telemetry
 
 import com.material.xray.core.xray.TproxyCompatibility
+import com.material.xray.model.ConnectionProgress
 import com.material.xray.model.RootConnectionBackend
 import io.sentry.SentryEvent
 import io.sentry.protocol.Message
@@ -106,6 +107,23 @@ class TelemetryReporterTest {
         assertEquals("interrupted", client.metrics.last().attributes["outcome"])
         assertEquals("interrupted", client.distributions.single().attributes["outcome"])
         assertEquals(TelemetryStatus.Aborted, client.transactions.single().finishedWith)
+    }
+
+    @Test
+    fun `specific connection step uses stable trace id`() {
+        val client = FakeTelemetryClient()
+        val reporter = TelemetryReporter(client).apply { setEnabled(true) }
+        reporter.recordConnectionAttempt(connection())
+
+        reporter.startConnectionStep(
+            ConnectionProgress.ConfiguringRouting,
+            ConnectionTelemetryStep.ActivateTproxy,
+        )
+
+        assertEquals(
+            RecordedChildSpan("connection.step", "tproxy.activate"),
+            client.transactions.single().children.single(),
+        )
     }
 
     @Test
@@ -224,6 +242,11 @@ private data class RecordedMessage(
     val tags: Map<String, String>,
 )
 
+private data class RecordedChildSpan(
+    val operation: String,
+    val description: String,
+)
+
 private class FakeTelemetryClient : TelemetryClient {
     var enableCount = 0
     var disableCount = 0
@@ -266,10 +289,14 @@ private class FakeTelemetryClient : TelemetryClient {
 
 private class FakeTelemetryTransaction : TelemetryTransaction {
     var finishedWith: TelemetryStatus? = null
+    val children = mutableListOf<RecordedChildSpan>()
 
     override fun setTag(key: String, value: String) = Unit
 
-    override fun startChild(operation: String, description: String): TelemetrySpan = TelemetrySpan {}
+    override fun startChild(operation: String, description: String): TelemetrySpan {
+        children += RecordedChildSpan(operation, description)
+        return TelemetrySpan {}
+    }
 
     override fun finish(status: TelemetryStatus) {
         finishedWith = status

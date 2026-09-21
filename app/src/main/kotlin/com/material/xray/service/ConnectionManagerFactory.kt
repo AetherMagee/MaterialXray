@@ -31,6 +31,7 @@ import com.material.xray.data.repository.ServerRepository
 import com.material.xray.model.ActiveBalancerSelection
 import com.material.xray.model.ConnectionProgress
 import com.material.xray.model.ServerConfig
+import com.material.xray.telemetry.ConnectionTelemetryStep
 import com.material.xray.telemetry.TelemetryReporter
 import com.material.xray.telemetry.TelemetrySpan
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -363,7 +364,7 @@ internal data class ConnectionManagerDependencies(
     val activeRouting: ActiveRoutingController,
     val apiClientFactory: ConnectionApiClientFactory,
     val xrayRoutingUpdater: ConnectionXrayRoutingUpdater,
-    val startTelemetrySpan: (ConnectionProgress) -> TelemetrySpan? = { null },
+    val startTelemetrySpan: (ConnectionProgress, ConnectionTelemetryStep?) -> TelemetrySpan? = { _, _ -> null },
 )
 
 class ConnectionManagerFactory @Inject constructor(

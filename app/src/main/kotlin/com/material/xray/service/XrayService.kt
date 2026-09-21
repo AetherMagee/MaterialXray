@@ -64,6 +64,7 @@ import com.material.xray.model.XrayRuntimeSettings
 import com.material.xray.model.primaryBalancerTag
 import com.material.xray.model.proxyOutboundCount
 import com.material.xray.telemetry.ConnectionOutcome
+import com.material.xray.telemetry.ConnectionTelemetryStep
 import com.material.xray.telemetry.CoreRecoveryCause
 import com.material.xray.telemetry.TelemetryConnectionContext
 import com.material.xray.telemetry.TelemetryReporter
@@ -670,12 +671,20 @@ class XrayService : VpnService() {
         preparation: ConnectionPreparation = ConnectionPreparation.Full,
     ): Boolean {
         executeStep(
-            ConnectionStep("Refresh selected server routing", ConnectionProgress.PreparingRuntime) {
+            ConnectionStep(
+                "Refresh selected server routing",
+                ConnectionProgress.PreparingRuntime,
+                telemetryStep = ConnectionTelemetryStep.RefreshServerRouting,
+            ) {
                 providerRoutingCoordinator.refreshSelectedServer(ProviderRoutingActiveUpdate.DEFER)
             },
         )
         val runtimeSettings = executeStep(
-            ConnectionStep("Load runtime settings", ConnectionProgress.PreparingRuntime) {
+            ConnectionStep(
+                "Load runtime settings",
+                ConnectionProgress.PreparingRuntime,
+                telemetryStep = ConnectionTelemetryStep.LoadRuntimeSettings,
+            ) {
                 settingsRepo.runtimeSettingsSnapshot()
             },
         )
@@ -686,6 +695,7 @@ class XrayService : VpnService() {
                 ConnectionStep(
                     "Check root runtime access",
                     ConnectionProgress.PreparingRuntime,
+                    telemetryStep = ConnectionTelemetryStep.RootAccess,
                     isSuccessful = { it },
                     action = {
                         withContext(Dispatchers.IO) { rootShell.open(RootShell.NetworkNamespace.INIT) }
@@ -750,6 +760,7 @@ class XrayService : VpnService() {
                 ConnectionStep(
                     "Establish Android VPN interface",
                     ConnectionProgress.ConfiguringTunnel,
+                    telemetryStep = ConnectionTelemetryStep.VpnInterface,
                     isSuccessful = { it != null },
                     action = { setupVpnInterface(effectiveRuntimeSettings, rootlessNetworkPlan) },
                 ),

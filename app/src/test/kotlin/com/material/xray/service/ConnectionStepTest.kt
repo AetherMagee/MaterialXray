@@ -1,6 +1,7 @@
 package com.material.xray.service
 
 import com.material.xray.model.ConnectionProgress
+import com.material.xray.telemetry.ConnectionTelemetryStep
 import com.material.xray.telemetry.TelemetrySpan
 import java.io.IOException
 import kotlinx.coroutines.CancellationException
@@ -260,7 +261,7 @@ class ConnectionStepTest {
             log = {},
             onProgressStarted = { 1L },
             onProgressFinished = {},
-            onTraceStarted = { TelemetrySpan(outcomes::add) },
+            onTraceStarted = { _, _ -> TelemetrySpan(outcomes::add) },
             waitBeforeRetry = {},
         )
 
@@ -276,5 +277,35 @@ class ConnectionStepTest {
         )
 
         assertEquals(listOf(false, true), outcomes)
+    }
+
+    @Test
+    fun `specific telemetry step traces an unreported operation`() = runTest {
+        val traced = mutableListOf<Pair<ConnectionProgress, ConnectionTelemetryStep?>>()
+        val executor = ConnectionStepExecutor(
+            elapsedRealtime = { 0 },
+            log = {},
+            onProgressStarted = { 1L },
+            onProgressFinished = {},
+            onTraceStarted = { progress, step ->
+                traced += progress to step
+                TelemetrySpan {}
+            },
+        )
+
+        executor.execute(
+            ConnectionStep(
+                label = "Physical route probe",
+                progress = ConnectionProgress.UpdatingNetworkRoute,
+                telemetryStep = ConnectionTelemetryStep.DetectPhysicalRoute,
+                reported = false,
+                action = { true },
+            ),
+        )
+
+        assertEquals(
+            listOf(ConnectionProgress.UpdatingNetworkRoute to ConnectionTelemetryStep.DetectPhysicalRoute),
+            traced,
+        )
     }
 }

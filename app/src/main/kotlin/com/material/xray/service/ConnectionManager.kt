@@ -15,6 +15,7 @@ import com.material.xray.model.ConnectionState
 import com.material.xray.model.RootConnectionBackend
 import com.material.xray.model.ServerConfig
 import com.material.xray.model.XrayRuntimeSettings
+import com.material.xray.telemetry.ConnectionTelemetryStep
 import java.io.IOException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -140,7 +141,11 @@ internal class ConnectionManager(
             val xrayServer = resolveServer(server, runtimeSettings.allowIpv6) ?: return
 
             val appRoutingPlan = executeStep(
-                ConnectionStep("Build app routing plan", ConnectionProgress.ConfiguringRouting) {
+                ConnectionStep(
+                    "Build app routing plan",
+                    ConnectionProgress.ConfiguringRouting,
+                    telemetryStep = ConnectionTelemetryStep.BuildAppRouting,
+                ) {
                     appRoutingPlanner.build(
                         baseTunName = tunName,
                         baseRouteTable = routeTable,
@@ -165,7 +170,11 @@ internal class ConnectionManager(
             val xrayApiEndpoint = strategy.nextApiEndpoint(environment)
             if (!prepareXrayApiAccess(xrayApiEndpoint)) return
             executeStep(
-                ConnectionStep("Create Xray control API clients", ConnectionProgress.PreparingCore) {
+                ConnectionStep(
+                    "Create Xray control API clients",
+                    ConnectionProgress.PreparingCore,
+                    telemetryStep = ConnectionTelemetryStep.CreateApiClients,
+                ) {
                     replaceXrayApiClients(xrayApiEndpoint)
                 },
             )
@@ -305,6 +314,7 @@ internal class ConnectionManager(
                     ConnectionStep(
                         "Cleanup",
                         ConnectionProgress.PreparingRuntime,
+                        telemetryStep = ConnectionTelemetryStep.CleanupPreviousRuntime,
                         isSuccessful = { it },
                         action = {
                             cleanup.ensureCleanState(
@@ -337,6 +347,7 @@ internal class ConnectionManager(
                 ConnectionStep(
                     "TUN interface name detection",
                     ConnectionProgress.PreparingRuntime,
+                    telemetryStep = ConnectionTelemetryStep.DetectTunInterface,
                     isSuccessful = { it != null },
                     action = tunGateway::findAvailableWlanName,
                 ),
@@ -356,7 +367,11 @@ internal class ConnectionManager(
         }
 
         executeStep(
-            ConnectionStep("Prepare Xray log file", ConnectionProgress.PreparingRuntime) {
+            ConnectionStep(
+                "Prepare Xray log file",
+                ConnectionProgress.PreparingRuntime,
+                telemetryStep = ConnectionTelemetryStep.PrepareLog,
+            ) {
                 strategy.prepareLogFile()
             },
         )
@@ -410,6 +425,7 @@ internal class ConnectionManager(
             ConnectionStep(
                 "TPROXY startup guard",
                 ConnectionProgress.ConfiguringRouting,
+                telemetryStep = ConnectionTelemetryStep.InstallTproxyGuard,
                 isSuccessful = { it.success },
                 action = { tproxyGateway.installGuard(tproxyPlan) },
             ),
@@ -428,6 +444,7 @@ internal class ConnectionManager(
             ConnectionStep(
                 "Root shell setup",
                 ConnectionProgress.PreparingRuntime,
+                telemetryStep = ConnectionTelemetryStep.RootAccess,
                 isSuccessful = { it },
                 action = rootRuntime::open,
             ),
@@ -474,6 +491,7 @@ internal class ConnectionManager(
             ConnectionStep(
                 "Xray API firewall setup",
                 ConnectionProgress.PreparingCore,
+                telemetryStep = ConnectionTelemetryStep.PrepareApiAccess,
                 isSuccessful = { it },
                 action = { prepareRootApiAccess(endpoint) },
             ),
@@ -502,6 +520,7 @@ internal class ConnectionManager(
                 ConnectionStep(
                     "xray binary setup",
                     ConnectionProgress.PreparingCore,
+                    telemetryStep = ConnectionTelemetryStep.PrepareCoreBinary,
                     isSuccessful = { it != null },
                     action = { strategy.prepareBinary(verifyAvailable = true) },
                 ),
@@ -532,6 +551,7 @@ internal class ConnectionManager(
             ConnectionStep(
                 "Routing data setup",
                 ConnectionProgress.UpdatingRoutingData,
+                telemetryStep = ConnectionTelemetryStep.PrepareRoutingData,
                 action = routingData::ensureReady,
             ),
         )
@@ -552,7 +572,8 @@ internal class ConnectionManager(
         val route = executeStep(
             ConnectionStep(
                 "Physical route detection",
-                progress = null,
+                progress = ConnectionProgress.PreparingRuntime,
+                telemetryStep = ConnectionTelemetryStep.DetectPhysicalRoute,
                 retryable = true,
                 maxRetries = CONNECTION_STEP_MAX_RETRIES,
                 retryDelayMs = CONNECTION_STEP_RETRY_DELAY_MS,
@@ -579,6 +600,7 @@ internal class ConnectionManager(
             ConnectionStep(
                 "Server address resolution",
                 ConnectionProgress.ResolvingEntryServer,
+                telemetryStep = ConnectionTelemetryStep.ResolveServer,
                 retryable = true,
                 maxRetries = CONNECTION_STEP_MAX_RETRIES,
                 retryDelayMs = CONNECTION_STEP_RETRY_DELAY_MS,
@@ -661,6 +683,7 @@ internal class ConnectionManager(
             ConnectionStep(
                 "Config generation",
                 ConnectionProgress.GeneratingConfiguration,
+                telemetryStep = ConnectionTelemetryStep.GenerateConfig,
                 action = { generateXrayConfig(generatedConfig) },
             ),
         )
@@ -668,6 +691,7 @@ internal class ConnectionManager(
             ConnectionStep(
                 "Config write",
                 ConnectionProgress.GeneratingConfiguration,
+                telemetryStep = ConnectionTelemetryStep.WriteConfig,
                 action = { xrayBinary.writeConfig(configJson) },
             ),
         )
@@ -737,6 +761,7 @@ internal class ConnectionManager(
             ConnectionStep(
                 "Config write",
                 ConnectionProgress.GeneratingConfiguration,
+                telemetryStep = ConnectionTelemetryStep.WriteConfig,
                 action = { xrayBinary.writeConfig(patched) },
             ),
         )
@@ -763,6 +788,7 @@ internal class ConnectionManager(
             ConnectionStep(
                 "xray process launch",
                 ConnectionProgress.StartingCore,
+                telemetryStep = ConnectionTelemetryStep.LaunchCore,
                 isSuccessful = { it > 0 },
                 action = {
                     strategy.startProcess(
@@ -826,6 +852,7 @@ internal class ConnectionManager(
             ConnectionStep(
                 "TUN setup",
                 ConnectionProgress.ConfiguringTunnel,
+                telemetryStep = ConnectionTelemetryStep.ConfigureTun,
                 isSuccessful = { it.success },
                 action = {
                     tunGateway.configureTun(
@@ -867,6 +894,7 @@ internal class ConnectionManager(
                     ConnectionStep(
                         "TPROXY routing setup",
                         ConnectionProgress.ConfiguringRouting,
+                        telemetryStep = ConnectionTelemetryStep.ActivateTproxy,
                         isSuccessful = { it.success },
                         action = { tproxyGateway.activate(tproxyPlan) },
                     ),
@@ -882,6 +910,7 @@ internal class ConnectionManager(
                     ConnectionStep(
                         "TPROXY routing verification",
                         ConnectionProgress.ConfiguringRouting,
+                        telemetryStep = ConnectionTelemetryStep.VerifyTproxy,
                         isSuccessful = { it.success },
                         action = { tproxyGateway.verify(tproxyPlan.runtimeState) },
                     ),
@@ -939,6 +968,7 @@ internal class ConnectionManager(
             ConnectionStep(
                 "TPROXY transition guard removal",
                 ConnectionProgress.ConfiguringRouting,
+                telemetryStep = ConnectionTelemetryStep.RemoveTproxyGuard,
                 isSuccessful = { it },
                 action = tproxyGateway::removeGuard,
             ),
@@ -971,6 +1001,7 @@ internal class ConnectionManager(
                 ConnectionStep(
                     "App TUN setup ${index + 1}",
                     ConnectionProgress.ConfiguringTunnel,
+                    telemetryStep = ConnectionTelemetryStep.ConfigureAppTun,
                     isSuccessful = { it.success },
                     action = {
                         tunGateway.configureTun(
@@ -1032,6 +1063,7 @@ internal class ConnectionManager(
             ConnectionStep(
                 "IP routing setup",
                 ConnectionProgress.ConfiguringRouting,
+                telemetryStep = ConnectionTelemetryStep.ApplyRootRouting,
                 isSuccessful = { it.success },
                 action = {
                     tunGateway.applyRouting(
@@ -1071,6 +1103,7 @@ internal class ConnectionManager(
         ConnectionStep(
             "Xray API readiness",
             ConnectionProgress.WaitingForCore,
+            telemetryStep = ConnectionTelemetryStep.WaitForApi,
             isSuccessful = { it == XrayApiReadiness.Ready },
             action = { probeXrayApiReadiness(pid) },
         ),
