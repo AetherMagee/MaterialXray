@@ -1,6 +1,7 @@
 package com.material.xray.telemetry
 
 import android.os.SystemClock
+import com.material.xray.core.xray.TproxyCompatibility
 import com.material.xray.model.ConnectionProgress
 import com.material.xray.model.ConnectionState
 import com.material.xray.model.RootConnectionBackend
@@ -17,6 +18,11 @@ enum class CoreRecoveryCause(val value: String) {
     MemoryLimit("memory_limit"),
     TunnelUnavailable("tunnel_unavailable"),
     RuntimeModeChanged("runtime_mode_changed"),
+}
+
+private enum class TproxyCompatibilityResult(val value: String) {
+    Supported("supported"),
+    Unsupported("unsupported"),
 }
 
 fun interface TelemetrySpan {
@@ -48,9 +54,12 @@ data class TelemetryConnectionContext(
 }
 
 @Singleton
-class TelemetryReporter @Inject constructor(
+class TelemetryReporter internal constructor(
     private val client: TelemetryClient,
+    private val elapsedRealtime: () -> Long,
 ) {
+    @Inject constructor(client: TelemetryClient) : this(client, SystemClock::elapsedRealtime)
+
     @Volatile private var enabled = false
     private val lastIssueAt = mutableMapOf<String, Long>()
     private var activeConnectionTrace: TelemetryTransaction? = null
@@ -112,6 +121,38 @@ class TelemetryReporter @Inject constructor(
         addBreadcrumb("connection.state", value, data)
     }
 
+    fun recordTproxyCompatibility(result: TproxyCompatibility, cached: Boolean) {
+        val attributes = when (result) {
+            is TproxyCompatibility.Supported -> mapOf(
+                "result" to TproxyCompatibilityResult.Supported.value,
+                "reason" to "none",
+                "ipv6_supported" to result.ipv6,
+                "cached" to cached,
+            )
+            is TproxyCompatibility.Unsupported -> mapOf(
+                "result" to TproxyCompatibilityResult.Unsupported.value,
+                "reason" to result.reason.telemetryValue(),
+                "ipv6_supported" to false,
+                "cached" to cached,
+            )
+            TproxyCompatibility.Checking,
+            TproxyCompatibility.Unknown,
+            -> return
+        }
+        count("tproxy.compatibility.checked", attributes)
+        addBreadcrumb("tproxy.compatibility", attributes.getValue("result").toString(), attributes)
+
+        val malfunction = (result as? TproxyCompatibility.Unsupported).takeUnless { cached }
+        if (malfunction?.reason?.isProbeMalfunction() != true) return
+        val reason = malfunction.reason.telemetryValue()
+        if (!shouldReportIssue("tproxy_compatibility_$reason")) return
+        captureSafeMessage(
+            message = "TPROXY compatibility probe malfunctioned",
+            fingerprint = "tproxy-compatibility-$reason",
+            tags = mapOf("reason" to reason),
+        )
+    }
+
     @Synchronized
     internal fun startConnectionStep(progress: ConnectionProgress): TelemetrySpan? {
         if (!enabled) return null
@@ -169,7 +210,7 @@ class TelemetryReporter @Inject constructor(
     @Synchronized
     private fun shouldReportIssue(key: String): Boolean {
         if (!enabled) return false
-        val now = SystemClock.elapsedRealtime()
+        val now = elapsedRealtime()
         val previous = lastIssueAt[key]
         if (previous != null && now - previous < ISSUE_REPORT_INTERVAL_MS) return false
         lastIssueAt[key] = now
@@ -205,6 +246,31 @@ class TelemetryReporter @Inject constructor(
         ConnectionProgress.RestoringControlApi -> "restoring_control_api"
         ConnectionProgress.UpdatingNetworkRoute -> "updating_network_route"
         ConnectionProgress.UpdatingAppRouting -> "updating_app_routing"
+    }
+
+    private fun TproxyCompatibility.Reason.isProbeMalfunction(): Boolean = when (this) {
+        TproxyCompatibility.Reason.ProbeCleanupFailed,
+        TproxyCompatibility.Reason.CommandTimedOut,
+        -> true
+        else -> false
+    }
+
+    private fun TproxyCompatibility.Reason.telemetryValue(): String = when (this) {
+        TproxyCompatibility.Reason.RootUnavailable -> "root_unavailable"
+        TproxyCompatibility.Reason.InitNetworkNamespaceUnavailable -> "init_network_namespace_unavailable"
+        TproxyCompatibility.Reason.IptablesMangleUnavailable -> "iptables_mangle_unavailable"
+        TproxyCompatibility.Reason.ProcessGroupUnavailable -> "process_group_unavailable"
+        TproxyCompatibility.Reason.OwnerMatchUnavailable -> "owner_match_unavailable"
+        TproxyCompatibility.Reason.MarkTargetUnavailable -> "mark_target_unavailable"
+        TproxyCompatibility.Reason.TproxyIpv4Unavailable -> "tproxy_ipv4_unavailable"
+        TproxyCompatibility.Reason.Ipv6BlockingUnavailable -> "ipv6_blocking_unavailable"
+        TproxyCompatibility.Reason.ListenerInspectionUnavailable -> "listener_inspection_unavailable"
+        TproxyCompatibility.Reason.PolicyRoutingUnavailable -> "policy_routing_unavailable"
+        TproxyCompatibility.Reason.RouteTableConflict -> "route_table_conflict"
+        TproxyCompatibility.Reason.TproxyIpv6Unavailable -> "tproxy_ipv6_unavailable"
+        TproxyCompatibility.Reason.MarkNamespaceConflict -> "mark_namespace_conflict"
+        TproxyCompatibility.Reason.ProbeCleanupFailed -> "probe_cleanup_failed"
+        TproxyCompatibility.Reason.CommandTimedOut -> "command_timed_out"
     }
 
     private companion object {

@@ -1,5 +1,6 @@
 package com.material.xray.telemetry
 
+import com.material.xray.core.xray.TproxyCompatibility
 import com.material.xray.model.RootConnectionBackend
 import io.sentry.SentryEvent
 import io.sentry.protocol.Message
@@ -73,6 +74,59 @@ class TelemetryReporterTest {
         assertNull(event.user?.ipAddress)
     }
 
+    @Test
+    fun `TPROXY compatibility uses fixed low cardinality attributes`() {
+        val client = FakeTelemetryClient()
+        val reporter = TelemetryReporter(client, elapsedRealtime = { 0 }).apply { setEnabled(true) }
+
+        reporter.recordTproxyCompatibility(
+            TproxyCompatibility.Unsupported(
+                reason = TproxyCompatibility.Reason.OwnerMatchUnavailable,
+                details = "secret shell output",
+            ),
+            cached = true,
+        )
+
+        assertEquals(
+            RecordedMetric(
+                name = "tproxy.compatibility.checked",
+                attributes = mapOf(
+                    "result" to "unsupported",
+                    "reason" to "owner_match_unavailable",
+                    "ipv6_supported" to false,
+                    "cached" to true,
+                ),
+            ),
+            client.metrics.single(),
+        )
+        assertTrue(client.messages.isEmpty())
+        assertTrue(client.metrics.single().attributes.values.none { it == "secret shell output" })
+    }
+
+    @Test
+    fun `fresh probe malfunctions create a fixed issue without raw output`() {
+        val client = FakeTelemetryClient()
+        val reporter = TelemetryReporter(client, elapsedRealtime = { 0 }).apply { setEnabled(true) }
+
+        reporter.recordTproxyCompatibility(
+            TproxyCompatibility.Unsupported(
+                reason = TproxyCompatibility.Reason.CommandTimedOut,
+                details = "secret shell output",
+            ),
+            cached = false,
+        )
+
+        assertEquals(
+            RecordedMessage(
+                message = "TPROXY compatibility probe malfunctioned",
+                fingerprint = "tproxy-compatibility-command_timed_out",
+                tags = mapOf("reason" to "command_timed_out"),
+            ),
+            client.messages.single(),
+        )
+        assertTrue(client.messages.single().toString().contains("secret shell output").not())
+    }
+
     private fun connection() = TelemetryConnectionContext(
         mode = TelemetryServiceMode.Root,
         backend = RootConnectionBackend.Tproxy,
@@ -99,6 +153,12 @@ private data class RecordedBreadcrumb(
     val data: Map<String, Any>,
 )
 
+private data class RecordedMessage(
+    val message: String,
+    val fingerprint: String,
+    val tags: Map<String, String>,
+)
+
 private class FakeTelemetryClient : TelemetryClient {
     var enableCount = 0
     var disableCount = 0
@@ -106,6 +166,7 @@ private class FakeTelemetryClient : TelemetryClient {
     val distributions = mutableListOf<RecordedDistribution>()
     val breadcrumbs = mutableListOf<RecordedBreadcrumb>()
     val transactions = mutableListOf<FakeTelemetryTransaction>()
+    val messages = mutableListOf<RecordedMessage>()
 
     override fun enable() {
         enableCount++
@@ -133,7 +194,9 @@ private class FakeTelemetryClient : TelemetryClient {
 
     override fun captureException(error: Throwable, fingerprint: List<String>, tags: Map<String, String>) = Unit
 
-    override fun captureMessage(message: String, fingerprint: String, tags: Map<String, String>) = Unit
+    override fun captureMessage(message: String, fingerprint: String, tags: Map<String, String>) {
+        messages += RecordedMessage(message, fingerprint, tags)
+    }
 }
 
 private class FakeTelemetryTransaction : TelemetryTransaction {

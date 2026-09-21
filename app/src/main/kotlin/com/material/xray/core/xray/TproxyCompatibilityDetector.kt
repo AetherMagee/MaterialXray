@@ -5,6 +5,7 @@ import android.os.Build
 import com.material.xray.core.root.RootShell
 import com.material.xray.core.xray.FirewallCommands.IPV4 as IPTABLES
 import com.material.xray.core.xray.FirewallCommands.IPV6 as IP6TABLES
+import com.material.xray.telemetry.TelemetryReporter
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -80,6 +81,7 @@ internal fun TproxyCompatibility.isConclusive(): Boolean = when (this) {
 class TproxyCompatibilityDetector @Inject constructor(
     private val shell: RootShell,
     @ApplicationContext context: Context,
+    private val telemetryReporter: TelemetryReporter,
 ) {
     private val appUid = context.applicationInfo.uid
     private val preferences = context.getSharedPreferences(CACHE_PREFERENCES_NAME, Context.MODE_PRIVATE)
@@ -103,11 +105,14 @@ class TproxyCompatibilityDetector @Inject constructor(
     suspend fun refresh(): TproxyCompatibility = detect(forceRefresh = true)
 
     private suspend fun detect(forceRefresh: Boolean): TproxyCompatibility = mutex.withLock {
-        if (probed && !forceRefresh) return@withLock _state.value
+        if (probed && !forceRefresh) {
+            return@withLock _state.value.also { telemetryReporter.recordTproxyCompatibility(it, cached = true) }
+        }
         probed = true
         if (!forceRefresh) {
             readCachedCompatibility()?.let { cached ->
                 _state.value = cached
+                telemetryReporter.recordTproxyCompatibility(cached, cached = true)
                 return@withLock cached
             }
         }
@@ -115,6 +120,7 @@ class TproxyCompatibilityDetector @Inject constructor(
         runDetection().also { result ->
             _state.value = result
             cacheCompatibility(result)
+            telemetryReporter.recordTproxyCompatibility(result, cached = false)
         }
     }
 
