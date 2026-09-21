@@ -48,10 +48,13 @@ internal class RawConfigTunInjector(
         }
         original["inbounds"] = JsonArray(effectiveInbounds.map(XrayInbound::toJson))
 
-        val normalizedOutbounds = normalizeOutbounds(original["outbounds"] as? JsonArray, fwmark, physicalInterface, allowIpv6)
-        val proxyOutbound = normalizedOutbounds.firstOrNull { outbound ->
-            outbound["tag"]?.jsonPrimitive?.contentOrNull.equals("proxy", ignoreCase = true)
-        } ?: error("Raw JSON config has no proxy outbound")
+        val normalizedOutbounds = normalizeOutbounds(
+            original["outbounds"] as? JsonArray,
+            fwmark,
+            physicalInterface,
+            allowIpv6,
+        )
+        val proxyOutbound = normalizedOutbounds.proxy
         val proxyOutboundTag = requireNotNull(proxyOutbound["tag"]?.jsonPrimitive?.contentOrNull)
         val rawRouting = original["routing"] as? JsonObject
         val defaultRouteTarget = rawRouting.defaultTcpRouteTarget()
@@ -61,9 +64,10 @@ internal class RawConfigTunInjector(
             buildProxyOutbound(route.server, fwmark, physicalInterface, route.outboundTag, allowIpv6)
         }
         val managedOutboundTags = managedOutboundTags(appProxyRoutes)
-        val unmanagedOutbounds = normalizedOutbounds.filterNot { outbound ->
+        val unmanagedOutbounds = normalizedOutbounds.all.filterIndexed { index, outbound ->
             val tag = outbound["tag"]?.jsonPrimitive?.contentOrNull
-            tag != null && managedOutboundTags.any { managedTag -> managedTag.equals(tag, ignoreCase = true) }
+            index != normalizedOutbounds.proxyIndex &&
+                (tag == null || managedOutboundTags.none { managedTag -> managedTag.equals(tag, ignoreCase = true) })
         }
 
         original["outbounds"] = JsonArray(
@@ -71,7 +75,7 @@ internal class RawConfigTunInjector(
                 defaultOutbound = defaultOutbound,
                 proxyOutbound = proxyOutbound,
                 directOutbound = buildDirectOutbound(fwmark, physicalInterface, allowIpv6),
-                dnsOutbound = normalizedOutbounds.firstOrNull { outbound ->
+                dnsOutbound = normalizedOutbounds.all.firstOrNull { outbound ->
                     profileDns != null &&
                         outbound["tag"]?.jsonPrimitive?.contentOrNull == "dns-out" &&
                         outbound["protocol"]?.jsonPrimitive?.contentOrNull == "dns"
@@ -141,26 +145,29 @@ internal class RawConfigTunInjector(
         fwmark: Int,
         physicalInterface: String?,
         allowIpv6: Boolean,
-    ): List<JsonObject> {
+    ): NormalizedOutbounds {
         val existingOutbounds = outbounds?.mapNotNull { it as? JsonObject }.orEmpty()
-        val firstProxyCandidateIndex = firstProxyCandidateIndex(existingOutbounds)
-        return existingOutbounds.mapIndexed { index, outbound ->
+        val proxyIndex = proxyCandidateIndex(existingOutbounds)
+        if (proxyIndex < 0) error("Raw JSON config has no proxy outbound")
+
+        val normalized = existingOutbounds.mapIndexed { index, outbound ->
             val obj = outbound.toMutableMap()
             val stream = (obj["streamSettings"] as? JsonObject)?.toMutableMap() ?: mutableMapOf()
             stream["sockopt"] = buildSockopt(fwmark, physicalInterface, allowIpv6)
             obj["streamSettings"] = JsonObject(stream)
-            if (index == firstProxyCandidateIndex) {
+            if (index == proxyIndex && obj["tag"]?.jsonPrimitive?.contentOrNull.isNullOrBlank()) {
                 obj["tag"] = JsonPrimitive("proxy")
             }
             JsonObject(obj)
         }
+        return NormalizedOutbounds(normalized, proxyIndex)
     }
 
-    private fun firstProxyCandidateIndex(outbounds: List<JsonObject>): Int {
-        val hasProxyTag = outbounds.any { outbound ->
+    private fun proxyCandidateIndex(outbounds: List<JsonObject>): Int {
+        val canonicalIndex = outbounds.indexOfFirst { outbound ->
             outbound["tag"]?.jsonPrimitive?.contentOrNull.equals("proxy", ignoreCase = true)
         }
-        if (hasProxyTag) return -1
+        if (canonicalIndex >= 0) return canonicalIndex
 
         return outbounds.indexOfFirst { outbound ->
             outbound["protocol"]?.jsonPrimitive?.contentOrNull?.lowercase() !in SPECIAL_OUTBOUND_PROTOCOLS
@@ -205,5 +212,13 @@ internal class RawConfigTunInjector(
 
     private companion object {
         val DEFAULT_ROUTE_FIELDS = setOf("type", "network", "outboundTag", "balancerTag", "ruleTag")
+    }
+
+    private data class NormalizedOutbounds(
+        val all: List<JsonObject>,
+        val proxyIndex: Int,
+    ) {
+        val proxy: JsonObject
+            get() = all[proxyIndex]
     }
 }

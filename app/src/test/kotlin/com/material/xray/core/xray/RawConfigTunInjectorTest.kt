@@ -272,6 +272,103 @@ class RawConfigTunInjectorTest {
     }
 
     @Test
+    fun `inject preserves a provider proxy tag and its routing references`() {
+        val providerTag = "usual-proxy-40"
+        val result = injector.inject(
+            rawJson = """
+                {
+                  "outbounds": [
+                    {"tag":"$providerTag","protocol":"vless","settings":{}},
+                    {"tag":"direct","protocol":"freedom"},
+                    {"tag":"block","protocol":"blackhole"}
+                  ],
+                  "routing": {
+                    "rules": [
+                      {"domain":["example.org"],"outboundTag":"direct"},
+                      {"network":"tcp,udp","outboundTag":"$providerTag"}
+                    ]
+                  }
+                }
+            """.trimIndent(),
+            tunName = "xray0",
+            fwmark = 1,
+            dnsServers = "1.1.1.1",
+            domesticDnsServers = "",
+            logLevel = XrayLogLevel.Error,
+            defaultOutbound = XrayOutbound.Proxy,
+            bypassLan = false,
+            routingRules = emptyList(),
+            appProxyRoutes = listOf(
+                AppProxyRoute(
+                    inboundTag = "app-in-default-selected",
+                    tunName = "xray0a1",
+                    outboundTag = "proxy",
+                    server = server("Default selected"),
+                    applyRoutingRules = true,
+                ),
+            ),
+            physicalInterface = null,
+        )
+
+        val root = json.parseToJsonElement(result).jsonObject
+        val outboundTags = root.getValue("outbounds").jsonArray
+            .map { it.jsonObject.getValue("tag").jsonPrimitive.content }
+        assertEquals(listOf(providerTag, "direct", "block", "dns-out"), outboundTags)
+
+        val rules = root.getValue("routing").jsonObject.getValue("rules").jsonArray.map { it.jsonObject }
+        val appFallback = rules.first {
+            it["inboundTag"]?.jsonArray?.singleOrNull()?.jsonPrimitive?.content == "app-in-default-selected"
+        }
+        assertEquals(providerTag, appFallback.getValue("outboundTag").jsonPrimitive.content)
+        assertTrue(rules.any { it["network"]?.jsonPrimitive?.content == "tcp,udp" && it["outboundTag"]?.jsonPrimitive?.content == providerTag })
+    }
+
+    @Test
+    fun `inject preserves provider tags used by balancer and observatory selectors`() {
+        val rawJson = """
+            {
+              "outbounds": [
+                {"tag":"usual-proxy-01","protocol":"vless","settings":{}},
+                {"tag":"usual-proxy-02","protocol":"vless","settings":{}}
+              ],
+              "routing": {
+                "rules": [{"network":"tcp,udp","balancerTag":"balance"}],
+                "balancers": [
+                  {"tag":"balance","selector":["usual-"],"fallbackTag":"usual-proxy-01"}
+                ]
+              },
+              "burstObservatory":{"subjectSelector":["usual-"]}
+            }
+        """.trimIndent()
+        val original = json.parseToJsonElement(rawJson).jsonObject
+
+        val result = injector.inject(
+            rawJson = rawJson,
+            tunName = "xray0",
+            fwmark = 1,
+            dnsServers = "1.1.1.1",
+            domesticDnsServers = "",
+            logLevel = XrayLogLevel.Error,
+            defaultOutbound = XrayOutbound.Proxy,
+            bypassLan = false,
+            routingRules = emptyList(),
+            appProxyRoutes = emptyList(),
+            physicalInterface = null,
+        )
+
+        val root = json.parseToJsonElement(result).jsonObject
+        assertEquals(
+            listOf("usual-proxy-01", "direct", "block", "dns-out", "usual-proxy-02"),
+            root.getValue("outbounds").jsonArray.map { it.jsonObject.getValue("tag").jsonPrimitive.content },
+        )
+        assertEquals(
+            original.getValue("routing").jsonObject.getValue("balancers"),
+            root.getValue("routing").jsonObject.getValue("balancers"),
+        )
+        assertEquals(original.getValue("burstObservatory"), root.getValue("burstObservatory"))
+    }
+
+    @Test
     fun `inject preserves raw routing for multi-outbound profiles`() {
         val result = injector.inject(
             rawJson = """
