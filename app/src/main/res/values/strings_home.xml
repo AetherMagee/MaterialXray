@@ -79,6 +79,9 @@
     <string name="home_connection_applying_routing">Applying routing changes&#8230;</string>
     <string name="home_connection_updating_routing">Updating routing data&#8230;</string>
     <string name="home_connection_updating_routing_percent">Updating routing data&#8230; %1$d%%</string>
+    <string name="home_geo_data_connecting">Connecting to download&#8230;</string>
+    <string name="home_geo_data_downloaded">Downloaded %1$.1f MiB</string>
+    <string name="home_geo_data_download_progress">%1$.1f / %2$.1f MiB downloaded</string>
     <string name="home_connection_restart_required">Restart required</string>
     <string name="home_connection_interface_busy">Interface busy</string>
     <string name="home_connection_disconnecting">Disconnecting&#8230;</string>

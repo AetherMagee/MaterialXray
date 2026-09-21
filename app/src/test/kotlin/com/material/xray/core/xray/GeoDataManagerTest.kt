@@ -16,26 +16,30 @@ class GeoDataManagerTest {
 
     @Test
     fun combinedProgressIsWeightedByFileSize() {
-        val fraction = combinedGeoDataDownloadFraction(
+        val progress = combinedGeoDataDownloadProgress(
             listOf(
                 GeoDataDownloadProgress(bytesDownloaded = 25, totalBytes = 100),
                 GeoDataDownloadProgress(bytesDownloaded = 150, totalBytes = 300),
             ),
         )
 
-        assertEquals(0.4375f, fraction)
+        assertEquals(175L, progress?.bytesDownloaded)
+        assertEquals(400L, progress?.totalBytes)
+        assertEquals(0.4375f, progress?.fraction)
     }
 
     @Test
     fun combinedProgressIsUnknownUntilEveryFileSizeIsKnown() {
-        val fraction = combinedGeoDataDownloadFraction(
+        val progress = combinedGeoDataDownloadProgress(
             listOf(
                 GeoDataDownloadProgress(bytesDownloaded = 25, totalBytes = 100),
-                GeoDataDownloadProgress(bytesDownloaded = 0, totalBytes = null),
+                GeoDataDownloadProgress(bytesDownloaded = 10, totalBytes = null),
             ),
         )
 
-        assertEquals(null, fraction)
+        assertEquals(35L, progress?.bytesDownloaded)
+        assertEquals(null, progress?.totalBytes)
+        assertEquals(null, progress?.fraction)
     }
 
     @Test

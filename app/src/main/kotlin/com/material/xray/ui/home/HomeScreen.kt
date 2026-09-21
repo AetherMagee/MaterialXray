@@ -160,6 +160,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import com.material.xray.R
+import com.material.xray.core.xray.GeoDataDownloadProgress
 import com.material.xray.data.db.entity.ServerEntity
 import com.material.xray.data.db.entity.SubscriptionEntity
 import com.material.xray.data.repository.ProviderRoutingAvailability
@@ -364,7 +365,7 @@ fun HomeScreen(
                 ConnectionPanel(
                     connectionState = uiState.connectionState,
                     connectionProgress = uiState.connectionProgress,
-                    geoDataDownloadFraction = uiState.geoDataDownloadFraction,
+                    geoDataDownloadProgress = uiState.geoDataDownloadProgress,
                     showProgressDetails = uiState.showAdvancedOptions,
                     selectedServerName = connectionUiState.displayServerName,
                     activeBalancer = uiState.activeBalancer,
@@ -1062,7 +1063,7 @@ private fun InstallPermissionRationaleDialogHost(
 private fun collectHomeUiState(viewModel: HomeViewModel): HomeUiState {
     val connectionState by viewModel.connectionState.collectAsStateWithLifecycle()
     val connectionProgress by viewModel.connectionProgress.collectAsStateWithLifecycle()
-    val geoDataDownloadFraction by viewModel.geoDataDownloadFraction.collectAsStateWithLifecycle()
+    val geoDataDownloadProgress by viewModel.geoDataDownloadProgress.collectAsStateWithLifecycle()
     val alwaysOnVpn by viewModel.alwaysOnVpn.collectAsStateWithLifecycle()
     val selectedServer by viewModel.selectedServer.collectAsStateWithLifecycle()
     val activeBalancer by viewModel.activeBalancer.collectAsStateWithLifecycle()
@@ -1085,7 +1086,7 @@ private fun collectHomeUiState(viewModel: HomeViewModel): HomeUiState {
     return HomeUiState(
         connectionState = connectionState,
         connectionProgress = connectionProgress,
-        geoDataDownloadFraction = geoDataDownloadFraction,
+        geoDataDownloadProgress = geoDataDownloadProgress,
         alwaysOnVpn = alwaysOnVpn,
         selectedServer = selectedServer,
         activeBalancer = activeBalancer,
@@ -1148,7 +1149,7 @@ private fun buildConnectionUiState(
 private data class HomeUiState(
     val connectionState: ConnectionState,
     val connectionProgress: ConnectionProgress?,
-    val geoDataDownloadFraction: Float?,
+    val geoDataDownloadProgress: GeoDataDownloadProgress?,
     val alwaysOnVpn: Boolean,
     val selectedServer: ServerConfig?,
     val activeBalancer: ActiveBalancerState?,
@@ -1187,7 +1188,7 @@ private data class ConnectionUiState(
 private fun ConnectionPanel(
     connectionState: ConnectionState,
     connectionProgress: ConnectionProgress?,
-    geoDataDownloadFraction: Float?,
+    geoDataDownloadProgress: GeoDataDownloadProgress?,
     showProgressDetails: Boolean,
     selectedServerName: String,
     activeBalancer: ActiveBalancerState?,
@@ -1221,7 +1222,7 @@ private fun ConnectionPanel(
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(
-            text = connectionHeading(connectionState, geoDataDownloadFraction),
+            text = connectionHeading(connectionState, geoDataDownloadProgress),
             style = MaterialTheme.typography.titleLarge,
             color = when {
                 isConnected -> MaterialTheme.colorScheme.primary
@@ -1234,17 +1235,29 @@ private fun ConnectionPanel(
         Spacer(modifier = Modifier.height(8.dp))
 
         Text(
-            text = when {
-                isInterfaceBusy -> stringResource(R.string.home_connection_interface_busy_detail)
-                isRestartRequired -> stringResource(R.string.home_connection_restart_required_detail)
-                else -> selectedServerName
-            },
+            text = connectionDetailText(
+                connectionState = connectionState,
+                geoDataDownloadProgress = geoDataDownloadProgress,
+                selectedServerName = selectedServerName,
+            ),
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
             maxLines = if (isRestartRequired || isInterfaceBusy) 4 else 1,
             overflow = TextOverflow.Ellipsis,
             textAlign = TextAlign.Center,
         )
+        if (connectionState == ConnectionState.UpdatingRoutingData) {
+            Spacer(modifier = Modifier.height(8.dp))
+            val fraction = geoDataDownloadProgress?.fraction
+            if (fraction == null) {
+                LinearProgressIndicator(modifier = Modifier.fillMaxWidth(0.6f))
+            } else {
+                LinearProgressIndicator(
+                    progress = { fraction },
+                    modifier = Modifier.fillMaxWidth(0.6f),
+                )
+            }
+        }
         // The row is normally held open even when empty so the panel does not jump as progress
         // text and uptime come and go. Idle-and-disconnected has nothing coming, so the compact
         // layout drops it rather than leave a gap.
@@ -1336,11 +1349,23 @@ private fun ConnectionPanel(
 }
 
 @Composable
-private fun connectionHeading(connectionState: ConnectionState, geoDataDownloadFraction: Float?): String = when (connectionState) {
+private fun connectionDetailText(
+    connectionState: ConnectionState,
+    geoDataDownloadProgress: GeoDataDownloadProgress?,
+    selectedServerName: String,
+): String = when (connectionState) {
+    is ConnectionState.InterfaceBusy -> stringResource(R.string.home_connection_interface_busy_detail)
+    is ConnectionState.RestartRequired -> stringResource(R.string.home_connection_restart_required_detail)
+    ConnectionState.UpdatingRoutingData -> geoDataProgressText(geoDataDownloadProgress)
+    else -> selectedServerName
+}
+
+@Composable
+private fun connectionHeading(connectionState: ConnectionState, geoDataDownloadProgress: GeoDataDownloadProgress?): String = when (connectionState) {
     is ConnectionState.Connected -> stringResource(R.string.home_connection_connected)
     is ConnectionState.Connecting -> stringResource(R.string.home_connection_connecting)
     ConnectionState.ApplyingRoutingChanges -> stringResource(R.string.home_connection_applying_routing)
-    ConnectionState.UpdatingRoutingData -> geoDataDownloadFraction?.let { fraction ->
+    ConnectionState.UpdatingRoutingData -> geoDataDownloadProgress?.fraction?.let { fraction ->
         stringResource(
             R.string.home_connection_updating_routing_percent,
             (fraction * 100).roundToInt(),
@@ -1353,8 +1378,32 @@ private fun connectionHeading(connectionState: ConnectionState, geoDataDownloadF
     ConnectionState.Disconnected -> stringResource(R.string.home_connection_disconnected)
 }
 
+@Composable
+private fun geoDataProgressText(progress: GeoDataDownloadProgress?): String {
+    val totalBytes = progress?.totalBytes
+    return when {
+        progress == null || (progress.bytesDownloaded == 0L && totalBytes == null) -> {
+            stringResource(R.string.home_geo_data_connecting)
+        }
+        totalBytes == null || totalBytes <= 0L -> {
+            stringResource(R.string.home_geo_data_downloaded, progress.bytesDownloaded.toMebibytes())
+        }
+        else -> {
+            stringResource(
+                R.string.home_geo_data_download_progress,
+                progress.bytesDownloaded.toMebibytes(),
+                totalBytes.toMebibytes(),
+            )
+        }
+    }
+}
+
+private fun Long.toMebibytes(): Float = this / BYTES_PER_MEBIBYTE.toFloat()
+
 internal fun ConnectionState.showsConnectionStats(): Boolean = this is ConnectionState.Connected ||
     this == ConnectionState.ApplyingRoutingChanges
+
+private const val BYTES_PER_MEBIBYTE = 1024 * 1024
 
 /**
  * Compact alternative to the large power button, anchored in the corner of the home screen.

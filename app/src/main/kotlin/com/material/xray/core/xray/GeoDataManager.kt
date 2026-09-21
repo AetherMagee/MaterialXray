@@ -39,13 +39,17 @@ data class GeoDataDownloadProgress(
             ?.let { total -> (bytesDownloaded.toDouble() / total).coerceIn(0.0, 1.0).toFloat() }
 }
 
-internal fun combinedGeoDataDownloadFraction(progress: Collection<GeoDataDownloadProgress>): Float? {
-    if (progress.isEmpty() || progress.any { it.totalBytes == null || it.totalBytes <= 0L }) return null
-    val totalBytes = progress.sumOf { requireNotNull(it.totalBytes) }
-    if (totalBytes <= 0L) return null
-    return (progress.sumOf(GeoDataDownloadProgress::bytesDownloaded).toDouble() / totalBytes)
-        .coerceIn(0.0, 1.0)
-        .toFloat()
+internal fun combinedGeoDataDownloadProgress(
+    progress: Collection<GeoDataDownloadProgress>,
+): GeoDataDownloadProgress? {
+    if (progress.isEmpty()) return null
+    val totalBytes = progress
+        .takeIf { entries -> entries.all { it.totalBytes != null && it.totalBytes > 0L } }
+        ?.sumOf { requireNotNull(it.totalBytes) }
+    return GeoDataDownloadProgress(
+        bytesDownloaded = progress.sumOf(GeoDataDownloadProgress::bytesDownloaded),
+        totalBytes = totalBytes,
+    )
 }
 
 data class GeoDataStatus(
@@ -133,6 +137,26 @@ class GeoDataManager @Inject constructor(
                     }
                 }
             }
+        }
+    }
+
+    suspend fun clearCachedData() = withContext(Dispatchers.IO) {
+        downloadMutex.withLock {
+            listOf(
+                File(binaryDir, GEOIP_FILE_NAME),
+                File(binaryDir, GEOSITE_FILE_NAME),
+                File(binaryDir, "$GEOIP_FILE_NAME.download"),
+                File(binaryDir, "$GEOSITE_FILE_NAME.download"),
+                geoipSourceFile,
+                geositeSourceFile,
+                geoipUpdatedAtFile,
+                geositeUpdatedAtFile,
+            ).forEach { file ->
+                if (file.exists() && !file.delete()) {
+                    throw IOException("Unable to delete ${file.name}")
+                }
+            }
+            _downloadProgress.value = emptyMap()
         }
     }
 

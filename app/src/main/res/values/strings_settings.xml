@@ -51,6 +51,9 @@
     <string name="settings_save">Save</string>
     <string name="settings_update">Update</string>
     <string name="settings_updating">Updating&#8230;</string>
+    <string name="settings_geo_data_connecting">Connecting&#8230;</string>
+    <string name="settings_geo_data_downloaded">Downloading&#8230; %1$.1f MiB</string>
+    <string name="settings_geo_data_download_progress">%1$d%% &#8226; %2$.1f / %3$.1f MiB</string>
     <string name="settings_section_appearance">Appearance</string>
     <string name="settings_app_language_title">App language</string>
     <string name="settings_app_language_dialog_title">Choose app language</string>
@@ -85,6 +88,11 @@
     <string name="settings_section_data">Data</string>
     <string name="settings_export">Export</string>
     <string name="settings_import">Import</string>
+    <string name="settings_clear_geodata">Clear geodata</string>
+    <string name="settings_clearing_geodata">Clearing geodata&#8230;</string>
+    <string name="settings_geodata_cleared">Geodata cleared</string>
+    <string name="settings_geodata_clear_failed">Unable to clear geodata</string>
+    <string name="settings_geodata_clear_failed_with_detail">Unable to clear geodata: %1$s</string>
     <string name="settings_backup_exported">Backup exported</string>
     <string name="settings_backup_export_failed">Unable to export backup</string>
     <string name="settings_backup_export_failed_with_detail">Unable to export backup: %1$s</string>

@@ -74,11 +74,12 @@ class SettingsViewModel @Inject constructor(
     private val providerRoutingCoordinator: ProviderRoutingCoordinator,
     private val settingsRuntimeManager: SettingsRuntimeManager,
     private val oemAutostartManager: OemAutostartManager,
-    geoDataManager: GeoDataManager,
+    private val geoDataManager: GeoDataManager,
     settingsDataState: SettingsDataState,
 ) : ViewModel() {
     private val _geoipUpdating = MutableStateFlow(false)
     private val _geositeUpdating = MutableStateFlow(false)
+    private val _geoDataClearing = MutableStateFlow(false)
     private val _assetUpdateEvents = Channel<AssetUpdateMessage>(Channel.BUFFERED)
     private val _rootAccessDeniedEvents = Channel<Unit>(Channel.BUFFERED)
     private val _databaseResetEvents = Channel<Boolean>(Channel.BUFFERED)
@@ -95,6 +96,8 @@ class SettingsViewModel @Inject constructor(
     val selectedSubscriptionRequiresHwid = settingsDataState.selectedSubscriptionRequiresHardwareId
     val geoipUpdating: StateFlow<Boolean> = _geoipUpdating.asStateFlow()
     val geositeUpdating: StateFlow<Boolean> = _geositeUpdating.asStateFlow()
+    val geoDataClearing: StateFlow<Boolean> = _geoDataClearing.asStateFlow()
+    val connectionState = connectionStateCoordinator.state
     val geoDataDownloadProgress = geoDataManager.downloadProgress
     val assetUpdateEvents: Flow<AssetUpdateMessage> = _assetUpdateEvents.receiveAsFlow()
     val rootAccessDeniedEvents: Flow<Unit> = _rootAccessDeniedEvents.receiveAsFlow()
@@ -403,6 +406,31 @@ class SettingsViewModel @Inject constructor(
         )
     }
 
+    fun clearGeoData() {
+        if (isGeoDataOperationInProgress() || connectionState.value !is ConnectionState.Disconnected) return
+        _geoDataClearing.value = true
+        viewModelScope.launch {
+            try {
+                val result = runCatching { geoDataManager.clearCachedData() }
+                result.exceptionOrNull()?.let { error ->
+                    if (error is CancellationException) throw error
+                }
+                if (result.isSuccess) {
+                    _assetUpdateEvents.send(AssetUpdateMessage(R.string.settings_geodata_cleared))
+                } else {
+                    val detail = requireNotNull(result.exceptionOrNull()).message
+                    _assetUpdateEvents.send(
+                        detail?.takeIf(String::isNotBlank)?.let {
+                            AssetUpdateMessage(R.string.settings_geodata_clear_failed_with_detail, it)
+                        } ?: AssetUpdateMessage(R.string.settings_geodata_clear_failed),
+                    )
+                }
+            } finally {
+                _geoDataClearing.value = false
+            }
+        }
+    }
+
     fun exportBackup(uri: Uri) {
         if (_backupBusy.value) return
         viewModelScope.launch {
@@ -494,23 +522,29 @@ class SettingsViewModel @Inject constructor(
         updating: MutableStateFlow<Boolean>,
         @StringRes successMessageResId: Int,
     ) {
-        if (updating.value) return
+        if (isGeoDataOperationInProgress()) return
+        updating.value = true
         viewModelScope.launch {
-            updating.value = true
-            runCatching {
-                settingsRuntimeManager.updateGeoDataAsset(asset, url)
-            }.onSuccess {
-                _assetUpdateEvents.send(AssetUpdateMessage(successMessageResId))
-            }.onFailure { error ->
-                _assetUpdateEvents.send(
-                    error.message?.let { detail ->
-                        AssetUpdateMessage(R.string.settings_asset_update_failed_with_detail, detail)
-                    } ?: AssetUpdateMessage(R.string.settings_asset_update_failed),
-                )
+            try {
+                runCatching {
+                    settingsRuntimeManager.updateGeoDataAsset(asset, url)
+                }.onSuccess {
+                    _assetUpdateEvents.send(AssetUpdateMessage(successMessageResId))
+                }.onFailure { error ->
+                    if (error is CancellationException) throw error
+                    _assetUpdateEvents.send(
+                        error.message?.let { detail ->
+                            AssetUpdateMessage(R.string.settings_asset_update_failed_with_detail, detail)
+                        } ?: AssetUpdateMessage(R.string.settings_asset_update_failed),
+                    )
+                }
+            } finally {
+                updating.value = false
             }
-            updating.value = false
         }
     }
+
+    private fun isGeoDataOperationInProgress(): Boolean = _geoipUpdating.value || _geositeUpdating.value || _geoDataClearing.value
 
     private fun updateXrayConfigStringSetting(
         newValue: String,

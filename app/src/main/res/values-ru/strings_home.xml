@@ -82,6 +82,9 @@
     <string name="home_connection_applying_routing">Применение изменений маршрутизации&#8230;</string>
     <string name="home_connection_updating_routing">Обновление данных маршрутизации&#8230;</string>
     <string name="home_connection_updating_routing_percent">Обновление данных маршрутизации&#8230; %1$d%%</string>
+    <string name="home_geo_data_connecting">Подключение для загрузки&#8230;</string>
+    <string name="home_geo_data_downloaded">Загружено %1$.1f МиБ</string>
+    <string name="home_geo_data_download_progress">Загружено %1$.1f / %2$.1f МиБ</string>
     <string name="home_connection_restart_required">Требуется перезапуск</string>
     <string name="home_connection_interface_busy">Интерфейс занят</string>
     <string name="home_connection_disconnecting">Отключение&#8230;</string>

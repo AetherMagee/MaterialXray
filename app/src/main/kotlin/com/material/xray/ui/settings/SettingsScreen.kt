@@ -29,13 +29,16 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.progressSemantics
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.toggleable
@@ -108,6 +111,7 @@ import com.material.xray.core.xray.TproxyCompatibility
 import com.material.xray.data.repository.BackupSummary
 import com.material.xray.data.repository.SettingsSnapshot
 import com.material.xray.model.AppUpdateCheckStatus
+import com.material.xray.model.ConnectionState
 import com.material.xray.model.GeoDataUpdateInterval
 import com.material.xray.model.LauncherIcon
 import com.material.xray.model.NotificationField
@@ -129,6 +133,7 @@ import com.material.xray.ui.components.rememberSystemState
 import com.material.xray.ui.text.descriptionResource
 import com.material.xray.ui.text.labelResource
 import java.util.Locale
+import kotlin.math.roundToInt
 import kotlinx.coroutines.flow.collect
 import org.xmlpull.v1.XmlPullParser
 
@@ -187,6 +192,8 @@ private fun SettingsScreenContent(
     val tproxyCompatibility by viewModel.tproxyCompatibility.collectAsStateWithLifecycle()
     val geoipUpdating by viewModel.geoipUpdating.collectAsStateWithLifecycle()
     val geositeUpdating by viewModel.geositeUpdating.collectAsStateWithLifecycle()
+    val geoDataClearing by viewModel.geoDataClearing.collectAsStateWithLifecycle()
+    val connectionState by viewModel.connectionState.collectAsStateWithLifecycle()
     val geoDataDownloadProgress by viewModel.geoDataDownloadProgress.collectAsStateWithLifecycle()
     val xrayCoreVersion by viewModel.xrayCoreVersion.collectAsStateWithLifecycle()
     val databaseResetting by viewModel.databaseResetting.collectAsStateWithLifecycle()
@@ -208,6 +215,7 @@ private fun SettingsScreenContent(
     val xrayMemoryRestartThresholdMiB = settings.xrayMemoryRestartThresholdMiB
     val passiveHealthMonitoringEnabled = settings.passiveHealthMonitoringEnabled
     val xrayLogLevel = settings.xrayLogLevel
+    val geoDataOperationInProgress = geoipUpdating || geositeUpdating || geoDataClearing
     val defaultOutbound = settings.defaultOutbound
     val launcherIcon = settings.launcherIcon
     val showTitleBarLogo = settings.showTitleBarLogo
@@ -728,15 +736,12 @@ private fun SettingsScreenContent(
                             Text(stringResource(R.string.settings_save))
                         }
                     }
-                    OutlinedButton(
+                    GeoDataUpdateButton(
+                        updating = geoipUpdating,
+                        enabled = !geoDataOperationInProgress,
+                        progress = geoDataDownloadProgress[GeoDataAsset.GEOIP],
                         onClick = { viewModel.updateGeoipAsset(editingGeoipUrl) },
-                        enabled = !geoipUpdating,
-                    ) {
-                        Text(stringResource(if (geoipUpdating) R.string.settings_updating else R.string.settings_update))
-                    }
-                    if (geoipUpdating) {
-                        GeoDataUpdateProgress(geoDataDownloadProgress[GeoDataAsset.GEOIP])
-                    }
+                    )
                 }
             }
 
@@ -758,15 +763,12 @@ private fun SettingsScreenContent(
                             Text(stringResource(R.string.settings_save))
                         }
                     }
-                    OutlinedButton(
+                    GeoDataUpdateButton(
+                        updating = geositeUpdating,
+                        enabled = !geoDataOperationInProgress,
+                        progress = geoDataDownloadProgress[GeoDataAsset.GEOSITE],
                         onClick = { viewModel.updateGeositeAsset(editingGeositeUrl) },
-                        enabled = !geositeUpdating,
-                    ) {
-                        Text(stringResource(if (geositeUpdating) R.string.settings_updating else R.string.settings_update))
-                    }
-                    if (geositeUpdating) {
-                        GeoDataUpdateProgress(geoDataDownloadProgress[GeoDataAsset.GEOSITE])
-                    }
+                    )
                 }
             }
 
@@ -822,6 +824,23 @@ private fun SettingsScreenContent(
                 }
             }
             if (showAdvancedOptions) {
+                item(key = "clear_geodata") {
+                    OutlinedButton(
+                        onClick = viewModel::clearGeoData,
+                        enabled = connectionState is ConnectionState.Disconnected && !geoDataOperationInProgress,
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                    ) {
+                        Text(
+                            stringResource(
+                                if (geoDataClearing) {
+                                    R.string.settings_clearing_geodata
+                                } else {
+                                    R.string.settings_clear_geodata
+                                },
+                            ),
+                        )
+                    }
+                }
                 item(key = "database_reset") {
                     SettingsActionRow(
                         title = stringResource(R.string.settings_reset_internal_database),
@@ -1675,17 +1694,85 @@ private fun AdvancedIntegerSetting(
 }
 
 @Composable
-private fun GeoDataUpdateProgress(progress: GeoDataDownloadProgress?) {
-    val fraction = progress?.fraction
-    if (fraction == null) {
-        LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-    } else {
-        LinearProgressIndicator(
-            progress = { fraction },
+private fun GeoDataUpdateButton(
+    updating: Boolean,
+    enabled: Boolean,
+    progress: GeoDataDownloadProgress?,
+    onClick: () -> Unit,
+) {
+    if (!updating) {
+        OutlinedButton(
+            onClick = onClick,
+            enabled = enabled,
             modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(stringResource(R.string.settings_update))
+        }
+        return
+    }
+
+    val fraction = progress?.fraction
+    val progressModifier = if (fraction == null) {
+        Modifier.progressSemantics()
+    } else {
+        Modifier.progressSemantics(fraction, 0f..1f, 0)
+    }
+    Box(
+        modifier = progressModifier
+            .fillMaxWidth()
+            .height(48.dp)
+            .clip(RoundedCornerShape(24.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (fraction == null) {
+            LinearProgressIndicator(
+                modifier = Modifier.fillMaxWidth().align(Alignment.BottomCenter),
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .fillMaxWidth(fraction)
+                    .align(Alignment.CenterStart)
+                    .background(MaterialTheme.colorScheme.primaryContainer),
+            )
+        }
+        Text(
+            text = geoDataProgressText(progress),
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            color = MaterialTheme.colorScheme.onSurface,
         )
     }
 }
+
+@Composable
+private fun geoDataProgressText(progress: GeoDataDownloadProgress?): String {
+    val totalBytes = progress?.totalBytes
+    return when {
+        progress == null || (progress.bytesDownloaded == 0L && totalBytes == null) -> {
+            stringResource(R.string.settings_geo_data_connecting)
+        }
+        totalBytes == null || totalBytes <= 0L -> {
+            stringResource(
+                R.string.settings_geo_data_downloaded,
+                progress.bytesDownloaded.toMebibytes(),
+            )
+        }
+        else -> {
+            stringResource(
+                R.string.settings_geo_data_download_progress,
+                requireNotNull(progress.fraction).times(100).roundToInt(),
+                progress.bytesDownloaded.toMebibytes(),
+                totalBytes.toMebibytes(),
+            )
+        }
+    }
+}
+
+private fun Long.toMebibytes(): Float = this / BYTES_PER_MEBIBYTE.toFloat()
+
+private const val BYTES_PER_MEBIBYTE = 1024 * 1024
 
 @Composable
 private fun SettingsActionRow(

@@ -51,6 +51,9 @@
     <string name="settings_save">Сохранить</string>
     <string name="settings_update">Обновить</string>
     <string name="settings_updating">Обновление&#8230;</string>
+    <string name="settings_geo_data_connecting">Подключение&#8230;</string>
+    <string name="settings_geo_data_downloaded">Загрузка&#8230; %1$.1f МиБ</string>
+    <string name="settings_geo_data_download_progress">%1$d%% &#8226; %2$.1f / %3$.1f МиБ</string>
     <string name="settings_section_appearance">Оформление</string>
     <string name="settings_app_language_title">Язык приложения</string>
     <string name="settings_app_language_dialog_title">Выберите язык приложения</string>
@@ -87,6 +90,11 @@
     <string name="settings_section_data">Данные</string>
     <string name="settings_export">Экспорт</string>
     <string name="settings_import">Импорт</string>
+    <string name="settings_clear_geodata">Очистить геоданные</string>
+    <string name="settings_clearing_geodata">Очистка геоданных&#8230;</string>
+    <string name="settings_geodata_cleared">Геоданные очищены</string>
+    <string name="settings_geodata_clear_failed">Не удалось очистить геоданные</string>
+    <string name="settings_geodata_clear_failed_with_detail">Не удалось очистить геоданные: %1$s</string>
     <string name="settings_backup_exported">Резервная копия экспортирована</string>
     <string name="settings_backup_export_failed">Не удалось экспортировать резервную копию</string>
     <string name="settings_backup_export_failed_with_detail">Не удалось экспортировать резервную копию: %1$s</string>
