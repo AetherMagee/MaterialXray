@@ -51,9 +51,6 @@
     <string name="settings_save">Сохранить</string>
     <string name="settings_update">Обновить</string>
     <string name="settings_updating">Обновление&#8230;</string>
-    <string name="settings_geo_data_connecting">Подключение&#8230;</string>
-    <string name="settings_geo_data_downloaded">Загрузка&#8230; %1$.1f МиБ</string>
-    <string name="settings_geo_data_download_progress">%1$d%% &#8226; %2$.1f / %3$.1f МиБ</string>
     <string name="settings_section_appearance">Оформление</string>
     <string name="settings_app_language_title">Язык приложения</string>
     <string name="settings_app_language_dialog_title">Выберите язык приложения</string>
