@@ -57,7 +57,7 @@ internal interface XrayRuntimeStrategy : XrayRuntimeProcess {
      * Launches the core. [vpnInterface] stays owned by the caller, so an implementation that needs
      * it must not suspend before the descriptor has been handed to the child.
      */
-    suspend fun startProcess(binDir: String, vpnInterface: ParcelFileDescriptor?): Int
+    suspend fun startProcess(binDir: String, vpnInterface: ParcelFileDescriptor?, primaryGid: Int? = null): Int
 
     /** Picks an address for the core's API that this runtime can actually reach. */
     fun nextApiEndpoint(environment: ConnectionEnvironment): XrayApiEndpoint
@@ -90,7 +90,11 @@ internal class RootXrayRuntimeStrategy(
 
     override suspend fun prepareLogFile() = processSupervisor.prepareLogFile()
 
-    override suspend fun startProcess(binDir: String, vpnInterface: ParcelFileDescriptor?): Int = processSupervisor.start(binDir)
+    override suspend fun startProcess(
+        binDir: String,
+        vpnInterface: ParcelFileDescriptor?,
+        primaryGid: Int?,
+    ): Int = processSupervisor.start(binDir, primaryGid)
 
     // The root shell reaches the core over the loopback interface, which is then firewalled to
     // this app's uid.
@@ -136,10 +140,17 @@ internal class VpnServiceXrayRuntimeStrategy(
     override suspend fun prepareLogFile() = processSupervisor.prepareLogFile()
 
     // The caller still owns the descriptor, so it is handed over without suspending first.
-    override suspend fun startProcess(binDir: String, vpnInterface: ParcelFileDescriptor?): Int = processSupervisor.start(
-        binDir = binDir,
-        tunFd = requireNotNull(vpnInterface) { "A rootless runtime cannot start without a tunnel" }.fd,
-    )
+    override suspend fun startProcess(
+        binDir: String,
+        vpnInterface: ParcelFileDescriptor?,
+        primaryGid: Int?,
+    ): Int {
+        require(primaryGid == null) { "A rootless runtime cannot change its process group" }
+        return processSupervisor.start(
+            binDir = binDir,
+            tunFd = requireNotNull(vpnInterface) { "A rootless runtime cannot start without a tunnel" }.fd,
+        )
+    }
 
     // A private filesystem socket is reachable by both the app's gRPC clients and Xray's own CLI,
     // which compiles JSON routing rules for live updates. The containing app directory is private.

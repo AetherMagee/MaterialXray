@@ -7,6 +7,7 @@ import com.material.xray.model.XrayLogLevel
 import com.material.xray.model.XrayOutbound
 import com.material.xray.model.XrayRuntimeSettings
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
@@ -185,6 +186,7 @@ class ConfigGenerator {
         xrayApiEndpoint: XrayApiEndpoint = XrayApiEndpoint.UnixSocket(XRAY_API_SOCKET_NAME_PREFIX),
         tunMtu: Int = XrayRuntimeSettings.DEFAULT_TUN_MTU,
         inbounds: List<XrayInbound>? = null,
+        clearOutboundMarks: Boolean = false,
     ): String? {
         val original = runCatching { json.parseToJsonElement(configJson) as? JsonObject }.getOrNull() ?: return null
         val effectiveInbounds = inbounds ?: buildList {
@@ -194,11 +196,34 @@ class ConfigGenerator {
 
         val patched = original.toMutableMap()
         patched["inbounds"] = buildJsonArray { effectiveInbounds.forEach { add(it.toJson()) } }
+        if (clearOutboundMarks) {
+            (original["outbounds"] as? JsonArray)?.let { outbounds ->
+                patched["outbounds"] = clearSockoptMarks(outbounds)
+            }
+        }
         patched["api"] = buildStatsApi(
             endpoint = xrayApiEndpoint,
             enableObservatory = original["observatory"] is JsonObject || original["burstObservatory"] is JsonObject,
         )
         return json.encodeToString(JsonObject.serializer(), JsonObject(patched))
+    }
+
+    private fun clearSockoptMarks(outbounds: JsonArray): JsonArray = buildJsonArray {
+        outbounds.forEach { outbound ->
+            val outboundObject = outbound as? JsonObject
+            val streamSettings = outboundObject?.get("streamSettings") as? JsonObject
+            val sockopt = streamSettings?.get("sockopt") as? JsonObject
+            if (outboundObject == null || streamSettings == null || sockopt == null) {
+                add(outbound)
+            } else if ("mark" !in sockopt) {
+                add(outbound)
+            } else {
+                val patchedStream = streamSettings.toMutableMap().apply {
+                    put("sockopt", JsonObject(sockopt - "mark"))
+                }
+                add(JsonObject(outboundObject.toMutableMap().apply { put("streamSettings", JsonObject(patchedStream)) }))
+            }
+        }
     }
 
     private fun bootstrapDnsHosts(

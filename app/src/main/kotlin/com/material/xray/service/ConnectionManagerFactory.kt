@@ -228,7 +228,6 @@ internal interface TproxyRoutingGateway {
     suspend fun createPlan(
         appRoutingPlan: AppRoutingPlan,
         routeTable: Int,
-        outboundMark: Int,
         allowIpv6: Boolean,
         existingState: TproxyRuntimeState? = null,
         tetherUpstreamInterface: String? = null,
@@ -252,7 +251,6 @@ internal class TproxyManagerRoutingGateway(
     override suspend fun createPlan(
         appRoutingPlan: AppRoutingPlan,
         routeTable: Int,
-        outboundMark: Int,
         allowIpv6: Boolean,
         existingState: TproxyRuntimeState?,
         tetherUpstreamInterface: String?,
@@ -291,7 +289,6 @@ internal class TproxyManagerRoutingGateway(
             groups = groups,
             bypassUids = appRoutingPlan.directUids + appUid,
             routeProfileIds = appRoutingPlan.routeProfileIds,
-            outboundMark = outboundMark,
         )
     }
 

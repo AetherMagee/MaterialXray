@@ -47,7 +47,7 @@ class TproxyManagerTest {
         val inputRules = command.substringAfter("iptables -w 2 -t filter -N MXG278bI")
             .substringBefore("iptables -w 2 -t filter -I INPUT")
 
-        assertTrue(inputRules.contains("--mark 0xa000000/0xf000000 -j DROP"))
+        assertTrue(inputRules.contains("--mark 0x10000000/0x10000000 -j DROP"))
         assertTrue(inputRules.contains("--dport 53 -j DROP"))
         assertFalse(inputRules.contains("-A MXG278bI -j RETURN"))
         assertFalse(inputRules.contains("-A MXG278bI -j DROP"))
@@ -61,9 +61,9 @@ class TproxyManagerTest {
         assertFalse(command.contains("-A MXP278b -d 192.168.43.1/32 -p tcp --dport 48322 -j DROP"))
         assertTrue(command.contains("-A MXP278b -d 127.0.0.0/8 -j RETURN"))
         assertFalse(command.contains("-A MXP278b -p tcp --dport 48322 -j DROP"))
-        // Incoming direct connections (including outbound-marked self-dials) are blocked;
+        // Incoming direct connections (including unmarked self-dials) are blocked;
         // remote traffic intercepted into a managed group retains its mark and passes INPUT.
-        assertTrue(command.contains("-A MXP278bL -p tcp --dport 48322 -m mark ! --mark 0xa000000/0xf000000 -j DROP"))
+        assertTrue(command.contains("-A MXP278bL -p tcp --dport 48322 -m mark ! --mark 0x10000000/0x10000000 -j DROP"))
         assertTrue(command.contains("-A MXOA278b -o lo -p tcp --dport 48322 -j DROP"))
         assertTrue(command.indexOf("--dport 53 -j TPROXY") < command.indexOf("-d 192.168.43.1/32 -j RETURN"))
         assertFalse(command.contains("-d 192.168.43.0/24 -j RETURN"))
@@ -303,8 +303,8 @@ class TproxyManagerTest {
 
         assertTrue(command.indexOf("ip route replace local") < command.indexOf("-I OUTPUT 2"))
         assertTrue(command.indexOf("-I PREROUTING 1") < command.indexOf("-I OUTPUT 2"))
-        assertTrue(command.contains("--mark 0xa000000/0xf000000"))
-        assertTrue(command.contains("--tproxy-mark 0xa000001/0xffffffff"))
+        assertTrue(command.contains("--mark 0x10000000/0x10000000"))
+        assertTrue(command.contains("--tproxy-mark 0x10200000/0x1fe00000"))
         assertTrue(command.contains("--on-ip 127.0.0.1"))
         assertTrue(command.contains("--on-port 48321"))
     }
@@ -371,34 +371,53 @@ class TproxyManagerTest {
     }
 
     @Test
-    fun `output rules exempt xray app and bypass uids before assigning marks`() {
+    fun `output rules exempt xray process app and bypass uids before assigning marks`() {
         val command = TproxyManager.activationCommand(plan(), APP_UID)
-        val exemptOutbound = command.indexOf("--mark 255/0xffffffff -j RETURN")
+        val clearXrayMark = command.indexOf(
+            "--gid-owner $APP_UID -m mark --mark 0x10000000/0x10000000 " +
+                "-j MARK --set-xmark 0x0/0x1fe00000",
+        )
+        val exemptXray = command.indexOf("--gid-owner $APP_UID -j RETURN")
         val exemptApp = command.indexOf("--uid-owner $APP_UID -j RETURN")
         val exemptBypass = command.indexOf("--uid-owner 10020 -j RETURN")
         val groupMark = command.indexOf("--uid-owner 10030 -p tcp -j MARK")
-        val groupReturn = command.indexOf("--mark 0xa000000/0xf000000 -j RETURN", groupMark)
+        val groupReturn = command.indexOf("--mark 0x10000000/0x10000000 -j RETURN", groupMark)
         val profileMark = command.indexOf("--uid-owner 10000-99999 -p tcp -j MARK")
 
-        assertTrue(exemptOutbound in 0..<exemptApp)
+        assertTrue(clearXrayMark in 0..<exemptXray)
+        assertTrue(exemptXray < exemptApp)
         assertTrue(exemptApp < exemptBypass)
         assertTrue(exemptBypass < groupMark)
         assertTrue(groupMark < groupReturn)
         assertTrue(groupReturn < profileMark)
         assertTrue(command.contains("--uid-owner 10000-99999 -j DROP"))
         assertTrue(command.split("--uid-owner $APP_UID -j RETURN").size - 1 == 2)
+        assertFalse(command.contains("--mark 255"))
+        assertFalse(command.contains("/0xffffffff"))
+    }
+
+    @Test
+    fun `verification requires xray marks to be cleared before the gid exemption`() {
+        val command = TproxyManager.verifyCommand(plan().runtimeState, APP_UID)
+        val clearXrayMark = command.indexOf(
+            "--gid-owner $APP_UID -m mark --mark 0x10000000/0x10000000 " +
+                "-j MARK --set-xmark 0x0/0x1fe00000",
+        )
+        val exemptXray = command.indexOf("--gid-owner $APP_UID -j RETURN")
+
+        assertTrue(clearXrayMark in 0..<exemptXray)
     }
 
     @Test
     fun `output rules route resolver DNS through the base inbound`() {
         val command = TproxyManager.activationCommand(plan(), APP_UID)
         val bypass = command.indexOf("--uid-owner 10020 -j RETURN")
-        val udpDns = command.indexOf("-p udp --dport 53 -j MARK --set-xmark 0xa000001/0xffffffff")
+        val udpDns = command.indexOf("-p udp --dport 53 -j MARK --set-xmark 0x10200000/0x1fe00000")
         val appRoute = command.indexOf("--uid-owner 10030 -p tcp -j MARK")
 
         assertTrue(bypass in 0..<udpDns)
         assertTrue(udpDns < appRoute)
-        assertTrue(command.contains("-p tcp --dport 53 -j MARK --set-xmark 0xa000001/0xffffffff"))
+        assertTrue(command.contains("-p tcp --dport 53 -j MARK --set-xmark 0x10200000/0x1fe00000"))
     }
 
     @Test
@@ -498,7 +517,7 @@ class TproxyManagerTest {
         val command = TproxyManager.cleanupCommand(plan().runtimeState, APP_UID)
 
         assertTrue(command.contains("MXO${APP_UID.toString(16)}"))
-        assertTrue(command.contains("fwmark 0xa000000/0xf000000"))
+        assertTrue(command.contains("fwmark 0x10000000/0x10000000"))
         assertTrue(command.contains("ip6tables -w 2 -t filter -D OUTPUT -j MXO278b"))
         assertFalse(command.contains("iptables-save"))
         assertFalse(command.contains("-F OUTPUT"))
@@ -514,7 +533,7 @@ class TproxyManagerTest {
         assertTrue(command.contains("--on-ip 0.0.0.0"))
         assertTrue(command.contains("--on-ip ::"))
         assertFalse(command.contains("addrtype"))
-        assertEquals(2, command.split("-p udp --dport 53 -j MARK --set-xmark 0xa000001/0xffffffff").size - 1)
+        assertEquals(2, command.split("-p udp --dport 53 -j MARK --set-xmark 0x10200000/0x1fe00000").size - 1)
         assertFalse(command.contains("ip6tables -w 2 -t filter"))
         assertFalse(command.contains("icmp6-no-route"))
     }
@@ -571,13 +590,13 @@ class TproxyManagerTest {
     fun `health verification covers marks UDP and live listeners`() {
         val command = TproxyManager.verifyCommand(plan().runtimeState, APP_UID)
 
-        assertTrue(command.contains("--set-xmark 0xa000001/0xffffffff"))
-        assertTrue(command.contains("-p udp -m mark --mark 0xa000001"))
+        assertTrue(command.contains("--set-xmark 0x10200000/0x1fe00000"))
+        assertTrue(command.contains("-p udp -m mark --mark 0x10200000/0x1fe00000"))
         assertTrue(command.contains("-d 127.0.0.0/8 -p udp -m udp --dport 48321 -j DROP"))
         assertTrue(
             command.contains(
                 "has_v4 '-A MXOA278b -p udp -m udp --dport 53 " +
-                    "-j MARK --set-xmark 0xa000001/0xffffffff",
+                    "-j MARK --set-xmark 0x10200000/0x1fe00000",
             ),
         )
         assertTrue(command.contains("ss -lnu"))
@@ -612,13 +631,13 @@ class TproxyManagerTest {
         assertTrue(
             command.contains(
                 "has_v4 '-A MXP278b -p tcp -m tcp --dport 53 -j TPROXY --on-port 48321 " +
-                    "--on-ip 0.0.0.0 --tproxy-mark 0xa000001/0xffffffff'",
+                    "--on-ip 0.0.0.0 --tproxy-mark 0x10200000/0x1fe00000'",
             ),
         )
         assertTrue(
             command.contains(
                 "has_v4 '-A MXP278b -p udp -j TPROXY --on-port 48321 --on-ip 0.0.0.0 " +
-                    "--tproxy-mark 0xa000001/0xffffffff'",
+                    "--tproxy-mark 0x10200000/0x1fe00000'",
             ),
         )
     }
@@ -645,7 +664,6 @@ class TproxyManagerTest {
             ),
             bypassUids = setOf(APP_UID, 10_020),
             routeProfileIds = setOf(0),
-            outboundMark = 255,
         )
     }
 

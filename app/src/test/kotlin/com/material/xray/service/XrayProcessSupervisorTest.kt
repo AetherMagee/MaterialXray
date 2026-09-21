@@ -22,10 +22,10 @@ class XrayProcessSupervisorTest {
                         "'SSL_CERT_FILE=/tmp/runtime dir/xray-ca-certificates.pem'",
                     ),
                 )
-                assertTrue(command.contains("sh -c 'exec \"\$@\"' xray"))
                 assertTrue(command.contains("config='/tmp/config dir/config.json'"))
-                assertTrue(command.contains("'/tmp/xray bin/xray' run -c \"\$config\""))
+                assertTrue(command.contains("'/tmp/xray bin/xray' run -c '/tmp/config dir/config.json'"))
                 assertTrue(command.contains("> '/tmp/runtime dir/xray.log' 2>&1 &"))
+                assertFalse(command.contains("su -g"))
                 assertFalse(command.contains("launcher=\$!"))
                 assertFalse(command.contains("is_owned \"\$launcher\""))
                 assertTrue(command.contains("pidof xray"))
@@ -41,6 +41,24 @@ class XrayProcessSupervisorTest {
         val pid = supervisor.start("/tmp/xray bin")
 
         assertEquals(1234, pid)
+    }
+
+    @Test
+    fun `tproxy start changes primary group and verifies launched process group`() = runTest {
+        val commands = FakeRootCommandRunner(
+            resultForCommand = { command ->
+                assertTrue(command.contains("su -g 12345 0 -c"))
+                assertTrue(command.contains("/tmp/xray bin"))
+                assertTrue(command.contains("&& exec env"))
+                assertTrue(command.contains("/^Gid:/"))
+                assertTrue(command.contains("= \"12345:12345\""))
+                RootShell.Result(exitCode = 0, output = "4321", error = "")
+            },
+        )
+
+        val pid = supervisor(commandRunner = commands).start("/tmp/xray bin", primaryGid = 12345)
+
+        assertEquals(4321, pid)
     }
 
     @Test

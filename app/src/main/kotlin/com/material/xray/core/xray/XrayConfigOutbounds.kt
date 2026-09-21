@@ -78,7 +78,6 @@ internal fun buildTunInbound(
 internal fun buildTproxyInbound(
     port: Int,
     tag: String,
-    outboundMark: Int,
     allowIpv6: Boolean,
     acceptNonLoopback: Boolean = false,
 ) = buildJsonObject {
@@ -124,7 +123,6 @@ internal fun buildTproxyInbound(
                 "sockopt",
                 buildJsonObject {
                     put("tproxy", "tproxy")
-                    put("mark", outboundMark)
                 },
             )
         },

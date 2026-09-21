@@ -102,13 +102,44 @@ class ActiveConfigRuntimeIdentityTest {
         val patched = generator.applyRuntimeIdentity(
             configJson = """{ "inbounds": [], "outbounds": [] }""",
             tunName = "xray0",
-            inbounds = listOf(XrayInbound.Tproxy(port = 12345, tag = "tproxy-in", outboundMark = 255, allowIpv6 = false)),
+            inbounds = listOf(XrayInbound.Tproxy(port = 12345, tag = "tproxy-in", allowIpv6 = false)),
         )
 
         val inbounds = patched.parse()["inbounds"]!!.jsonArray
         assertEquals(1, inbounds.size)
         assertEquals("tproxy-in", inbounds[0].jsonObject["tag"]!!.jsonPrimitive.content)
         assertEquals(12345, inbounds[0].jsonObject["port"]!!.jsonPrimitive.content.toInt())
+    }
+
+    @Test
+    fun `TPROXY runtime identity removes obsolete outbound socket marks`() {
+        val edited = """
+            {
+              "inbounds": [],
+              "outbounds": [
+                {
+                  "tag": "proxy",
+                  "protocol": "vless",
+                  "streamSettings": {"network":"tcp","sockopt":{"mark":255,"tcpFastOpen":true}}
+                }
+              ]
+            }
+        """.trimIndent()
+
+        val patched = requireNotNull(
+            generator.applyRuntimeIdentity(
+                configJson = edited,
+                tunName = "xray0",
+                clearOutboundMarks = true,
+            ),
+        ).parse()
+
+        val outbound = patched["outbounds"]!!.jsonArray.single().jsonObject
+        val streamSettings = outbound["streamSettings"]!!.jsonObject
+        val sockopt = streamSettings["sockopt"]!!.jsonObject
+        assertTrue("mark" !in sockopt)
+        assertEquals("true", sockopt["tcpFastOpen"]!!.jsonPrimitive.content)
+        assertEquals("tcp", streamSettings["network"]!!.jsonPrimitive.content)
     }
 
     @Test

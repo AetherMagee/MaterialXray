@@ -31,6 +31,7 @@ sealed interface TproxyCompatibility {
         RootUnavailable,
         InitNetworkNamespaceUnavailable,
         IptablesMangleUnavailable,
+        ProcessGroupUnavailable,
         OwnerMatchUnavailable,
         MarkTargetUnavailable,
         TproxyIpv4Unavailable,
@@ -53,6 +54,7 @@ internal fun TproxyCompatibility.isConclusive(): Boolean = when (this) {
     is TproxyCompatibility.Supported -> true
     is TproxyCompatibility.Unsupported -> when (reason) {
         TproxyCompatibility.Reason.IptablesMangleUnavailable,
+        TproxyCompatibility.Reason.ProcessGroupUnavailable,
         TproxyCompatibility.Reason.OwnerMatchUnavailable,
         TproxyCompatibility.Reason.MarkTargetUnavailable,
         TproxyCompatibility.Reason.TproxyIpv4Unavailable,
@@ -174,7 +176,7 @@ class TproxyCompatibilityDetector @Inject constructor(
 
     private suspend fun runProbe(allowIpv6: Boolean): TproxyCompatibility {
         val suffix = (System.nanoTime() and 0xffffff).toString(16)
-        val result = shell.execute(probeCommand(suffix, allowIpv6), timeoutMs = PROBE_TIMEOUT_MS)
+        val result = shell.execute(probeCommand(suffix, allowIpv6, appUid), timeoutMs = PROBE_TIMEOUT_MS)
         if (result.isSuccess) {
             return TproxyCompatibility.Supported(ipv6 = allowIpv6)
         }
@@ -188,6 +190,7 @@ class TproxyCompatibilityDetector @Inject constructor(
             stage == "cleanup" -> TproxyCompatibility.Reason.ProbeCleanupFailed
             allowIpv6 -> TproxyCompatibility.Reason.TproxyIpv6Unavailable
             stage == "iptables" -> TproxyCompatibility.Reason.IptablesMangleUnavailable
+            stage == "gid" -> TproxyCompatibility.Reason.ProcessGroupUnavailable
             stage == "owner" -> TproxyCompatibility.Reason.OwnerMatchUnavailable
             stage == "mark" -> TproxyCompatibility.Reason.MarkTargetUnavailable
             stage == "tproxy4" -> TproxyCompatibility.Reason.TproxyIpv4Unavailable
@@ -204,17 +207,23 @@ class TproxyCompatibilityDetector @Inject constructor(
     }
 
     internal companion object {
-        const val MARK_PREFIX = 0x0a000000
-        const val MARK_MASK = 0x0f000000
+        const val MARK_PREFIX = 0x10000000
+        const val MARK_MASK = 0x10000000
+        const val GROUP_MARK_MASK = 0x1fe00000
+        const val MAX_GROUPS = 127
+        private const val GROUP_MARK_SHIFT = 21
 
         /**
          * The probe must measure kernel capability, never our own live policy routing. It therefore uses a
          * mark outside [MARK_MASK] so the production rule cannot capture it, evaluated at a priority ahead of
-         * Android's own `fwmark 0x8000000/0xce00000` rules which would otherwise divert the probe.
+         * Android's own fwmark rules which would otherwise divert the probe now that we preserve
+         * the platform-owned low mark fields.
          */
-        private const val PROBE_MARK = 0x0b000000
-        private const val PROBE_MASK = 0x0f000000
-        private const val PROBE_PRIORITY_BASE = 11_991
+        private const val PROBE_MARK = 0x08000000
+        private const val PROBE_MASK = 0x18000000
+        private const val PROBE_GROUP_MARK = 0x08200000
+        private const val PROBE_GROUP_MASK = 0x1fe00000
+        private const val PROBE_PRIORITY_BASE = 9_991
         private const val PROBE_PRIORITY_SLOTS = 8
         private const val PROBE_TIMEOUT_MS = 15_000L
         private const val MARK_CONFLICT_EXIT_CODE = 42
@@ -232,23 +241,31 @@ class TproxyCompatibilityDetector @Inject constructor(
                 "$IPTABLES -t mangle -C OUTPUT -j $outputChain 2>/dev/null || exit $MARK_CONFLICT_EXIT_CODE;; esac; true"
         }
 
-        fun probeCommand(suffix: String, allowIpv6: Boolean): String {
+        fun groupMark(group: Int): Int {
+            require(group in 1..MAX_GROUPS)
+            return MARK_PREFIX or (group shl GROUP_MARK_SHIFT)
+        }
+
+        fun probeCommand(suffix: String, allowIpv6: Boolean, appUid: Int): String {
             require(suffix.matches(Regex("[a-f0-9]+")))
+            require(appUid > 0)
             val chains = probeChains(suffix)
             val table = 19_000 + suffix.takeLast(3).toInt(16) % 500
             val priority = PROBE_PRIORITY_BASE + suffix.takeLast(3).toInt(16) % PROBE_PRIORITY_SLOTS
             val prefixHex = "0x${PROBE_MARK.toString(16)}"
-            val groupHex = "0x${(PROBE_MARK or 1).toString(16)}"
+            val groupHex = "0x${PROBE_GROUP_MARK.toString(16)}"
             val maskHex = "0x${PROBE_MASK.toString(16)}"
+            val groupMaskHex = "0x${PROBE_GROUP_MASK.toString(16)}"
             val resources = probeFirewallResources(chains, allowIpv6)
             val cleanup = probeCleanupCommands(resources, table, priority, prefixHex, maskHex, allowIpv6)
             val commands = buildList {
                 add("cleanup() { ${cleanup.joinToString("; ")}; }")
                 add("fail() { printf 'stage=%s\\n' \"\$1\"; cleanup; exit 1; }")
+                add("su -g $appUid 0 -c ${shellQuote("[ \"\$(id -u):\$(id -g)\" = \"0:$appUid\" ]")} || fail gid")
                 add(probeConflictCommand(resources, table, priority))
-                addAll(ipv4ProbeCommands(chains, table, priority, prefixHex, groupHex, maskHex, allowIpv6))
+                addAll(ipv4ProbeCommands(chains, table, priority, prefixHex, groupHex, maskHex, groupMaskHex, appUid, allowIpv6))
                 if (allowIpv6) {
-                    addAll(ipv6ProbeCommands(chains, table, priority, prefixHex, groupHex, maskHex))
+                    addAll(ipv6ProbeCommands(chains, table, priority, prefixHex, groupHex, maskHex, groupMaskHex, appUid))
                 } else {
                     addAll(ipv6BlockingProbeCommands(chains))
                 }
@@ -333,6 +350,8 @@ class TproxyCompatibilityDetector @Inject constructor(
             prefixHex: String,
             groupHex: String,
             maskHex: String,
+            groupMaskHex: String,
+            appUid: Int,
             allowIpv6: Boolean,
         ): List<String> {
             val localMatch = if (allowIpv6) "-o lo" else "-d 127.0.0.0/8"
@@ -340,20 +359,22 @@ class TproxyCompatibilityDetector @Inject constructor(
             return listOf(
                 "$IPTABLES -t mangle -N ${chains.ipv4Prerouting} || fail iptables",
                 "$IPTABLES -t mangle -A ${chains.ipv4Prerouting} -j RETURN || fail iptables",
-                "$IPTABLES -t mangle -A ${chains.ipv4Prerouting} -p tcp -m mark --mark $groupHex/0xffffffff " +
-                    "-j TPROXY --on-ip $onIp --on-port 9 --tproxy-mark $groupHex/0xffffffff || fail tproxy4",
-                "$IPTABLES -t mangle -A ${chains.ipv4Prerouting} -p udp -m mark --mark $groupHex/0xffffffff " +
-                    "-j TPROXY --on-ip $onIp --on-port 9 --tproxy-mark $groupHex/0xffffffff || fail tproxy4",
+                "$IPTABLES -t mangle -A ${chains.ipv4Prerouting} -p tcp -m mark --mark $groupHex/$groupMaskHex " +
+                    "-j TPROXY --on-ip $onIp --on-port 9 --tproxy-mark $groupHex/$groupMaskHex || fail tproxy4",
+                "$IPTABLES -t mangle -A ${chains.ipv4Prerouting} -p udp -m mark --mark $groupHex/$groupMaskHex " +
+                    "-j TPROXY --on-ip $onIp --on-port 9 --tproxy-mark $groupHex/$groupMaskHex || fail tproxy4",
                 "$IPTABLES -t mangle -N ${chains.ipv4Output} || fail iptables",
                 "$IPTABLES -t mangle -A ${chains.ipv4Output} -j RETURN || fail iptables",
-                "$IPTABLES -t mangle -A ${chains.ipv4Output} -m mark --mark 255/0xffffffff -j RETURN || fail mark",
+                "$IPTABLES -t mangle -A ${chains.ipv4Output} -m owner --gid-owner $appUid -j RETURN || fail owner",
+                "$IPTABLES -t mangle -A ${chains.ipv4Output} -m owner --gid-owner $appUid " +
+                    "-m mark --mark $prefixHex/$maskHex -j MARK --set-xmark 0x0/$groupMaskHex || fail mark",
                 "$IPTABLES -t mangle -A ${chains.ipv4Output} -m owner --uid-owner 0-1 -j RETURN || fail owner",
                 "$IPTABLES -t mangle -A ${chains.ipv4Output} $localMatch -p tcp --dport 9 -j DROP || fail iptables",
                 "$IPTABLES -t mangle -A ${chains.ipv4Output} $localMatch -p udp --dport 9 -j DROP || fail iptables",
                 "$IPTABLES -t mangle -A ${chains.ipv4Output} -m owner --uid-owner 0-1 -p tcp " +
-                    "-j MARK --set-xmark $groupHex/0xffffffff || fail mark",
+                    "-j MARK --set-xmark $groupHex/$groupMaskHex || fail mark",
                 "$IPTABLES -t mangle -A ${chains.ipv4Output} -m owner --uid-owner 0-1 -p udp " +
-                    "-j MARK --set-xmark $groupHex/0xffffffff || fail mark",
+                    "-j MARK --set-xmark $groupHex/$groupMaskHex || fail mark",
                 "$IPTABLES -t mangle -A ${chains.ipv4Output} -m mark --mark $prefixHex/$maskHex -j RETURN || fail mark",
                 "$IPTABLES -t mangle -A ${chains.ipv4Output} -m owner --uid-owner 0-1 -j DROP || fail owner",
                 "ip route replace local 0.0.0.0/0 dev lo table $table || fail route4",
@@ -375,24 +396,29 @@ class TproxyCompatibilityDetector @Inject constructor(
             prefixHex: String,
             groupHex: String,
             maskHex: String,
+            groupMaskHex: String,
+            appUid: Int,
         ): List<String> = listOf(
             "$IP6TABLES -t mangle -N ${chains.ipv6Prerouting} || fail tproxy6",
             "$IP6TABLES -t mangle -A ${chains.ipv6Prerouting} -j RETURN || fail tproxy6",
-            "$IP6TABLES -t mangle -A ${chains.ipv6Prerouting} -p tcp -m mark --mark $groupHex/0xffffffff " +
-                "-j TPROXY --on-ip :: --on-port 9 --tproxy-mark $groupHex/0xffffffff || fail tproxy6",
-            "$IP6TABLES -t mangle -A ${chains.ipv6Prerouting} -p udp -m mark --mark $groupHex/0xffffffff " +
-                "-j TPROXY --on-ip :: --on-port 9 --tproxy-mark $groupHex/0xffffffff || fail tproxy6",
+            "$IP6TABLES -t mangle -A ${chains.ipv6Prerouting} -p tcp -m mark --mark $groupHex/$groupMaskHex " +
+                "-j TPROXY --on-ip :: --on-port 9 --tproxy-mark $groupHex/$groupMaskHex || fail tproxy6",
+            "$IP6TABLES -t mangle -A ${chains.ipv6Prerouting} -p udp -m mark --mark $groupHex/$groupMaskHex " +
+                "-j TPROXY --on-ip :: --on-port 9 --tproxy-mark $groupHex/$groupMaskHex || fail tproxy6",
             "$IP6TABLES -t mangle -N ${chains.ipv6Output} || fail tproxy6",
             "$IP6TABLES -t mangle -A ${chains.ipv6Output} -j RETURN || fail tproxy6",
+            "$IP6TABLES -t mangle -A ${chains.ipv6Output} -m owner --gid-owner $appUid -j RETURN || fail tproxy6",
+            "$IP6TABLES -t mangle -A ${chains.ipv6Output} -m owner --gid-owner $appUid " +
+                "-m mark --mark $prefixHex/$maskHex -j MARK --set-xmark 0x0/$groupMaskHex || fail tproxy6",
             "$IP6TABLES -t mangle -A ${chains.ipv6Output} -m owner --uid-owner 0-1 -j RETURN || fail tproxy6",
             "$IP6TABLES -t mangle -A ${chains.ipv6Output} -o lo " +
                 "-p tcp --dport 9 -j DROP || fail tproxy6",
             "$IP6TABLES -t mangle -A ${chains.ipv6Output} -o lo " +
                 "-p udp --dport 9 -j DROP || fail tproxy6",
             "$IP6TABLES -t mangle -A ${chains.ipv6Output} -m owner --uid-owner 0-1 -p tcp " +
-                "-j MARK --set-xmark $groupHex/0xffffffff || fail tproxy6",
+                "-j MARK --set-xmark $groupHex/$groupMaskHex || fail tproxy6",
             "$IP6TABLES -t mangle -A ${chains.ipv6Output} -m owner --uid-owner 0-1 -p udp " +
-                "-j MARK --set-xmark $groupHex/0xffffffff || fail tproxy6",
+                "-j MARK --set-xmark $groupHex/$groupMaskHex || fail tproxy6",
             "$IP6TABLES -t mangle -A ${chains.ipv6Output} -m mark --mark $prefixHex/$maskHex -j RETURN || fail tproxy6",
             "ip -6 route replace local ::/0 dev lo table $table || fail route6",
             "ip -6 rule add fwmark $prefixHex/$maskHex table $table pref $priority || fail route6",
@@ -438,7 +464,7 @@ class TproxyCompatibilityDetector @Inject constructor(
     }
 }
 
-private const val TPROXY_CACHE_VERSION = "2"
+private const val TPROXY_CACHE_VERSION = "3"
 
 internal fun encodeCachedTproxyCompatibility(result: TproxyCompatibility): String? = when {
     result is TproxyCompatibility.Supported ->
@@ -473,8 +499,8 @@ internal data class FwmarkRule(
 )
 
 internal fun overlappingFwmarkRules(output: String, value: Int, mask: Int): List<FwmarkRule> {
-    require(mask and 0xff == 0) { "TPROXY group bits must remain outside the prefix mask" }
     val targetValue = value.toUInt()
+    val targetMask = mask.toUInt()
     return output.lineSequence().mapNotNull { line ->
         val priority = line.substringBefore(':').trim().toIntOrNull() ?: return@mapNotNull null
         val encoded = Regex("\\bfwmark\\s+(0x[0-9a-fA-F]+|[0-9]+)(?:/(0x[0-9a-fA-F]+|[0-9]+))?")
@@ -483,10 +509,7 @@ internal fun overlappingFwmarkRules(output: String, value: Int, mask: Int): List
         val ruleValue = encoded.groupValues[1].parseUInt() ?: return@mapNotNull null
         val ruleMask = encoded.groupValues[2].takeIf(String::isNotEmpty)?.parseUInt() ?: UInt.MAX_VALUE
         FwmarkRule(priority, ruleValue, ruleMask).takeIf {
-            (1u..255u).any { group ->
-                val generatedMark = targetValue or group
-                (generatedMark and ruleMask) == (ruleValue and ruleMask)
-            }
+            ((targetValue xor ruleValue) and targetMask and ruleMask) == 0u
         }
     }.toList()
 }

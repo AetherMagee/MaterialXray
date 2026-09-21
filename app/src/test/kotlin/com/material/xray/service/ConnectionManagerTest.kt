@@ -1000,7 +1000,6 @@ class ConnectionManagerTest {
         override suspend fun createPlan(
             appRoutingPlan: AppRoutingPlan,
             routeTable: Int,
-            outboundMark: Int,
             allowIpv6: Boolean,
             existingState: TproxyRuntimeState?,
             tetherUpstreamInterface: String?,
@@ -1019,7 +1018,6 @@ class ConnectionManagerTest {
                 groups = listOf(TproxyTrafficGroup(state.groups.single(), emptySet(), isBase = true)),
                 bypassUids = appRoutingPlan.directUids + appUid,
                 routeProfileIds = appRoutingPlan.routeProfileIds,
-                outboundMark = outboundMark,
             )
         }
 
@@ -1093,7 +1091,7 @@ class ConnectionManagerTest {
 
         override suspend fun prepareLogFile() = Unit
 
-        override suspend fun start(binDir: String): Int {
+        override suspend fun start(binDir: String, primaryGid: Int?): Int {
             startCalls += 1
             return 42
         }

@@ -17,7 +17,6 @@ data class TproxyTrafficPlan(
     val groups: List<TproxyTrafficGroup>,
     val bypassUids: Set<Int>,
     val routeProfileIds: Set<Int>,
-    val outboundMark: Int,
 )
 
 class TproxyManager internal constructor(
@@ -140,7 +139,10 @@ class TproxyManager internal constructor(
     internal companion object {
         const val SLOT_A = "a"
         const val SLOT_B = "b"
-        const val RULE_PRIORITY = 11_990
+
+        // Run before Android's first fwmark rule (normally priority 10000). Group marking preserves
+        // Android's low fwmark fields, so those rules must not consume intercepted packets first.
+        const val RULE_PRIORITY = 9_990
         private const val ACTIVATION_INSPECTION_SEPARATOR = "__MXRAY_TPROXY_ROUTES__"
         private const val COMMAND_NOT_FOUND_EXIT_CODE = 127
 
@@ -157,7 +159,7 @@ class TproxyManager internal constructor(
             require(groups.size == ports.size)
             require(routeTable in 1..32_765)
             require(ports.all { it in 1..65_535 } && ports.distinct().size == ports.size)
-            require(groups.size <= 255)
+            require(groups.size <= TproxyCompatibilityDetector.MAX_GROUPS)
             require(tetherUpstreamInterface == null || TETHER_INTERFACE_PATTERN.matches(tetherUpstreamInterface))
             return TproxyRuntimeState(
                 markPrefix = TproxyCompatibilityDetector.MARK_PREFIX,
@@ -168,7 +170,7 @@ class TproxyManager internal constructor(
                 groups = groups.mapIndexed { index, (routeKey, inboundTag) ->
                     TproxyGroupState(
                         routeKey = routeKey,
-                        mark = TproxyCompatibilityDetector.MARK_PREFIX or (index + 1),
+                        mark = TproxyCompatibilityDetector.groupMark(index + 1),
                         port = ports[index],
                         inboundTag = inboundTag,
                     )
@@ -308,6 +310,7 @@ class TproxyManager internal constructor(
             val names = chainNames(appUid)
             val prefix = hex(state.markPrefix)
             val mask = hex(state.markMask)
+            val groupMask = hex(TproxyCompatibilityDetector.GROUP_MARK_MASK)
             val baseMark = hex(state.groups.first().mark)
             fun hasV4(rule: String) = "has_v4 ${shellQuote("-A $rule")}"
             fun hasV6(rule: String) = "has_v6 ${shellQuote("-A $rule")}"
@@ -330,22 +333,27 @@ class TproxyManager internal constructor(
                 hasV4("INPUT -j ${names.prerouting}L"),
                 "ip rule show | grep -q 'fwmark $prefix/$mask.*lookup ${state.routeTable}'",
                 "ip route show table ${state.routeTable} | grep -q '^local .* dev lo'",
+                hasV4(
+                    "${names.slot(state.outputChainSlot)} -m owner --gid-owner $appUid " +
+                        "-m mark --mark $prefix/$mask -j MARK --set-xmark 0x0/$groupMask",
+                ),
+                hasV4("${names.slot(state.outputChainSlot)} -m owner --gid-owner $appUid -j RETURN"),
             )
             for (protocol in listOf("tcp", "udp")) {
                 commands += hasV4(
                     "${names.slot(state.outputChainSlot)} -p $protocol -m $protocol --dport 53 " +
-                        "-j MARK --set-xmark $baseMark/0xffffffff",
+                        "-j MARK --set-xmark $baseMark/$groupMask",
                 )
             }
             state.groups.forEach { group ->
                 val mark = hex(group.mark)
-                commands += "has_v4_fragment ${shellQuote("--set-xmark $mark/0xffffffff")}"
+                commands += "has_v4_fragment ${shellQuote("--set-xmark $mark/$groupMask")}"
                 for (protocol in listOf("tcp", "udp")) {
                     commands += hasV4("${names.prerouting}L ${listenerDestinationMatch(state)}-p $protocol -m $protocol --dport ${group.port} -m mark ! --mark $prefix/$mask -j DROP")
                     commands += hasV4(
-                        "${names.prerouting} -p $protocol -m mark --mark $mark -j TPROXY --on-port ${group.port} --on-ip ${
+                        "${names.prerouting} -p $protocol -m mark --mark $mark/$groupMask -j TPROXY --on-port ${group.port} --on-ip ${
                             tproxyOnIp(IPV4, state.ipv6Enabled, state.tetherUpstreamInterface != null)
-                        } --tproxy-mark $mark/0xffffffff",
+                        } --tproxy-mark $mark/$groupMask",
                     )
                     commands += hasV4(
                         "${names.slot(state.outputChainSlot)} " +
@@ -367,21 +375,26 @@ class TproxyManager internal constructor(
                 commands += hasV6("INPUT -j ${names.prerouting}L")
                 commands += "ip -6 rule show | grep -q 'fwmark $prefix/$mask.*lookup ${state.routeTable}'"
                 commands += "ip -6 route show table ${state.routeTable} | grep -q '^local .* dev lo'"
+                commands += hasV6(
+                    "${names.slot(state.outputChainSlot)} -m owner --gid-owner $appUid " +
+                        "-m mark --mark $prefix/$mask -j MARK --set-xmark 0x0/$groupMask",
+                )
+                commands += hasV6("${names.slot(state.outputChainSlot)} -m owner --gid-owner $appUid -j RETURN")
                 for (protocol in listOf("tcp", "udp")) {
                     commands += hasV6(
                         "${names.slot(state.outputChainSlot)} -p $protocol -m $protocol --dport 53 " +
-                            "-j MARK --set-xmark $baseMark/0xffffffff",
+                            "-j MARK --set-xmark $baseMark/$groupMask",
                     )
                 }
                 state.groups.forEach { group ->
                     val mark = hex(group.mark)
-                    commands += "has_v6_fragment ${shellQuote("--set-xmark $mark/0xffffffff")}"
+                    commands += "has_v6_fragment ${shellQuote("--set-xmark $mark/$groupMask")}"
                     for (protocol in listOf("tcp", "udp")) {
                         commands += hasV6("${names.prerouting}L ${listenerDestinationMatch(state)}-p $protocol -m $protocol --dport ${group.port} -m mark ! --mark $prefix/$mask -j DROP")
                         commands += hasV6(
-                            "${names.prerouting} -p $protocol -m mark --mark $mark -j TPROXY " +
+                            "${names.prerouting} -p $protocol -m mark --mark $mark/$groupMask -j TPROXY " +
                                 "--on-port ${group.port} --on-ip ${tproxyOnIp(IPV6, state.ipv6Enabled)} " +
-                                "--tproxy-mark $mark/0xffffffff",
+                                "--tproxy-mark $mark/$groupMask",
                         )
                         commands += hasV6(
                             "${names.slot(state.outputChainSlot)} " +
@@ -405,11 +418,11 @@ class TproxyManager internal constructor(
                 for (protocol in listOf("tcp", "udp")) {
                     commands += hasV4(
                         "${names.prerouting} -p $protocol -m $protocol --dport 53 -j TPROXY --on-port $basePort " +
-                            "--on-ip 0.0.0.0 --tproxy-mark $baseMark/0xffffffff",
+                            "--on-ip 0.0.0.0 --tproxy-mark $baseMark/$groupMask",
                     )
                     commands += hasV4(
                         "${names.prerouting} -p $protocol -j TPROXY --on-port $basePort --on-ip 0.0.0.0 " +
-                            "--tproxy-mark $baseMark/0xffffffff",
+                            "--tproxy-mark $baseMark/$groupMask",
                     )
                 }
                 if (!state.ipv6Enabled) {
@@ -626,6 +639,7 @@ class TproxyManager internal constructor(
             chain: String,
             plan: TproxyTrafficPlan,
         ): List<String> = buildList {
+            val groupMask = hex(TproxyCompatibilityDetector.GROUP_MARK_MASK)
             add("$tool -t mangle -N $chain")
             plan.groups.forEach { group ->
                 val mark = hex(group.state.mark)
@@ -636,9 +650,9 @@ class TproxyManager internal constructor(
                 )
                 for (protocol in listOf("tcp", "udp")) {
                     add(
-                        "$tool -t mangle -A $chain -p $protocol -m mark --mark $mark/0xffffffff " +
+                        "$tool -t mangle -A $chain -p $protocol -m mark --mark $mark/$groupMask " +
                             "-j TPROXY --on-ip $onIp --on-port ${group.state.port} " +
-                            "--tproxy-mark $mark/0xffffffff",
+                            "--tproxy-mark $mark/$groupMask",
                     )
                 }
             }
@@ -653,7 +667,7 @@ class TproxyManager internal constructor(
                 for (protocol in listOf("tcp", "udp")) {
                     add(
                         "$tool -t mangle -A $chain -p $protocol --dport 53 -j TPROXY --on-ip $onIp " +
-                            "--on-port ${base.state.port} --tproxy-mark $mark/0xffffffff",
+                            "--on-port ${base.state.port} --tproxy-mark $mark/$groupMask",
                     )
                 }
                 localAddresses.forEach { address ->
@@ -665,7 +679,7 @@ class TproxyManager internal constructor(
                 for (protocol in listOf("tcp", "udp")) {
                     add(
                         "$tool -t mangle -A $chain -p $protocol -j TPROXY --on-ip $onIp " +
-                            "--on-port ${base.state.port} --tproxy-mark $mark/0xffffffff",
+                            "--on-port ${base.state.port} --tproxy-mark $mark/$groupMask",
                     )
                 }
                 add("$tool -t mangle -A $chain -j DROP")
@@ -809,7 +823,12 @@ class TproxyManager internal constructor(
             val mask = hex(state.markMask)
             val base = plan.groups.single { it.isBase }
             val baseMark = hex(base.state.mark)
-            add("$tool -t mangle -A $chain -m mark --mark ${plan.outboundMark}/0xffffffff -j RETURN")
+            val groupMask = hex(TproxyCompatibilityDetector.GROUP_MARK_MASK)
+            add(
+                "$tool -t mangle -A $chain -m owner --gid-owner $appUid " +
+                    "-m mark --mark $prefix/$mask -j MARK --set-xmark 0x0/$groupMask",
+            )
+            add("$tool -t mangle -A $chain -m owner --gid-owner $appUid -j RETURN")
             add("$tool -t mangle -A $chain -m owner --uid-owner $appUid -j RETURN")
             state.groups.forEach { group ->
                 for (protocol in listOf("tcp", "udp")) {
@@ -831,16 +850,16 @@ class TproxyManager internal constructor(
             }
             // Android sends application DNS through a system resolver UID outside the managed app ranges.
             for (protocol in listOf("tcp", "udp")) {
-                add("$tool -t mangle -A $chain -p $protocol --dport 53 -j MARK --set-xmark $baseMark/0xffffffff")
+                add("$tool -t mangle -A $chain -p $protocol --dport 53 -j MARK --set-xmark $baseMark/$groupMask")
             }
             plan.groups.filterNot { it.isBase }.forEach { group ->
                 uidRanges(group.uids).forEach { range ->
-                    addMarkRules(tool, chain, range, group.state.mark)
+                    addMarkRules(tool, chain, range, group.state.mark, groupMask)
                 }
             }
             add("$tool -t mangle -A $chain -m mark --mark $prefix/$mask -j RETURN")
             plan.routeProfileIds.toSortedSet().forEach { profileId ->
-                addMarkRules(tool, chain, appUidRangeForProfile(profileId), base.state.mark)
+                addMarkRules(tool, chain, appUidRangeForProfile(profileId), base.state.mark, groupMask)
             }
             add("$tool -t mangle -A $chain -m mark --mark $prefix/$mask -j RETURN")
             plan.routeProfileIds.toSortedSet().forEach { profileId ->
@@ -854,12 +873,13 @@ class TproxyManager internal constructor(
             chain: String,
             range: IntRange,
             mark: Int,
+            markMask: String,
         ) {
             val markHex = hex(mark)
             for (protocol in listOf("tcp", "udp")) {
                 add(
                     "$tool -t mangle -A $chain -m owner --uid-owner ${range.asArgument()} -p $protocol " +
-                        "-j MARK --set-xmark $markHex/0xffffffff",
+                        "-j MARK --set-xmark $markHex/$markMask",
                 )
             }
         }
@@ -906,7 +926,6 @@ class TproxyManager internal constructor(
             require(plan.groups.isNotEmpty() && plan.groups.count { it.isBase } == 1)
             require(plan.groups.map { it.state } == plan.runtimeState.groups)
             require(plan.routeProfileIds.all { it >= 0 })
-            require(plan.outboundMark >= 0)
             require(
                 plan.runtimeState.tetherUpstreamInterface == null ||
                     TETHER_INTERFACE_PATTERN.matches(plan.runtimeState.tetherUpstreamInterface),

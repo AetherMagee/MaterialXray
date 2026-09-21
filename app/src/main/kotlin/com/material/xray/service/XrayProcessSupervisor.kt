@@ -19,7 +19,7 @@ internal interface XrayProcessProbe {
 
 internal interface RootXrayProcessController : XrayProcessProbe {
     suspend fun prepareLogFile()
-    suspend fun start(binDir: String): Int
+    suspend fun start(binDir: String, primaryGid: Int? = null): Int
     suspend fun kill(pid: Int, signal: Int = 15): Boolean
     suspend fun readResidentMemoryMb(pid: Int): Long?
     suspend fun readCrashReason(lines: Int = 80): String
@@ -117,23 +117,33 @@ internal class XrayProcessSupervisor(
         }
     }
 
-    override suspend fun start(binDir: String): Int {
+    override suspend fun start(binDir: String, primaryGid: Int?): Int {
+        require(primaryGid == null || primaryGid > 0)
         val certificateBundleFile = environment.filesDir.resolve(ROOT_CERTIFICATE_BUNDLE_FILE)
         certificateBundle.update(certificateBundleFile)
-        val command = buildString {
-            append("config=${shellQuote(xrayBinary.configPath())}; ")
-            append("cd ${shellQuote(binDir)} && ")
-            append("env ")
+        val xrayCommand = buildString {
+            append("cd ${shellQuote(binDir)} && exec env ")
             rootXrayEnvironment(binDir, certificateBundleFile.absolutePath).forEach { (key, value) ->
                 append("${shellQuote("$key=$value")} ")
             }
-            append("sh -c 'exec \"\$@\"' xray ")
-            append("${shellQuote(xrayBinary.rootBinaryPath)} run -c \"\$config\"")
+            append("${shellQuote(xrayBinary.rootBinaryPath)} run -c ${shellQuote(xrayBinary.configPath())}")
+        }
+        val command = buildString {
+            append("config=${shellQuote(xrayBinary.configPath())}; ")
+            if (primaryGid != null) {
+                append("su -g $primaryGid 0 -c ${shellQuote(xrayCommand)}")
+            } else {
+                append("$xrayCommand")
+            }
             append(" > ${shellQuote(logFile)} 2>&1 & ")
             append("found=\"\"; ")
             append("is_owned() { [ -r \"/proc/\$1/cmdline\" ] || return 1; ")
             append("cmdline=\$(cat -v \"/proc/\$1/cmdline\" 2>/dev/null) || return 1; ")
-            append("case \"\$cmdline\" in *\"\$config\"*) return 0;; *) return 1;; esac; }; ")
+            append("case \"\$cmdline\" in *\"\$config\"*) true;; *) return 1;; esac; ")
+            if (primaryGid != null) {
+                append("[ \"\$(awk '/^Gid:/ { print \$3 \":\" \$5; exit }' \"/proc/\$1/status\" 2>/dev/null)\" = \"$primaryGid:$primaryGid\" ] || return 1; ")
+            }
+            append("return 0; }; ")
             append("i=0; ")
             append("while [ \$i -lt 20 ]; do ")
             append("for pid in \$(pidof xray 2>/dev/null); do ")

@@ -8,10 +8,18 @@ import org.junit.Test
 class TproxyCompatibilityDetectorTest {
     @Test
     fun `dual stack probe exercises production firewall hooks and policy routing`() {
-        val command = TproxyCompatibilityDetector.probeCommand("abc123", allowIpv6 = true)
+        val command = TproxyCompatibilityDetector.probeCommand("abc123", allowIpv6 = true, appUid = APP_UID)
 
-        assertTrue(command.contains("-p tcp -m mark --mark 0xb000001/0xffffffff -j TPROXY"))
-        assertTrue(command.contains("-p udp -m mark --mark 0xb000001/0xffffffff -j TPROXY"))
+        assertTrue(command.contains("-p tcp -m mark --mark 0x8200000/0x1fe00000 -j TPROXY"))
+        assertTrue(command.contains("-p udp -m mark --mark 0x8200000/0x1fe00000 -j TPROXY"))
+        assertTrue(command.contains("su -g $APP_UID 0 -c"))
+        assertTrue(command.contains("--gid-owner $APP_UID"))
+        assertTrue(
+            command.contains(
+                "--gid-owner $APP_UID -m mark --mark 0x8000000/0x18000000 " +
+                    "-j MARK --set-xmark 0x0/0x1fe00000",
+            ),
+        )
         assertTrue(command.contains("iptables -w 2 -t mangle -I PREROUTING 1 -j MXPabc1234P"))
         assertTrue(command.contains("iptables -w 2 -t mangle -I OUTPUT 1 -j MXPabc1234O"))
         assertTrue(command.contains("ip6tables -w 2 -t mangle -I PREROUTING 1 -j MXPabc1236P"))
@@ -28,7 +36,7 @@ class TproxyCompatibilityDetectorTest {
 
     @Test
     fun `IPv4 only probe covers loopback binding IPv6 blocking and listener checks`() {
-        val command = TproxyCompatibilityDetector.probeCommand("abc123", allowIpv6 = false)
+        val command = TproxyCompatibilityDetector.probeCommand("abc123", allowIpv6 = false, appUid = APP_UID)
 
         assertTrue(command.contains("--on-ip 127.0.0.1"))
         assertTrue(command.contains("-d 127.0.0.0/8 -p tcp --dport 9 -j DROP"))
@@ -44,8 +52,8 @@ class TproxyCompatibilityDetectorTest {
     @Test
     fun `probe waits for the xtables lock on every firewall command`() {
         val commands = listOf(
-            TproxyCompatibilityDetector.probeCommand("abc123", allowIpv6 = false),
-            TproxyCompatibilityDetector.probeCommand("abc123", allowIpv6 = true),
+            TproxyCompatibilityDetector.probeCommand("abc123", allowIpv6 = false, appUid = APP_UID),
+            TproxyCompatibilityDetector.probeCommand("abc123", allowIpv6 = true, appUid = APP_UID),
             TproxyCompatibilityDetector.markCollisionCommand(10_123),
         )
 
@@ -56,30 +64,29 @@ class TproxyCompatibilityDetectorTest {
 
     @Test
     fun `probe mark cannot be captured by the production policy rule`() {
-        val command = TproxyCompatibilityDetector.probeCommand("abc123", allowIpv6 = true)
+        val command = TproxyCompatibilityDetector.probeCommand("abc123", allowIpv6 = true, appUid = APP_UID)
 
-        assertTrue(command.contains("0xb000000"))
-        assertFalse(command.contains("0xa000000"))
-        assertFalse(command.contains("0xa000001"))
+        assertTrue(command.contains("0x8000000/0x18000000"))
+        assertFalse(command.contains("0x10000000"))
     }
 
     @Test
     fun `probe rule outruns Android policy routing and the production rule`() {
         val priorities = (0..0xfff).map { value ->
             val suffix = value.toString(16).padStart(3, '0')
-            val command = TproxyCompatibilityDetector.probeCommand(suffix, allowIpv6 = false)
+            val command = TproxyCompatibilityDetector.probeCommand(suffix, allowIpv6 = false, appUid = APP_UID)
             Regex("ip rule add fwmark \\S+ table \\d+ pref (\\d+)").find(command)!!.groupValues[1].toInt()
         }
 
         assertTrue(priorities.all { it > TproxyManager.RULE_PRIORITY })
-        assertTrue(priorities.all { it < ANDROID_INTERFACE_RULE_PRIORITY })
+        assertTrue(priorities.all { it < ANDROID_FIRST_FWMARK_RULE_PRIORITY })
     }
 
     @Test
     fun `collision check accepts only the apps owned output chain`() {
         val command = TproxyCompatibilityDetector.markCollisionCommand(10_123)
 
-        assertTrue(command.contains("fwmark 0xa000000/0xf000000"))
+        assertTrue(command.contains("fwmark 0x10000000/0x10000000"))
         assertTrue(command.contains("iptables -w 2 -t mangle -C OUTPUT -j MXO278b"))
         assertTrue(command.contains("exit 42"))
     }
@@ -87,10 +94,10 @@ class TproxyCompatibilityDetectorTest {
     @Test
     fun `overlap detection catches broader narrower and exact rules`() {
         val output = """
-            100: from all fwmark 0xa000000/0xff000000 lookup 1
-            101: from all fwmark 0xa000001/0xffffffff lookup 2
-            102: from all fwmark 0xb000000/0xff000000 lookup 3
-            103: from all fwmark 0xa000000/0xf000000 lookup 4
+            100: from all fwmark 0x10000000/0xf0000000 lookup 1
+            101: from all fwmark 0x10200000/0x1fe00000 lookup 2
+            102: from all fwmark 0x08000000/0x18000000 lookup 3
+            103: from all fwmark 0x10000000/0x10000000 lookup 4
         """.trimIndent()
 
         val overlaps = overlappingFwmarkRules(
@@ -103,7 +110,7 @@ class TproxyCompatibilityDetectorTest {
     }
 
     @Test
-    fun `normal Android low-bit fwmark rules do not conflict with generated marks`() {
+    fun `low-bit fwmark predicates can overlap while preserving Android fields`() {
         val output = """
             9999: from all fwmark 0x20000/0xfffff lookup 1027
             10000: from all fwmark 0xc0000/0xd0000 lookup 99
@@ -115,7 +122,7 @@ class TproxyCompatibilityDetectorTest {
             TproxyCompatibilityDetector.MARK_MASK,
         )
 
-        assertTrue(overlaps.isEmpty())
+        assertEquals(listOf(9999, 10000), overlaps.map { it.priority })
     }
 
     @Test
@@ -138,6 +145,9 @@ class TproxyCompatibilityDetectorTest {
         )
         assertTrue(
             TproxyCompatibility.Unsupported(TproxyCompatibility.Reason.Ipv6BlockingUnavailable).isConclusive(),
+        )
+        assertTrue(
+            TproxyCompatibility.Unsupported(TproxyCompatibility.Reason.ProcessGroupUnavailable).isConclusive(),
         )
         assertFalse(TproxyCompatibility.Unsupported(TproxyCompatibility.Reason.RootUnavailable).isConclusive())
         assertFalse(TproxyCompatibility.Unsupported(TproxyCompatibility.Reason.CommandTimedOut).isConclusive())
@@ -172,6 +182,7 @@ class TproxyCompatibilityDetectorTest {
     }
 
     private companion object {
-        const val ANDROID_INTERFACE_RULE_PRIORITY = 14_999
+        const val APP_UID = 10_123
+        const val ANDROID_FIRST_FWMARK_RULE_PRIORITY = 10_000
     }
 }

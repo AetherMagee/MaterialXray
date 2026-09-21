@@ -15,7 +15,6 @@ sealed interface XrayInbound {
     data class Tproxy(
         val port: Int,
         override val tag: String,
-        val outboundMark: Int,
         val allowIpv6: Boolean,
         val acceptNonLoopback: Boolean = false,
     ) : XrayInbound
@@ -33,6 +32,6 @@ sealed interface XrayInbound {
 
 internal fun XrayInbound.toJson(): JsonObject = when (this) {
     is XrayInbound.Tun -> buildTunInbound(name, tag, mtu)
-    is XrayInbound.Tproxy -> buildTproxyInbound(port, tag, outboundMark, allowIpv6, acceptNonLoopback)
+    is XrayInbound.Tproxy -> buildTproxyInbound(port, tag, allowIpv6, acceptNonLoopback)
     is XrayInbound.Http -> buildHttpInbound(port, tag, username, password)
 }

@@ -193,7 +193,11 @@ internal class ConnectionManager(
                 tproxyPlan,
                 syntheticDnsAddress,
             )
-            val pid = startXrayProcess(strategy, vpnInterface)
+            val pid = startXrayProcess(
+                strategy = strategy,
+                vpnInterface = vpnInterface,
+                primaryGid = environment.appUid.takeIf { rootBackend == RootConnectionBackend.Tproxy },
+            )
 
             if (pid <= 0) {
                 fail(environment.localizedString(R.string.connection_error_missing_process_id))
@@ -370,7 +374,6 @@ internal class ConnectionManager(
             tproxyGateway.createPlan(
                 appRoutingPlan = appRoutingPlan,
                 routeTable = runtimeSettings.routeTable,
-                outboundMark = runtimeSettings.fwmark,
                 allowIpv6 = runtimeSettings.allowIpv6,
                 tetherUpstreamInterface = physicalRoute?.dev?.takeIf { runtimeSettings.tunnelTetheredClients },
                 bypassLan = runtimeSettings.bypassLan,
@@ -617,7 +620,6 @@ internal class ConnectionManager(
             XrayInbound.Tproxy(
                 port = group.port,
                 tag = group.inboundTag,
-                outboundMark = runtimeSettings.fwmark,
                 allowIpv6 = runtimeSettings.allowIpv6,
                 acceptNonLoopback = tproxyPlan.runtimeState.tetherUpstreamInterface != null,
             )
@@ -626,12 +628,23 @@ internal class ConnectionManager(
         // A hand-edited config replaces generation wholesale, but not the identifiers this connect
         // just allocated: the API endpoint and the inbounds have to be the current ones or the
         // stats clients talk to nothing and the firewall rule guards the wrong port.
-        if (writeOverriddenXrayConfig(runtimeSettings, appRoutingPlan, xrayApiEndpoint, effectiveInbounds)) return null
+        if (
+            writeOverriddenXrayConfig(
+                runtimeSettings,
+                appRoutingPlan,
+                xrayApiEndpoint,
+                effectiveInbounds,
+                clearOutboundMarks = tproxyPlan != null,
+            )
+        ) {
+            return null
+        }
 
         val generatedConfig = GeneratedXrayConfig(
             server = xrayServer,
             runtimeSettings = runtimeSettings,
             managesSystemRouting = managesSystemRouting,
+            fwmark = runtimeSettings.fwmark.takeIf { managesSystemRouting && tproxyPlan == null } ?: 0,
             appRoutingPlan = appRoutingPlan,
             physicalRoute = physicalRoute,
             xrayApiEndpoint = xrayApiEndpoint,
@@ -662,7 +675,7 @@ internal class ConnectionManager(
         configGenerator.generate(
             server = config.server,
             tunName = settings.tunName,
-            fwmark = settings.fwmark.takeIf { config.managesSystemRouting } ?: 0,
+            fwmark = config.fwmark,
             dnsServers = settings.dnsServers,
             domesticDnsServers = settings.domesticDnsServers,
             preferProfileDns = settings.preferProfileDns,
@@ -694,6 +707,7 @@ internal class ConnectionManager(
         appRoutingPlan: AppRoutingPlan,
         xrayApiEndpoint: XrayApiEndpoint,
         inbounds: List<XrayInbound>?,
+        clearOutboundMarks: Boolean,
     ): Boolean {
         val override = xrayBinary.readOverrideConfig() ?: return false
         val patched = withContext(Dispatchers.Default) {
@@ -704,6 +718,7 @@ internal class ConnectionManager(
                 xrayApiEndpoint = xrayApiEndpoint,
                 tunMtu = runtimeSettings.tunMtu,
                 inbounds = inbounds,
+                clearOutboundMarks = clearOutboundMarks,
             )
         }
         if (patched == null) {
@@ -731,14 +746,24 @@ internal class ConnectionManager(
         )
     }
 
-    private suspend fun startXrayProcess(strategy: XrayRuntimeStrategy, vpnInterface: ParcelFileDescriptor?): Int {
+    private suspend fun startXrayProcess(
+        strategy: XrayRuntimeStrategy,
+        vpnInterface: ParcelFileDescriptor?,
+        primaryGid: Int? = null,
+    ): Int {
         log.append(LogSource.APP, "Starting xray process...")
         return executeStep(
             ConnectionStep(
                 "xray process launch",
                 ConnectionProgress.StartingCore,
                 isSuccessful = { it > 0 },
-                action = { strategy.startProcess(binDir = environment.binDir, vpnInterface = vpnInterface) },
+                action = {
+                    strategy.startProcess(
+                        binDir = environment.binDir,
+                        vpnInterface = vpnInterface,
+                        primaryGid = primaryGid,
+                    )
+                },
             ),
         )
     }
@@ -1247,7 +1272,6 @@ internal class ConnectionManager(
         val plan = tproxyGateway.createPlan(
             appRoutingPlan = appRoutingPlan,
             routeTable = runtimeSettings.routeTable,
-            outboundMark = runtimeSettings.fwmark,
             allowIpv6 = runtimeSettings.allowIpv6,
             existingState = tproxyState,
             tetherUpstreamInterface = tproxyState.tetherUpstreamInterface,
@@ -1459,7 +1483,6 @@ internal class ConnectionManager(
             },
             bypassUids = runtimeBypassUids(appRoutingPlan.directUids),
             routeProfileIds = appRoutingPlan.routeProfileIds,
-            outboundMark = state.fwmark,
         )
         val result = tproxyGateway.installGuard(plan)
         if (!result.success) {
@@ -1723,6 +1746,7 @@ private data class GeneratedXrayConfig(
     val server: ServerConfig,
     val runtimeSettings: XrayRuntimeSettings,
     val managesSystemRouting: Boolean,
+    val fwmark: Int,
     val appRoutingPlan: AppRoutingPlan,
     val physicalRoute: TunManager.PhysicalRoute?,
     val xrayApiEndpoint: XrayApiEndpoint,

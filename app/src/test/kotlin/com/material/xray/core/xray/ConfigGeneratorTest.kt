@@ -66,7 +66,7 @@ class ConfigGeneratorTest {
             generator.generate(
                 rawServer,
                 preferProfileDns = true,
-                inbounds = listOf(XrayInbound.Tproxy(48_321, "tproxy-in-default", 255, allowIpv6 = false)),
+                inbounds = listOf(XrayInbound.Tproxy(48_321, "tproxy-in-default", allowIpv6 = false)),
             ),
         ).jsonObject
         val rules = config.getValue("routing").jsonObject.getValue("rules").jsonArray.map { it.jsonObject }
@@ -102,7 +102,6 @@ class ConfigGeneratorTest {
                 XrayInbound.Tproxy(
                     port = 48_321,
                     tag = "tproxy-in-default",
-                    outboundMark = 255,
                     allowIpv6 = false,
                 ),
             ),
@@ -121,6 +120,7 @@ class ConfigGeneratorTest {
                 .getValue("sockopt").jsonObject
                 .getValue("tproxy").jsonPrimitive.content,
         )
+        assertTrue("mark" !in inbound.getValue("streamSettings").jsonObject.getValue("sockopt").jsonObject)
         assertTrue(inbounds.none { it.jsonObject["protocol"]?.jsonPrimitive?.content == "tun" })
         val firstRoutingRule = json.getValue("routing").jsonObject.getValue("rules").jsonArray.first().jsonObject
         assertEquals(
@@ -306,7 +306,7 @@ class ConfigGeneratorTest {
 
         val config = generator.generate(
             rawServer,
-            inbounds = listOf(XrayInbound.Tproxy(48_321, "tproxy-in-default", 255, allowIpv6 = false)),
+            inbounds = listOf(XrayInbound.Tproxy(48_321, "tproxy-in-default", allowIpv6 = false)),
         )
         val inbounds = Json.parseToJsonElement(config).jsonObject.getValue("inbounds").jsonArray
 
@@ -319,7 +319,7 @@ class ConfigGeneratorTest {
     fun `dual stack TPROXY inbound listens on both address families`() {
         val config = generator.generate(
             vlessReality,
-            inbounds = listOf(XrayInbound.Tproxy(48_321, "tproxy-in-default", 255, allowIpv6 = true)),
+            inbounds = listOf(XrayInbound.Tproxy(48_321, "tproxy-in-default", allowIpv6 = true)),
         )
         val inbound = Json.parseToJsonElement(config).jsonObject.getValue("inbounds").jsonArray.single().jsonObject
 
@@ -334,7 +334,6 @@ class ConfigGeneratorTest {
                 XrayInbound.Tproxy(
                     48_321,
                     "tproxy-in-default",
-                    255,
                     allowIpv6 = false,
                     acceptNonLoopback = true,
                 ),
