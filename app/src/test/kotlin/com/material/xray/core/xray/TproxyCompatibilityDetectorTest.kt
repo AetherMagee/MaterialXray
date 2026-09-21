@@ -20,6 +20,12 @@ class TproxyCompatibilityDetectorTest {
                     "-j MARK --set-xmark 0x0/0x1fe00000",
             ),
         )
+        assertTrue(
+            command.indexOf(
+                "--gid-owner $APP_UID -m mark --mark 0x8000000/0x18000000 " +
+                    "-j MARK --set-xmark 0x0/0x1fe00000",
+            ) < command.indexOf("--gid-owner $APP_UID -j RETURN"),
+        )
         assertTrue(command.contains("iptables -w 2 -t mangle -I PREROUTING 1 -j MXPabc1234P"))
         assertTrue(command.contains("iptables -w 2 -t mangle -I OUTPUT 1 -j MXPabc1234O"))
         assertTrue(command.contains("ip6tables -w 2 -t mangle -I PREROUTING 1 -j MXPabc1236P"))
@@ -44,6 +50,12 @@ class TproxyCompatibilityDetectorTest {
         assertTrue(command.contains("ip6tables -w 2 -t filter -I OUTPUT 1 -j MXPabc1236F"))
         assertTrue(command.contains("-j REJECT --reject-with icmp6-no-route"))
         assertTrue(command.contains("--uid-owner 0-1"))
+        assertTrue(
+            command.contains(
+                "ip6tables -w 2 -t mangle -A MXPabc1236O -m owner --gid-owner $APP_UID " +
+                    "-m mark --mark 0x8000000/0x18000000 -j MARK --set-xmark 0x0/0x1fe00000",
+            ),
+        )
         assertTrue(command.contains("ss -lnt >/dev/null && ss -lnu >/dev/null"))
         assertFalse(command.contains("addrtype"))
         assertFalse(command.contains("-m socket"))

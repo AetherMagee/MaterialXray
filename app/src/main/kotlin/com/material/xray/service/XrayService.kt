@@ -1039,8 +1039,8 @@ class XrayService : VpnService() {
             staleState?.transitionGuard != null
         ) {
             logBuffer.append(LogSource.APP, "Cleaning incomplete TPROXY runtime before reconnecting")
-            var preserveGuard = connectionManager.adoptPersistedTransitionGuard()
-            if (!preserveGuard && (staleState.tproxy != null || staleState.transitionGuard != null)) {
+            var preserveGuard = false
+            if (staleState.tproxy != null || staleState.transitionGuard != null) {
                 if (!connectionManager.prepareSeamlessReconnect()) {
                     failRuntimeRestore("Could not take over the recorded TPROXY runtime")
                     return false

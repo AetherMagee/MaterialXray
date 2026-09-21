@@ -1035,7 +1035,6 @@ class ConnectionManagerTest {
             removeGuardCalls += 1
             return true
         }
-        override suspend fun hasGuard(state: TproxyRuntimeState?): Boolean = true
     }
 
     private class FakeCleanup : ConnectionCleanup {

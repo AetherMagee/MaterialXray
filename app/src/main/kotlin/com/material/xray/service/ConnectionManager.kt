@@ -1502,15 +1502,6 @@ internal class ConnectionManager(
         requestXrayApiClientClose()
     }
 
-    suspend fun adoptPersistedTransitionGuard(): Boolean {
-        val state = stateStore.read() ?: return false
-        val guardState = state.transitionGuard ?: state.tproxy ?: return false
-        if (!tproxyGateway.hasGuard(guardState)) return false
-        transitionGuardInstalled = true
-        preserveGuardOnFailure = true
-        return true
-    }
-
     suspend fun ensureCleanRootRuntime(preserveTproxyGuard: Boolean = false): Boolean {
         val cleaned = executeStep(
             ConnectionStep(

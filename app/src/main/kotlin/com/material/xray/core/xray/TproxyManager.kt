@@ -37,7 +37,7 @@ class TproxyManager internal constructor(
     )
 
     suspend fun installGuard(plan: TproxyTrafficPlan): TunManager.RoutingResult {
-        if (useIndividualCommands) return installGuardIndividually(plan)
+        if (useIndividualCommands) return installGuardIndividually(plan, hasCompleteGuard(plan))
         val restored = executeCommand(guardRestoreCommand(plan, appUid))
         if (restored.isSuccess) {
             bulkRestoreSupported = true
@@ -45,10 +45,9 @@ class TproxyManager internal constructor(
             return TunManager.RoutingResult(success = true)
         }
         if (restored.canRetryIndividually()) {
-            val cleanup = executeCommand(guardCleanupCommand(appUid))
-            if (!cleanup.isSuccess) return cleanup.toRoutingResult("TPROXY startup guard rollback")
+            val existingGuard = hasCompleteGuard(plan)
             useIndividualCommands = true
-            return installGuardIndividually(plan).withRestoreError(restored)
+            return installGuardIndividually(plan, existingGuard).withRestoreError(restored)
         }
         return restored.toRoutingResult("TPROXY bulk startup guard setup")
     }
@@ -84,7 +83,25 @@ class TproxyManager internal constructor(
         return activate(plan).withRestoreError(restored)
     }
 
-    private suspend fun installGuardIndividually(plan: TproxyTrafficPlan): TunManager.RoutingResult {
+    private suspend fun hasCompleteGuard(plan: TproxyTrafficPlan): Boolean = executeCommand(guardHookVerifyCommand(plan, appUid)).isSuccess
+
+    private suspend fun installGuardIndividually(
+        plan: TproxyTrafficPlan,
+        existingGuard: Boolean,
+    ): TunManager.RoutingResult {
+        if (existingGuard) {
+            val verified = executeCommand(guardPlanVerifyCommand(plan, appUid))
+            if (verified.isSuccess) {
+                guardCoversTethering = plan.runtimeState.tetherUpstreamInterface != null
+                return TunManager.RoutingResult(success = true)
+            }
+            return TunManager.RoutingResult(
+                success = false,
+                error = "TPROXY startup guard changed and cannot be refreshed safely without iptables-restore",
+            )
+        }
+        val cleanup = executeCommand(guardCleanupCommand(appUid))
+        if (!cleanup.isSuccess) return cleanup.toRoutingResult("TPROXY startup guard rollback")
         val result = execute(guardInstallCommand(plan, appUid), "TPROXY startup guard setup")
         if (result.success) {
             guardCoversTethering = plan.runtimeState.tetherUpstreamInterface != null
@@ -119,8 +136,6 @@ class TproxyManager internal constructor(
     suspend fun removeGuard(): Boolean = executeCommand(guardCleanupCommand(appUid, guardCoversTethering)).isSuccess.also {
         if (it) guardCoversTethering = false
     }
-
-    suspend fun hasGuard(state: TproxyRuntimeState?): Boolean = executeCommand(guardVerifyCommand(appUid, state)).isSuccess
 
     private suspend fun execute(command: String, label: String): TunManager.RoutingResult {
         val result = executeCommand(command)
@@ -230,18 +245,20 @@ class TproxyManager internal constructor(
             val guard = chainNames(appUid).guard
             val restores = FirewallCommands.tools.flatMap { tool ->
                 buildList {
-                    val restore = FirewallRestoreBatch(tool, "mangle", guardSetupCommands(tool, guard, plan, appUid))
+                    val setup = FirewallRestoreBatch(tool, "mangle", guardSetupCommands(tool, guard, plan, appUid))
+                    val refresh = FirewallRestoreBatch(tool, "mangle", guardRefreshCommands(tool, guard, plan, appUid))
                     add(
-                        "if $tool -t mangle -C OUTPUT -j $guard 2>/dev/null; then true; else " +
-                            "${restore.command()}; fi",
+                        "if $tool -t mangle -C OUTPUT -j $guard 2>/dev/null; then ${refresh.command()}; else " +
+                            "${guardCleanupCommands(tool, guard).joinToString("; ")}; ${setup.command()}; fi",
                     )
                     if (plan.runtimeState.tetherUpstreamInterface != null) {
-                        val filterRestore = FirewallRestoreBatch(tool, "filter", tetherGuardSetupCommands(tool, guard, plan))
+                        val filterSetup = FirewallRestoreBatch(tool, "filter", tetherGuardSetupCommands(tool, guard, plan))
+                        val filterRefresh = FirewallRestoreBatch(tool, "filter", tetherGuardRefreshCommands(tool, guard, plan))
                         add(
                             "if $tool -t filter -C INPUT -j ${guard}I 2>/dev/null && " +
-                                "$tool -t filter -C FORWARD -j $guard 2>/dev/null; then true; else " +
+                                "$tool -t filter -C FORWARD -j $guard 2>/dev/null; then ${filterRefresh.command()}; else " +
                                 "${tetherGuardCleanupCommands(tool, guard).joinToString("; ")}; " +
-                                "${filterRestore.command()}; fi",
+                                "${filterSetup.command()}; fi",
                         )
                     } else {
                         add("{ ${tetherGuardCleanupCommands(tool, guard).joinToString("; ")}; }")
@@ -249,7 +266,9 @@ class TproxyManager internal constructor(
                 }
             }
             return "if ${FirewallCommands.restoreAvailable()}; then if ${restores.shellAnd()}; " +
-                "then true; else status=\$?; ${guardCleanupCommand(appUid)}; exit \$status; fi; else exit 127; fi"
+                "then ${guardPlanVerifyCommand(plan, appUid)}; else status=\$?; " +
+                "if ${guardHookVerifyCommand(plan, appUid)}; then true; else ${guardCleanupCommand(appUid)}; fi; " +
+                "exit \$status; fi; else exit 127; fi"
         }
 
         private fun routingActivationCommands(plan: TproxyTrafficPlan): List<String> {
@@ -312,6 +331,10 @@ class TproxyManager internal constructor(
             val mask = hex(state.markMask)
             val groupMask = hex(TproxyCompatibilityDetector.GROUP_MARK_MASK)
             val baseMark = hex(state.groups.first().mark)
+            val clearXrayMarkRule =
+                "${names.slot(state.outputChainSlot)} -m owner --gid-owner $appUid " +
+                    "-m mark --mark $prefix/$mask -j MARK --set-xmark 0x0/$groupMask"
+            val returnXrayRule = "${names.slot(state.outputChainSlot)} -m owner --gid-owner $appUid -j RETURN"
             fun hasV4(rule: String) = "has_v4 ${shellQuote("-A $rule")}"
             fun hasV6(rule: String) = "has_v6 ${shellQuote("-A $rule")}"
             val commands = mutableListOf(
@@ -324,6 +347,8 @@ class TproxyManager internal constructor(
                     "chain=\${1#-A }; chain=\${chain%% *}; printf '%s\\n' \"\$v4_rules\" | " +
                     "grep -F -- \"-A \$chain \" >&2; return 1; };; esac; }",
                 "has_v4_fragment() { case \"\$v4_slot_rules\" in *\"\$1\"*) true;; *) return 1;; esac; }",
+                "has_v4_order() { case \"\$newline\$v4_slot_rules\$newline\" in " +
+                    "*\"\$newline\$1\$newline\$2\$newline\"*) true;; *) return 1;; esac; }",
                 "has_port() { case \"\$1\" in *\":\$2 \"*|*\".\$2 \"*) true;; *) return 1;; esac; }",
                 "tcp_listeners=\$(ss -lnt)",
                 "udp_listeners=\$(ss -lnu)",
@@ -333,11 +358,9 @@ class TproxyManager internal constructor(
                 hasV4("INPUT -j ${names.prerouting}L"),
                 "ip rule show | grep -q 'fwmark $prefix/$mask.*lookup ${state.routeTable}'",
                 "ip route show table ${state.routeTable} | grep -q '^local .* dev lo'",
-                hasV4(
-                    "${names.slot(state.outputChainSlot)} -m owner --gid-owner $appUid " +
-                        "-m mark --mark $prefix/$mask -j MARK --set-xmark 0x0/$groupMask",
-                ),
-                hasV4("${names.slot(state.outputChainSlot)} -m owner --gid-owner $appUid -j RETURN"),
+                hasV4(clearXrayMarkRule),
+                hasV4(returnXrayRule),
+                "has_v4_order ${shellQuote("-A $clearXrayMarkRule")} ${shellQuote("-A $returnXrayRule")}",
             )
             for (protocol in listOf("tcp", "udp")) {
                 commands += hasV4(
@@ -369,17 +392,17 @@ class TproxyManager internal constructor(
                 commands += "has_v6() { case \"\$newline\$v6_rules\$newline\" in " +
                     "*\"\$newline\$1\$newline\"*) true;; *) return 1;; esac; }"
                 commands += "has_v6_fragment() { case \"\$v6_slot_rules\" in *\"\$1\"*) true;; *) return 1;; esac; }"
+                commands += "has_v6_order() { case \"\$newline\$v6_slot_rules\$newline\" in " +
+                    "*\"\$newline\$1\$newline\$2\$newline\"*) true;; *) return 1;; esac; }"
                 commands += hasV6("OUTPUT -j ${names.output}")
                 commands += hasV6("${names.output} -j ${names.slot(state.outputChainSlot)}")
                 commands += hasV6("PREROUTING -j ${names.prerouting}")
                 commands += hasV6("INPUT -j ${names.prerouting}L")
                 commands += "ip -6 rule show | grep -q 'fwmark $prefix/$mask.*lookup ${state.routeTable}'"
                 commands += "ip -6 route show table ${state.routeTable} | grep -q '^local .* dev lo'"
-                commands += hasV6(
-                    "${names.slot(state.outputChainSlot)} -m owner --gid-owner $appUid " +
-                        "-m mark --mark $prefix/$mask -j MARK --set-xmark 0x0/$groupMask",
-                )
-                commands += hasV6("${names.slot(state.outputChainSlot)} -m owner --gid-owner $appUid -j RETURN")
+                commands += hasV6(clearXrayMarkRule)
+                commands += hasV6(returnXrayRule)
+                commands += "has_v6_order ${shellQuote("-A $clearXrayMarkRule")} ${shellQuote("-A $returnXrayRule")}"
                 for (protocol in listOf("tcp", "udp")) {
                     commands += hasV6(
                         "${names.slot(state.outputChainSlot)} -p $protocol -m $protocol --dport 53 " +
@@ -513,15 +536,36 @@ class TproxyManager internal constructor(
             return commands.joinToString("; ")
         }
 
-        fun guardVerifyCommand(appUid: Int, state: TproxyRuntimeState? = null): String {
+        fun guardHookVerifyCommand(plan: TproxyTrafficPlan, appUid: Int): String {
+            validatePlan(plan, appUid)
             require(appUid > 0)
             val guard = chainNames(appUid).guard
             return buildList {
                 for (tool in FirewallCommands.tools) {
-                    add("$tool -t mangle -C OUTPUT -j $guard")
-                    if (state?.tetherUpstreamInterface != null) {
-                        add("$tool -t filter -C INPUT -j ${guard}I")
-                        add("$tool -t filter -C FORWARD -j $guard")
+                    add(firstHookIs(tool, "mangle", "OUTPUT", guard))
+                    if (plan.runtimeState.tetherUpstreamInterface != null) {
+                        add(firstHookIs(tool, "filter", "INPUT", "${guard}I"))
+                        add(firstHookIs(tool, "filter", "FORWARD", guard))
+                    }
+                }
+            }.shellAnd()
+        }
+
+        fun guardPlanVerifyCommand(plan: TproxyTrafficPlan, appUid: Int): String {
+            validatePlan(plan, appUid)
+            val guard = chainNames(appUid).guard
+            return buildList {
+                for (tool in FirewallCommands.tools) {
+                    add(firstHookIs(tool, "mangle", "OUTPUT", guard))
+                    add(exactChain(tool, "mangle", guard, guardRuleCommands(tool, guard, plan, appUid)))
+                    if (plan.runtimeState.tetherUpstreamInterface != null) {
+                        add(firstHookIs(tool, "filter", "INPUT", "${guard}I"))
+                        add(firstHookIs(tool, "filter", "FORWARD", guard))
+                        add(exactChain(tool, "filter", guard, tetherForwardRuleCommands(tool, guard, plan)))
+                        add(exactChain(tool, "filter", "${guard}I", tetherInputRuleCommands(tool, "${guard}I", plan)))
+                    } else {
+                        add("! $tool -t filter -C INPUT -j ${guard}I 2>/dev/null")
+                        add("! $tool -t filter -C FORWARD -j $guard 2>/dev/null")
                     }
                 }
             }.shellAnd()
@@ -570,21 +614,44 @@ class TproxyManager internal constructor(
         )
 
         private fun tetherGuardSetupCommands(tool: String, chain: String, plan: TproxyTrafficPlan): List<String> = buildList {
-            val upstream = requireNotNull(plan.runtimeState.tetherUpstreamInterface)
             add("$tool -t filter -N $chain")
+            addAll(tetherForwardRuleCommands(tool, chain, plan))
+            add("$tool -t filter -N ${chain}I")
+            addAll(tetherInputRuleCommands(tool, "${chain}I", plan))
+            add("$tool -t filter -I INPUT 1 -j ${chain}I")
+            add("$tool -t filter -I FORWARD 1 -j $chain")
+        }
+
+        private fun tetherGuardRefreshCommands(tool: String, chain: String, plan: TproxyTrafficPlan): List<String> = buildList {
+            add("$tool -t filter -D INPUT -j ${chain}I")
+            add("$tool -t filter -D FORWARD -j $chain")
+            add("$tool -t filter -F $chain")
+            addAll(tetherForwardRuleCommands(tool, chain, plan))
+            add("$tool -t filter -F ${chain}I")
+            addAll(tetherInputRuleCommands(tool, "${chain}I", plan))
+            add("$tool -t filter -I INPUT 1 -j ${chain}I")
+            add("$tool -t filter -I FORWARD 1 -j $chain")
+        }
+
+        private fun tetherForwardRuleCommands(tool: String, chain: String, plan: TproxyTrafficPlan): List<String> = buildList {
+            val upstream = requireNotNull(plan.runtimeState.tetherUpstreamInterface)
             add("$tool -t filter -A $chain -i $upstream -j RETURN")
             for (protocol in listOf("tcp", "udp")) {
-                add("$tool -t filter -A $chain -p $protocol --dport 53 -j DROP")
+                add("$tool -t filter -A $chain -p $protocol -m $protocol --dport 53 -j DROP")
             }
-
             tetherBypassCidrs(tool, plan.runtimeState.tetherBypassLan).forEach { cidr ->
                 add("$tool -t filter -A $chain -d $cidr -j RETURN")
             }
             add("$tool -t filter -A $chain -j DROP")
-            addAll(tetherInputRules(tool, chain + "I", upstream, "DROP", plan.runtimeState))
-            add("$tool -t filter -I INPUT 1 -j ${chain}I")
-            add("$tool -t filter -I FORWARD 1 -j $chain")
         }
+
+        private fun tetherInputRuleCommands(tool: String, chain: String, plan: TproxyTrafficPlan): List<String> = tetherInputRuleCommands(
+            tool = tool,
+            chain = chain,
+            upstream = requireNotNull(plan.runtimeState.tetherUpstreamInterface),
+            target = "DROP",
+            guardedState = plan.runtimeState,
+        )
 
         private fun tetherInputRules(
             tool: String,
@@ -594,12 +661,22 @@ class TproxyManager internal constructor(
             guardedState: TproxyRuntimeState? = null,
         ): List<String> = buildList {
             add("$tool -t filter -N $chain")
+            addAll(tetherInputRuleCommands(tool, chain, upstream, target, guardedState))
+        }
+
+        private fun tetherInputRuleCommands(
+            tool: String,
+            chain: String,
+            upstream: String,
+            target: String,
+            guardedState: TproxyRuntimeState? = null,
+        ): List<String> = buildList {
             guardedState?.let { state ->
                 add("$tool -t filter -A $chain -m mark --mark ${hex(state.markPrefix)}/${hex(state.markMask)} -j DROP")
             }
             add("$tool -t filter -A $chain -i $upstream -j RETURN")
             for (protocol in listOf("tcp", "udp")) {
-                add("$tool -t filter -A $chain -p $protocol --dport 53 -j $target")
+                add("$tool -t filter -A $chain -p $protocol -m $protocol --dport 53 -j $target")
             }
         }
 
@@ -610,6 +687,35 @@ class TproxyManager internal constructor(
             appUid: Int,
         ): List<String> = buildList {
             add("$tool -t mangle -N $chain")
+            addAll(guardRuleCommands(tool, chain, plan, appUid))
+            add("$tool -t mangle -I OUTPUT 1 -j $chain")
+        }
+
+        private fun guardRefreshCommands(
+            tool: String,
+            chain: String,
+            plan: TproxyTrafficPlan,
+            appUid: Int,
+        ): List<String> = buildList {
+            add("$tool -t mangle -D OUTPUT -j $chain")
+            add("$tool -t mangle -F $chain")
+            addAll(guardRuleCommands(tool, chain, plan, appUid))
+            add("$tool -t mangle -I OUTPUT 1 -j $chain")
+        }
+
+        private fun guardRuleCommands(
+            tool: String,
+            chain: String,
+            plan: TproxyTrafficPlan,
+            appUid: Int,
+        ): List<String> = buildList {
+            val state = plan.runtimeState
+            add(
+                "$tool -t mangle -A $chain -m owner --gid-owner $appUid " +
+                    "-m mark --mark ${hex(state.markPrefix)}/${hex(state.markMask)} " +
+                    "-j MARK --set-xmark 0x0/${hex(TproxyCompatibilityDetector.GROUP_MARK_MASK)}",
+            )
+            add("$tool -t mangle -A $chain -m owner --gid-owner $appUid -j RETURN")
             add("$tool -t mangle -A $chain -m owner --uid-owner $appUid -j RETURN")
             uidRanges(plan.bypassUids - appUid).forEach { range ->
                 add("$tool -t mangle -A $chain -m owner --uid-owner ${range.asArgument()} -j RETURN")
@@ -618,7 +724,26 @@ class TproxyManager internal constructor(
                 val range = appUidRangeForProfile(profileId)
                 add("$tool -t mangle -A $chain -m owner --uid-owner ${range.asArgument()} -j DROP")
             }
-            add("$tool -t mangle -I OUTPUT 1 -j $chain")
+        }
+
+        private fun firstHookIs(tool: String, table: String, hook: String, target: String): String = "[ \"\$($tool -t $table -S $hook | grep '^-A $hook ' | head -n 1)\" = " +
+            "${shellQuote("-A $hook -j $target")} ]"
+
+        private fun exactChain(
+            tool: String,
+            table: String,
+            chain: String,
+            ruleCommands: List<String>,
+        ): String {
+            val prefix = "$tool -t $table "
+            val expected = buildList {
+                add("-N $chain")
+                ruleCommands.forEach { command ->
+                    require(command.startsWith(prefix))
+                    add(command.removePrefix(prefix))
+                }
+            }.joinToString("\n")
+            return "actual=\$($tool -t $table -S $chain) && [ \"\$actual\" = ${shellQuote(expected)} ]"
         }
 
         private fun guardCleanupCommands(tool: String, chain: String): List<String> = listOf(

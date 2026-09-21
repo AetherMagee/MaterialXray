@@ -240,7 +240,6 @@ internal interface TproxyRoutingGateway {
     suspend fun update(plan: TproxyTrafficPlan, currentSlot: String): TunManager.RoutingResult
     suspend fun verify(state: TproxyRuntimeState): TunManager.RoutingResult
     suspend fun removeGuard(): Boolean
-    suspend fun hasGuard(state: TproxyRuntimeState?): Boolean
 }
 
 internal class TproxyManagerRoutingGateway(
@@ -299,7 +298,6 @@ internal class TproxyManagerRoutingGateway(
     override suspend fun update(plan: TproxyTrafficPlan, currentSlot: String): TunManager.RoutingResult = manager.update(plan, currentSlot)
     override suspend fun verify(state: TproxyRuntimeState): TunManager.RoutingResult = manager.verify(state)
     override suspend fun removeGuard(): Boolean = manager.removeGuard()
-    override suspend fun hasGuard(state: TproxyRuntimeState?): Boolean = manager.hasGuard(state)
 
     private companion object {
         const val TPROXY_ROUTE_TABLE_OFFSET = 200

@@ -267,7 +267,7 @@ class TproxyCompatibilityDetector @Inject constructor(
                 if (allowIpv6) {
                     addAll(ipv6ProbeCommands(chains, table, priority, prefixHex, groupHex, maskHex, groupMaskHex, appUid))
                 } else {
-                    addAll(ipv6BlockingProbeCommands(chains))
+                    addAll(ipv6BlockingProbeCommands(chains, prefixHex, maskHex, groupMaskHex, appUid))
                 }
                 add("cleanup")
                 resources.forEach { resource ->
@@ -365,9 +365,9 @@ class TproxyCompatibilityDetector @Inject constructor(
                     "-j TPROXY --on-ip $onIp --on-port 9 --tproxy-mark $groupHex/$groupMaskHex || fail tproxy4",
                 "$IPTABLES -t mangle -N ${chains.ipv4Output} || fail iptables",
                 "$IPTABLES -t mangle -A ${chains.ipv4Output} -j RETURN || fail iptables",
-                "$IPTABLES -t mangle -A ${chains.ipv4Output} -m owner --gid-owner $appUid -j RETURN || fail owner",
                 "$IPTABLES -t mangle -A ${chains.ipv4Output} -m owner --gid-owner $appUid " +
                     "-m mark --mark $prefixHex/$maskHex -j MARK --set-xmark 0x0/$groupMaskHex || fail mark",
+                "$IPTABLES -t mangle -A ${chains.ipv4Output} -m owner --gid-owner $appUid -j RETURN || fail owner",
                 "$IPTABLES -t mangle -A ${chains.ipv4Output} -m owner --uid-owner 0-1 -j RETURN || fail owner",
                 "$IPTABLES -t mangle -A ${chains.ipv4Output} $localMatch -p tcp --dport 9 -j DROP || fail iptables",
                 "$IPTABLES -t mangle -A ${chains.ipv4Output} $localMatch -p udp --dport 9 -j DROP || fail iptables",
@@ -407,9 +407,9 @@ class TproxyCompatibilityDetector @Inject constructor(
                 "-j TPROXY --on-ip :: --on-port 9 --tproxy-mark $groupHex/$groupMaskHex || fail tproxy6",
             "$IP6TABLES -t mangle -N ${chains.ipv6Output} || fail tproxy6",
             "$IP6TABLES -t mangle -A ${chains.ipv6Output} -j RETURN || fail tproxy6",
-            "$IP6TABLES -t mangle -A ${chains.ipv6Output} -m owner --gid-owner $appUid -j RETURN || fail tproxy6",
             "$IP6TABLES -t mangle -A ${chains.ipv6Output} -m owner --gid-owner $appUid " +
                 "-m mark --mark $prefixHex/$maskHex -j MARK --set-xmark 0x0/$groupMaskHex || fail tproxy6",
+            "$IP6TABLES -t mangle -A ${chains.ipv6Output} -m owner --gid-owner $appUid -j RETURN || fail tproxy6",
             "$IP6TABLES -t mangle -A ${chains.ipv6Output} -m owner --uid-owner 0-1 -j RETURN || fail tproxy6",
             "$IP6TABLES -t mangle -A ${chains.ipv6Output} -o lo " +
                 "-p tcp --dport 9 -j DROP || fail tproxy6",
@@ -430,9 +430,18 @@ class TproxyCompatibilityDetector @Inject constructor(
             "ip -6 route get 2001:db8::1 mark $groupHex | grep -q 'dev lo' || fail route6",
         )
 
-        private fun ipv6BlockingProbeCommands(chains: ProbeChains): List<String> = listOf(
+        private fun ipv6BlockingProbeCommands(
+            chains: ProbeChains,
+            prefixHex: String,
+            maskHex: String,
+            groupMaskHex: String,
+            appUid: Int,
+        ): List<String> = listOf(
             "$IP6TABLES -t mangle -N ${chains.ipv6Output} || fail ipv6block",
             "$IP6TABLES -t mangle -A ${chains.ipv6Output} -j RETURN || fail ipv6block",
+            "$IP6TABLES -t mangle -A ${chains.ipv6Output} -m owner --gid-owner $appUid " +
+                "-m mark --mark $prefixHex/$maskHex -j MARK --set-xmark 0x0/$groupMaskHex || fail owner",
+            "$IP6TABLES -t mangle -A ${chains.ipv6Output} -m owner --gid-owner $appUid -j RETURN || fail owner",
             "$IP6TABLES -t mangle -A ${chains.ipv6Output} -m owner --uid-owner 0-1 -j RETURN || fail ipv6block",
             "$IP6TABLES -t mangle -A ${chains.ipv6Output} -m owner --uid-owner 0-1 -j DROP || fail ipv6block",
             "$IP6TABLES -t mangle -I OUTPUT 1 -j ${chains.ipv6Output} || fail ipv6block",
@@ -464,7 +473,7 @@ class TproxyCompatibilityDetector @Inject constructor(
     }
 }
 
-private const val TPROXY_CACHE_VERSION = "3"
+private const val TPROXY_CACHE_VERSION = "4"
 
 internal fun encodeCachedTproxyCompatibility(result: TproxyCompatibility): String? = when {
     result is TproxyCompatibility.Supported ->
