@@ -17,7 +17,7 @@
 
 ## Get started
 
-You'll need Android 9 or newer on an arm64 device, plus a proxy server or subscription of your own. Material Xray is a client, not a service that provides servers.
+You'll need Android 7.0 or newer on an arm64 device, plus a proxy server or subscription of your own. Material Xray is a client, not a service that provides servers.
 
 1. Download the APK from the [latest release](https://github.com/AetherMagee/MaterialXray/releases/latest) and install it. Android may ask you to allow installation from your browser or file manager.
 2. Open the app and choose **Add new server or subscription**. Paste a link, scan a QR code, or enter it manually.

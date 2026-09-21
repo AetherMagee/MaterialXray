@@ -22,6 +22,7 @@ sqlite-jdbc = "3.53.4.0"
 androidx-test = "1.7.0"
 sentry = "8.56.0"
 sentry-gradle = "6.22.0"
+desugar-jdk-libs = "2.1.5"
 
 [libraries]
 compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "compose-bom" }
@@ -69,6 +70,7 @@ junit = { group = "junit", name = "junit", version = "4.13.2" }
 sqlite-jdbc = { group = "org.xerial", name = "sqlite-jdbc", version.ref = "sqlite-jdbc" }
 androidx-test-runner = { group = "androidx.test", name = "runner", version.ref = "androidx-test" }
 sentry-android = { group = "io.sentry", name = "sentry-android", version.ref = "sentry" }
+desugar-jdk-libs-nio = { group = "com.android.tools", name = "desugar_jdk_libs_nio", version.ref = "desugar-jdk-libs" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

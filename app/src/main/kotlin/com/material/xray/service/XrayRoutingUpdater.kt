@@ -1,5 +1,6 @@
 package com.material.xray.service
 
+import com.material.xray.core.process.RedirectedProcess
 import com.material.xray.core.xray.XRAY_API_TIMEOUT_MS
 import com.material.xray.core.xray.XrayApiEndpoint
 import com.material.xray.core.xray.cliServerAddress
@@ -54,15 +55,14 @@ internal class XrayCliRoutingUpdater(
                 )
             }
             outputFile = File.createTempFile("routing-update-", ".log", workingDirectory)
-            val process = ProcessBuilder(buildXrayRoutingCommand(executable, server, inputFile.absolutePath))
+            val processBuilder = ProcessBuilder(buildXrayRoutingCommand(executable, server, inputFile.absolutePath))
                 .directory(workingDirectory)
                 .redirectErrorStream(true)
-                .redirectOutput(outputFile)
                 .apply {
                     environment()["xray.location.asset"] = workingDirectory.absolutePath
                     environment()["XRAY_LOCATION_ASSET"] = workingDirectory.absolutePath
                 }
-                .start()
+            val process = RedirectedProcess.start(processBuilder, outputFile, append = false)
 
             if (!process.waitFor(PROCESS_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
                 process.destroyForcibly()

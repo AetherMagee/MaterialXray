@@ -147,7 +147,7 @@ android {
 
     defaultConfig {
         applicationId = "com.material.xray"
-        minSdk = 28
+        minSdk = 24
         targetSdk = 36
         versionCode = 802
         versionName = "0.8.2"
@@ -187,6 +187,10 @@ android {
 
     buildFeatures {
         compose = true
+    }
+
+    compileOptions {
+        isCoreLibraryDesugaringEnabled = true
     }
 
     lint {
@@ -307,6 +311,8 @@ protobuf {
 }
 
 dependencies {
+    coreLibraryDesugaring(libs.desugar.jdk.libs.nio)
+
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.material3)
     implementation(libs.compose.ui)

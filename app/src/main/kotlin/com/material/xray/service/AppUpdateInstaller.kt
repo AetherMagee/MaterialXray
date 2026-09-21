@@ -2,6 +2,7 @@ package com.material.xray.service
 
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.provider.Settings
 import androidx.core.content.FileProvider
 import androidx.core.net.toUri
@@ -98,14 +99,19 @@ class AppUpdateInstaller @Inject constructor(
     }
 
     fun resumePendingInstall() {
-        if (!waitingForInstallPermission || !context.packageManager.canRequestPackageInstalls()) return
+        if (!waitingForInstallPermission || !canRequestPackageInstalls()) return
         waitingForInstallPermission = false
         updateFile.takeIf(File::isFile)?.let(::launchPackageInstaller)
     }
 
     fun confirmInstallPermissionRationale() {
         _installPermissionRationaleRequired.value = false
-        context.startActivity(installPermissionIntent())
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            context.startActivity(installPermissionIntent())
+        } else {
+            waitingForInstallPermission = false
+            updateFile.takeIf(File::isFile)?.let(::launchPackageInstaller)
+        }
     }
 
     fun dismissInstallPermissionRationale() {
@@ -218,7 +224,7 @@ class AppUpdateInstaller @Inject constructor(
     }
 
     private fun requestInstall(apk: File) {
-        if (!context.packageManager.canRequestPackageInstalls()) {
+        if (!canRequestPackageInstalls()) {
             waitingForInstallPermission = true
             _installPermissionRationaleRequired.value = true
             return
@@ -229,6 +235,9 @@ class AppUpdateInstaller @Inject constructor(
         )
         launchPackageInstaller(apk)
     }
+
+    private fun canRequestPackageInstalls(): Boolean = Build.VERSION.SDK_INT < Build.VERSION_CODES.O ||
+        context.packageManager.canRequestPackageInstalls()
 
     private fun launchPackageInstaller(apk: File) {
         val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", apk)

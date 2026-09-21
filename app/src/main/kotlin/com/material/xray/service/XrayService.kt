@@ -1545,7 +1545,11 @@ class XrayService : VpnService() {
         val connectivityManager = getSystemService(ConnectivityManager::class.java)
         val callbackHandler = Handler(mainLooper)
         val defaultRegistered = registerNetworkWatcher("default") { callback ->
-            connectivityManager.registerDefaultNetworkCallback(callback, callbackHandler)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                connectivityManager.registerDefaultNetworkCallback(callback, callbackHandler)
+            } else {
+                connectivityManager.registerDefaultNetworkCallback(callback)
+            }
         }
 
         val physicalNetworkRequest = NetworkRequest.Builder()
@@ -1553,7 +1557,11 @@ class XrayService : VpnService() {
             .addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
             .build()
         val physicalRegistered = registerNetworkWatcher("physical") { callback ->
-            connectivityManager.registerNetworkCallback(physicalNetworkRequest, callback, callbackHandler)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                connectivityManager.registerNetworkCallback(physicalNetworkRequest, callback, callbackHandler)
+            } else {
+                connectivityManager.registerNetworkCallback(physicalNetworkRequest, callback)
+            }
         }
         networkCallbacksAvailable = defaultRegistered || physicalRegistered
     }
@@ -2252,6 +2260,8 @@ class XrayService : VpnService() {
     }
 
     private fun createNotificationChannel() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+
         val channel = NotificationChannel(
             CHANNEL_ID,
             localizedString(R.string.notification_channel_service),
@@ -2395,23 +2405,26 @@ class XrayService : VpnService() {
                 action = ACTION_CONNECT
                 putExtra(EXTRA_SERVER_CONFIG, Json.encodeToString(ServerConfig.serializer(), serverConfig))
             }
-            context.startForegroundService(intent)
+            ContextCompat.startForegroundService(context, intent)
         }
 
         fun autoConnect(context: Context) {
-            context.startForegroundService(
+            ContextCompat.startForegroundService(
+                context,
                 Intent(context, XrayService::class.java).setAction(ACTION_AUTO_CONNECT),
             )
         }
 
         fun recoverAfterPackageReplacement(context: Context) {
-            context.startForegroundService(
+            ContextCompat.startForegroundService(
+                context,
                 Intent(context, XrayService::class.java).setAction(ACTION_RECOVER_AFTER_PACKAGE_REPLACEMENT),
             )
         }
 
         fun switchServer(context: Context) {
-            context.startForegroundService(
+            ContextCompat.startForegroundService(
+                context,
                 Intent(context, XrayService::class.java).setAction(ACTION_SWITCH_SERVER),
             )
         }
@@ -2443,7 +2456,8 @@ class XrayService : VpnService() {
         }
 
         fun restoreStatus(context: Context) {
-            context.startForegroundService(
+            ContextCompat.startForegroundService(
+                context,
                 Intent(context, XrayService::class.java).setAction(ACTION_RESTORE_STATUS),
             )
         }

@@ -2,6 +2,8 @@ package com.material.xray.core.root
 
 import android.os.Process as AndroidProcess
 import android.util.Log
+import com.material.xray.core.process.destroyForciblyCompat
+import com.material.xray.core.process.isAliveCompat
 import java.io.BufferedReader
 import java.io.OutputStreamWriter
 import java.util.concurrent.LinkedBlockingQueue
@@ -116,7 +118,7 @@ class RootShell(
 
     fun close() {
         closeGeneration.incrementAndGet()
-        runCatching { process?.destroyForcibly() }
+        runCatching { process?.destroyForciblyCompat() }
         if (!lock.tryLock()) return
         try {
             closeInternal()
@@ -141,7 +143,7 @@ class RootShell(
             val rootProcess = ProcessBuilder("su").redirectErrorStream(false).start()
             process = rootProcess
             if (closeGeneration.get() != expectedGeneration) {
-                rootProcess.destroyForcibly()
+                rootProcess.destroyForciblyCompat()
                 process = null
                 return false
             }
@@ -272,7 +274,7 @@ class RootShell(
         return Result(exitCode, outputLines.joinToString("\n"), errorOutput)
     }
 
-    private fun isShellReady(): Boolean = process?.isAlive == true && stdoutPump?.isAlive == true
+    private fun isShellReady(): Boolean = process?.isAliveCompat() == true && stdoutPump?.isAlive == true
 
     private fun startStreamPump(
         name: String,
@@ -301,7 +303,7 @@ class RootShell(
             stdin?.write("exit\n")
             stdin?.flush()
         }
-        runCatching { process?.destroyForcibly() }
+        runCatching { process?.destroyForciblyCompat() }
         stdoutPump?.interrupt()
         stderrPump?.interrupt()
         process = null

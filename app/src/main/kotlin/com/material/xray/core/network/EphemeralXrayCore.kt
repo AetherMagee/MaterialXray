@@ -1,6 +1,7 @@
 package com.material.xray.core.network
 
 import android.content.Context
+import com.material.xray.core.process.RedirectedProcess
 import com.material.xray.core.xray.XRAY_API_LOOPBACK_ADDRESS
 import com.material.xray.core.xray.XrayBinary
 import com.material.xray.core.xray.XrayInbound
@@ -70,7 +71,7 @@ class EphemeralXrayCore @Inject constructor(
     }
 
     private inner class RunningCore(
-        private val process: Process,
+        private val process: RedirectedProcess,
         val inbound: XrayInbound.Http,
         private val files: List<File>,
     ) {
@@ -93,7 +94,7 @@ class EphemeralXrayCore @Inject constructor(
         val configFile = workDir.resolve("xray-$runId.json")
         val logFile = workDir.resolve("xray-$runId.log")
 
-        var process: Process? = null
+        var process: RedirectedProcess? = null
         var started = false
         try {
             val inbound = XrayInbound.Http(
@@ -106,6 +107,7 @@ class EphemeralXrayCore @Inject constructor(
             val spawned = startProcess(binaryPath, binDir, configFile, logFile)
             process = spawned
             if (!waitForLocalPort(inbound.port, spawned, startTimeoutMs)) {
+                spawned.awaitOutput()
                 val tail = runCatching { logFile.readText().takeLast(LOG_TAIL_CHARS).trim() }.getOrDefault("")
                 throw EphemeralXrayCoreException(
                     if (tail.isBlank()) "Xray core did not start" else "Xray core did not start: $tail",
@@ -149,15 +151,16 @@ class EphemeralXrayCore @Inject constructor(
         binDir: File,
         configFile: File,
         logFile: File,
-    ): Process = ProcessBuilder(binaryPath, "run", "-c", configFile.absolutePath)
-        .directory(binDir)
-        .redirectErrorStream(true)
-        .redirectOutput(ProcessBuilder.Redirect.appendTo(logFile))
-        .apply {
-            environment()["xray.location.asset"] = binDir.absolutePath
-            environment()["XRAY_LOCATION_ASSET"] = binDir.absolutePath
-        }
-        .start()
+    ): RedirectedProcess {
+        val builder = ProcessBuilder(binaryPath, "run", "-c", configFile.absolutePath)
+            .directory(binDir)
+            .redirectErrorStream(true)
+            .apply {
+                environment()["xray.location.asset"] = binDir.absolutePath
+                environment()["XRAY_LOCATION_ASSET"] = binDir.absolutePath
+            }
+        return RedirectedProcess.start(builder, logFile, append = true)
+    }
 
     private fun buildProxyClient(inbound: XrayInbound.Http): OkHttpClient {
         val credential = Credentials.basic(inbound.username, inbound.password)
@@ -181,11 +184,11 @@ class EphemeralXrayCore @Inject constructor(
         return bytes.joinToString("") { "%02x".format(it) }
     }
 
-    private suspend fun waitForLocalPort(port: Int, process: Process, timeoutMs: Long): Boolean {
+    private suspend fun waitForLocalPort(port: Int, process: RedirectedProcess, timeoutMs: Long): Boolean {
         var elapsedMs = 0L
         while (elapsedMs <= timeoutMs) {
             currentCoroutineContext().ensureActive()
-            if (!process.isAlive) return false
+            if (!process.isAlive()) return false
             if (canConnectLocalPort(port)) return true
             delay(POLL_INTERVAL_MS)
             elapsedMs += POLL_INTERVAL_MS
@@ -210,15 +213,15 @@ class EphemeralXrayCore @Inject constructor(
         socket.localPort
     }
 
-    private suspend fun stopProcess(process: Process) {
-        if (process.isAlive) {
+    private suspend fun stopProcess(process: RedirectedProcess) {
+        if (process.isAlive()) {
             process.destroy()
             var elapsedMs = 0L
-            while (process.isAlive && elapsedMs <= STOP_TIMEOUT_MS) {
+            while (process.isAlive() && elapsedMs <= STOP_TIMEOUT_MS) {
                 delay(STOP_POLL_INTERVAL_MS)
                 elapsedMs += STOP_POLL_INTERVAL_MS
             }
-            if (process.isAlive) process.destroyForcibly()
+            if (process.isAlive()) process.destroyForcibly()
         }
         runCatching { process.waitFor(WAIT_TIMEOUT_MS, TimeUnit.MILLISECONDS) }
     }

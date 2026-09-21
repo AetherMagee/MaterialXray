@@ -2,6 +2,8 @@ package com.material.xray.core.xray
 
 import android.content.Context
 import android.os.Build
+import com.material.xray.core.process.destroyForciblyCompat
+import com.material.xray.core.process.waitForCompat
 import java.io.File
 import java.io.InputStream
 import java.util.concurrent.TimeUnit
@@ -88,8 +90,8 @@ class XrayBinary internal constructor(
                 }
                 .start()
 
-            if (!process.waitFor(VERSION_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
-                process.destroyForcibly()
+            if (!process.waitForCompat(VERSION_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+                process.destroyForciblyCompat()
                 return@runCatching null
             }
 

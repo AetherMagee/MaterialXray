@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.os.Build
 import android.os.PowerManager
+import androidx.core.content.pm.PackageInfoCompat
 import com.material.xray.data.repository.SettingsRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
@@ -40,7 +41,7 @@ class StartupDiagnosticsLogger @Inject constructor(
         val runtimeSettings = settingsRepository.runtimeSettingsSnapshot()
         val snapshot = StartupDiagnosticSnapshot(
             appVersion = packageInfo.versionName.orEmpty(),
-            appVersionCode = packageInfo.longVersionCode,
+            appVersionCode = PackageInfoCompat.getLongVersionCode(packageInfo),
             debugBuild = context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0,
             manufacturer = Build.MANUFACTURER,
             brand = Build.BRAND,

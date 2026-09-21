@@ -65,14 +65,16 @@ class AppUpdateNotifier @Inject constructor(
         if (!canPostNotifications()) return false
 
         val notificationManager = context.getSystemService(NotificationManager::class.java)
-        val channel = NotificationChannel(
-            CHANNEL_ID,
-            context.localizedString(R.string.notification_channel_app_updates),
-            NotificationManager.IMPORTANCE_DEFAULT,
-        )
-        notificationManager.createNotificationChannel(channel)
-        if (notificationManager.getNotificationChannel(CHANNEL_ID)?.importance == NotificationManager.IMPORTANCE_NONE) {
-            return false
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                CHANNEL_ID,
+                context.localizedString(R.string.notification_channel_app_updates),
+                NotificationManager.IMPORTANCE_DEFAULT,
+            )
+            notificationManager.createNotificationChannel(channel)
+            if (notificationManager.getNotificationChannel(CHANNEL_ID)?.importance == NotificationManager.IMPORTANCE_NONE) {
+                return false
+            }
         }
 
         val openAppIntent = context.packageManager.getLaunchIntentForPackage(context.packageName) ?: Intent()
