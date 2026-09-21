@@ -18,10 +18,12 @@ import com.material.xray.ui.settings.SettingsDataState
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 
 @HiltAndroidApp
 class MaterialXrayApp : Application() {
@@ -64,6 +66,10 @@ class MaterialXrayApp : Application() {
         // summaries. Initializing afterwards would race that first snapshot on API <= 32.
         initializeAppLocales(this)
         super.onCreate()
+        val diagnosticsEnabled = runBlocking(Dispatchers.IO) {
+            settingsRepository.diagnosticsEnabled.first()
+        }
+        telemetryReporter.setEnabled(diagnosticsEnabled)
         appScope.launch {
             settingsRepository.diagnosticsEnabled.collectLatest(telemetryReporter::setEnabled)
         }

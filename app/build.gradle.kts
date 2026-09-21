@@ -106,6 +106,13 @@ val releaseStorePassword = providers.environmentVariable("RELEASE_STORE_PASSWORD
     .orNull
     ?: localProperty("releaseStorePassword")
 val sentryAuthToken = providers.environmentVariable("SENTRY_AUTH_TOKEN").filter { it.isNotBlank() }
+val requestedReleaseArtifact = gradle.startParameter.taskNames.any { requestedTask ->
+    val taskName = requestedTask.substringAfterLast(':')
+    taskName == "assembleRelease" || taskName == "bundleRelease"
+}
+if (requestedReleaseArtifact && !sentryAuthToken.isPresent) {
+    throw GradleException("SENTRY_AUTH_TOKEN is required to build a release artifact with symbolication support")
+}
 val hasReleaseSigning = listOf(
     releaseKeystorePath,
     releaseKeyAlias,
@@ -202,6 +209,8 @@ sentry {
     }
     autoUploadProguardMapping.set(sentryAuthToken.map { true }.orElse(false))
     includeSourceContext.set(sentryAuthToken.map { true }.orElse(false))
+    uploadNativeSymbols.set(sentryAuthToken.map { true }.orElse(false))
+    includeNativeSources.set(sentryAuthToken.map { true }.orElse(false))
 }
 
 // Room exports one JSON schema per database version. They are committed so that
