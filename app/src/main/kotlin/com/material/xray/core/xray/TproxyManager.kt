@@ -38,7 +38,7 @@ class TproxyManager internal constructor(
 
     suspend fun installGuard(plan: TproxyTrafficPlan): TunManager.RoutingResult {
         if (useIndividualCommands) return installGuardIndividually(plan, hasCompleteGuard(plan))
-        val restored = executeCommand(guardRestoreCommand(plan, appUid))
+        val restored = executeCommand(guardRestoreCommand(plan, appUid, checkSupport = !bulkRestoreSupported))
         if (restored.isSuccess) {
             bulkRestoreSupported = true
             guardCoversTethering = plan.runtimeState.tetherUpstreamInterface != null
@@ -240,7 +240,11 @@ class TproxyManager internal constructor(
             return commands.shellAnd()
         }
 
-        internal fun guardRestoreCommand(plan: TproxyTrafficPlan, appUid: Int): String {
+        internal fun guardRestoreCommand(
+            plan: TproxyTrafficPlan,
+            appUid: Int,
+            checkSupport: Boolean = true,
+        ): String {
             validatePlan(plan, appUid)
             val guard = chainNames(appUid).guard
             val restores = FirewallCommands.tools.flatMap { tool ->
@@ -265,10 +269,15 @@ class TproxyManager internal constructor(
                     }
                 }
             }
-            return "if ${FirewallCommands.restoreAvailable()}; then if ${restores.shellAnd()}; " +
+            val guardedRestore = "if ${restores.shellAnd()}; " +
                 "then ${guardPlanVerifyCommand(plan, appUid)}; else status=\$?; " +
                 "if ${guardHookVerifyCommand(plan, appUid)}; then true; else ${guardCleanupCommand(appUid)}; fi; " +
-                "exit \$status; fi; else exit 127; fi"
+                "exit \$status; fi"
+            return if (checkSupport) {
+                "if ${FirewallCommands.restoreAvailable()}; then $guardedRestore; else exit 127; fi"
+            } else {
+                guardedRestore
+            }
         }
 
         private fun routingActivationCommands(plan: TproxyTrafficPlan): List<String> {
@@ -350,8 +359,9 @@ class TproxyManager internal constructor(
                 "has_v4_order() { case \"\$newline\$v4_slot_rules\$newline\" in " +
                     "*\"\$newline\$1\$newline\$2\$newline\"*) true;; *) return 1;; esac; }",
                 "has_port() { case \"\$1\" in *\":\$2 \"*|*\".\$2 \"*) true;; *) return 1;; esac; }",
-                "tcp_listeners=\$(ss -lnt)",
-                "udp_listeners=\$(ss -lnu)",
+                "listeners=\$(ss -lntu)",
+                "tcp_listeners=\$(printf '%s\\n' \"\$listeners\" | grep '^tcp ')",
+                "udp_listeners=\$(printf '%s\\n' \"\$listeners\" | grep '^udp ')",
                 hasV4("OUTPUT -j ${names.output}"),
                 hasV4("${names.output} -j ${names.slot(state.outputChainSlot)}"),
                 hasV4("PREROUTING -j ${names.prerouting}"),

@@ -122,6 +122,78 @@ class XrayHealthWatchdogTest {
     }
 
     @Test
+    fun `structural tunnel checks run slowly but confirm failures on the next process tick`() = runTest {
+        val stateCoordinator = ConnectionStateCoordinator()
+        val probe = FakeHealthProbe(processAlive = true)
+        var tunnelChecks = 0
+        val watchdog = XrayHealthWatchdog(
+            scope = backgroundScope,
+            stateCoordinator = stateCoordinator,
+            healthProbe = probe,
+            log = LogBuffer(),
+            config = config(),
+            passiveMonitoringEnabled = { true },
+            memoryRestartThresholdMiB = { 1_000 },
+            elapsedRealtime = { testScheduler.currentTime },
+            tunnelAvailable = {
+                tunnelChecks++
+                tunnelChecks == 1
+            },
+            runtimeModeRecoveryReason = { null },
+            scheduleNetworkSafetyCheck = {},
+            recover = { _, _, _, _ -> true },
+            dispatcher = StandardTestDispatcher(testScheduler),
+        )
+        val state = connectedState(tunName = TPROXY_INTERFACE_LABEL)
+        stateCoordinator.markConnected(state)
+
+        watchdog.start(state)
+        advanceTimeBy(550)
+        runCurrent()
+        assertEquals(1, tunnelChecks)
+
+        advanceTimeBy(50)
+        runCurrent()
+        assertEquals(2, tunnelChecks)
+
+        advanceTimeBy(100)
+        runCurrent()
+        assertEquals(3, tunnelChecks)
+    }
+
+    @Test
+    fun `cheap non TPROXY tunnel checks keep the process cadence`() = runTest {
+        val stateCoordinator = ConnectionStateCoordinator()
+        var tunnelChecks = 0
+        val watchdog = XrayHealthWatchdog(
+            scope = backgroundScope,
+            stateCoordinator = stateCoordinator,
+            healthProbe = FakeHealthProbe(processAlive = true),
+            log = LogBuffer(),
+            config = config(),
+            passiveMonitoringEnabled = { true },
+            memoryRestartThresholdMiB = { 1_000 },
+            elapsedRealtime = { testScheduler.currentTime },
+            tunnelAvailable = {
+                tunnelChecks++
+                true
+            },
+            runtimeModeRecoveryReason = { null },
+            scheduleNetworkSafetyCheck = {},
+            recover = { _, _, _, _ -> true },
+            dispatcher = StandardTestDispatcher(testScheduler),
+        )
+        val state = connectedState()
+        stateCoordinator.markConnected(state)
+
+        watchdog.start(state)
+        advanceTimeBy(450)
+        runCurrent()
+
+        assertEquals(4, tunnelChecks)
+    }
+
+    @Test
     fun `restarted watchdog rejects stale result when pid is reused`() = runTest {
         val stateCoordinator = ConnectionStateCoordinator()
         val firstProbeStarted = CompletableDeferred<Unit>()
@@ -208,6 +280,7 @@ class XrayHealthWatchdogTest {
     private companion object {
         fun config() = XrayHealthWatchdogConfig(
             processIntervalMs = 100,
+            tproxyCheckIntervalMs = 500,
             memoryCheckIntervalMs = 500,
             apiProbeIntervalMs = 100,
             snapshotIntervalMs = 500,
@@ -216,10 +289,10 @@ class XrayHealthWatchdogTest {
             checkFailureLogThreshold = 3,
         )
 
-        fun connectedState() = ConnectionState.Connected(
+        fun connectedState(tunName: String = "xray0") = ConnectionState.Connected(
             serverName = "Test",
             corePid = 42,
-            tunName = "xray0",
+            tunName = tunName,
             physicalInterface = "wlan0",
         )
     }

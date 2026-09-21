@@ -321,6 +321,53 @@ class ConnectionManagerTest {
         val config = Json.parseToJsonElement(requireNotNull(harness.binary.configJson)).jsonObject
         assertTrue(config.getValue("inbounds").jsonArray.none { it.jsonObject["protocol"]?.jsonPrimitive?.content == "tun" })
         assertEquals("0.0.0.0", config.getValue("inbounds").jsonArray.single().jsonObject["listen"]?.jsonPrimitive?.content)
+        assertTrue(
+            config.getValue("outbounds").jsonArray.any { outbound ->
+                outbound.jsonObject["streamSettings"]?.jsonObject
+                    ?.get("sockopt")?.jsonObject
+                    ?.get("interface")?.jsonPrimitive?.content == "wlan0"
+            },
+        )
+    }
+
+    @Test
+    fun `local TPROXY leaves outbounds unbound and retargets without reconnect`() = runTest {
+        val harness = Harness()
+        val settings = runtimeSettings().copy(rootConnectionBackend = RootConnectionBackend.Tproxy)
+        harness.manager.connect(server(), settings, preparation = ConnectionPreparation.ReusePreparedRuntime)
+        val connected = harness.stateCoordinator.state.value as ConnectionState.Connected
+        val config = Json.parseToJsonElement(requireNotNull(harness.binary.configJson)).jsonObject
+
+        config.getValue("outbounds").jsonArray.forEach { outbound ->
+            val sockopt = outbound.jsonObject["streamSettings"]?.jsonObject?.get("sockopt")?.jsonObject
+            assertFalse(sockopt?.containsKey("interface") == true)
+        }
+
+        val route = TunManager.PhysicalRoute(dev = "rmnet0", gateway = null, table = "main")
+        assertEquals(
+            PhysicalRouteUpdateResult.Applied(route),
+            harness.manager.updatePhysicalBypassRoute(connected, route, settings),
+        )
+        assertEquals("rmnet0", harness.stateStore.state?.physicalInterface)
+    }
+
+    @Test
+    fun `tethered TPROXY requires reconnect when its upstream interface changes`() = runTest {
+        val harness = Harness()
+        val settings = runtimeSettings().copy(
+            rootConnectionBackend = RootConnectionBackend.Tproxy,
+            tunnelTetheredClients = true,
+        )
+        harness.manager.connect(server(), settings, preparation = ConnectionPreparation.ReusePreparedRuntime)
+        val connected = harness.stateCoordinator.state.value as ConnectionState.Connected
+
+        val result = harness.manager.updatePhysicalBypassRoute(
+            connected,
+            TunManager.PhysicalRoute(dev = "rmnet0", gateway = null, table = "main"),
+            settings,
+        )
+
+        assertEquals(PhysicalRouteUpdateResult.RequiresReconnect, result)
     }
 
     @Test

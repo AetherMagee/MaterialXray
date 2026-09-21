@@ -112,7 +112,7 @@ class ActiveConfigRuntimeIdentityTest {
     }
 
     @Test
-    fun `TPROXY runtime identity removes obsolete outbound socket marks`() {
+    fun `TPROXY runtime identity removes obsolete outbound routing constraints`() {
         val edited = """
             {
               "inbounds": [],
@@ -120,7 +120,10 @@ class ActiveConfigRuntimeIdentityTest {
                 {
                   "tag": "proxy",
                   "protocol": "vless",
-                  "streamSettings": {"network":"tcp","sockopt":{"mark":255,"tcpFastOpen":true}}
+                  "streamSettings": {
+                    "network":"tcp",
+                    "sockopt":{"mark":255,"interface":"wlan0","tcpFastOpen":true}
+                  }
                 }
               ]
             }
@@ -131,6 +134,7 @@ class ActiveConfigRuntimeIdentityTest {
                 configJson = edited,
                 tunName = "xray0",
                 clearOutboundMarks = true,
+                clearOutboundInterfaces = true,
             ),
         ).parse()
 
@@ -138,6 +142,7 @@ class ActiveConfigRuntimeIdentityTest {
         val streamSettings = outbound["streamSettings"]!!.jsonObject
         val sockopt = streamSettings["sockopt"]!!.jsonObject
         assertTrue("mark" !in sockopt)
+        assertTrue("interface" !in sockopt)
         assertEquals("true", sockopt["tcpFastOpen"]!!.jsonPrimitive.content)
         assertEquals("tcp", streamSettings["network"]!!.jsonPrimitive.content)
     }

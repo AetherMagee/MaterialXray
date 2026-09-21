@@ -262,7 +262,7 @@ class TproxyCompatibilityDetector @Inject constructor(
                 add("cleanup() { ${cleanup.joinToString("; ")}; }")
                 add("fail() { printf 'stage=%s\\n' \"\$1\"; cleanup; exit 1; }")
                 add("su -g $appUid 0 -c ${shellQuote("[ \"\$(id -u):\$(id -g)\" = \"0:$appUid\" ]")} || fail gid")
-                add(probeConflictCommand(resources, table, priority))
+                add(probeConflictCommand(resources, table, priority, allowIpv6))
                 addAll(ipv4ProbeCommands(chains, table, priority, prefixHex, groupHex, maskHex, groupMaskHex, appUid, allowIpv6))
                 if (allowIpv6) {
                     addAll(ipv6ProbeCommands(chains, table, priority, prefixHex, groupHex, maskHex, groupMaskHex, appUid))
@@ -332,13 +332,16 @@ class TproxyCompatibilityDetector @Inject constructor(
             resources: List<ProbeFirewallResource>,
             table: Int,
             priority: Int,
+            allowIpv6: Boolean,
         ): String {
             val conflicts = buildList {
                 resources.forEach { resource -> add("${resource.tool} -S ${resource.chain} >/dev/null 2>&1") }
                 add("[ -n \"\$(ip rule show pref $priority 2>/dev/null)\" ]")
-                add("[ -n \"\$(ip -6 rule show pref $priority 2>/dev/null)\" ]")
                 add("[ -n \"\$(ip route show table $table 2>/dev/null)\" ]")
-                add("[ -n \"\$(ip -6 route show table $table 2>/dev/null)\" ]")
+                if (allowIpv6) {
+                    add("[ -n \"\$(ip -6 rule show pref $priority 2>/dev/null)\" ]")
+                    add("[ -n \"\$(ip -6 route show table $table 2>/dev/null)\" ]")
+                }
             }
             return "if ${conflicts.joinToString(" || ")}; then printf 'stage=conflict\\n'; exit 43; fi"
         }
@@ -385,7 +388,7 @@ class TproxyCompatibilityDetector @Inject constructor(
                 "$IPTABLES -t mangle -C OUTPUT -j ${chains.ipv4Output} || fail iptables",
                 "$IPTABLES -t mangle -R ${chains.ipv4Output} 1 -j RETURN || fail iptables",
                 "ip route get 192.0.2.1 mark $groupHex | grep -q 'dev lo' || fail route4",
-                "ss -lnt >/dev/null && ss -lnu >/dev/null || fail tools",
+                "ss -lntu >/dev/null || fail tools",
             )
         }
 

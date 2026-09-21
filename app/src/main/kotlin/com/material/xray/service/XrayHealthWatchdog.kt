@@ -15,6 +15,7 @@ import kotlinx.coroutines.launch
 
 internal data class XrayHealthWatchdogConfig(
     val processIntervalMs: Long,
+    val tproxyCheckIntervalMs: Long,
     val memoryCheckIntervalMs: Long,
     val apiProbeIntervalMs: Long,
     val snapshotIntervalMs: Long,
@@ -158,9 +159,13 @@ internal class XrayHealthWatchdog(
         }
         if (!isCurrent(session)) return false
 
-        if (passiveMonitoringEnabled() && !checkTunnel(session, state, healthMonitor)) return false
-
         val now = elapsedRealtime()
+        val shouldCheckTunnel = passiveMonitoringEnabled() &&
+            (state.tunName != TPROXY_INTERFACE_LABEL || healthMonitor.shouldCheckTproxy(now))
+        if (shouldCheckTunnel && !checkTunnel(session, state, healthMonitor)) {
+            return false
+        }
+
         if (healthMonitor.shouldCheckMemory(now)) {
             val residentMemoryMb = healthProbe.readProcessResidentMemoryMb(pid)
             if (!isCurrent(session)) return false
@@ -242,6 +247,7 @@ internal class XrayHealthWatchdog(
 
     private fun healthMonitor() = LocalXrayHealthMonitor(
         memoryCheckIntervalMs = config.memoryCheckIntervalMs,
+        tproxyCheckIntervalMs = config.tproxyCheckIntervalMs,
         apiProbeIntervalMs = config.apiProbeIntervalMs,
         snapshotIntervalMs = config.snapshotIntervalMs,
         tunnelFailureThreshold = config.tunnelFailureThreshold,

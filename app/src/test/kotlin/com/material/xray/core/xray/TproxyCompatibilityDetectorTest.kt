@@ -56,7 +56,9 @@ class TproxyCompatibilityDetectorTest {
                     "-m mark --mark 0x8000000/0x18000000 -j MARK --set-xmark 0x0/0x1fe00000",
             ),
         )
-        assertTrue(command.contains("ss -lnt >/dev/null && ss -lnu >/dev/null"))
+        assertTrue(command.contains("ss -lntu >/dev/null"))
+        assertFalse(command.contains("ip -6 rule show pref"))
+        assertFalse(command.contains("ip -6 route show table"))
         assertFalse(command.contains("addrtype"))
         assertFalse(command.contains("-m socket"))
     }

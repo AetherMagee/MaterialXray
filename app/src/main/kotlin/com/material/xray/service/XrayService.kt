@@ -271,6 +271,7 @@ class XrayService : VpnService() {
             log = logBuffer,
             config = XrayHealthWatchdogConfig(
                 processIntervalMs = PROCESS_WATCHDOG_INTERVAL_MS,
+                tproxyCheckIntervalMs = TPROXY_HEALTH_CHECK_INTERVAL_MS,
                 memoryCheckIntervalMs = MEMORY_HEALTH_CHECK_INTERVAL_MS,
                 apiProbeIntervalMs = LOCAL_API_HEALTH_PROBE_INTERVAL_MS,
                 snapshotIntervalMs = LOCAL_HEALTH_SNAPSHOT_INTERVAL_MS,
@@ -1702,21 +1703,6 @@ class XrayService : VpnService() {
             return@runConnectionCommand NetworkRetargetResult.Done
         }
 
-        if (
-            shouldReconnectForNetworkChange(
-                previousInterface = latestState.physicalInterface,
-                currentInterface = currentRoute.dev,
-            )
-        ) {
-            logBuffer.append(
-                LogSource.APP,
-                "Network changed ($reason): ${describeNetworkChange(previousNetwork, currentNetwork)}, " +
-                    "${latestState.physicalInterface} -> ${currentRoute.describe()}, reconnecting...",
-            )
-            reconnectForPhysicalRouteChange(latestConfig, latestState, currentRoute)
-            return@runConnectionCommand NetworkRetargetResult.Done
-        }
-
         refreshPhysicalRoutingForNetworkChange(
             reason = reason,
             latestConfig = latestConfig,
@@ -2384,6 +2370,7 @@ class XrayService : VpnService() {
         private const val ALWAYS_ON_RETRY_DELAY_MS = 30_000L
         private const val PROCESS_RESTART_DELAY_MS = 2_000L
         private const val PROCESS_WATCHDOG_INTERVAL_MS = 10_000L
+        private const val TPROXY_HEALTH_CHECK_INTERVAL_MS = 60_000L
         private const val BALANCER_SELECTION_POLL_INTERVAL_MS = 5_000L
         private const val METRICS_PRIMING_DELAY_MS = 250L
         private const val RECONFIGURE_SETTLE_DELAY_MS = 200L
@@ -2486,11 +2473,6 @@ internal fun shouldVerifyRootRoute(
     networkChanged: Boolean,
     networkCallbacksAvailable: Boolean,
 ): Boolean = passiveHealthMonitoringEnabled || networkChanged || !networkCallbacksAvailable
-
-internal fun shouldReconnectForNetworkChange(
-    previousInterface: String,
-    currentInterface: String,
-): Boolean = currentInterface != previousInterface
 
 internal fun selectRestoredPhysicalRoute(
     state: XrayState,

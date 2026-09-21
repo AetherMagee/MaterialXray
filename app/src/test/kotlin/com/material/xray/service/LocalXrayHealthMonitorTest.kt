@@ -54,14 +54,28 @@ class LocalXrayHealthMonitorTest {
         assertTrue(monitor.shouldCheckMemory(70_000L))
     }
 
+    @Test
+    fun `tunnel checks are slow until a failure needs confirmation`() {
+        val monitor = monitor(tproxyCheckIntervalMs = 60_000L)
+
+        assertTrue(monitor.shouldCheckTproxy(10_000L))
+        monitor.recordTunnelAvailability(available = true)
+        assertFalse(monitor.shouldCheckTproxy(20_000L))
+        assertTrue(monitor.shouldCheckTproxy(70_000L))
+        monitor.recordTunnelAvailability(available = false)
+        assertTrue(monitor.shouldCheckTproxy(80_000L))
+    }
+
     private fun monitor(
         memoryCheckIntervalMs: Long = 60_000L,
+        tproxyCheckIntervalMs: Long = 60_000L,
         apiProbeIntervalMs: Long = 60_000L,
         snapshotIntervalMs: Long = 300_000L,
         tunnelFailureThreshold: Int = 2,
         apiFailureThreshold: Int = 3,
     ) = LocalXrayHealthMonitor(
         memoryCheckIntervalMs = memoryCheckIntervalMs,
+        tproxyCheckIntervalMs = tproxyCheckIntervalMs,
         apiProbeIntervalMs = apiProbeIntervalMs,
         snapshotIntervalMs = snapshotIntervalMs,
         tunnelFailureThreshold = tunnelFailureThreshold,

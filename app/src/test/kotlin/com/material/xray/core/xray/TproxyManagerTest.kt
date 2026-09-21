@@ -506,6 +506,22 @@ class TproxyManagerTest {
     }
 
     @Test
+    fun `successful guard restore capability check is reused`() = runTest {
+        val commands = mutableListOf<String>()
+        val manager = TproxyManager(APP_UID) { command ->
+            commands += command
+            RootShell.Result(0, "", "")
+        }
+
+        assertTrue(manager.installGuard(plan()).success)
+        assertTrue(manager.installGuard(plan()).success)
+
+        assertTrue(commands[0].contains("command -v iptables-restore"))
+        assertFalse(commands[1].contains("command -v iptables-restore"))
+        assertTrue(commands[1].contains("iptables-restore --noflush"))
+    }
+
+    @Test
     fun `non tether guard setup removes stale tether hooks`() {
         val restore = TproxyManager.guardRestoreCommand(plan(), APP_UID)
         val fallback = TproxyManager.guardInstallCommand(plan(), APP_UID)
@@ -655,9 +671,9 @@ class TproxyManagerTest {
                     "-j MARK --set-xmark 0x10200000/0x1fe00000",
             ),
         )
-        assertTrue(command.contains("ss -lnu"))
-        assertEquals(1, command.split("ss -lnt").size - 1)
-        assertEquals(1, command.split("ss -lnu").size - 1)
+        assertTrue(command.contains("listeners=\$(ss -lntu)"))
+        assertEquals(1, command.split("ss -lntu").size - 1)
+        assertFalse(command.contains("ss -lnu"))
         assertEquals(2, command.split("iptables -w 2 -t mangle -S").size - 1)
         assertTrue(command.contains("v4_slot_rules=\$(iptables -w 2 -t mangle -S MXOA278b)"))
         assertTrue(command.contains("*\"\$newline\$1\$newline\$2\$newline\"*"))

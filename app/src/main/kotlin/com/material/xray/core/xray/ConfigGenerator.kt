@@ -187,6 +187,7 @@ class ConfigGenerator {
         tunMtu: Int = XrayRuntimeSettings.DEFAULT_TUN_MTU,
         inbounds: List<XrayInbound>? = null,
         clearOutboundMarks: Boolean = false,
+        clearOutboundInterfaces: Boolean = false,
     ): String? {
         val original = runCatching { json.parseToJsonElement(configJson) as? JsonObject }.getOrNull() ?: return null
         val effectiveInbounds = inbounds ?: buildList {
@@ -196,9 +197,13 @@ class ConfigGenerator {
 
         val patched = original.toMutableMap()
         patched["inbounds"] = buildJsonArray { effectiveInbounds.forEach { add(it.toJson()) } }
-        if (clearOutboundMarks) {
+        if (clearOutboundMarks || clearOutboundInterfaces) {
             (original["outbounds"] as? JsonArray)?.let { outbounds ->
-                patched["outbounds"] = clearSockoptMarks(outbounds)
+                patched["outbounds"] = clearSockoptRouting(
+                    outbounds = outbounds,
+                    clearMarks = clearOutboundMarks,
+                    clearInterfaces = clearOutboundInterfaces,
+                )
             }
         }
         patched["api"] = buildStatsApi(
@@ -208,18 +213,26 @@ class ConfigGenerator {
         return json.encodeToString(JsonObject.serializer(), JsonObject(patched))
     }
 
-    private fun clearSockoptMarks(outbounds: JsonArray): JsonArray = buildJsonArray {
+    private fun clearSockoptRouting(
+        outbounds: JsonArray,
+        clearMarks: Boolean,
+        clearInterfaces: Boolean,
+    ): JsonArray = buildJsonArray {
+        val removedKeys = buildSet {
+            if (clearMarks) add("mark")
+            if (clearInterfaces) add("interface")
+        }
         outbounds.forEach { outbound ->
             val outboundObject = outbound as? JsonObject
             val streamSettings = outboundObject?.get("streamSettings") as? JsonObject
             val sockopt = streamSettings?.get("sockopt") as? JsonObject
             if (outboundObject == null || streamSettings == null || sockopt == null) {
                 add(outbound)
-            } else if ("mark" !in sockopt) {
+            } else if (sockopt.keys.none(removedKeys::contains)) {
                 add(outbound)
             } else {
                 val patchedStream = streamSettings.toMutableMap().apply {
-                    put("sockopt", JsonObject(sockopt - "mark"))
+                    put("sockopt", JsonObject(sockopt - removedKeys))
                 }
                 add(JsonObject(outboundObject.toMutableMap().apply { put("streamSettings", JsonObject(patchedStream)) }))
             }
