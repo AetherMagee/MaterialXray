@@ -79,6 +79,7 @@ class SubscriptionRepository @Inject constructor(
         name: String,
         url: String,
         preferJson: Boolean = true,
+        allowInsecureUpdates: Boolean = false,
         userAgentMode: SubscriptionUserAgentMode = SubscriptionUserAgentMode.default,
         customUserAgent: String = "",
         customHeaders: String = "",
@@ -99,6 +100,7 @@ class SubscriptionRepository @Inject constructor(
                 name = trimmedName.ifEmpty { nextFallbackName() },
                 url = trimmedUrl,
                 preferJson = preferJson,
+                allowInsecureUpdates = allowInsecureUpdates,
                 userAgentMode = userAgentMode.value,
                 customUserAgent = customUserAgent.trim().ifBlank { null },
                 customHeaders = customHeaders.trim().ifBlank { null },
@@ -183,13 +185,23 @@ class SubscriptionRepository @Inject constructor(
         identity: SubscriptionRequestIdentity,
         preferJson: Boolean,
     ): FetchedSubscription = try {
-        fetcher.fetchWithMetadata(url = url, identity = identity, preferJson = preferJson)
+        fetcher.fetchWithMetadata(
+            url = url,
+            identity = identity,
+            preferJson = preferJson,
+            allowInsecureUpdates = existing.allowInsecureUpdates,
+        )
     } catch (error: CancellationException) {
         throw error
     } catch (error: IOException) {
         val fallbackUrl = existing.fallbackRefreshUrl(url) ?: throw error
         try {
-            fetcher.fetchWithMetadata(url = fallbackUrl, identity = identity, preferJson = preferJson)
+            fetcher.fetchWithMetadata(
+                url = fallbackUrl,
+                identity = identity,
+                preferJson = preferJson,
+                allowInsecureUpdates = existing.allowInsecureUpdates,
+            )
         } catch (fallbackError: CancellationException) {
             throw fallbackError
         } catch (_: IOException) {
@@ -256,6 +268,7 @@ class SubscriptionRepository @Inject constructor(
             userAgentMode = sub.userAgentMode,
             customUserAgent = sub.customUserAgent,
             customHeaders = sub.customHeaders,
+            allowInsecureUpdates = sub.allowInsecureUpdates,
         )
         subscriptionDao.update(updated)
         updated

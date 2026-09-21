@@ -493,13 +493,22 @@ class HomeViewModel @Inject constructor(
         name: String,
         url: String,
         preferJson: Boolean,
+        allowInsecureUpdates: Boolean,
         userAgentMode: SubscriptionUserAgentMode,
         customUserAgent: String,
         customHeaders: String,
     ) {
         viewModelScope.launch {
             runSubscriptionOperation {
-                subscriptionRepo.add(name, url, preferJson, userAgentMode, customUserAgent, customHeaders)
+                subscriptionRepo.add(
+                    name = name,
+                    url = url,
+                    preferJson = preferJson,
+                    allowInsecureUpdates = allowInsecureUpdates,
+                    userAgentMode = userAgentMode,
+                    customUserAgent = customUserAgent,
+                    customHeaders = customHeaders,
+                )
             }
         }
     }
@@ -541,6 +550,7 @@ class HomeViewModel @Inject constructor(
         name: String,
         url: String,
         preferJson: Boolean,
+        allowInsecureUpdates: Boolean,
         autoUpdateIntervalHours: Int,
         userAgentMode: SubscriptionUserAgentMode,
         customUserAgent: String,
@@ -556,6 +566,7 @@ class HomeViewModel @Inject constructor(
             val hasSubscriptionChanges = name.trim() != sub.name ||
                 url.trim() != sub.url ||
                 preferJson != (sub.preferJson ?: true) ||
+                allowInsecureUpdates != sub.allowInsecureUpdates ||
                 identityChanged
             val hasIntervalChanges = normalizedIntervalHours != sub.autoUpdateIntervalHours
 
@@ -564,6 +575,7 @@ class HomeViewModel @Inject constructor(
                     subscriptionRefreshCoordinator.updateSubscription(
                         sub.copy(
                             preferJson = preferJson,
+                            allowInsecureUpdates = allowInsecureUpdates,
                             autoUpdateIntervalHours = normalizedIntervalHours,
                             userAgentMode = userAgentMode.value,
                             customUserAgent = normalizedCustomUserAgent,

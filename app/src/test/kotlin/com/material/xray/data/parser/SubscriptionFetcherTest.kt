@@ -16,8 +16,11 @@ import com.material.xray.model.SubscriptionHeader
 import com.material.xray.model.SubscriptionRequestIdentity
 import com.material.xray.model.SubscriptionUserAgentMode
 import com.material.xray.model.endpointSummary
+import java.net.InetAddress
 import java.util.Base64
 import kotlinx.coroutines.test.runTest
+import mockwebserver3.MockResponse
+import mockwebserver3.MockWebServer
 import okhttp3.Headers
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -25,6 +28,8 @@ import okhttp3.Protocol as OkHttpProtocol
 import okhttp3.Request
 import okhttp3.Response
 import okhttp3.ResponseBody.Companion.toResponseBody
+import okhttp3.tls.HandshakeCertificates
+import okhttp3.tls.HeldCertificate
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -512,6 +517,99 @@ class SubscriptionFetcherTest {
             (error as SubscriptionFetchException).reason,
         )
         assertTrue(requests.isEmpty())
+    }
+
+    @Test
+    fun `insecure updates allow cleartext subscription url`() = runTest {
+        val requests = mutableListOf<Request>()
+        val fetcher = requestAwareFetcher(requests) {
+            TestResponse("vless://uuid@example.com:443?encryption=none&type=tcp#Node", "text/plain")
+        }
+
+        val subscription = fetcher.fetchWithMetadata(
+            url = "http://subscriptions.example/sub",
+            allowInsecureUpdates = true,
+        )
+
+        assertEquals(1, subscription.configs.size)
+        assertEquals("http", requests.single().url.scheme)
+    }
+
+    @Test
+    fun `insecure updates allow an untrusted certificate for the matching host`() = runTest {
+        val certificate = HeldCertificate.Builder()
+            .addSubjectAlternativeName("localhost")
+            .build()
+        val serverCertificates = HandshakeCertificates.Builder()
+            .heldCertificate(certificate)
+            .build()
+
+        MockWebServer().use { server ->
+            server.useHttps(serverCertificates.sslSocketFactory())
+            server.enqueue(MockResponse(body = "vless://uuid@example.com:443?encryption=none&type=tcp#Node"))
+            server.start()
+
+            val subscription = SubscriptionFetcher(DirectHttpClient(OkHttpClient())).fetchWithMetadata(
+                url = server.url("/sub").toString(),
+                allowInsecureUpdates = true,
+            )
+
+            assertEquals(1, subscription.configs.size)
+        }
+    }
+
+    @Test
+    fun `strict updates reject an untrusted certificate`() = runTest {
+        val certificate = HeldCertificate.Builder()
+            .addSubjectAlternativeName("localhost")
+            .build()
+        val serverCertificates = HandshakeCertificates.Builder()
+            .heldCertificate(certificate)
+            .build()
+
+        MockWebServer().use { server ->
+            server.useHttps(serverCertificates.sslSocketFactory())
+            server.enqueue(MockResponse(body = "vless://uuid@example.com:443?encryption=none&type=tcp#Node"))
+            server.start()
+            val client = OkHttpClient.Builder()
+                .dns { listOf(InetAddress.getByName("127.0.0.1")) }
+                .build()
+
+            val error = runCatching {
+                SubscriptionFetcher(DirectHttpClient(client)).fetchWithMetadata(server.url("/sub").toString())
+            }.exceptionOrNull()
+
+            assertTrue(error is javax.net.ssl.SSLHandshakeException)
+        }
+    }
+
+    @Test
+    fun `insecure updates still reject a certificate for the wrong host`() = runTest {
+        val certificate = HeldCertificate.Builder()
+            .commonName("wrong.example")
+            .addSubjectAlternativeName("wrong.example")
+            .build()
+        val serverCertificates = HandshakeCertificates.Builder()
+            .heldCertificate(certificate)
+            .build()
+
+        MockWebServer().use { server ->
+            server.useHttps(serverCertificates.sslSocketFactory())
+            server.enqueue(MockResponse(body = "vless://uuid@example.com:443?encryption=none&type=tcp#Node"))
+            server.start()
+            val client = OkHttpClient.Builder()
+                .dns { listOf(InetAddress.getByName("127.0.0.1")) }
+                .build()
+
+            val error = runCatching {
+                SubscriptionFetcher(DirectHttpClient(client)).fetchWithMetadata(
+                    url = server.url("/sub").toString(),
+                    allowInsecureUpdates = true,
+                )
+            }.exceptionOrNull()
+
+            assertTrue(error is javax.net.ssl.SSLPeerUnverifiedException)
+        }
     }
 
     @Test

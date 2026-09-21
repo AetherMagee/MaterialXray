@@ -351,6 +351,8 @@ dependencies {
 
     testImplementation(libs.junit)
     testImplementation(libs.coroutines.test)
+    testImplementation(libs.okhttp.mockwebserver)
+    testImplementation(libs.okhttp.tls)
     testImplementation(libs.sqlite.jdbc)
     androidTestImplementation(libs.androidx.test.runner)
 }

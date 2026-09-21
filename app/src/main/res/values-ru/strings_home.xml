@@ -194,6 +194,8 @@
     <string name="home_fetch_type_compatibility">Режим совместимости</string>
     <string name="home_fetch_type_json_first_description">Сначала пробовать адрес /json, затем сохранённый URL-адрес</string>
     <string name="home_fetch_type_compatibility_description">Загружать непосредственно по сохранённому URL-адресу</string>
+    <string name="home_allow_insecure_updates">Разрешить небезопасные обновления</string>
+    <string name="home_allow_insecure_updates_description">Разрешает незашифрованный HTTP и недоверенные сертификаты HTTPS. Имя узла всё равно проверяется.</string>
     <string name="home_user_agent_example">Например: %1$s</string>
     <string name="home_field_headers">Заголовки</string>
     <string name="home_headers_example">По одному на строку, например: X-Hwid: 0123456789abcdef</string>

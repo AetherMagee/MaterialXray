@@ -32,8 +32,12 @@ import com.material.xray.model.SubscriptionRequestIdentity
 import com.material.xray.model.SubscriptionRouting
 import com.material.xray.model.SubscriptionUserAgentMode
 import java.io.IOException
+import java.security.SecureRandom
+import java.security.cert.X509Certificate
 import java.util.UUID
 import javax.inject.Inject
+import javax.net.ssl.SSLContext
+import javax.net.ssl.X509TrustManager
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -90,7 +94,15 @@ class SubscriptionFetcher @Inject constructor(
         prettyPrint = false
     }
 
-    suspend fun fetch(url: String, preferJson: Boolean = false): List<ServerConfig> = fetchWithMetadata(url, preferJson = preferJson).configs
+    suspend fun fetch(
+        url: String,
+        preferJson: Boolean = false,
+        allowInsecureUpdates: Boolean = false,
+    ): List<ServerConfig> = fetchWithMetadata(
+        url = url,
+        preferJson = preferJson,
+        allowInsecureUpdates = allowInsecureUpdates,
+    ).configs
 
     /**
      * Re-derives a [ServerConfig] from a single edited JSON config document, so a locally edited
@@ -103,23 +115,21 @@ class SubscriptionFetcher @Inject constructor(
         url: String,
         identity: SubscriptionRequestIdentity = SubscriptionRequestIdentity(),
         preferJson: Boolean = false,
+        allowInsecureUpdates: Boolean = false,
     ): FetchedSubscription {
         val normalizedUrl = url.trim()
         val httpUrl = normalizedUrl.toHttpUrlOrNull()
             ?: throw SubscriptionFetchException(SubscriptionFetchException.Reason.INVALID_URL)
-        if (!httpUrl.isHttps) {
+        if (!allowInsecureUpdates && !httpUrl.isHttps) {
             throw SubscriptionFetchException(SubscriptionFetchException.Reason.INSECURE_TRANSPORT)
         }
         return httpClient.use { baseClient ->
             withContext(Dispatchers.IO) {
-                // Subscription requests carry the subscription token plus the identity headers, so no hop
-                // may ever leave the device in cleartext. The caller cannot inspect redirect hops, because
-                // OkHttp follows them internally, so cross-protocol redirects are refused at the client
-                // level instead.
-                val client = baseClient.newBuilder()
-                    .followSslRedirects(false)
-                    .build()
-                fetchWithMetadata(client, httpUrl, normalizedUrl, identity, preferJson)
+                // Strict requests carry the subscription token plus identity headers, so no hop may leave
+                // the device in cleartext. OkHttp follows redirects internally, so enforce that boundary at
+                // the client level. The per-subscription opt-in deliberately relaxes both transport checks.
+                val client = baseClient.subscriptionClient(allowInsecureUpdates)
+                fetchWithMetadata(client, httpUrl, normalizedUrl, identity, preferJson, allowInsecureUpdates)
             }
         }
     }
@@ -130,11 +140,18 @@ class SubscriptionFetcher @Inject constructor(
         normalizedUrl: String,
         identity: SubscriptionRequestIdentity,
         preferJson: Boolean,
+        allowInsecureUpdates: Boolean,
     ): FetchedSubscription {
         if (preferJson) {
             httpUrl.jsonEndpointOrNull()?.let { jsonUrl ->
                 val jsonSubscription = try {
-                    fetchUrl(client, jsonUrl, identity, originalUrl = jsonUrl.toString())
+                    fetchUrl(
+                        client,
+                        jsonUrl,
+                        identity,
+                        originalUrl = jsonUrl.toString(),
+                        allowInsecureUpdates = allowInsecureUpdates,
+                    )
                 } catch (error: CancellationException) {
                     throw error
                 } catch (_: Exception) {
@@ -146,7 +163,13 @@ class SubscriptionFetcher @Inject constructor(
             }
         }
 
-        return fetchUrl(client, httpUrl, identity, originalUrl = normalizedUrl)
+        return fetchUrl(
+            client,
+            httpUrl,
+            identity,
+            originalUrl = normalizedUrl,
+            allowInsecureUpdates = allowInsecureUpdates,
+        )
     }
 
     private fun fetchUrl(
@@ -154,6 +177,7 @@ class SubscriptionFetcher @Inject constructor(
         httpUrl: HttpUrl,
         identity: SubscriptionRequestIdentity,
         originalUrl: String,
+        allowInsecureUpdates: Boolean,
     ): FetchedSubscription {
         val request = SubscriptionStandardHeaders.applyRequestHeaders(
             builder = Request.Builder()
@@ -162,7 +186,7 @@ class SubscriptionFetcher @Inject constructor(
         ).build()
 
         return client.newCall(request).execute().use { response ->
-            response.requireValidSubscriptionResponse()
+            response.requireValidSubscriptionResponse(allowInsecureUpdates)
 
             val resolvedUrl = response.request.url.toString()
             val bodyText = response.readSubscriptionBody()
@@ -206,10 +230,10 @@ class SubscriptionFetcher @Inject constructor(
         return SubscriptionBodyComments.parse(decoded)
     }
 
-    private fun Response.requireValidSubscriptionResponse() {
+    private fun Response.requireValidSubscriptionResponse(allowInsecureUpdates: Boolean) {
         val errorReason = when {
-            !request.url.isHttps -> SubscriptionFetchException.Reason.INSECURE_TRANSPORT
-            redirectsToCleartext() -> SubscriptionFetchException.Reason.INSECURE_TRANSPORT
+            !allowInsecureUpdates && !request.url.isHttps -> SubscriptionFetchException.Reason.INSECURE_TRANSPORT
+            !allowInsecureUpdates && redirectsToCleartext() -> SubscriptionFetchException.Reason.INSECURE_TRANSPORT
             !isSuccessful -> SubscriptionFetchException.Reason.HTTP_STATUS
             else -> null
         }
@@ -225,6 +249,19 @@ class SubscriptionFetcher @Inject constructor(
         if (!isRedirect) return false
         val location = header("Location") ?: return false
         return request.url.resolve(location)?.isHttps == false
+    }
+
+    private fun OkHttpClient.subscriptionClient(allowInsecureUpdates: Boolean): OkHttpClient {
+        val builder = newBuilder()
+            .followSslRedirects(allowInsecureUpdates)
+        if (allowInsecureUpdates) {
+            val trustManager = InsecureSubscriptionTrustManager
+            val sslContext = SSLContext.getInstance("TLS").apply {
+                init(null, arrayOf(trustManager), SecureRandom())
+            }
+            builder.sslSocketFactory(sslContext.socketFactory, trustManager)
+        }
+        return builder.build()
     }
 
     private fun Response.readSubscriptionBody(): String {
@@ -759,5 +796,13 @@ class SubscriptionFetcher @Inject constructor(
 
     private companion object {
         private val SPECIAL_OUTBOUND_PROTOCOLS = setOf("freedom", "blackhole", "dns")
+
+        private object InsecureSubscriptionTrustManager : X509TrustManager {
+            override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?) = Unit
+
+            override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?) = Unit
+
+            override fun getAcceptedIssuers(): Array<X509Certificate> = emptyArray()
+        }
     }
 }

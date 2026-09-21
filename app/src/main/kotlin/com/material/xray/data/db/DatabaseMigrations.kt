@@ -176,6 +176,9 @@ internal object DatabaseMigrations {
             "DROP TABLE subscriptions",
             "ALTER TABLE subscriptions_new RENAME TO subscriptions",
         ),
+        20 to listOf(
+            "ALTER TABLE subscriptions ADD COLUMN allowInsecureUpdates INTEGER NOT NULL DEFAULT 0",
+        ),
     )
 
     val all: Array<Migration> = sqlByStartVersion.entries

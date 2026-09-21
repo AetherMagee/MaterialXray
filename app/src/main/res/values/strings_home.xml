@@ -182,6 +182,8 @@
     <string name="home_fetch_type_compatibility">Compatibility mode</string>
     <string name="home_fetch_type_json_first_description">Try the /json endpoint first, then fall back to the saved URL</string>
     <string name="home_fetch_type_compatibility_description">Fetch directly from the saved URL</string>
+    <string name="home_allow_insecure_updates">Allow insecure updates</string>
+    <string name="home_allow_insecure_updates_description">Allow plain HTTP and untrusted HTTPS certificates. Hostnames are still verified.</string>
     <string name="home_field_user_agent" translatable="false">User-Agent</string>
     <string name="home_user_agent_example">For example: %1$s</string>
     <string name="home_user_agent_example_value" translatable="false">Happ/3.23.0</string>

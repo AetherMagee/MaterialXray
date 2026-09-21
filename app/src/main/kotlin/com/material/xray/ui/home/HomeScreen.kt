@@ -21,8 +21,10 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.LocalIndication
@@ -178,6 +180,7 @@ import com.material.xray.ui.components.DropdownOption
 import com.material.xray.ui.components.ReadOnlyDropdownField
 import com.material.xray.ui.components.ScrolledTopAppBar
 import com.material.xray.ui.components.SelectableOptionRow
+import com.material.xray.ui.components.SettingsSwitchRow
 import com.material.xray.ui.components.rememberSystemState
 import com.material.xray.ui.text.descriptionResource
 import com.material.xray.ui.text.labelResource
@@ -477,8 +480,16 @@ fun HomeScreen(
     AddSubscriptionDialogHost(
         visible = showAddDialog,
         onDismiss = { showAddDialog = false },
-        onConfirm = { name, url, preferJson, userAgentMode, customUserAgent, customHeaders ->
-            viewModel.addSubscription(name, url, preferJson, userAgentMode, customUserAgent, customHeaders)
+        onConfirm = { name, url, preferJson, allowInsecureUpdates, userAgentMode, customUserAgent, customHeaders ->
+            viewModel.addSubscription(
+                name,
+                url,
+                preferJson,
+                allowInsecureUpdates,
+                userAgentMode,
+                customUserAgent,
+                customHeaders,
+            )
             showAddDialog = false
         },
     )
@@ -528,12 +539,13 @@ fun HomeScreen(
     EditSubscriptionDialogHost(
         subscription = editingSubscription,
         onDismiss = { editingSubscriptionId = null },
-        onConfirm = { subscription, name, url, preferJson, autoUpdateIntervalHours, userAgentMode, customUserAgent, customHeaders ->
+        onConfirm = { subscription, name, url, preferJson, allowInsecureUpdates, autoUpdateIntervalHours, userAgentMode, customUserAgent, customHeaders ->
             viewModel.updateSubscription(
                 subscription,
                 name,
                 url,
                 preferJson,
+                allowInsecureUpdates,
                 autoUpdateIntervalHours,
                 userAgentMode,
                 customUserAgent,
@@ -619,7 +631,7 @@ private fun DiscardEditedActiveConfigDialogHost(
 private fun AddSubscriptionDialogHost(
     visible: Boolean,
     onDismiss: () -> Unit,
-    onConfirm: (String, String, Boolean, SubscriptionUserAgentMode, String, String) -> Unit,
+    onConfirm: (String, String, Boolean, Boolean, SubscriptionUserAgentMode, String, String) -> Unit,
 ) {
     if (!visible) return
 
@@ -1011,19 +1023,20 @@ private fun ReorderableSubscriptionList(order: SnapshotStateList<SubscriptionEnt
 private fun EditSubscriptionDialogHost(
     subscription: SubscriptionEntity?,
     onDismiss: () -> Unit,
-    onConfirm: (SubscriptionEntity, String, String, Boolean, Int, SubscriptionUserAgentMode, String, String) -> Unit,
+    onConfirm: (SubscriptionEntity, String, String, Boolean, Boolean, Int, SubscriptionUserAgentMode, String, String) -> Unit,
 ) {
     subscription ?: return
 
     EditSubscriptionDialog(
         subscription = subscription,
         onDismiss = onDismiss,
-        onConfirm = { name, url, preferJson, autoUpdateIntervalHours, userAgentMode, customUserAgent, customHeaders ->
+        onConfirm = { name, url, preferJson, allowInsecureUpdates, autoUpdateIntervalHours, userAgentMode, customUserAgent, customHeaders ->
             onConfirm(
                 subscription,
                 name,
                 url,
                 preferJson,
+                allowInsecureUpdates,
                 autoUpdateIntervalHours,
                 userAgentMode,
                 customUserAgent,
@@ -2625,12 +2638,15 @@ private fun autoUpdateIntervalLabel(intervalHours: Int): String = when (interval
 private fun EditSubscriptionDialog(
     subscription: SubscriptionEntity,
     onDismiss: () -> Unit,
-    onConfirm: (String, String, Boolean, Int, SubscriptionUserAgentMode, String, String) -> Unit,
+    onConfirm: (String, String, Boolean, Boolean, Int, SubscriptionUserAgentMode, String, String) -> Unit,
 ) {
     var advancedExpanded by rememberSaveable(subscription.id) { mutableStateOf(false) }
     var name by rememberSaveable(subscription.id) { mutableStateOf(subscription.name) }
     var url by rememberSaveable(subscription.id) { mutableStateOf(subscription.url) }
     var preferJson by rememberSaveable(subscription.id) { mutableStateOf(subscription.preferJson ?: true) }
+    var allowInsecureUpdates by rememberSaveable(subscription.id) {
+        mutableStateOf(subscription.allowInsecureUpdates)
+    }
     var autoUpdateIntervalHours by rememberSaveable(subscription.id) {
         mutableStateOf(subscription.autoUpdateIntervalHours)
     }
@@ -2646,6 +2662,7 @@ private fun EditSubscriptionDialog(
     val hasChanges = name.trim() != subscription.name ||
         url.trim() != subscription.url ||
         preferJson != (subscription.preferJson ?: true) ||
+        allowInsecureUpdates != subscription.allowInsecureUpdates ||
         autoUpdateIntervalHours != subscription.autoUpdateIntervalHours ||
         userAgentMode != SubscriptionUserAgentMode.fromValue(subscription.userAgentMode) ||
         customUserAgent.trim().ifBlank { null } != subscription.customUserAgent ||
@@ -2693,6 +2710,8 @@ private fun EditSubscriptionDialog(
                     onExpandedChange = { advancedExpanded = it },
                     preferJson = preferJson,
                     onPreferJsonChange = { preferJson = it },
+                    allowInsecureUpdates = allowInsecureUpdates,
+                    onAllowInsecureUpdatesChange = { allowInsecureUpdates = it },
                     userAgentMode = userAgentMode,
                     customUserAgent = customUserAgent,
                     customHeaders = customHeaders,
@@ -2709,6 +2728,7 @@ private fun EditSubscriptionDialog(
                         name.trim(),
                         url.trim(),
                         preferJson,
+                        allowInsecureUpdates,
                         autoUpdateIntervalHours,
                         userAgentMode,
                         customUserAgent,
@@ -2784,12 +2804,13 @@ private fun RemoveSubscriptionDialog(
 @Composable
 private fun AddSubscriptionDialog(
     onDismiss: () -> Unit,
-    onConfirm: (String, String, Boolean, SubscriptionUserAgentMode, String, String) -> Unit,
+    onConfirm: (String, String, Boolean, Boolean, SubscriptionUserAgentMode, String, String) -> Unit,
 ) {
     var advancedExpanded by rememberSaveable { mutableStateOf(false) }
     var name by rememberSaveable { mutableStateOf("") }
     var url by rememberSaveable { mutableStateOf("") }
     var preferJson by rememberSaveable { mutableStateOf(true) }
+    var allowInsecureUpdates by rememberSaveable { mutableStateOf(false) }
     var userAgentMode by rememberSaveable { mutableStateOf(SubscriptionUserAgentMode.default) }
     var customUserAgent by rememberSaveable { mutableStateOf("") }
     var customHeaders by rememberSaveable { mutableStateOf("") }
@@ -2823,6 +2844,8 @@ private fun AddSubscriptionDialog(
                     onExpandedChange = { advancedExpanded = it },
                     preferJson = preferJson,
                     onPreferJsonChange = { preferJson = it },
+                    allowInsecureUpdates = allowInsecureUpdates,
+                    onAllowInsecureUpdatesChange = { allowInsecureUpdates = it },
                     userAgentMode = userAgentMode,
                     customUserAgent = customUserAgent,
                     customHeaders = customHeaders,
@@ -2834,7 +2857,17 @@ private fun AddSubscriptionDialog(
         },
         confirmButton = {
             TextButton(
-                onClick = { onConfirm(name.trim(), url.trim(), preferJson, userAgentMode, customUserAgent, customHeaders) },
+                onClick = {
+                    onConfirm(
+                        name.trim(),
+                        url.trim(),
+                        preferJson,
+                        allowInsecureUpdates,
+                        userAgentMode,
+                        customUserAgent,
+                        customHeaders,
+                    )
+                },
                 enabled = url.isNotBlank(),
             ) {
                 Text(stringResource(R.string.home_action_add))
@@ -2854,6 +2887,8 @@ private fun SubscriptionAdvancedOptions(
     onExpandedChange: (Boolean) -> Unit,
     preferJson: Boolean,
     onPreferJsonChange: (Boolean) -> Unit,
+    allowInsecureUpdates: Boolean,
+    onAllowInsecureUpdatesChange: (Boolean) -> Unit,
     userAgentMode: SubscriptionUserAgentMode,
     customUserAgent: String,
     customHeaders: String,
@@ -2877,7 +2912,11 @@ private fun SubscriptionAdvancedOptions(
             ),
         )
     }
-    AnimatedVisibility(visible = expanded) {
+    AnimatedVisibility(
+        visible = expanded,
+        enter = fadeIn() + expandVertically(expandFrom = Alignment.Top),
+        exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut(),
+    ) {
         Column {
             Spacer(modifier = Modifier.height(8.dp))
             SubscriptionFetchTypeDropdown(
@@ -2892,6 +2931,13 @@ private fun SubscriptionAdvancedOptions(
                 onModeChange = onUserAgentModeChange,
                 onCustomUserAgentChange = onCustomUserAgentChange,
                 onCustomHeadersChange = onCustomHeadersChange,
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            SettingsSwitchRow(
+                title = stringResource(R.string.home_allow_insecure_updates),
+                description = stringResource(R.string.home_allow_insecure_updates_description),
+                checked = allowInsecureUpdates,
+                onCheckedChange = onAllowInsecureUpdatesChange,
             )
         }
     }

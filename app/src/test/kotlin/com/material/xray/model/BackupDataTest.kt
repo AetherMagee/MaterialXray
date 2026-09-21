@@ -3,6 +3,7 @@ package com.material.xray.model
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Test
 
@@ -22,6 +23,7 @@ class BackupDataTest {
         )
 
         assertNull(backup.subscriptions.single().preferJson)
+        assertFalse(backup.subscriptions.single().allowInsecureUpdates)
     }
 
     @Test
@@ -41,6 +43,25 @@ class BackupDataTest {
         val restored = json.decodeFromString<BackupData>(json.encodeToString(backup))
 
         assertEquals(false, restored.subscriptions.single().preferJson)
+    }
+
+    @Test
+    fun `backup round trip preserves insecure update preference`() {
+        val backup = BackupData(
+            subscriptions = listOf(
+                BackupData.BackupSubscription(
+                    name = "Provider",
+                    url = "https://example.com/sub",
+                    allowInsecureUpdates = true,
+                ),
+            ),
+            bypassedApps = emptyList(),
+            settings = emptyMap(),
+        )
+
+        val restored = json.decodeFromString<BackupData>(json.encodeToString(backup))
+
+        assertEquals(true, restored.subscriptions.single().allowInsecureUpdates)
     }
 
     @Test
