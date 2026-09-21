@@ -6,7 +6,9 @@ import org.gradle.api.artifacts.VersionCatalogsExtension
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.FileSystemOperations
 import org.gradle.api.file.RegularFileProperty
+import org.gradle.api.provider.Property
 import org.gradle.api.tasks.CacheableTask
+import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputDirectory
 import org.gradle.api.tasks.InputFile
 import org.gradle.api.tasks.OutputDirectory
@@ -80,6 +82,18 @@ abstract class GenerateLegalAssets @Inject constructor(
     }
 }
 
+abstract class ValidateReleaseTelemetry : DefaultTask() {
+    @get:Input
+    abstract val configured: Property<Boolean>
+
+    @TaskAction
+    fun validate() {
+        require(configured.get()) {
+            "SENTRY_AUTH_TOKEN is required to build a release artifact with symbolication support"
+        }
+    }
+}
+
 val localProperties = Properties().apply {
     val file = rootProject.file("local.properties")
     if (file.isFile) {
@@ -106,13 +120,6 @@ val releaseStorePassword = providers.environmentVariable("RELEASE_STORE_PASSWORD
     .orNull
     ?: localProperty("releaseStorePassword")
 val sentryAuthToken = providers.environmentVariable("SENTRY_AUTH_TOKEN").filter { it.isNotBlank() }
-val requestedReleaseArtifact = gradle.startParameter.taskNames.any { requestedTask ->
-    val taskName = requestedTask.substringAfterLast(':')
-    taskName == "assembleRelease" || taskName == "bundleRelease"
-}
-if (requestedReleaseArtifact && !sentryAuthToken.isPresent) {
-    throw GradleException("SENTRY_AUTH_TOKEN is required to build a release artifact with symbolication support")
-}
 val hasReleaseSigning = listOf(
     releaseKeystorePath,
     releaseKeyAlias,
@@ -121,13 +128,16 @@ val hasReleaseSigning = listOf(
 ).all { !it.isNullOrBlank() }
 val libsCatalog = extensions.getByType<VersionCatalogsExtension>().named("libs")
 val grpcVersion = libsCatalog.findVersion("grpc").get().requiredVersion
-val generateLegalAssets by tasks.registering(GenerateLegalAssets::class) {
+val generateLegalAssets = tasks.register<GenerateLegalAssets>("generateLegalAssets") {
     projectLicense.set(rootProject.layout.projectDirectory.file("LICENSE"))
     thirdPartyNotices.set(rootProject.layout.projectDirectory.file("THIRD_PARTY_NOTICES.md"))
     thirdPartyLicenses.set(rootProject.layout.projectDirectory.dir("third_party/licenses"))
     xrayLicense.set(rootProject.layout.projectDirectory.file("third_party/xray/LICENSE"))
     xrayMetadata.set(rootProject.layout.projectDirectory.dir("third_party/xray"))
     outputDirectory.set(layout.buildDirectory.dir("generated/legalAssets"))
+}
+val validateReleaseTelemetry = tasks.register<ValidateReleaseTelemetry>("validateReleaseTelemetry") {
+    configured.set(sentryAuthToken.map { true }.orElse(false))
 }
 
 android {
@@ -260,6 +270,14 @@ androidComponents {
             GenerateLegalAssets::outputDirectory,
         )
     }
+}
+
+tasks.matching { task ->
+    task.name == "assembleRelease" ||
+        task.name == "bundleRelease" ||
+        task.name.startsWith("packageRelease")
+}.configureEach {
+    dependsOn(validateReleaseTelemetry)
 }
 
 protobuf {

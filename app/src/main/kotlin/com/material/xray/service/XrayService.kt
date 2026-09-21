@@ -583,17 +583,7 @@ class XrayService : VpnService() {
         getSystemService(NotificationManager::class.java).cancel(FAILURE_NOTIFICATION_ID)
         val runtimeSettings = settingsRepo.runtimeSettingsSnapshot()
         val alwaysOnVpn = isRunningAlwaysOnVpn()
-        val connection = TelemetryConnectionContext(
-            mode = if (runtimeSettings.useRootService && !alwaysOnVpn) {
-                TelemetryServiceMode.Root
-            } else {
-                TelemetryServiceMode.Vpn
-            },
-            backend = runtimeSettings.rootConnectionBackend,
-            alwaysOnVpn = alwaysOnVpn,
-            allowIpv6 = runtimeSettings.allowIpv6,
-            bypassLan = runtimeSettings.bypassLan,
-        )
+        val connection = runtimeSettings.telemetryConnectionContext(alwaysOnVpn)
         telemetryReporter.recordConnectionAttempt(connection)
         val startedAt = SystemClock.elapsedRealtime()
         var succeeded: Boolean? = null
@@ -617,7 +607,6 @@ class XrayService : VpnService() {
             telemetryReporter.recordConnectionCompletion(
                 outcome = outcome,
                 durationMillis = SystemClock.elapsedRealtime() - startedAt,
-                connection = connection,
             )
         }
     }
@@ -708,6 +697,9 @@ class XrayService : VpnService() {
         }
         if (runtimeSettings.useRootService && !forceVpnService && !rootServiceAvailable) {
             if (runtimeSettings.rootConnectionBackend == RootConnectionBackend.Tproxy) {
+                telemetryReporter.updateConnectionContext(
+                    runtimeSettings.telemetryConnectionContext(alwaysOnVpn = false),
+                )
                 val message = localizedString(
                     R.string.connection_error_tproxy_unsupported,
                     "root access or the init network namespace is unavailable",
@@ -744,6 +736,10 @@ class XrayService : VpnService() {
                 backend = baseRuntimeSettings.rootConnectionBackend,
                 compatibility = tproxyCompatibility,
             ),
+        )
+        telemetryReporter.updateConnectionContext(
+            effectiveRuntimeSettings.telemetryConnectionContext(alwaysOnVpn = forceVpnService),
+            clearPriorFailure = runtimeSettings.useRootService && !useRootService,
         )
         if (baseRuntimeSettings.allowIpv6 && !effectiveRuntimeSettings.allowIpv6) {
             logBuffer.append(LogSource.APP, "TPROXY IPv6 is unavailable; using IPv4-only TPROXY")
@@ -2459,6 +2455,14 @@ internal fun shouldUseRootService(
     available: Boolean,
     alwaysOnVpn: Boolean,
 ): Boolean = requested && available && !alwaysOnVpn
+
+private fun XrayRuntimeSettings.telemetryConnectionContext(alwaysOnVpn: Boolean) = TelemetryConnectionContext(
+    mode = if (useRootService && !alwaysOnVpn) TelemetryServiceMode.Root else TelemetryServiceMode.Vpn,
+    backend = rootConnectionBackend,
+    alwaysOnVpn = alwaysOnVpn,
+    allowIpv6 = allowIpv6,
+    bypassLan = bypassLan,
+)
 
 internal fun activePingMethod(
     hasEditedRuntimeConfig: Boolean,

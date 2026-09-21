@@ -23,7 +23,6 @@ class TelemetryReporterTest {
         reporter.recordConnectionCompletion(
             outcome = ConnectionOutcome.Success,
             durationMillis = 25,
-            connection = connection(),
         )
 
         assertTrue(client.metrics.isEmpty())
@@ -57,7 +56,6 @@ class TelemetryReporterTest {
         reporter.recordConnectionCompletion(
             outcome = ConnectionOutcome.Failure,
             durationMillis = 25,
-            connection = connection(),
         )
 
         assertEquals(
@@ -105,7 +103,6 @@ class TelemetryReporterTest {
         reporter.recordConnectionCompletion(
             outcome = ConnectionOutcome.Interrupted,
             durationMillis = 40,
-            connection = connection(),
         )
 
         assertEquals("interrupted", client.metrics.last().attributes["outcome"])
@@ -138,7 +135,7 @@ class TelemetryReporterTest {
 
         reporter.recordConnectionStepFailure(ConnectionTelemetryStep.ActivateTproxy)
         reporter.recordConnectionStepFailure(ConnectionTelemetryStep.WaitForApi)
-        reporter.recordConnectionCompletion(ConnectionOutcome.Failure, 50, connection())
+        reporter.recordConnectionCompletion(ConnectionOutcome.Failure, 50)
 
         assertEquals(
             mapOf(
@@ -150,6 +147,30 @@ class TelemetryReporterTest {
             ),
             client.metrics.last().attributes,
         )
+    }
+
+    @Test
+    fun `root fallback records effective VPN context and clears handled failure`() {
+        val client = FakeTelemetryClient()
+        val reporter = TelemetryReporter(client).apply { setEnabled(true) }
+        reporter.recordConnectionAttempt(connection())
+        reporter.recordConnectionStepFailure(ConnectionTelemetryStep.RootAccess)
+
+        reporter.updateConnectionContext(
+            connection(
+                mode = TelemetryServiceMode.Vpn,
+                backend = RootConnectionBackend.Tun,
+            ),
+            clearPriorFailure = true,
+        )
+        reporter.recordConnectionStepFailure(ConnectionTelemetryStep.VpnInterface)
+        reporter.recordConnectionCompletion(ConnectionOutcome.Failure, 50)
+
+        assertEquals(
+            mapOf("service_mode" to "vpn", "root_backend" to "none"),
+            client.metrics.first().attributes,
+        )
+        assertEquals("vpn_interface_setup_failed", client.metrics.last().attributes["failure_reason"])
     }
 
     @Test
@@ -236,9 +257,12 @@ class TelemetryReporterTest {
         assertTrue(client.messages.single().toString().contains("secret shell output").not())
     }
 
-    private fun connection() = TelemetryConnectionContext(
-        mode = TelemetryServiceMode.Root,
-        backend = RootConnectionBackend.Tproxy,
+    private fun connection(
+        mode: TelemetryServiceMode = TelemetryServiceMode.Root,
+        backend: RootConnectionBackend = RootConnectionBackend.Tproxy,
+    ) = TelemetryConnectionContext(
+        mode = mode,
+        backend = backend,
         alwaysOnVpn = false,
         allowIpv6 = true,
         bypassLan = true,

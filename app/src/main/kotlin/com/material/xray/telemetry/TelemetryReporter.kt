@@ -181,6 +181,8 @@ class TelemetryReporter internal constructor(
     @Volatile private var enabled = false
     private val lastIssueAt = mutableMapOf<String, Long>()
     private var activeConnectionTrace: TelemetryTransaction? = null
+    private var activeConnectionContext: TelemetryConnectionContext? = null
+    private var activeConnectionAttemptCounted = false
     private var activeConnectionFailure: Pair<ConnectionFailureStage, ConnectionFailureReason>? = null
     private var connectionAttemptActive = false
 
@@ -191,6 +193,8 @@ class TelemetryReporter internal constructor(
             enabled = false
             activeConnectionTrace?.finish(TelemetryStatus.Cancelled)
             activeConnectionTrace = null
+            activeConnectionContext = null
+            activeConnectionAttemptCounted = false
             activeConnectionFailure = null
             connectionAttemptActive = false
             client.disable()
@@ -204,8 +208,9 @@ class TelemetryReporter internal constructor(
 
     @Synchronized
     fun recordConnectionAttempt(connection: TelemetryConnectionContext) {
-        count("connection.attempted", connection.metricAttributes)
         if (!enabled) return
+        activeConnectionContext = connection
+        activeConnectionAttemptCounted = false
         activeConnectionFailure = null
         connectionAttemptActive = true
         connection.scopeTags.forEach(client::setTag)
@@ -220,8 +225,9 @@ class TelemetryReporter internal constructor(
     fun recordConnectionCompletion(
         outcome: ConnectionOutcome,
         durationMillis: Long,
-        connection: TelemetryConnectionContext,
     ) {
+        val connection = activeConnectionContext ?: return
+        recordActiveConnectionAttempt()
         val attributes = connection.metricAttributes +
             ("outcome" to outcome.value) +
             failureAttributes(outcome)
@@ -235,6 +241,8 @@ class TelemetryReporter internal constructor(
             )
             activeConnectionTrace?.finish(outcome.telemetryStatus())
             activeConnectionTrace = null
+            activeConnectionContext = null
+            activeConnectionAttemptCounted = false
             activeConnectionFailure = null
             connectionAttemptActive = false
         }
@@ -301,6 +309,21 @@ class TelemetryReporter internal constructor(
         activeConnectionFailure = step.failureStage to step.failureReason
     }
 
+    @Synchronized
+    internal fun updateConnectionContext(
+        connection: TelemetryConnectionContext,
+        clearPriorFailure: Boolean = false,
+    ) {
+        if (!enabled || !connectionAttemptActive) return
+        activeConnectionContext = connection
+        if (clearPriorFailure) activeConnectionFailure = null
+        connection.scopeTags.forEach(client::setTag)
+        activeConnectionTrace?.apply {
+            connection.metricAttributes.forEach { (key, value) -> setTag(key, value.toString()) }
+        }
+        recordActiveConnectionAttempt()
+    }
+
     fun recordCoreRecovery(cause: CoreRecoveryCause, succeeded: Boolean) {
         val attributes = mapOf("cause" to cause.value, "succeeded" to succeeded)
         count("core.recovery", attributes)
@@ -326,6 +349,13 @@ class TelemetryReporter internal constructor(
     private fun count(name: String, attributes: Map<String, Any>) {
         if (!enabled) return
         client.count(name, attributes)
+    }
+
+    private fun recordActiveConnectionAttempt() {
+        if (activeConnectionAttemptCounted) return
+        val connection = activeConnectionContext ?: return
+        count("connection.attempted", connection.metricAttributes)
+        activeConnectionAttemptCounted = true
     }
 
     private fun addBreadcrumb(category: String, message: String, data: Map<String, Any>) {
