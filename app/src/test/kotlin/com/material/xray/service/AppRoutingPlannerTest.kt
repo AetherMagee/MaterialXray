@@ -86,6 +86,45 @@ class AppRoutingPlannerTest {
     }
 
     @Test
+    fun `build folds default-selected apps into the base route when requested`() = runTest {
+        val serverSpecificConfig = server("Server route", "203.0.113.7")
+        val planner = AppRoutingPlanner(
+            appBypassDao = FakeAppBypassDao(
+                listOf(
+                    assignment("default.selected", uid = 1001, excluded = false, routeMode = "default_selected"),
+                    assignment("server.specific", uid = 1002, excluded = false, serverId = SERVER_ID),
+                ),
+            ),
+            serverRepository = ServerRepository(
+                FakeServerDao(serverEntity(SERVER_ID, serverSpecificConfig)),
+            ),
+            appInventory = FakeAppInventory(
+                apps = listOf(
+                    app("default.selected", uid = 2001),
+                    app("server.specific", uid = 2002),
+                    app("unassigned", uid = 2003),
+                ),
+            ),
+            serverAddressResolver = ServerAddressResolver(),
+            log = LogBuffer(),
+        )
+
+        val plan = planner.build(
+            baseTunName = BASE_TUN,
+            baseRouteTable = BASE_TABLE,
+            includeProxyRoutes = true,
+            includeDefaultSelectedRoute = false,
+        )
+
+        assertEquals(listOf(SERVER_ID), plan.proxyServerIds)
+        assertEquals(
+            listOf(TunManager.AppTunRoute(TunManager.appTunName(BASE_TUN, 1), routeTable = 110, uids = setOf(2002))),
+            plan.tunRoutes,
+        )
+        assertEquals(listOf("app-in-$SERVER_ID"), plan.proxyRoutes.map { it.inboundTag })
+    }
+
+    @Test
     fun `build omits proxy route configs when only live routing update is needed`() = runTest {
         val planner = AppRoutingPlanner(
             appBypassDao = FakeAppBypassDao(

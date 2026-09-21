@@ -151,6 +151,7 @@ class ActiveRoutingUpdaterTest {
             baseRouteTable: Int,
             includeProxyRoutes: Boolean,
             includeTunRoutes: Boolean,
+            includeDefaultSelectedRoute: Boolean,
             defaultProxyServer: com.material.xray.model.ServerConfig?,
             allowIpv6: Boolean,
         ): AppRoutingPlan = plan

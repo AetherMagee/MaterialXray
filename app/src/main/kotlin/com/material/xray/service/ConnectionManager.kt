@@ -14,6 +14,7 @@ import com.material.xray.model.ConnectionProgress
 import com.material.xray.model.ConnectionState
 import com.material.xray.model.RootConnectionBackend
 import com.material.xray.model.ServerConfig
+import com.material.xray.model.XrayOutbound
 import com.material.xray.model.XrayRuntimeSettings
 import com.material.xray.telemetry.ConnectionTelemetryStep
 import java.io.IOException
@@ -152,6 +153,8 @@ internal class ConnectionManager(
                         baseRouteTable = routeTable,
                         includeProxyRoutes = managesSystemRouting,
                         includeTunRoutes = managesSystemRouting,
+                        includeDefaultSelectedRoute = rootBackend != RootConnectionBackend.Tproxy ||
+                            !runtimeSettings.usesProxyAsRoutingDefault(),
                         defaultProxyServer = xrayServer,
                         allowIpv6 = runtimeSettings.allowIpv6,
                     )
@@ -197,6 +200,7 @@ internal class ConnectionManager(
                 xrayServer,
                 effectiveRuntimeSettings,
                 managesSystemRouting,
+                rootBackend,
                 appRoutingPlan,
                 physicalRouteResult.route,
                 xrayApiEndpoint,
@@ -633,6 +637,7 @@ internal class ConnectionManager(
         xrayServer: ServerConfig,
         runtimeSettings: XrayRuntimeSettings,
         managesSystemRouting: Boolean,
+        rootBackend: RootConnectionBackend,
         appRoutingPlan: AppRoutingPlan,
         physicalRoute: TunManager.PhysicalRoute?,
         xrayApiEndpoint: XrayApiEndpoint,
@@ -672,6 +677,7 @@ internal class ConnectionManager(
             server = xrayServer,
             runtimeSettings = runtimeSettings,
             managesSystemRouting = managesSystemRouting,
+            rootBackend = rootBackend,
             fwmark = runtimeSettings.fwmark.takeIf { managesSystemRouting && tproxyPlan == null } ?: 0,
             appRoutingPlan = appRoutingPlan,
             physicalRoute = physicalRoute.takeUnless { localTproxy },
@@ -1234,13 +1240,19 @@ internal class ConnectionManager(
             log.append(LogSource.APP, "Live routing update requires a restart to change domain strategy")
             return false
         }
-        val nextInputs = currentInputs.copy(
-            runtimeSettings = currentInputs.runtimeSettings.copy(
-                routingRules = runtimeSettings.routingRules,
-                routingDomainMatcher = runtimeSettings.routingDomainMatcher,
-                routingFallbackOutbound = runtimeSettings.routingFallbackOutbound,
-            ),
+        val nextRuntimeSettings = currentInputs.runtimeSettings.copy(
+            routingRules = runtimeSettings.routingRules,
+            routingDomainMatcher = runtimeSettings.routingDomainMatcher,
+            routingFallbackOutbound = runtimeSettings.routingFallbackOutbound,
         )
+        if (
+            currentInputs.rootBackend == RootConnectionBackend.Tproxy &&
+            currentInputs.runtimeSettings.usesProxyAsRoutingDefault() != nextRuntimeSettings.usesProxyAsRoutingDefault()
+        ) {
+            log.append(LogSource.APP, "Live routing update requires a restart to change the TPROXY default route")
+            return false
+        }
+        val nextInputs = currentInputs.copy(runtimeSettings = nextRuntimeSettings)
         val nextConfigJson = try {
             generateXrayConfig(nextInputs)
         } catch (error: IllegalArgumentException) {
@@ -1307,6 +1319,7 @@ internal class ConnectionManager(
             baseRouteTable = runtimeSettings.routeTable,
             includeProxyRoutes = false,
             includeTunRoutes = true,
+            includeDefaultSelectedRoute = !runtimeSettings.usesProxyAsRoutingDefault(),
             allowIpv6 = runtimeSettings.allowIpv6,
         )
         if (appRoutingPlan.proxyServerIds != persistedState.appProxyServerIds) return false
@@ -1784,6 +1797,7 @@ private data class GeneratedXrayConfig(
     val server: ServerConfig,
     val runtimeSettings: XrayRuntimeSettings,
     val managesSystemRouting: Boolean,
+    val rootBackend: RootConnectionBackend,
     val fwmark: Int,
     val appRoutingPlan: AppRoutingPlan,
     val physicalRoute: TunManager.PhysicalRoute?,
@@ -1824,6 +1838,8 @@ private fun effectiveRootBackend(
     managesSystemRouting: Boolean,
     configuredBackend: RootConnectionBackend,
 ): RootConnectionBackend = if (managesSystemRouting) configuredBackend else RootConnectionBackend.Tun
+
+private fun XrayRuntimeSettings.usesProxyAsRoutingDefault(): Boolean = (routingFallbackOutbound ?: defaultOutbound) == XrayOutbound.Proxy
 
 private const val LEGACY_DEFAULT_TUN_NAME = "xray0"
 internal const val TPROXY_INTERFACE_LABEL = "TPROXY"

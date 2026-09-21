@@ -27,6 +27,7 @@ internal interface RoutingPlanBuilder {
         baseRouteTable: Int,
         includeProxyRoutes: Boolean,
         includeTunRoutes: Boolean = true,
+        includeDefaultSelectedRoute: Boolean = true,
         defaultProxyServer: ServerConfig? = null,
         allowIpv6: Boolean = false,
     ): AppRoutingPlan
@@ -44,6 +45,7 @@ internal class AppRoutingPlanner(
         baseRouteTable: Int,
         includeProxyRoutes: Boolean,
         includeTunRoutes: Boolean,
+        includeDefaultSelectedRoute: Boolean,
         defaultProxyServer: ServerConfig?,
         allowIpv6: Boolean,
     ): AppRoutingPlan {
@@ -85,6 +87,7 @@ internal class AppRoutingPlanner(
             baseTunName = baseTunName,
             baseRouteTable = baseRouteTable,
             includeProxyRoutes = includeProxyRoutes,
+            includeDefaultSelectedRoute = includeDefaultSelectedRoute,
             defaultProxyServer = defaultProxyServer,
             defaultProxyUids = defaultProxyUids,
             proxyAssignments = proxyAssignments,
@@ -98,6 +101,7 @@ internal class AppRoutingPlanner(
         baseTunName: String,
         baseRouteTable: Int,
         includeProxyRoutes: Boolean,
+        includeDefaultSelectedRoute: Boolean,
         defaultProxyServer: ServerConfig?,
         defaultProxyUids: Set<Int>,
         proxyAssignments: Map<Long, List<RoutedAppAssignment>>,
@@ -105,7 +109,7 @@ internal class AppRoutingPlanner(
     ): AppRoutingPlan {
         val routeBuilder = AppProxyRouteBuilder(baseTunName, baseRouteTable)
 
-        if (defaultProxyUids.isNotEmpty()) {
+        if (includeDefaultSelectedRoute && defaultProxyUids.isNotEmpty()) {
             addDefaultProxyRoute(routeBuilder, defaultProxyUids, includeProxyRoutes, defaultProxyServer)
         }
 

@@ -331,6 +331,83 @@ class ConnectionManagerTest {
     }
 
     @Test
+    fun `TPROXY proxy default folds default-selected apps into the base route`() = runTest {
+        val routingPlanBuilder = RecordingRoutingPlanBuilder()
+        val harness = Harness(routingPlanBuilder)
+        val settings = runtimeSettings().copy(
+            rootConnectionBackend = RootConnectionBackend.Tproxy,
+            defaultOutbound = XrayOutbound.Direct,
+            routingFallbackOutbound = XrayOutbound.Proxy,
+        )
+
+        harness.manager.connect(
+            server(),
+            settings,
+            preparation = ConnectionPreparation.ReusePreparedRuntime,
+        )
+        val connectedState = harness.stateCoordinator.state.value as ConnectionState.Connected
+
+        assertTrue(harness.manager.applyAppRoutingChanges(connectedState, settings))
+        assertEquals(listOf(false, false), routingPlanBuilder.includeDefaultSelectedRouteCalls)
+    }
+
+    @Test
+    fun `TPROXY non-proxy default keeps a separate default-selected route`() = runTest {
+        val routingPlanBuilder = RecordingRoutingPlanBuilder()
+        val harness = Harness(routingPlanBuilder)
+
+        harness.manager.connect(
+            server(),
+            runtimeSettings().copy(
+                rootConnectionBackend = RootConnectionBackend.Tproxy,
+                defaultOutbound = XrayOutbound.Proxy,
+                routingFallbackOutbound = XrayOutbound.Direct,
+            ),
+            preparation = ConnectionPreparation.ReusePreparedRuntime,
+        )
+
+        assertEquals(listOf(true), routingPlanBuilder.includeDefaultSelectedRouteCalls)
+    }
+
+    @Test
+    fun `root TUN keeps a separate default-selected route for a proxy default`() = runTest {
+        val routingPlanBuilder = RecordingRoutingPlanBuilder()
+        val harness = Harness(routingPlanBuilder)
+
+        harness.manager.connect(
+            server(),
+            runtimeSettings().copy(
+                rootConnectionBackend = RootConnectionBackend.Tun,
+                defaultOutbound = XrayOutbound.Proxy,
+            ),
+            preparation = ConnectionPreparation.ReusePreparedRuntime,
+        )
+
+        assertEquals(listOf(true), routingPlanBuilder.includeDefaultSelectedRouteCalls)
+    }
+
+    @Test
+    fun `live routing update reconnects when TPROXY default route consolidation changes`() = runTest {
+        val harness = Harness()
+        val settings = runtimeSettings().copy(rootConnectionBackend = RootConnectionBackend.Tproxy)
+        harness.manager.connect(server(), settings, preparation = ConnectionPreparation.ReusePreparedRuntime)
+        val connectedState = harness.stateCoordinator.state.value as ConnectionState.Connected
+
+        val applied = harness.manager.applyXrayRoutingChanges(
+            connectedState,
+            settings.copy(routingFallbackOutbound = XrayOutbound.Direct),
+        )
+
+        assertFalse(applied)
+        assertEquals(0, harness.xrayRoutingUpdater.calls)
+        assertTrue(
+            harness.log.entries.value.any {
+                it.message == "Live routing update requires a restart to change the TPROXY default route"
+            },
+        )
+    }
+
+    @Test
     fun `local TPROXY leaves outbounds unbound and retargets without reconnect`() = runTest {
         val harness = Harness()
         val settings = runtimeSettings().copy(rootConnectionBackend = RootConnectionBackend.Tproxy)
@@ -834,7 +911,9 @@ class ConnectionManagerTest {
         )
     }
 
-    private class Harness {
+    private class Harness(
+        routingPlanBuilder: RoutingPlanBuilder = EmptyRoutingPlanBuilder(),
+    ) {
         val environment = FakeConnectionEnvironment()
         val rootRuntime = FakeRootRuntime()
         val binary = FakeXrayBinary()
@@ -869,7 +948,7 @@ class ConnectionManagerTest {
                 rootProcess = rootProcess,
                 userProcess = userProcess,
                 diagnostics = diagnostics,
-                routingPlanBuilder = EmptyRoutingPlanBuilder(),
+                routingPlanBuilder = routingPlanBuilder,
                 activeRouting = activeRouting,
                 apiClientFactory = ConnectionApiClientFactory { endpoint ->
                     createdApiEndpoints += endpoint
@@ -1187,6 +1266,7 @@ class ConnectionManagerTest {
             baseRouteTable: Int,
             includeProxyRoutes: Boolean,
             includeTunRoutes: Boolean,
+            includeDefaultSelectedRoute: Boolean,
             defaultProxyServer: ServerConfig?,
             allowIpv6: Boolean,
         ) = AppRoutingPlan(
@@ -1196,6 +1276,29 @@ class ConnectionManagerTest {
             proxyServerIds = emptyList(),
             routeProfileIds = setOf(0),
         )
+    }
+
+    private class RecordingRoutingPlanBuilder : RoutingPlanBuilder {
+        val includeDefaultSelectedRouteCalls = mutableListOf<Boolean>()
+
+        override suspend fun build(
+            baseTunName: String,
+            baseRouteTable: Int,
+            includeProxyRoutes: Boolean,
+            includeTunRoutes: Boolean,
+            includeDefaultSelectedRoute: Boolean,
+            defaultProxyServer: ServerConfig?,
+            allowIpv6: Boolean,
+        ): AppRoutingPlan {
+            includeDefaultSelectedRouteCalls += includeDefaultSelectedRoute
+            return AppRoutingPlan(
+                directUids = emptySet(),
+                proxyRoutes = emptyList(),
+                tunRoutes = emptyList(),
+                proxyServerIds = emptyList(),
+                routeProfileIds = setOf(0),
+            )
+        }
     }
 
     private class FakeActiveRoutingController : ActiveRoutingController {
