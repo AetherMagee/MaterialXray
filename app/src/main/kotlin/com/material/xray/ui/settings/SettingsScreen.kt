@@ -51,6 +51,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -101,10 +102,13 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import com.material.xray.R
 import com.material.xray.core.locale.setAppLocales
+import com.material.xray.core.xray.GeoDataAsset
+import com.material.xray.core.xray.GeoDataDownloadProgress
 import com.material.xray.core.xray.TproxyCompatibility
 import com.material.xray.data.repository.BackupSummary
 import com.material.xray.data.repository.SettingsSnapshot
 import com.material.xray.model.AppUpdateCheckStatus
+import com.material.xray.model.GeoDataUpdateInterval
 import com.material.xray.model.LauncherIcon
 import com.material.xray.model.NotificationField
 import com.material.xray.model.NotificationSettings
@@ -183,6 +187,7 @@ private fun SettingsScreenContent(
     val tproxyCompatibility by viewModel.tproxyCompatibility.collectAsStateWithLifecycle()
     val geoipUpdating by viewModel.geoipUpdating.collectAsStateWithLifecycle()
     val geositeUpdating by viewModel.geositeUpdating.collectAsStateWithLifecycle()
+    val geoDataDownloadProgress by viewModel.geoDataDownloadProgress.collectAsStateWithLifecycle()
     val xrayCoreVersion by viewModel.xrayCoreVersion.collectAsStateWithLifecycle()
     val databaseResetting by viewModel.databaseResetting.collectAsStateWithLifecycle()
     val backupBusy by viewModel.backupBusy.collectAsStateWithLifecycle()
@@ -213,6 +218,7 @@ private fun SettingsScreenContent(
     val routingPolicyControl = settings.routingPolicyControl
     val geoipUrl = settings.geoipUrl
     val geositeUrl = settings.geositeUrl
+    val geoDataUpdateIntervalHours = settings.geoDataUpdateIntervalHours
     val latencyCheckUrl = settings.latencyCheckUrl
     val sortOutboundsByLatency = settings.sortOutboundsByLatency
     val showBothLatencyResults = settings.showBothLatencyResults
@@ -240,6 +246,9 @@ private fun SettingsScreenContent(
     }
     var editingGeoipUrl by rememberSaveable(geoipUrl) { mutableStateOf(geoipUrl) }
     var editingGeositeUrl by rememberSaveable(geositeUrl) { mutableStateOf(geositeUrl) }
+    var editingGeoDataUpdateIntervalHours by rememberSaveable(geoDataUpdateIntervalHours) {
+        mutableStateOf(geoDataUpdateIntervalHours.toString())
+    }
     var editingLatencyCheckUrl by rememberSaveable(latencyCheckUrl) { mutableStateOf(latencyCheckUrl) }
     val topAppBarScrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
     val hasTunNameChanges by remember(editingTunName, tunName) { derivedStateOf { editingTunName != tunName } }
@@ -249,6 +258,9 @@ private fun SettingsScreenContent(
     val parsedTunMtu by remember(editingTunMtu) { derivedStateOf { editingTunMtu.toIntOrNull() } }
     val parsedXrayMemoryRestartThresholdMiB by remember(editingXrayMemoryRestartThresholdMiB) {
         derivedStateOf { editingXrayMemoryRestartThresholdMiB.toIntOrNull() }
+    }
+    val parsedGeoDataUpdateIntervalHours by remember(editingGeoDataUpdateIntervalHours) {
+        derivedStateOf { editingGeoDataUpdateIntervalHours.toIntOrNull() }
     }
     val isXrayBufferSizeKiBValid by remember(parsedXrayBufferSizeKiB) {
         derivedStateOf { parsedXrayBufferSizeKiB?.let(XrayRuntimeSettings::isValidXrayBufferSizeKiB) == true }
@@ -261,6 +273,9 @@ private fun SettingsScreenContent(
             parsedXrayMemoryRestartThresholdMiB
                 ?.let(XrayRuntimeSettings::isValidXrayMemoryRestartThresholdMiB) == true
         }
+    }
+    val isGeoDataUpdateIntervalHoursValid by remember(parsedGeoDataUpdateIntervalHours) {
+        derivedStateOf { parsedGeoDataUpdateIntervalHours?.let(GeoDataUpdateInterval::isValid) == true }
     }
     val hasXrayBufferSizeKiBChanges by remember(editingXrayBufferSizeKiB, xrayBufferSizeKiB) {
         derivedStateOf { editingXrayBufferSizeKiB != xrayBufferSizeKiB.toString() }
@@ -279,6 +294,12 @@ private fun SettingsScreenContent(
     }
     val hasGeositeUrlChanges by remember(editingGeositeUrl, geositeUrl) {
         derivedStateOf { editingGeositeUrl.trim() != geositeUrl }
+    }
+    val hasGeoDataUpdateIntervalHoursChanges by remember(
+        editingGeoDataUpdateIntervalHours,
+        geoDataUpdateIntervalHours,
+    ) {
+        derivedStateOf { editingGeoDataUpdateIntervalHours != geoDataUpdateIntervalHours.toString() }
     }
     val hasLatencyCheckUrlChanges by remember(editingLatencyCheckUrl, latencyCheckUrl) {
         derivedStateOf { editingLatencyCheckUrl.trim() != latencyCheckUrl }
@@ -663,6 +684,32 @@ private fun SettingsScreenContent(
                 }
             }
 
+            item(key = "geo_data_update_interval") {
+                Column(
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    AdvancedIntegerSetting(
+                        value = editingGeoDataUpdateIntervalHours,
+                        onValueChange = { editingGeoDataUpdateIntervalHours = it },
+                        label = stringResource(R.string.settings_geo_data_update_interval_label),
+                        supportingText = stringResource(
+                            R.string.settings_geo_data_update_interval_supporting_text,
+                            GeoDataUpdateInterval.MIN_HOURS,
+                            GeoDataUpdateInterval.MAX_HOURS,
+                            GeoDataUpdateInterval.DEFAULT_HOURS,
+                        ),
+                        suffix = stringResource(R.string.settings_hours_abbreviation),
+                        isValid = isGeoDataUpdateIntervalHoursValid,
+                        hasChanges = hasGeoDataUpdateIntervalHoursChanges,
+                        onSave = {
+                            parsedGeoDataUpdateIntervalHours
+                                ?.let(viewModel::setGeoDataUpdateIntervalHours)
+                        },
+                    )
+                }
+            }
+
             item(key = "geoip") {
                 Column(
                     modifier = Modifier.padding(horizontal = 16.dp),
@@ -686,6 +733,9 @@ private fun SettingsScreenContent(
                         enabled = !geoipUpdating,
                     ) {
                         Text(stringResource(if (geoipUpdating) R.string.settings_updating else R.string.settings_update))
+                    }
+                    if (geoipUpdating) {
+                        GeoDataUpdateProgress(geoDataDownloadProgress[GeoDataAsset.GEOIP])
                     }
                 }
             }
@@ -713,6 +763,9 @@ private fun SettingsScreenContent(
                         enabled = !geositeUpdating,
                     ) {
                         Text(stringResource(if (geositeUpdating) R.string.settings_updating else R.string.settings_update))
+                    }
+                    if (geositeUpdating) {
+                        GeoDataUpdateProgress(geoDataDownloadProgress[GeoDataAsset.GEOSITE])
                     }
                 }
             }
@@ -1618,6 +1671,19 @@ private fun AdvancedIntegerSetting(
         Button(onClick = onSave, enabled = isValid) {
             Text(stringResource(R.string.settings_save))
         }
+    }
+}
+
+@Composable
+private fun GeoDataUpdateProgress(progress: GeoDataDownloadProgress?) {
+    val fraction = progress?.fraction
+    if (fraction == null) {
+        LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+    } else {
+        LinearProgressIndicator(
+            progress = { fraction },
+            modifier = Modifier.fillMaxWidth(),
+        )
     }
 }
 

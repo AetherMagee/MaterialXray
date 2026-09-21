@@ -21,6 +21,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
@@ -68,6 +69,11 @@ class MaterialXrayApp : Application() {
         appScope.launch(start = CoroutineStart.UNDISPATCHED) {
             settingsRepository.diagnosticsEnabled.collectLatest(telemetryReporter::setEnabled)
         }
+        appScope.launch(start = CoroutineStart.UNDISPATCHED) {
+            settingsRepository.geoDataUpdateIntervalHours.distinctUntilChanged().collectLatest(
+                geoDataUpdateScheduler::schedulePeriodicRefresh,
+            )
+        }
         appScope.launch {
             if (settingsRepository.autoConnect.first()) {
                 delay(STARTUP_BACKGROUND_WORK_DELAY_SECONDS * 1_000)
@@ -84,7 +90,6 @@ class MaterialXrayApp : Application() {
         }
         subscriptionUpdateScheduler.schedulePeriodicUpdates()
         subscriptionUpdateScheduler.enqueueDueCheckNow(STARTUP_BACKGROUND_WORK_DELAY_SECONDS)
-        geoDataUpdateScheduler.schedulePeriodicRefresh()
     }
 
     private companion object {

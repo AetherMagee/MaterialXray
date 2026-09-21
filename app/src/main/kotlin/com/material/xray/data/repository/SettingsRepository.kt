@@ -9,6 +9,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.material.xray.model.DnsPreset
+import com.material.xray.model.GeoDataUpdateInterval
 import com.material.xray.model.LauncherIcon
 import com.material.xray.model.NotificationField
 import com.material.xray.model.NotificationSettings
@@ -58,6 +59,7 @@ data class SettingsSnapshot(
     val routingPolicyControl: RoutingPolicyControl,
     val geoipUrl: String,
     val geositeUrl: String,
+    val geoDataUpdateIntervalHours: Int,
     val latencyCheckUrl: String,
     val sortOutboundsByLatency: Boolean,
     val showBothLatencyResults: Boolean,
@@ -97,6 +99,7 @@ class SettingsRepository @Inject constructor(
         val LAST_SERVER_ID = longPreferencesKey("last_server_id")
         val GEOIP_URL = stringPreferencesKey("geoip_url")
         val GEOSITE_URL = stringPreferencesKey("geosite_url")
+        val GEO_DATA_UPDATE_INTERVAL_HOURS = intPreferencesKey("geo_data_update_interval_hours")
         val LATENCY_CHECK_URL = stringPreferencesKey("latency_check_url")
         val DEFAULT_PING_METHOD = stringPreferencesKey("default_ping_method")
         val SORT_OUTBOUNDS_BY_LATENCY = booleanPreferencesKey("sort_outbounds_by_latency")
@@ -216,6 +219,9 @@ class SettingsRepository @Inject constructor(
             ?: prefs[LEGACY_GEO_DATA_BASE_URL]?.let { legacyBaseUrl -> appendLegacyFileName(legacyBaseUrl, "geosite.dat") }
             ?: DEFAULT_GEOSITE_URL
     }
+    val geoDataUpdateIntervalHours: Flow<Int> = store.data.map { prefs ->
+        GeoDataUpdateInterval.normalize(prefs[GEO_DATA_UPDATE_INTERVAL_HOURS])
+    }
     val latencyCheckUrl: Flow<String> = store.data.map { prefs ->
         prefs[LATENCY_CHECK_URL] ?: DEFAULT_LATENCY_CHECK_URL
     }
@@ -324,6 +330,7 @@ class SettingsRepository @Inject constructor(
             geositeUrl = prefs[GEOSITE_URL]
                 ?: prefs[LEGACY_GEO_DATA_BASE_URL]?.let { appendLegacyFileName(it, "geosite.dat") }
                 ?: DEFAULT_GEOSITE_URL,
+            geoDataUpdateIntervalHours = GeoDataUpdateInterval.normalize(prefs[GEO_DATA_UPDATE_INTERVAL_HOURS]),
             latencyCheckUrl = prefs[LATENCY_CHECK_URL] ?: DEFAULT_LATENCY_CHECK_URL,
             sortOutboundsByLatency = prefs[SORT_OUTBOUNDS_BY_LATENCY] ?: false,
             showBothLatencyResults = prefs[SHOW_BOTH_LATENCY_RESULTS] ?: false,
@@ -483,6 +490,10 @@ class SettingsRepository @Inject constructor(
         val trimmedUrl = url.trim()
         if (trimmedUrl.isEmpty()) prefs.remove(GEOSITE_URL) else prefs[GEOSITE_URL] = trimmedUrl
     }
+    suspend fun setGeoDataUpdateIntervalHours(hours: Int) {
+        require(GeoDataUpdateInterval.isValid(hours))
+        store.edit { prefs -> prefs[GEO_DATA_UPDATE_INTERVAL_HOURS] = hours }
+    }
     suspend fun setLatencyCheckUrl(url: String) = store.edit { prefs ->
         val trimmedUrl = url.trim()
         if (trimmedUrl.isEmpty()) prefs.remove(LATENCY_CHECK_URL) else prefs[LATENCY_CHECK_URL] = trimmedUrl
@@ -623,6 +634,10 @@ class SettingsRepository @Inject constructor(
             map["app_update_checks_enabled"]?.toBooleanStrictOrNull()?.let { prefs[APP_UPDATE_CHECKS_ENABLED] = it }
             map["geoip_url"]?.takeIf { it.isNotBlank() }?.let { prefs[GEOIP_URL] = it }
             map["geosite_url"]?.takeIf { it.isNotBlank() }?.let { prefs[GEOSITE_URL] = it }
+            map["geo_data_update_interval_hours"]
+                ?.toIntOrNull()
+                ?.let(GeoDataUpdateInterval::normalize)
+                ?.let { prefs[GEO_DATA_UPDATE_INTERVAL_HOURS] = it }
             map["latency_check_url"]?.takeIf { it.isNotBlank() }?.let { prefs[LATENCY_CHECK_URL] = it }
             map["default_ping_method"]?.let { prefs[DEFAULT_PING_METHOD] = PingMethod.fromValue(it).value }
             map["sort_outbounds_by_latency"]?.toBooleanStrictOrNull()?.let { prefs[SORT_OUTBOUNDS_BY_LATENCY] = it }

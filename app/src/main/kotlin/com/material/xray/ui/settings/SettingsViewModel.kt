@@ -8,6 +8,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.material.xray.R
 import com.material.xray.core.xray.GeoDataAsset
+import com.material.xray.core.xray.GeoDataManager
 import com.material.xray.core.xray.TproxyCompatibility
 import com.material.xray.data.repository.BackupManager
 import com.material.xray.data.repository.BackupSummary
@@ -16,6 +17,7 @@ import com.material.xray.data.repository.ProviderRoutingCoordinator
 import com.material.xray.data.repository.SettingsRepository
 import com.material.xray.model.AppUpdateCheckStatus
 import com.material.xray.model.ConnectionState
+import com.material.xray.model.GeoDataUpdateInterval
 import com.material.xray.model.LauncherIcon
 import com.material.xray.model.NotificationField
 import com.material.xray.model.NotificationStyle
@@ -72,6 +74,7 @@ class SettingsViewModel @Inject constructor(
     private val providerRoutingCoordinator: ProviderRoutingCoordinator,
     private val settingsRuntimeManager: SettingsRuntimeManager,
     private val oemAutostartManager: OemAutostartManager,
+    geoDataManager: GeoDataManager,
     settingsDataState: SettingsDataState,
 ) : ViewModel() {
     private val _geoipUpdating = MutableStateFlow(false)
@@ -92,6 +95,7 @@ class SettingsViewModel @Inject constructor(
     val selectedSubscriptionRequiresHwid = settingsDataState.selectedSubscriptionRequiresHardwareId
     val geoipUpdating: StateFlow<Boolean> = _geoipUpdating.asStateFlow()
     val geositeUpdating: StateFlow<Boolean> = _geositeUpdating.asStateFlow()
+    val geoDataDownloadProgress = geoDataManager.downloadProgress
     val assetUpdateEvents: Flow<AssetUpdateMessage> = _assetUpdateEvents.receiveAsFlow()
     val rootAccessDeniedEvents: Flow<Unit> = _rootAccessDeniedEvents.receiveAsFlow()
     val databaseResetEvents: Flow<Boolean> = _databaseResetEvents.receiveAsFlow()
@@ -346,6 +350,15 @@ class SettingsViewModel @Inject constructor(
 
     fun setGeoipUrl(url: String) = viewModelScope.launch { settingsRepo.setGeoipUrl(url) }
     fun setGeositeUrl(url: String) = viewModelScope.launch { settingsRepo.setGeositeUrl(url) }
+    fun setGeoDataUpdateIntervalHours(hours: Int) = viewModelScope.launch {
+        if (
+            hours == currentSettings().geoDataUpdateIntervalHours ||
+            !GeoDataUpdateInterval.isValid(hours)
+        ) {
+            return@launch
+        }
+        settingsRepo.setGeoDataUpdateIntervalHours(hours)
+    }
     fun setLatencyCheckUrl(url: String) = viewModelScope.launch { settingsRepo.setLatencyCheckUrl(url) }
     fun setSortOutboundsByLatency(enabled: Boolean) = viewModelScope.launch {
         settingsRepo.setSortOutboundsByLatency(enabled)

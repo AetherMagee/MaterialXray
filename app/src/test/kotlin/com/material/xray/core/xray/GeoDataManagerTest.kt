@@ -1,8 +1,6 @@
 package com.material.xray.core.xray
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class GeoDataManagerTest {
@@ -17,23 +15,33 @@ class GeoDataManagerTest {
     }
 
     @Test
-    fun stalenessTreatsMissingTimestampAsStale() {
-        assertTrue(isGeoDataStale(updatedAtMillis = null, nowMillis = NOW_MILLIS))
-        assertTrue(isGeoDataStale(updatedAtMillis = 0L, nowMillis = NOW_MILLIS))
+    fun combinedProgressIsWeightedByFileSize() {
+        val fraction = combinedGeoDataDownloadFraction(
+            listOf(
+                GeoDataDownloadProgress(bytesDownloaded = 25, totalBytes = 100),
+                GeoDataDownloadProgress(bytesDownloaded = 150, totalBytes = 300),
+            ),
+        )
+
+        assertEquals(0.4375f, fraction)
     }
 
     @Test
-    fun stalenessTriggersAtExactlyMaxAge() {
-        assertTrue(isGeoDataStale(updatedAtMillis = NOW_MILLIS - GEO_DATA_MAX_AGE_MS, nowMillis = NOW_MILLIS))
+    fun combinedProgressIsUnknownUntilEveryFileSizeIsKnown() {
+        val fraction = combinedGeoDataDownloadFraction(
+            listOf(
+                GeoDataDownloadProgress(bytesDownloaded = 25, totalBytes = 100),
+                GeoDataDownloadProgress(bytesDownloaded = 0, totalBytes = null),
+            ),
+        )
+
+        assertEquals(null, fraction)
     }
 
     @Test
-    fun freshnessWithinMaxAgeIsNotStale() {
-        assertFalse(isGeoDataStale(updatedAtMillis = NOW_MILLIS - GEO_DATA_MAX_AGE_MS + 1, nowMillis = NOW_MILLIS))
-        assertFalse(isGeoDataStale(updatedAtMillis = NOW_MILLIS, nowMillis = NOW_MILLIS))
-    }
-
-    private companion object {
-        const val NOW_MILLIS = 1_800_000_000_000L
+    fun downloadProgressFractionIsClamped() {
+        assertEquals(1f, GeoDataDownloadProgress(bytesDownloaded = 150, totalBytes = 100).fraction)
+        assertEquals(0f, GeoDataDownloadProgress(bytesDownloaded = -1, totalBytes = 100).fraction)
+        assertEquals(null, GeoDataDownloadProgress(bytesDownloaded = 1, totalBytes = 0).fraction)
     }
 }

@@ -7,6 +7,7 @@ import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
+import com.material.xray.model.GeoDataUpdateInterval
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
@@ -16,11 +17,13 @@ import javax.inject.Singleton
 class GeoDataUpdateScheduler @Inject constructor(
     @param:ApplicationContext private val context: Context,
 ) {
-    fun schedulePeriodicRefresh() {
+    fun schedulePeriodicRefresh(intervalHours: Int) {
+        val normalizedIntervalHours = GeoDataUpdateInterval.normalize(intervalHours).toLong()
         val request = PeriodicWorkRequestBuilder<GeoDataUpdateWorker>(
-            REPEAT_INTERVAL_HOURS,
+            normalizedIntervalHours,
             TimeUnit.HOURS,
         )
+            .setInitialDelay(normalizedIntervalHours, TimeUnit.HOURS)
             .setConstraints(networkConstraints())
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, BACKOFF_DELAY_MINUTES, TimeUnit.MINUTES)
             .build()
@@ -38,7 +41,6 @@ class GeoDataUpdateScheduler @Inject constructor(
 
     private companion object {
         const val PERIODIC_WORK_NAME = "geo_data_auto_update"
-        const val REPEAT_INTERVAL_HOURS = 24L
         const val BACKOFF_DELAY_MINUTES = 15L
     }
 }

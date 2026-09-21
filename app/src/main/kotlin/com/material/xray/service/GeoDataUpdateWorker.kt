@@ -21,7 +21,7 @@ class GeoDataUpdateWorker(
         )
 
         return runCatching {
-            entryPoint.geoDataManager().refreshIfStale()
+            entryPoint.geoDataManager().refreshForScheduledUpdate()
         }.fold(
             onSuccess = { Result.success() },
             onFailure = { Result.retry() },

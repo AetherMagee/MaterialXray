@@ -7,6 +7,8 @@ import com.material.xray.R
 import com.material.xray.core.locale.localizedString
 import com.material.xray.core.network.ServerLatencyTester
 import com.material.xray.core.xray.ActiveConfigOverrideStore
+import com.material.xray.core.xray.GeoDataManager
+import com.material.xray.core.xray.combinedGeoDataDownloadFraction
 import com.material.xray.data.db.entity.ServerEntity
 import com.material.xray.data.db.entity.SubscriptionEntity
 import com.material.xray.data.parser.SubscriptionFetchException
@@ -152,6 +154,7 @@ class HomeViewModel @Inject constructor(
     alwaysOnVpnState: AlwaysOnVpnState,
     private val routingChangeManager: RoutingChangeManager,
     private val serverLatencyTester: ServerLatencyTester,
+    geoDataManager: GeoDataManager,
 ) : ViewModel() {
     private var serverSelectionJob: Job? = null
     private var latencyJob: Job? = null
@@ -161,6 +164,9 @@ class HomeViewModel @Inject constructor(
 
     val connectionState: StateFlow<ConnectionState> = connectionStateCoordinator.state
     internal val connectionProgress = connectionStateCoordinator.connectionProgress
+    internal val geoDataDownloadFraction: StateFlow<Float?> = geoDataManager.downloadProgress
+        .map { progress -> combinedGeoDataDownloadFraction(progress.values) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
     val alwaysOnVpn: StateFlow<Boolean> = alwaysOnVpnState.active
     val connectionEvents: Flow<ConnectionEvent> = connectionStateCoordinator.events
     private val _uiEvents = Channel<HomeUiEvent>(Channel.BUFFERED)

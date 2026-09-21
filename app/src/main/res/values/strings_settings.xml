@@ -43,6 +43,9 @@
     <string name="settings_geoip_url_supporting_text">Direct URL for the geoip.dat download</string>
     <string name="settings_geosite_url_label">GeoSite URL</string>
     <string name="settings_geosite_url_supporting_text">Direct URL for the geosite.dat download</string>
+    <string name="settings_geo_data_update_interval_label">Geo data update interval</string>
+    <string name="settings_geo_data_update_interval_supporting_text">How often to check for updated GeoIP and GeoSite files. Range: %1$d–%2$d hours. Default: %3$d hours.</string>
+    <string name="settings_hours_abbreviation">h</string>
     <string name="settings_latency_check_url_label">Latency Check URL</string>
     <string name="settings_latency_check_url_supporting_text">HTTP endpoint used for node latency checks</string>
     <string name="settings_save">Save</string>

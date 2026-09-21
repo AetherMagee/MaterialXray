@@ -364,6 +364,7 @@ fun HomeScreen(
                 ConnectionPanel(
                     connectionState = uiState.connectionState,
                     connectionProgress = uiState.connectionProgress,
+                    geoDataDownloadFraction = uiState.geoDataDownloadFraction,
                     showProgressDetails = uiState.showAdvancedOptions,
                     selectedServerName = connectionUiState.displayServerName,
                     activeBalancer = uiState.activeBalancer,
@@ -1061,6 +1062,7 @@ private fun InstallPermissionRationaleDialogHost(
 private fun collectHomeUiState(viewModel: HomeViewModel): HomeUiState {
     val connectionState by viewModel.connectionState.collectAsStateWithLifecycle()
     val connectionProgress by viewModel.connectionProgress.collectAsStateWithLifecycle()
+    val geoDataDownloadFraction by viewModel.geoDataDownloadFraction.collectAsStateWithLifecycle()
     val alwaysOnVpn by viewModel.alwaysOnVpn.collectAsStateWithLifecycle()
     val selectedServer by viewModel.selectedServer.collectAsStateWithLifecycle()
     val activeBalancer by viewModel.activeBalancer.collectAsStateWithLifecycle()
@@ -1083,6 +1085,7 @@ private fun collectHomeUiState(viewModel: HomeViewModel): HomeUiState {
     return HomeUiState(
         connectionState = connectionState,
         connectionProgress = connectionProgress,
+        geoDataDownloadFraction = geoDataDownloadFraction,
         alwaysOnVpn = alwaysOnVpn,
         selectedServer = selectedServer,
         activeBalancer = activeBalancer,
@@ -1145,6 +1148,7 @@ private fun buildConnectionUiState(
 private data class HomeUiState(
     val connectionState: ConnectionState,
     val connectionProgress: ConnectionProgress?,
+    val geoDataDownloadFraction: Float?,
     val alwaysOnVpn: Boolean,
     val selectedServer: ServerConfig?,
     val activeBalancer: ActiveBalancerState?,
@@ -1183,6 +1187,7 @@ private data class ConnectionUiState(
 private fun ConnectionPanel(
     connectionState: ConnectionState,
     connectionProgress: ConnectionProgress?,
+    geoDataDownloadFraction: Float?,
     showProgressDetails: Boolean,
     selectedServerName: String,
     activeBalancer: ActiveBalancerState?,
@@ -1216,17 +1221,7 @@ private fun ConnectionPanel(
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(
-            text = when (connectionState) {
-                is ConnectionState.Connected -> stringResource(R.string.home_connection_connected)
-                is ConnectionState.Connecting -> stringResource(R.string.home_connection_connecting)
-                ConnectionState.ApplyingRoutingChanges -> stringResource(R.string.home_connection_applying_routing)
-                ConnectionState.UpdatingRoutingData -> stringResource(R.string.home_connection_updating_routing)
-                is ConnectionState.RestartRequired -> stringResource(R.string.home_connection_restart_required)
-                is ConnectionState.InterfaceBusy -> stringResource(R.string.home_connection_interface_busy)
-                is ConnectionState.Disconnecting -> stringResource(R.string.home_connection_disconnecting)
-                is ConnectionState.Error -> stringResource(R.string.home_connection_error)
-                ConnectionState.Disconnected -> stringResource(R.string.home_connection_disconnected)
-            },
+            text = connectionHeading(connectionState, geoDataDownloadFraction),
             style = MaterialTheme.typography.titleLarge,
             color = when {
                 isConnected -> MaterialTheme.colorScheme.primary
@@ -1338,6 +1333,24 @@ private fun ConnectionPanel(
 
         Spacer(modifier = Modifier.height(10.dp))
     }
+}
+
+@Composable
+private fun connectionHeading(connectionState: ConnectionState, geoDataDownloadFraction: Float?): String = when (connectionState) {
+    is ConnectionState.Connected -> stringResource(R.string.home_connection_connected)
+    is ConnectionState.Connecting -> stringResource(R.string.home_connection_connecting)
+    ConnectionState.ApplyingRoutingChanges -> stringResource(R.string.home_connection_applying_routing)
+    ConnectionState.UpdatingRoutingData -> geoDataDownloadFraction?.let { fraction ->
+        stringResource(
+            R.string.home_connection_updating_routing_percent,
+            (fraction * 100).roundToInt(),
+        )
+    } ?: stringResource(R.string.home_connection_updating_routing)
+    is ConnectionState.RestartRequired -> stringResource(R.string.home_connection_restart_required)
+    is ConnectionState.InterfaceBusy -> stringResource(R.string.home_connection_interface_busy)
+    is ConnectionState.Disconnecting -> stringResource(R.string.home_connection_disconnecting)
+    is ConnectionState.Error -> stringResource(R.string.home_connection_error)
+    ConnectionState.Disconnected -> stringResource(R.string.home_connection_disconnected)
 }
 
 internal fun ConnectionState.showsConnectionStats(): Boolean = this is ConnectionState.Connected ||

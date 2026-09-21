@@ -43,6 +43,9 @@
     <string name="settings_geoip_url_supporting_text">Прямая ссылка для скачивания geoip.dat</string>
     <string name="settings_geosite_url_label">URL-адрес GeoSite</string>
     <string name="settings_geosite_url_supporting_text">Прямая ссылка для скачивания geosite.dat</string>
+    <string name="settings_geo_data_update_interval_label">Интервал обновления геоданных</string>
+    <string name="settings_geo_data_update_interval_supporting_text">Частота проверки обновлений файлов GeoIP и GeoSite. Диапазон: %1$d–%2$d ч. По умолчанию: %3$d ч.</string>
+    <string name="settings_hours_abbreviation">ч</string>
     <string name="settings_latency_check_url_label">URL-адрес для проверки задержки</string>
     <string name="settings_latency_check_url_supporting_text">HTTP-адрес для проверки задержки узлов</string>
     <string name="settings_save">Сохранить</string>
