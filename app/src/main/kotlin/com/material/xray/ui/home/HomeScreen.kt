@@ -2627,6 +2627,7 @@ private fun EditSubscriptionDialog(
     onDismiss: () -> Unit,
     onConfirm: (String, String, Boolean, Int, SubscriptionUserAgentMode, String, String) -> Unit,
 ) {
+    var advancedExpanded by rememberSaveable(subscription.id) { mutableStateOf(false) }
     var name by rememberSaveable(subscription.id) { mutableStateOf(subscription.name) }
     var url by rememberSaveable(subscription.id) { mutableStateOf(subscription.url) }
     var preferJson by rememberSaveable(subscription.id) { mutableStateOf(subscription.preferJson ?: true) }
@@ -2673,11 +2674,6 @@ private fun EditSubscriptionDialog(
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Spacer(modifier = Modifier.height(16.dp))
-                SubscriptionFetchTypeDropdown(
-                    preferJson = preferJson,
-                    onPreferJsonChange = { preferJson = it },
-                )
-                Spacer(modifier = Modifier.height(16.dp))
                 key(subscription.id) {
                     ReadOnlyDropdownField(
                         label = stringResource(R.string.home_auto_update_label),
@@ -2691,12 +2687,16 @@ private fun EditSubscriptionDialog(
                         onSelected = { autoUpdateIntervalHours = it },
                     )
                 }
-                Spacer(modifier = Modifier.height(16.dp))
-                SubscriptionUserAgentSection(
-                    selectedMode = userAgentMode,
+                Spacer(modifier = Modifier.height(8.dp))
+                SubscriptionAdvancedOptions(
+                    expanded = advancedExpanded,
+                    onExpandedChange = { advancedExpanded = it },
+                    preferJson = preferJson,
+                    onPreferJsonChange = { preferJson = it },
+                    userAgentMode = userAgentMode,
                     customUserAgent = customUserAgent,
                     customHeaders = customHeaders,
-                    onModeChange = { userAgentMode = it },
+                    onUserAgentModeChange = { userAgentMode = it },
                     onCustomUserAgentChange = { customUserAgent = it },
                     onCustomHeadersChange = { customHeaders = it },
                 )
@@ -2818,40 +2818,18 @@ private fun AddSubscriptionDialog(
                     supportingText = { Text(stringResource(R.string.home_name_from_provider_hint)) },
                 )
                 Spacer(modifier = Modifier.height(8.dp))
-                TextButton(
-                    onClick = { advancedExpanded = !advancedExpanded },
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(
-                        text = stringResource(R.string.home_advanced),
-                        modifier = Modifier.weight(1f),
-                        textAlign = TextAlign.Start,
-                    )
-                    Icon(
-                        imageVector = if (advancedExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                        contentDescription = stringResource(
-                            if (advancedExpanded) R.string.home_collapse_advanced else R.string.home_expand_advanced,
-                        ),
-                    )
-                }
-                AnimatedVisibility(visible = advancedExpanded) {
-                    Column {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        SubscriptionFetchTypeDropdown(
-                            preferJson = preferJson,
-                            onPreferJsonChange = { preferJson = it },
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-                        SubscriptionUserAgentSection(
-                            selectedMode = userAgentMode,
-                            customUserAgent = customUserAgent,
-                            customHeaders = customHeaders,
-                            onModeChange = { userAgentMode = it },
-                            onCustomUserAgentChange = { customUserAgent = it },
-                            onCustomHeadersChange = { customHeaders = it },
-                        )
-                    }
-                }
+                SubscriptionAdvancedOptions(
+                    expanded = advancedExpanded,
+                    onExpandedChange = { advancedExpanded = it },
+                    preferJson = preferJson,
+                    onPreferJsonChange = { preferJson = it },
+                    userAgentMode = userAgentMode,
+                    customUserAgent = customUserAgent,
+                    customHeaders = customHeaders,
+                    onUserAgentModeChange = { userAgentMode = it },
+                    onCustomUserAgentChange = { customUserAgent = it },
+                    onCustomHeadersChange = { customHeaders = it },
+                )
             }
         },
         confirmButton = {
@@ -2868,6 +2846,55 @@ private fun AddSubscriptionDialog(
             }
         },
     )
+}
+
+@Composable
+private fun SubscriptionAdvancedOptions(
+    expanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
+    preferJson: Boolean,
+    onPreferJsonChange: (Boolean) -> Unit,
+    userAgentMode: SubscriptionUserAgentMode,
+    customUserAgent: String,
+    customHeaders: String,
+    onUserAgentModeChange: (SubscriptionUserAgentMode) -> Unit,
+    onCustomUserAgentChange: (String) -> Unit,
+    onCustomHeadersChange: (String) -> Unit,
+) {
+    TextButton(
+        onClick = { onExpandedChange(!expanded) },
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Text(
+            text = stringResource(R.string.home_advanced),
+            modifier = Modifier.weight(1f),
+            textAlign = TextAlign.Start,
+        )
+        Icon(
+            imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+            contentDescription = stringResource(
+                if (expanded) R.string.home_collapse_advanced else R.string.home_expand_advanced,
+            ),
+        )
+    }
+    AnimatedVisibility(visible = expanded) {
+        Column {
+            Spacer(modifier = Modifier.height(8.dp))
+            SubscriptionFetchTypeDropdown(
+                preferJson = preferJson,
+                onPreferJsonChange = onPreferJsonChange,
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            SubscriptionUserAgentSection(
+                selectedMode = userAgentMode,
+                customUserAgent = customUserAgent,
+                customHeaders = customHeaders,
+                onModeChange = onUserAgentModeChange,
+                onCustomUserAgentChange = onCustomUserAgentChange,
+                onCustomHeadersChange = onCustomHeadersChange,
+            )
+        }
+    }
 }
 
 @Composable
