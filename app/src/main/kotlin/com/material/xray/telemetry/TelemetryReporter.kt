@@ -19,32 +19,116 @@ enum class ConnectionOutcome(val value: String) {
     Interrupted("interrupted"),
 }
 
-enum class ConnectionTelemetryStep(val value: String) {
-    RefreshServerRouting("routing.server.refresh"),
-    LoadRuntimeSettings("runtime.settings.load"),
-    RootAccess("root.access"),
-    VpnInterface("vpn.interface.establish"),
-    CleanupPreviousRuntime("runtime.cleanup"),
-    DetectTunInterface("tun.interface.detect"),
-    PrepareLog("runtime.log.prepare"),
-    InstallTproxyGuard("tproxy.guard.install"),
-    PrepareApiAccess("api.access.prepare"),
-    PrepareCoreBinary("core.binary.prepare"),
-    PrepareRoutingData("routing.data.prepare"),
-    DetectPhysicalRoute("network.route.detect"),
-    ResolveServer("server.resolve"),
-    BuildAppRouting("routing.app.plan"),
-    CreateApiClients("api.clients.create"),
-    GenerateConfig("config.generate"),
-    WriteConfig("config.write"),
-    LaunchCore("core.process.launch"),
-    ConfigureTun("tun.root.configure"),
-    ActivateTproxy("tproxy.activate"),
-    WaitForApi("api.ready"),
-    VerifyTproxy("tproxy.verify"),
-    RemoveTproxyGuard("tproxy.guard.remove"),
-    ConfigureAppTun("tun.app.configure"),
-    ApplyRootRouting("routing.root.apply"),
+enum class ConnectionFailureStage(val value: String) {
+    Preparation("preparation"),
+    Cleanup("cleanup"),
+    Configuration("configuration"),
+    Core("core"),
+    Tunnel("tunnel"),
+    Routing("routing"),
+    Api("api"),
+    Unknown("unknown"),
+}
+
+enum class ConnectionFailureReason(val value: String) {
+    ServerRoutingRefreshFailed("server_routing_refresh_failed"),
+    RuntimeSettingsLoadFailed("runtime_settings_load_failed"),
+    RootAccessUnavailable("root_access_unavailable"),
+    VpnInterfaceSetupFailed("vpn_interface_setup_failed"),
+    PreviousRuntimeCleanupFailed("previous_runtime_cleanup_failed"),
+    TunInterfaceDetectionFailed("tun_interface_detection_failed"),
+    RuntimeLogPreparationFailed("runtime_log_preparation_failed"),
+    TproxyGuardInstallFailed("tproxy_guard_install_failed"),
+    ApiAccessSetupFailed("api_access_setup_failed"),
+    CoreBinarySetupFailed("core_binary_setup_failed"),
+    RoutingDataSetupFailed("routing_data_setup_failed"),
+    PhysicalRouteDetectionFailed("physical_route_detection_failed"),
+    ServerResolutionFailed("server_resolution_failed"),
+    AppRoutingPlanFailed("app_routing_plan_failed"),
+    ApiClientSetupFailed("api_client_setup_failed"),
+    ConfigGenerationFailed("config_generation_failed"),
+    ConfigWriteFailed("config_write_failed"),
+    CoreLaunchFailed("core_launch_failed"),
+    TunSetupFailed("tun_setup_failed"),
+    TproxyActivationFailed("tproxy_activation_failed"),
+    ApiReadinessFailed("api_readiness_failed"),
+    TproxyVerificationFailed("tproxy_verification_failed"),
+    TproxyGuardRemovalFailed("tproxy_guard_removal_failed"),
+    AppTunSetupFailed("app_tun_setup_failed"),
+    RootRoutingFailed("root_routing_failed"),
+    Unknown("unknown"),
+}
+
+enum class ConnectionTelemetryStep(
+    val value: String,
+    internal val failureStage: ConnectionFailureStage,
+    internal val failureReason: ConnectionFailureReason,
+) {
+    RefreshServerRouting(
+        "routing.server.refresh",
+        ConnectionFailureStage.Preparation,
+        ConnectionFailureReason.ServerRoutingRefreshFailed,
+    ),
+    LoadRuntimeSettings(
+        "runtime.settings.load",
+        ConnectionFailureStage.Preparation,
+        ConnectionFailureReason.RuntimeSettingsLoadFailed,
+    ),
+    RootAccess("root.access", ConnectionFailureStage.Preparation, ConnectionFailureReason.RootAccessUnavailable),
+    VpnInterface("vpn.interface.establish", ConnectionFailureStage.Tunnel, ConnectionFailureReason.VpnInterfaceSetupFailed),
+    CleanupPreviousRuntime(
+        "runtime.cleanup",
+        ConnectionFailureStage.Cleanup,
+        ConnectionFailureReason.PreviousRuntimeCleanupFailed,
+    ),
+    DetectTunInterface(
+        "tun.interface.detect",
+        ConnectionFailureStage.Tunnel,
+        ConnectionFailureReason.TunInterfaceDetectionFailed,
+    ),
+    PrepareLog(
+        "runtime.log.prepare",
+        ConnectionFailureStage.Preparation,
+        ConnectionFailureReason.RuntimeLogPreparationFailed,
+    ),
+    InstallTproxyGuard(
+        "tproxy.guard.install",
+        ConnectionFailureStage.Routing,
+        ConnectionFailureReason.TproxyGuardInstallFailed,
+    ),
+    PrepareApiAccess("api.access.prepare", ConnectionFailureStage.Api, ConnectionFailureReason.ApiAccessSetupFailed),
+    PrepareCoreBinary("core.binary.prepare", ConnectionFailureStage.Core, ConnectionFailureReason.CoreBinarySetupFailed),
+    PrepareRoutingData(
+        "routing.data.prepare",
+        ConnectionFailureStage.Preparation,
+        ConnectionFailureReason.RoutingDataSetupFailed,
+    ),
+    DetectPhysicalRoute(
+        "network.route.detect",
+        ConnectionFailureStage.Routing,
+        ConnectionFailureReason.PhysicalRouteDetectionFailed,
+    ),
+    ResolveServer("server.resolve", ConnectionFailureStage.Preparation, ConnectionFailureReason.ServerResolutionFailed),
+    BuildAppRouting("routing.app.plan", ConnectionFailureStage.Routing, ConnectionFailureReason.AppRoutingPlanFailed),
+    CreateApiClients("api.clients.create", ConnectionFailureStage.Api, ConnectionFailureReason.ApiClientSetupFailed),
+    GenerateConfig(
+        "config.generate",
+        ConnectionFailureStage.Configuration,
+        ConnectionFailureReason.ConfigGenerationFailed,
+    ),
+    WriteConfig("config.write", ConnectionFailureStage.Configuration, ConnectionFailureReason.ConfigWriteFailed),
+    LaunchCore("core.process.launch", ConnectionFailureStage.Core, ConnectionFailureReason.CoreLaunchFailed),
+    ConfigureTun("tun.root.configure", ConnectionFailureStage.Tunnel, ConnectionFailureReason.TunSetupFailed),
+    ActivateTproxy("tproxy.activate", ConnectionFailureStage.Routing, ConnectionFailureReason.TproxyActivationFailed),
+    WaitForApi("api.ready", ConnectionFailureStage.Api, ConnectionFailureReason.ApiReadinessFailed),
+    VerifyTproxy("tproxy.verify", ConnectionFailureStage.Routing, ConnectionFailureReason.TproxyVerificationFailed),
+    RemoveTproxyGuard(
+        "tproxy.guard.remove",
+        ConnectionFailureStage.Cleanup,
+        ConnectionFailureReason.TproxyGuardRemovalFailed,
+    ),
+    ConfigureAppTun("tun.app.configure", ConnectionFailureStage.Tunnel, ConnectionFailureReason.AppTunSetupFailed),
+    ApplyRootRouting("routing.root.apply", ConnectionFailureStage.Routing, ConnectionFailureReason.RootRoutingFailed),
 }
 
 enum class CoreRecoveryCause(val value: String) {
@@ -97,6 +181,8 @@ class TelemetryReporter internal constructor(
     @Volatile private var enabled = false
     private val lastIssueAt = mutableMapOf<String, Long>()
     private var activeConnectionTrace: TelemetryTransaction? = null
+    private var activeConnectionFailure: Pair<ConnectionFailureStage, ConnectionFailureReason>? = null
+    private var connectionAttemptActive = false
 
     @Synchronized
     fun setEnabled(enable: Boolean) {
@@ -105,6 +191,8 @@ class TelemetryReporter internal constructor(
             enabled = false
             activeConnectionTrace?.finish(TelemetryStatus.Cancelled)
             activeConnectionTrace = null
+            activeConnectionFailure = null
+            connectionAttemptActive = false
             client.disable()
             lastIssueAt.clear()
             return
@@ -118,6 +206,8 @@ class TelemetryReporter internal constructor(
     fun recordConnectionAttempt(connection: TelemetryConnectionContext) {
         count("connection.attempted", connection.metricAttributes)
         if (!enabled) return
+        activeConnectionFailure = null
+        connectionAttemptActive = true
         connection.scopeTags.forEach(client::setTag)
         addBreadcrumb("connection", "attempt", connection.metricAttributes)
         activeConnectionTrace?.finish(TelemetryStatus.Aborted)
@@ -132,7 +222,9 @@ class TelemetryReporter internal constructor(
         durationMillis: Long,
         connection: TelemetryConnectionContext,
     ) {
-        val attributes = connection.metricAttributes + ("outcome" to outcome.value)
+        val attributes = connection.metricAttributes +
+            ("outcome" to outcome.value) +
+            failureAttributes(outcome)
         count("connection.completed", attributes)
         if (enabled) {
             client.distributionMillis("connection.duration", durationMillis, attributes)
@@ -143,6 +235,8 @@ class TelemetryReporter internal constructor(
             )
             activeConnectionTrace?.finish(outcome.telemetryStatus())
             activeConnectionTrace = null
+            activeConnectionFailure = null
+            connectionAttemptActive = false
         }
     }
 
@@ -199,6 +293,12 @@ class TelemetryReporter internal constructor(
             addBreadcrumb("connection.step", step, mapOf("succeeded" to succeeded))
             span.finish(succeeded)
         }
+    }
+
+    @Synchronized
+    internal fun recordConnectionStepFailure(step: ConnectionTelemetryStep) {
+        if (!enabled || !connectionAttemptActive || activeConnectionFailure != null) return
+        activeConnectionFailure = step.failureStage to step.failureReason
     }
 
     fun recordCoreRecovery(cause: CoreRecoveryCause, succeeded: Boolean) {
@@ -264,6 +364,16 @@ class TelemetryReporter internal constructor(
         ConnectionOutcome.Success -> TelemetryStatus.Ok
         ConnectionOutcome.Failure -> TelemetryStatus.InternalError
         ConnectionOutcome.Interrupted -> TelemetryStatus.Aborted
+    }
+
+    private fun failureAttributes(outcome: ConnectionOutcome): Map<String, Any> {
+        if (outcome != ConnectionOutcome.Failure) return emptyMap()
+        val (stage, reason) = activeConnectionFailure
+            ?: (ConnectionFailureStage.Unknown to ConnectionFailureReason.Unknown)
+        return mapOf(
+            "failure_stage" to stage.value,
+            "failure_reason" to reason.value,
+        )
     }
 
     private fun ConnectionProgress.telemetryValue(): String = when (this) {

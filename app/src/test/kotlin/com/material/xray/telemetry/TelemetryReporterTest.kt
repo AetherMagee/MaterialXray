@@ -72,6 +72,8 @@ class TelemetryReporterTest {
                         "service_mode" to "root",
                         "root_backend" to "tproxy",
                         "outcome" to "failure",
+                        "failure_stage" to "unknown",
+                        "failure_reason" to "unknown",
                     ),
                 ),
             ),
@@ -85,6 +87,8 @@ class TelemetryReporterTest {
                     "service_mode" to "root",
                     "root_backend" to "tproxy",
                     "outcome" to "failure",
+                    "failure_stage" to "unknown",
+                    "failure_reason" to "unknown",
                 ),
             ),
             client.distributions.single(),
@@ -123,6 +127,28 @@ class TelemetryReporterTest {
         assertEquals(
             RecordedChildSpan("connection.step", "tproxy.activate"),
             client.transactions.single().children.single(),
+        )
+    }
+
+    @Test
+    fun `connection failure uses first specific step classification`() {
+        val client = FakeTelemetryClient()
+        val reporter = TelemetryReporter(client).apply { setEnabled(true) }
+        reporter.recordConnectionAttempt(connection())
+
+        reporter.recordConnectionStepFailure(ConnectionTelemetryStep.ActivateTproxy)
+        reporter.recordConnectionStepFailure(ConnectionTelemetryStep.WaitForApi)
+        reporter.recordConnectionCompletion(ConnectionOutcome.Failure, 50, connection())
+
+        assertEquals(
+            mapOf(
+                "service_mode" to "root",
+                "root_backend" to "tproxy",
+                "outcome" to "failure",
+                "failure_stage" to "routing",
+                "failure_reason" to "tproxy_activation_failed",
+            ),
+            client.metrics.last().attributes,
         )
     }
 

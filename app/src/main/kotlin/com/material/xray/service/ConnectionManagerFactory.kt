@@ -365,6 +365,7 @@ internal data class ConnectionManagerDependencies(
     val apiClientFactory: ConnectionApiClientFactory,
     val xrayRoutingUpdater: ConnectionXrayRoutingUpdater,
     val startTelemetrySpan: (ConnectionProgress, ConnectionTelemetryStep?) -> TelemetrySpan? = { _, _ -> null },
+    val recordTelemetryStepFailure: (ConnectionTelemetryStep) -> Unit = {},
 )
 
 class ConnectionManagerFactory @Inject constructor(
@@ -441,6 +442,7 @@ class ConnectionManagerFactory @Inject constructor(
                 binDir = environment.binDir,
             ),
             startTelemetrySpan = telemetryReporter::startConnectionStep,
+            recordTelemetryStepFailure = telemetryReporter::recordConnectionStepFailure,
         )
         return ConnectionManager(
             configGenerator = ConfigGenerator(),

@@ -58,6 +58,7 @@ internal class ConnectionManager(
         onProgressStarted = stateCoordinator::beginConnectionProgress,
         onProgressFinished = stateCoordinator::endConnectionProgress,
         onTraceStarted = dependencies.startTelemetrySpan,
+        onTelemetryStepFailed = dependencies.recordTelemetryStepFailure,
     )
 
     private val rootStrategy: XrayRuntimeStrategy = RootXrayRuntimeStrategy(

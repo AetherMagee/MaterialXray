@@ -308,4 +308,31 @@ class ConnectionStepTest {
             traced,
         )
     }
+
+    @Test
+    fun `telemetry step reports failure only after retries are exhausted`() = runTest {
+        val failures = mutableListOf<ConnectionTelemetryStep>()
+        val executor = ConnectionStepExecutor(
+            elapsedRealtime = { 0 },
+            log = {},
+            onProgressStarted = { 1L },
+            onProgressFinished = {},
+            onTelemetryStepFailed = failures::add,
+            waitBeforeRetry = {},
+        )
+
+        executor.execute(
+            ConnectionStep(
+                label = "TPROXY routing setup",
+                progress = ConnectionProgress.ConfiguringRouting,
+                telemetryStep = ConnectionTelemetryStep.ActivateTproxy,
+                retryable = true,
+                maxRetries = 1,
+                isSuccessful = { false },
+                action = { Unit },
+            ),
+        )
+
+        assertEquals(listOf(ConnectionTelemetryStep.ActivateTproxy), failures)
+    }
 }

@@ -134,6 +134,7 @@ class XrayService : VpnService() {
             onProgressStarted = connectionStateCoordinator::beginConnectionProgress,
             onProgressFinished = connectionStateCoordinator::endConnectionProgress,
             onTraceStarted = telemetryReporter::startConnectionStep,
+            onTelemetryStepFailed = telemetryReporter::recordConnectionStepFailure,
         )
     }
     private val stateFile by lazy { StateFile(this) }
