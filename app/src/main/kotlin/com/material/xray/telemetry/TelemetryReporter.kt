@@ -13,6 +13,12 @@ enum class TelemetryServiceMode(val value: String) {
     Vpn("vpn"),
 }
 
+enum class ConnectionOutcome(val value: String) {
+    Success("success"),
+    Failure("failure"),
+    Interrupted("interrupted"),
+}
+
 enum class CoreRecoveryCause(val value: String) {
     ProcessExit("process_exit"),
     MemoryLimit("memory_limit"),
@@ -93,21 +99,21 @@ class TelemetryReporter internal constructor(
     }
 
     @Synchronized
-    fun recordConnectionResult(
-        succeeded: Boolean,
+    fun recordConnectionCompletion(
+        outcome: ConnectionOutcome,
         durationMillis: Long,
         connection: TelemetryConnectionContext,
     ) {
-        val attributes = connection.metricAttributes
-        count(if (succeeded) "connection.succeeded" else "connection.failed", attributes)
+        val attributes = connection.metricAttributes + ("outcome" to outcome.value)
+        count("connection.completed", attributes)
         if (enabled) {
             client.distributionMillis("connection.duration", durationMillis, attributes)
             addBreadcrumb(
                 "connection",
-                if (succeeded) "succeeded" else "failed",
+                outcome.value,
                 mapOf("duration_ms" to durationMillis),
             )
-            activeConnectionTrace?.finish(if (succeeded) TelemetryStatus.Ok else TelemetryStatus.InternalError)
+            activeConnectionTrace?.finish(outcome.telemetryStatus())
             activeConnectionTrace = null
         }
     }
@@ -162,12 +168,6 @@ class TelemetryReporter internal constructor(
             addBreadcrumb("connection.step", step, mapOf("succeeded" to succeeded))
             span.finish(succeeded)
         }
-    }
-
-    @Synchronized
-    fun finishInterruptedConnectionTrace() {
-        activeConnectionTrace?.finish(TelemetryStatus.InternalError)
-        activeConnectionTrace = null
     }
 
     fun recordCoreRecovery(cause: CoreRecoveryCause, succeeded: Boolean) {
@@ -227,6 +227,12 @@ class TelemetryReporter internal constructor(
         is ConnectionState.Connected -> "connected"
         ConnectionState.Disconnecting -> "disconnecting"
         is ConnectionState.Error -> "error"
+    }
+
+    private fun ConnectionOutcome.telemetryStatus(): TelemetryStatus = when (this) {
+        ConnectionOutcome.Success -> TelemetryStatus.Ok
+        ConnectionOutcome.Failure -> TelemetryStatus.InternalError
+        ConnectionOutcome.Interrupted -> TelemetryStatus.Aborted
     }
 
     private fun ConnectionProgress.telemetryValue(): String = when (this) {

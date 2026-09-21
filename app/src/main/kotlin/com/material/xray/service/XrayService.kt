@@ -63,6 +63,7 @@ import com.material.xray.model.SessionTrafficMetrics
 import com.material.xray.model.XrayRuntimeSettings
 import com.material.xray.model.primaryBalancerTag
 import com.material.xray.model.proxyOutboundCount
+import com.material.xray.telemetry.ConnectionOutcome
 import com.material.xray.telemetry.CoreRecoveryCause
 import com.material.xray.telemetry.TelemetryConnectionContext
 import com.material.xray.telemetry.TelemetryReporter
@@ -606,15 +607,16 @@ class XrayService : VpnService() {
             return result
         } finally {
             val result = succeeded
-            if (result == null) {
-                telemetryReporter.finishInterruptedConnectionTrace()
-            } else {
-                telemetryReporter.recordConnectionResult(
-                    succeeded = result,
-                    durationMillis = SystemClock.elapsedRealtime() - startedAt,
-                    connection = connection,
-                )
+            val outcome = when (result) {
+                true -> ConnectionOutcome.Success
+                false -> ConnectionOutcome.Failure
+                null -> ConnectionOutcome.Interrupted
             }
+            telemetryReporter.recordConnectionCompletion(
+                outcome = outcome,
+                durationMillis = SystemClock.elapsedRealtime() - startedAt,
+                connection = connection,
+            )
         }
     }
 

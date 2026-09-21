@@ -19,7 +19,11 @@ class TelemetryReporterTest {
         val reporter = TelemetryReporter(client)
 
         reporter.recordConnectionAttempt(connection())
-        reporter.recordConnectionResult(succeeded = true, durationMillis = 25, connection = connection())
+        reporter.recordConnectionCompletion(
+            outcome = ConnectionOutcome.Success,
+            durationMillis = 25,
+            connection = connection(),
+        )
 
         assertTrue(client.metrics.isEmpty())
         assertTrue(client.distributions.isEmpty())
@@ -41,6 +45,67 @@ class TelemetryReporterTest {
         assertEquals(1, client.disableCount)
         assertEquals(emittedBeforeDisabledCall, client.metrics.size)
         assertEquals(TelemetryStatus.Cancelled, client.transactions.single().finishedWith)
+    }
+
+    @Test
+    fun `connection completion records one exhaustive outcome`() {
+        val client = FakeTelemetryClient()
+        val reporter = TelemetryReporter(client).apply { setEnabled(true) }
+
+        reporter.recordConnectionAttempt(connection())
+        reporter.recordConnectionCompletion(
+            outcome = ConnectionOutcome.Failure,
+            durationMillis = 25,
+            connection = connection(),
+        )
+
+        assertEquals(
+            listOf(
+                RecordedMetric(
+                    name = "connection.attempted",
+                    attributes = mapOf("service_mode" to "root", "root_backend" to "tproxy"),
+                ),
+                RecordedMetric(
+                    name = "connection.completed",
+                    attributes = mapOf(
+                        "service_mode" to "root",
+                        "root_backend" to "tproxy",
+                        "outcome" to "failure",
+                    ),
+                ),
+            ),
+            client.metrics,
+        )
+        assertEquals(
+            RecordedDistribution(
+                name = "connection.duration",
+                value = 25,
+                attributes = mapOf(
+                    "service_mode" to "root",
+                    "root_backend" to "tproxy",
+                    "outcome" to "failure",
+                ),
+            ),
+            client.distributions.single(),
+        )
+        assertEquals(TelemetryStatus.InternalError, client.transactions.single().finishedWith)
+    }
+
+    @Test
+    fun `interrupted connection is counted and timed`() {
+        val client = FakeTelemetryClient()
+        val reporter = TelemetryReporter(client).apply { setEnabled(true) }
+
+        reporter.recordConnectionAttempt(connection())
+        reporter.recordConnectionCompletion(
+            outcome = ConnectionOutcome.Interrupted,
+            durationMillis = 40,
+            connection = connection(),
+        )
+
+        assertEquals("interrupted", client.metrics.last().attributes["outcome"])
+        assertEquals("interrupted", client.distributions.single().attributes["outcome"])
+        assertEquals(TelemetryStatus.Aborted, client.transactions.single().finishedWith)
     }
 
     @Test
