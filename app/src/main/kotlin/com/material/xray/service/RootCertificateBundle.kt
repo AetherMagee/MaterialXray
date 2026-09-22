@@ -16,6 +16,7 @@ internal fun interface RootCertificateBundle {
 }
 
 internal class AndroidRootCertificateBundle(
+    private val loadBundledCertificates: () -> List<ByteArray> = { emptyList() },
     private val loadCertificates: () -> List<ByteArray> = ::loadAndroidCaCertificates,
 ) : RootCertificateBundle {
     private val generatedInProcess = AtomicBoolean()
@@ -25,7 +26,7 @@ internal class AndroidRootCertificateBundle(
     override suspend fun update(file: File) {
         withContext(Dispatchers.IO) {
             if (generatedInProcess.get() && file.isFile && file.length() > 0L) return@withContext
-            val certificates = loadCertificates()
+            val certificates = loadCertificates() + loadBundledCertificates()
             require(certificates.isNotEmpty()) { "Android CA store contains no certificates" }
 
             val parent = requireNotNull(file.parentFile) { "Certificate bundle must have a parent directory" }

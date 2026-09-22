@@ -119,7 +119,7 @@ internal class XrayProcessSupervisor(
 
     override suspend fun start(binDir: String, primaryGid: Int?): Int {
         require(primaryGid == null || primaryGid > 0)
-        val certificateBundleFile = environment.filesDir.resolve(ROOT_CERTIFICATE_BUNDLE_FILE)
+        val certificateBundleFile = environment.filesDir.resolve(XRAY_CERTIFICATE_BUNDLE_FILE)
         certificateBundle.update(certificateBundleFile)
         val xrayCommand = buildString {
             append("cd ${shellQuote(binDir)} && exec env ")
@@ -255,13 +255,13 @@ internal class XrayProcessSupervisor(
 
     private companion object {
         private const val KILOBYTES_PER_MEGABYTE = 1024L
-        private const val ROOT_CERTIFICATE_BUNDLE_FILE = "xray-ca-certificates.pem"
     }
 }
 
 internal class UserXrayProcessSupervisor(
     private val environment: XrayRuntimeEnvironment,
     private val xrayBinary: XrayProcessBinary,
+    private val certificateBundle: RootCertificateBundle,
     private val processLauncher: UserXrayProcessLauncher = AndroidUserXrayProcessLauncher(),
 ) : UserXrayProcessController {
     // Probes and lifecycle commands arrive from different dispatchers, so the tracked PID needs
@@ -270,9 +270,12 @@ internal class UserXrayProcessSupervisor(
     private var pid: Int = -1
     private val logFile: File
         get() = environment.filesDir.resolve(XRAY_LOG_FILE_NAME)
+    private val certificateBundleFile: File
+        get() = environment.filesDir.resolve(XRAY_CERTIFICATE_BUNDLE_FILE)
 
     override suspend fun prepareLogFile() {
         withContext(Dispatchers.IO) { FileOutputStream(logFile, false).use { } }
+        certificateBundle.update(certificateBundleFile)
     }
 
     // Deliberately not dispatched elsewhere. The caller owns the tunnel ParcelFileDescriptor and
@@ -287,7 +290,7 @@ internal class UserXrayProcessSupervisor(
             workingDir = binDir,
             logPath = logFile.absolutePath,
             tunFd = tunFd,
-            environment = xrayAssetEnvironment(binDir),
+            environment = xrayEnvironment(binDir, certificateBundleFile.absolutePath),
         )
         return pid
     }
@@ -464,14 +467,20 @@ private fun xrayAssetEnvironment(assetDir: String): Map<String, String> = mapOf(
     "XRAY_LOCATION_ASSET" to assetDir,
 )
 
-private fun rootXrayEnvironment(assetDir: String, certificateBundlePath: String): Map<String, String> = xrayAssetEnvironment(assetDir) + mapOf(
-    // Root mode uses a Linux build, so Go does not discover Android's CA store itself.
+private fun rootXrayEnvironment(assetDir: String, certificateBundlePath: String): Map<String, String> = xrayEnvironment(
+    assetDir,
+    certificateBundlePath,
+)
+
+private fun xrayEnvironment(assetDir: String, certificateBundlePath: String): Map<String, String> = xrayAssetEnvironment(assetDir) + mapOf(
+    // Go does not reliably discover Android's CA store, especially in the rootless process.
     "SSL_CERT_FILE" to certificateBundlePath,
 )
 
 internal fun shellQuote(value: String): String = "'${value.replace("'", "'\\''")}'"
 
 internal const val XRAY_LOG_FILE_NAME = "xray.log"
+internal const val XRAY_CERTIFICATE_BUNDLE_FILE = "xray-ca-certificates.pem"
 
 private const val BYTES_PER_KILOBYTE = 1024L
 private const val STATM_BUFFER_SIZE = 128

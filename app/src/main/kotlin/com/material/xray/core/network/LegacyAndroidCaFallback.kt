@@ -52,13 +52,7 @@ internal class AdditiveX509TrustManager(
 }
 
 internal fun loadX509TrustManager(certificateBundle: InputStream): X509TrustManager {
-    val certificateFactory = CertificateFactory.getInstance("X.509")
-    val pem = certificateBundle.bufferedReader(StandardCharsets.US_ASCII).use { it.readText() }
-    val certificates = PEM_CERTIFICATE_PATTERN.findAll(pem).map { match ->
-        ByteArrayInputStream(match.value.toByteArray(StandardCharsets.US_ASCII)).use { input ->
-            certificateFactory.generateCertificate(input) as X509Certificate
-        }
-    }.toList()
+    val certificates = loadX509Certificates(certificateBundle)
     require(certificates.isNotEmpty()) { "Bundled CA store contains no certificates" }
 
     val keyStore = KeyStore.getInstance(KeyStore.getDefaultType()).apply {
@@ -68,6 +62,16 @@ internal fun loadX509TrustManager(certificateBundle: InputStream): X509TrustMana
         }
     }
     return loadX509TrustManager(keyStore)
+}
+
+internal fun loadX509Certificates(certificateBundle: InputStream): List<X509Certificate> {
+    val certificateFactory = CertificateFactory.getInstance("X.509")
+    val pem = certificateBundle.bufferedReader(StandardCharsets.US_ASCII).use { it.readText() }
+    return PEM_CERTIFICATE_PATTERN.findAll(pem).map { match ->
+        ByteArrayInputStream(match.value.toByteArray(StandardCharsets.US_ASCII)).use { input ->
+            certificateFactory.generateCertificate(input) as X509Certificate
+        }
+    }.toList()
 }
 
 private fun loadSystemTrustManager(): X509TrustManager = loadX509TrustManager(null)

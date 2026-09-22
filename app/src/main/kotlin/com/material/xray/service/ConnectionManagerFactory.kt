@@ -4,8 +4,10 @@ import android.content.Context
 import android.os.SystemClock
 import androidx.annotation.StringRes
 import androidx.core.content.pm.PackageInfoCompat
+import com.material.xray.R
 import com.material.xray.core.app.AppInventory
 import com.material.xray.core.locale.localizedString
+import com.material.xray.core.network.loadX509Certificates
 import com.material.xray.core.root.RootShell
 import com.material.xray.core.xray.CleanupManager
 import com.material.xray.core.xray.ConfigGenerator
@@ -380,7 +382,15 @@ class ConnectionManagerFactory @Inject constructor(
     private val telemetryReporter: TelemetryReporter,
 ) {
     private val serverAddressResolver by lazy { ServerAddressResolver(context) }
-    private val rootCertificateBundle by lazy { AndroidRootCertificateBundle() }
+    private val rootCertificateBundle by lazy {
+        AndroidRootCertificateBundle(
+            loadBundledCertificates = {
+                context.resources.openRawResource(R.raw.mozilla_ca_bundle).use { input ->
+                    loadX509Certificates(input).map { certificate -> certificate.encoded }
+                }
+            },
+        )
+    }
 
     internal fun create(): ConnectionManager {
         val environment = AndroidConnectionEnvironment(context)
@@ -403,6 +413,7 @@ class ConnectionManagerFactory @Inject constructor(
         val userProcess = UserXrayProcessSupervisor(
             environment = runtimeEnvironment,
             xrayBinary = xrayBinary,
+            certificateBundle = rootCertificateBundle,
         )
         val routingPlanBuilder = AppRoutingPlanner(
             appBypassDao = appBypassDao,

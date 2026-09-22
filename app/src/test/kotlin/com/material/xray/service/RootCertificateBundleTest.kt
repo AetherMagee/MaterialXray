@@ -15,12 +15,10 @@ class RootCertificateBundleTest {
         val bundleFile = directory.resolve("ca-certificates.pem")
 
         try {
-            AndroidRootCertificateBundle {
-                listOf(
-                    byteArrayOf(1, 2, 3),
-                    byteArrayOf(4, 5, 6),
-                )
-            }.update(bundleFile)
+            AndroidRootCertificateBundle(
+                loadBundledCertificates = { listOf(byteArrayOf(4, 5, 6)) },
+                loadCertificates = { listOf(byteArrayOf(1, 2, 3)) },
+            ).update(bundleFile)
 
             assertEquals(
                 """

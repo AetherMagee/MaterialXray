@@ -2,6 +2,7 @@ package com.material.xray.service
 
 import com.material.xray.core.root.RootShell
 import java.io.File
+import java.nio.file.Files
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -201,6 +202,31 @@ class XrayProcessSupervisorTest {
     }
 
     @Test
+    fun `user process prepares CA bundle and passes it to xray`() = runTest {
+        val directory = Files.createTempDirectory("user-xray-process-test").toFile()
+        val launcher = FakeUserXrayProcessLauncher()
+        var bundleFile: File? = null
+        val supervisor = userSupervisor(
+            environment = FakeRuntimeEnvironment(filesDir = directory),
+            processLauncher = launcher,
+            certificateBundle = RootCertificateBundle { bundleFile = it },
+        )
+
+        try {
+            supervisor.prepareLogFile()
+            supervisor.start(binDir = "/tmp/xray bin", tunFd = 89)
+
+            assertEquals(directory.resolve(XRAY_CERTIFICATE_BUNDLE_FILE), bundleFile)
+            assertEquals(
+                directory.resolve(XRAY_CERTIFICATE_BUNDLE_FILE).absolutePath,
+                launcher.startedEnvironment?.get("SSL_CERT_FILE"),
+            )
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+
+    @Test
     fun `user process stop escalates to kill when process remains alive`() = runTest {
         val launcher = FakeUserXrayProcessLauncher(
             alive = { pid, killedSignals -> pid == 42 && 9 !in killedSignals },
@@ -265,9 +291,11 @@ class XrayProcessSupervisorTest {
     private fun userSupervisor(
         environment: XrayRuntimeEnvironment = FakeRuntimeEnvironment(),
         processLauncher: UserXrayProcessLauncher = FakeUserXrayProcessLauncher(),
+        certificateBundle: RootCertificateBundle = RootCertificateBundle { },
     ) = UserXrayProcessSupervisor(
         environment = environment,
         xrayBinary = FakeXrayProcessBinary(),
+        certificateBundle = certificateBundle,
         processLauncher = processLauncher,
     )
 
@@ -308,6 +336,7 @@ class XrayProcessSupervisorTest {
         private val alive: (pid: Int, killedSignals: List<Int>) -> Boolean = { pid, _ -> pid == 42 },
     ) : UserXrayProcessLauncher {
         val killedSignals = mutableListOf<Int>()
+        var startedEnvironment: Map<String, String>? = null
 
         override fun start(
             binaryPath: String,
@@ -316,7 +345,10 @@ class XrayProcessSupervisorTest {
             logPath: String,
             tunFd: Int,
             environment: Map<String, String>,
-        ): Int = 42
+        ): Int {
+            startedEnvironment = environment
+            return 42
+        }
 
         override fun isAlive(pid: Int): Boolean = alive(pid, killedSignals)
 
