@@ -21,6 +21,14 @@
     <string name="routing_default_rule_block_ads_name">Block ads</string>
     <string name="routing_rules_managed_by_provider">Routing rules are managed by %1$s</string>
     <string name="routing_rules_managed_by_selected_subscription">Routing rules are managed by the selected subscription</string>
+    <string name="routing_scope_custom">Custom</string>
+    <string name="routing_scope_subscription_wide">Subscription-wide</string>
+    <string name="routing_scope_profile_specific">Profile-specific</string>
+    <string name="routing_rule_target_outbound">Outbound: %1$s</string>
+    <string name="routing_rule_target_balancer">Balancer: %1$s</string>
+    <string name="routing_rule_additional_conditions">Other conditions: %1$s</string>
+    <string name="routing_rule_raw_json">Raw JSON</string>
+    <string name="routing_rule_viewer_back">Back to routing rules</string>
     <string name="routing_rules_automatic_title">Routing rules are automatic</string>
     <string name="routing_rules_automatic_provider_description">Your current routing rules are provided by %1$s and are updated automatically. Editing them will disable automatic updates.</string>
     <string name="routing_rules_automatic_selected_subscription_description">Your current routing rules are provided by the selected subscription and are updated automatically. Editing them will disable automatic updates.</string>
@@ -57,14 +65,26 @@
         <item quantity="one">Domain: %1$s</item>
         <item quantity="other">Domains: %1$s</item>
     </plurals>
+    <plurals name="routing_rule_more_domains">
+        <item quantity="one">%1$s and %2$d more domain</item>
+        <item quantity="other">%1$s and %2$d more domains</item>
+    </plurals>
     <plurals name="routing_rule_ips">
         <item quantity="one">IP: %1$s</item>
         <item quantity="other">IPs: %1$s</item>
+    </plurals>
+    <plurals name="routing_rule_more_ips">
+        <item quantity="one">%1$s and %2$d more IP</item>
+        <item quantity="other">%1$s and %2$d more IPs</item>
     </plurals>
     <string name="routing_rule_port">Port: %1$s</string>
     <plurals name="routing_rule_protocols">
         <item quantity="one">Protocol: %1$s</item>
         <item quantity="other">Protocols: %1$s</item>
+    </plurals>
+    <plurals name="routing_rule_more_protocols">
+        <item quantity="one">%1$s and %2$d more protocol</item>
+        <item quantity="other">%1$s and %2$d more protocols</item>
     </plurals>
 
     <string name="apps_search">Search apps</string>

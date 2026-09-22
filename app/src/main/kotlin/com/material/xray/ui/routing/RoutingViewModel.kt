@@ -3,6 +3,8 @@ package com.material.xray.ui.routing
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.material.xray.data.db.dao.SubscriptionDao
+import com.material.xray.data.parser.ProfileRouting
+import com.material.xray.data.parser.ProfileRoutingInspector
 import com.material.xray.data.repository.ProviderRoutingAvailability
 import com.material.xray.data.repository.ServerRepository
 import com.material.xray.data.repository.SettingsRepository
@@ -14,9 +16,11 @@ import com.material.xray.model.SubscriptionRouting
 import com.material.xray.service.RoutingChangeManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -30,6 +34,16 @@ class RoutingViewModel @Inject constructor(
 ) : ViewModel() {
     val rules: StateFlow<List<RoutingRule>> = settingsRepository.routingRules
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    internal val profileRouting: StateFlow<ProfileRouting?> = combine(
+        settingsRepository.lastServerId,
+        serverRepository.observeAll(),
+    ) { selectedServerId, servers ->
+        servers.firstOrNull { it.id == selectedServerId }
+            ?.let { entity -> runCatching { serverRepository.parseConfig(entity) }.getOrNull() }
+            ?.rawConfigJson
+            ?.let(ProfileRoutingInspector::inspect)
+    }.flowOn(Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
     private val selectedProviderRouting: StateFlow<ProviderRoutingAvailability?> = combine(
         settingsRepository.lastServerId,
         serverRepository.observeAll(),
@@ -56,6 +70,7 @@ class RoutingViewModel @Inject constructor(
 
     fun updateRule(rule: RoutingRule) {
         viewModelScope.launch {
+            settingsRepository.setRoutingPolicyControl(RoutingPolicyControl.User)
             settingsRepository.setRoutingRule(rule)
             routingChangeManager.markPendingChanges()
         }
@@ -63,6 +78,7 @@ class RoutingViewModel @Inject constructor(
 
     fun addRule(rule: RoutingRule) {
         viewModelScope.launch {
+            settingsRepository.setRoutingPolicyControl(RoutingPolicyControl.User)
             settingsRepository.setRoutingRules(rules.value + rule)
             routingChangeManager.markPendingChanges()
         }
@@ -71,6 +87,7 @@ class RoutingViewModel @Inject constructor(
     fun deleteRules(ruleIds: Set<String>) {
         if (ruleIds.isEmpty()) return
         viewModelScope.launch {
+            settingsRepository.setRoutingPolicyControl(RoutingPolicyControl.User)
             settingsRepository.setRoutingRules(rules.value.filterNot { it.id in ruleIds })
             routingChangeManager.markPendingChanges()
         }
@@ -80,6 +97,7 @@ class RoutingViewModel @Inject constructor(
         val updatedRules = rules.value.map { it.copy(enabled = enabled) }
         if (updatedRules == rules.value) return
         viewModelScope.launch {
+            settingsRepository.setRoutingPolicyControl(RoutingPolicyControl.User)
             settingsRepository.setRoutingRules(updatedRules)
             routingChangeManager.markPendingChanges()
         }
@@ -87,6 +105,7 @@ class RoutingViewModel @Inject constructor(
 
     fun resetRulesToDefaults() {
         viewModelScope.launch {
+            settingsRepository.setRoutingPolicyControl(RoutingPolicyControl.User)
             settingsRepository.setSubscriptionRouting(
                 SubscriptionRouting(RoutingRuleCatalog.defaults()),
             )

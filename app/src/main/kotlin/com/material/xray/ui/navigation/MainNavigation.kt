@@ -45,8 +45,13 @@ import com.material.xray.ui.configviewer.ConfigViewerRequest
 import com.material.xray.ui.configviewer.ConfigViewerScreen
 import com.material.xray.ui.home.HomeScreen
 import com.material.xray.ui.logs.LogsScreen
+import com.material.xray.ui.routing.RoutingRuleViewerRequest
+import com.material.xray.ui.routing.RoutingRuleViewerScreen
 import com.material.xray.ui.routing.RoutingScreen
 import com.material.xray.ui.settings.SettingsScreen
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 
 @Composable
 fun MainNavigation(
@@ -113,49 +118,54 @@ fun MainNavigation(
     var configViewerRequest by rememberSaveable(stateSaver = ConfigViewerRequestSaver) {
         mutableStateOf<ConfigViewerRequest?>(null)
     }
+    var routingRuleViewerRequest by rememberSaveable(stateSaver = RoutingRuleViewerRequestSaver) {
+        mutableStateOf<RoutingRuleViewerRequest?>(null)
+    }
     BackHandler(enabled = configViewerRequest != null) { configViewerRequest = null }
 
     Box {
         Scaffold(
             contentWindowInsets = WindowInsets(0.dp),
             bottomBar = {
-                AnimatedContent(
-                    targetState = showAdvancedOptions,
-                    transitionSpec = { fadeIn(tween(150)) togetherWith fadeOut(tween(150)) },
-                    label = "advancedNavigationItems",
-                ) { showLogs ->
-                    val navigationScreens = remember(showLogs) {
-                        if (showLogs) {
-                            Screen.entries
-                        } else {
-                            Screen.entries.filterNot { it == Screen.Logs }
+                if (currentRoute != ROUTING_RULE_VIEWER_ROUTE) {
+                    AnimatedContent(
+                        targetState = showAdvancedOptions,
+                        transitionSpec = { fadeIn(tween(150)) togetherWith fadeOut(tween(150)) },
+                        label = "advancedNavigationItems",
+                    ) { showLogs ->
+                        val navigationScreens = remember(showLogs) {
+                            if (showLogs) {
+                                Screen.entries
+                            } else {
+                                Screen.entries.filterNot { it == Screen.Logs }
+                            }
                         }
-                    }
-                    NavigationBar(modifier = Modifier.height(CompactNavigationBarHeight + bottomInset)) {
-                        navigationScreens.forEach { screen ->
-                            val label = stringResource(screen.labelRes)
-                            NavigationBarItem(
-                                icon = {
-                                    val icon = screen.icon
-                                    if (icon != null) {
-                                        Icon(icon, contentDescription = label)
-                                    } else {
-                                        Icon(
-                                            painter = painterResource(requireNotNull(screen.iconRes)),
-                                            contentDescription = label,
-                                        )
-                                    }
-                                },
-                                label = { Text(label) },
-                                selected = currentDestination?.hierarchy?.any { it.route == screen.route } == true,
-                                onClick = {
-                                    navController.navigate(screen.route) {
-                                        popUpTo(navController.graph.startDestinationId) { saveState = true }
-                                        launchSingleTop = true
-                                        restoreState = true
-                                    }
-                                },
-                            )
+                        NavigationBar(modifier = Modifier.height(CompactNavigationBarHeight + bottomInset)) {
+                            navigationScreens.forEach { screen ->
+                                val label = stringResource(screen.labelRes)
+                                NavigationBarItem(
+                                    icon = {
+                                        val icon = screen.icon
+                                        if (icon != null) {
+                                            Icon(icon, contentDescription = label)
+                                        } else {
+                                            Icon(
+                                                painter = painterResource(requireNotNull(screen.iconRes)),
+                                                contentDescription = label,
+                                            )
+                                        }
+                                    },
+                                    label = { Text(label) },
+                                    selected = currentDestination?.hierarchy?.any { it.route == screen.route } == true,
+                                    onClick = {
+                                        navController.navigate(screen.route) {
+                                            popUpTo(navController.graph.startDestinationId) { saveState = true }
+                                            launchSingleTop = true
+                                            restoreState = true
+                                        }
+                                    },
+                                )
+                            }
                         }
                     }
                 }
@@ -179,8 +189,30 @@ fun MainNavigation(
                     )
                 }
                 composable(Screen.Logs.route) { LogsScreen(showTitleBarLogo) }
-                composable(Screen.Routing.route) { RoutingScreen(showTitleBarLogo) }
+                composable(Screen.Routing.route) {
+                    RoutingScreen(
+                        showTitleBarLogo = showTitleBarLogo,
+                        onViewRule = { request ->
+                            routingRuleViewerRequest = request
+                            navController.navigate(ROUTING_RULE_VIEWER_ROUTE) { launchSingleTop = true }
+                        },
+                    )
+                }
                 composable(Screen.Settings.route) { SettingsScreen(showTitleBarLogo) }
+                composable(ROUTING_RULE_VIEWER_ROUTE) {
+                    val request = routingRuleViewerRequest
+                    if (request == null) {
+                        LaunchedEffect(Unit) { navController.popBackStack() }
+                    } else {
+                        RoutingRuleViewerScreen(
+                            request = request,
+                            onBack = {
+                                routingRuleViewerRequest = null
+                                navController.popBackStack()
+                            },
+                        )
+                    }
+                }
             }
         }
 
@@ -215,8 +247,14 @@ private val ConfigViewerRequestSaver: Saver<ConfigViewerRequest?, Any> = listSav
     },
 )
 
+private val RoutingRuleViewerRequestSaver: Saver<RoutingRuleViewerRequest?, String> = Saver(
+    save = { request -> request?.let(Json::encodeToString) },
+    restore = { saved -> runCatching { Json.decodeFromString<RoutingRuleViewerRequest>(saved) }.getOrNull() },
+)
+
 private const val RUNNING_CONFIG_TAG = "running"
 private const val SERVER_CONFIG_TAG = "server"
 private const val CONFIG_VIEWER_FADE_MS = 180
+private const val ROUTING_RULE_VIEWER_ROUTE = "routing/rule"
 
 private val CompactNavigationBarHeight = 68.dp

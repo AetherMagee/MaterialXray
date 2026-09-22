@@ -29,9 +29,11 @@ class ProviderRoutingCoordinatorTest {
     }
 
     @Test
-    fun `selected subscription without provider routing preserves manual routing`() = runTest {
+    fun `selected subscription without provider routing clears previous provider routing`() = runTest {
         var appRoutingApplyCalls = 0
         var xrayRoutingApplyCalls = 0
+        var appRoutingClearCalls = 0
+        var xrayRoutingClearCalls = 0
         val coordinator = coordinator(
             selection = ProviderRoutingSelection.Selected(
                 subscriptionId = 7,
@@ -46,13 +48,26 @@ class ProviderRoutingCoordinatorTest {
                 xrayRoutingApplyCalls += 1
                 true
             },
+            clearAppRouting = {
+                appRoutingClearCalls += 1
+                true
+            },
+            clearXrayRouting = {
+                xrayRoutingClearCalls += 1
+                true
+            },
         )
 
         val result = coordinator.refreshSelectedServer()
 
-        assertEquals(ProviderRoutingRefreshResult.Unchanged, result)
+        assertEquals(
+            ProviderRoutingRefreshResult.Persisted(PendingRoutingChange.XRAY_CONFIG),
+            result,
+        )
         assertEquals(0, appRoutingApplyCalls)
         assertEquals(0, xrayRoutingApplyCalls)
+        assertEquals(1, appRoutingClearCalls)
+        assertEquals(1, xrayRoutingClearCalls)
     }
 
     @Test
@@ -181,11 +196,15 @@ class ProviderRoutingCoordinatorTest {
         selection: ProviderRoutingSelection = ProviderRoutingSelection.Selected(subscriptionId = 7),
         applyAppRouting: suspend (Long) -> Boolean = { false },
         applyXrayRouting: suspend (Long) -> Boolean = { false },
+        clearAppRouting: suspend () -> Boolean = { false },
+        clearXrayRouting: suspend () -> Boolean = { false },
         applyActiveConnectionChange: (PendingRoutingChange) -> Boolean = { false },
     ) = ProviderRoutingCoordinator(
         loadSelection = { selection },
         applyAppRouting = applyAppRouting,
         applyXrayRouting = applyXrayRouting,
+        clearAppRouting = clearAppRouting,
+        clearXrayRouting = clearXrayRouting,
         applyActiveConnectionChange = applyActiveConnectionChange,
     )
 }

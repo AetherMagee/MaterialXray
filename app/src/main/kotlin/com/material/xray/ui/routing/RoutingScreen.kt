@@ -1,5 +1,6 @@
 package com.material.xray.ui.routing
 
+import androidx.annotation.PluralsRes
 import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
@@ -27,6 +28,7 @@ import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
@@ -85,6 +87,8 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.material.xray.R
+import com.material.xray.data.parser.ProfileRoutingRule
+import com.material.xray.data.parser.ProfileRoutingTarget
 import com.material.xray.model.RoutingPolicyControl
 import com.material.xray.model.RoutingRule
 import com.material.xray.model.RoutingRuleCatalog
@@ -162,10 +166,15 @@ private val matchModeOptions = listOf(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun RoutingScreen(showTitleBarLogo: Boolean, viewModel: RoutingViewModel = hiltViewModel()) {
+fun RoutingScreen(
+    showTitleBarLogo: Boolean,
+    onViewRule: (RoutingRuleViewerRequest) -> Unit,
+    viewModel: RoutingViewModel = hiltViewModel(),
+) {
     val rules by viewModel.rules.collectAsStateWithLifecycle()
     val routingPolicyControl by viewModel.routingPolicyControl.collectAsStateWithLifecycle()
     val automaticRoutingProviderName by viewModel.automaticRoutingProviderName.collectAsStateWithLifecycle()
+    val profileRouting by viewModel.profileRouting.collectAsStateWithLifecycle()
     val pagerState = rememberPagerState(pageCount = { RoutingTab.entries.size })
     val coroutineScope = rememberCoroutineScope()
     var previousTab by remember { mutableIntStateOf(pagerState.currentPage) }
@@ -342,6 +351,7 @@ fun RoutingScreen(showTitleBarLogo: Boolean, viewModel: RoutingViewModel = hiltV
             when (RoutingTab.entries[page]) {
                 RoutingTab.Rules -> RoutingRulesTab(
                     rules = rules,
+                    profileRules = profileRouting?.rules.orEmpty(),
                     providerManaged = routingPolicyControl == RoutingPolicyControl.SubscriptionProvider,
                     providerName = automaticRoutingProviderName,
                     selectionMode = selectionMode,
@@ -350,12 +360,17 @@ fun RoutingScreen(showTitleBarLogo: Boolean, viewModel: RoutingViewModel = hiltV
                     onRuleClick = { rule ->
                         if (selectionMode) {
                             selectedRuleIds = selectedRuleIds.toggle(rule.id)
+                        } else if (routingPolicyControl == RoutingPolicyControl.SubscriptionProvider) {
+                            onViewRule(rule.toViewerRequest())
                         } else {
                             requestRuleAction(RoutingRuleAction.Edit(rule))
                         }
                     },
                     onRuleLongClick = { rule ->
                         selectedRuleIds = selectedRuleIds.toggle(rule.id)
+                    },
+                    onProfileRuleClick = { rule ->
+                        onViewRule(rule.toViewerRequest())
                     },
                 )
                 RoutingTab.Apps -> AppBypassContent(active = selectedTab == RoutingTab.Apps.ordinal)
@@ -410,6 +425,7 @@ fun RoutingScreen(showTitleBarLogo: Boolean, viewModel: RoutingViewModel = hiltV
 @Composable
 private fun RoutingRulesTab(
     rules: List<RoutingRule>,
+    profileRules: List<ProfileRoutingRule>,
     providerManaged: Boolean,
     providerName: String?,
     selectionMode: Boolean,
@@ -417,6 +433,7 @@ private fun RoutingRulesTab(
     onRuleToggled: (RoutingRule, Boolean) -> Unit,
     onRuleClick: (RoutingRule) -> Unit,
     onRuleLongClick: (RoutingRule) -> Unit,
+    onProfileRuleClick: (ProfileRoutingRule) -> Unit,
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
         LazyColumn(
@@ -452,6 +469,17 @@ private fun RoutingRulesTab(
                             )
                         }
                     }
+                }
+            }
+            if (rules.isNotEmpty()) {
+                item(contentType = "routingScopeHeader") {
+                    RoutingScopeHeader(
+                        if (providerManaged) {
+                            R.string.routing_scope_subscription_wide
+                        } else {
+                            R.string.routing_scope_custom
+                        },
+                    )
                 }
             }
             items(items = rules, key = { it.id }, contentType = { "routingRule" }) { rule ->
@@ -539,8 +567,69 @@ private fun RoutingRulesTab(
                     }
                 }
             }
+            if (profileRules.isNotEmpty()) {
+                item(contentType = "routingScopeHeader") {
+                    RoutingScopeHeader(R.string.routing_scope_profile_specific)
+                }
+                itemsIndexed(
+                    items = profileRules,
+                    key = { index, rule -> "profile-$index-${rule.id}" },
+                    contentType = { _, _ -> "profileRoutingRule" },
+                ) { _, rule ->
+                    ProfileRoutingRuleCard(rule = rule, onClick = { onProfileRuleClick(rule) })
+                }
+            }
         }
         ScrollFadeEdges()
+    }
+}
+
+@Composable
+private fun RoutingScopeHeader(@StringRes titleResource: Int) {
+    Text(
+        text = stringResource(titleResource),
+        style = MaterialTheme.typography.titleSmall,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(start = 4.dp, top = 8.dp),
+    )
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun ProfileRoutingRuleCard(rule: ProfileRoutingRule, onClick: () -> Unit) {
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        shape = MaterialTheme.shapes.medium,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(MaterialTheme.shapes.medium)
+            .combinedClickable(onClick = onClick),
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Text(
+                text = rule.name,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = profileRoutingRuleContentText(rule),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            rule.target?.let { target ->
+                Text(
+                    text = target.displayText(),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
     }
 }
 
@@ -869,21 +958,104 @@ private fun routingRuleContentText(rule: RoutingRule): String {
     val domains = rule.domains.map(String::trim).filter(String::isNotEmpty)
     val ips = rule.ips.map(String::trim).filter(String::isNotEmpty)
     val protocols = rule.protocols.map(String::trim).filter(String::isNotEmpty)
-    val domainText = domains.takeIf(List<String>::isNotEmpty)?.let {
-        pluralStringResource(R.plurals.routing_rule_domains, it.size, it.joinToString(", "))
-    }
-    val ipText = ips.takeIf(List<String>::isNotEmpty)?.let {
-        pluralStringResource(R.plurals.routing_rule_ips, it.size, it.joinToString(", "))
-    }
+    val domainText = compactDomainText(domains)
+    val ipText = compactListText(ips, R.plurals.routing_rule_ips, R.plurals.routing_rule_more_ips)
     val portText = rule.port?.takeIf(String::isNotBlank)?.let {
         stringResource(R.string.routing_rule_port, it)
     }
-    val protocolText = protocols.takeIf(List<String>::isNotEmpty)?.let {
-        pluralStringResource(R.plurals.routing_rule_protocols, it.size, it.joinToString(", "))
-    }
+    val protocolText = compactListText(
+        protocols,
+        R.plurals.routing_rule_protocols,
+        R.plurals.routing_rule_more_protocols,
+    )
     return listOfNotNull(domainText, ipText, portText, protocolText)
         .joinToString("\n")
         .ifBlank { stringResource(R.string.routing_no_match_content) }
+}
+
+@Composable
+private fun profileRoutingRuleContentText(rule: ProfileRoutingRule): String {
+    val domainText = compactDomainText(rule.domains)
+    val ipText = compactListText(rule.ips, R.plurals.routing_rule_ips, R.plurals.routing_rule_more_ips)
+    val portText = rule.port?.let { stringResource(R.string.routing_rule_port, it) }
+    val protocolText = compactListText(
+        rule.protocols,
+        R.plurals.routing_rule_protocols,
+        R.plurals.routing_rule_more_protocols,
+    )
+    val additionalText = rule.additionalConditionFields.takeIf(List<String>::isNotEmpty)?.let {
+        stringResource(R.string.routing_rule_additional_conditions, it.joinToString(", "))
+    }
+    return listOfNotNull(domainText, ipText, portText, protocolText, additionalText)
+        .joinToString("\n")
+        .ifBlank { stringResource(R.string.routing_no_match_content) }
+}
+
+@Composable
+private fun compactDomainText(domains: List<String>): String? {
+    if (domains.isEmpty()) return null
+    val preview = routingDomainPreview(domains)
+    val visibleText = preview.visibleValues.joinToString(", ")
+    val domainList = if (preview.omittedCount > 0) {
+        pluralStringResource(
+            R.plurals.routing_rule_more_domains,
+            preview.omittedCount,
+            visibleText,
+            preview.omittedCount,
+        )
+    } else {
+        visibleText
+    }
+    return pluralStringResource(R.plurals.routing_rule_domains, domains.size, domainList)
+}
+
+@Composable
+private fun compactListText(
+    values: List<String>,
+    @PluralsRes labelResource: Int,
+    @PluralsRes moreResource: Int,
+): String? {
+    val preview = routingListPreview(values)
+    if (preview.visibleValues.isEmpty()) return null
+    val visibleText = preview.visibleValues.joinToString(", ")
+    val valueList = if (preview.omittedCount > 0) {
+        pluralStringResource(moreResource, preview.omittedCount, visibleText, preview.omittedCount)
+    } else {
+        visibleText
+    }
+    return pluralStringResource(labelResource, values.size, valueList)
+}
+
+private fun RoutingRule.toViewerRequest(): RoutingRuleViewerRequest = RoutingRuleViewerRequest(
+    name = name,
+    domains = domains,
+    ips = ips,
+    port = port,
+    protocols = protocols,
+    targetKind = RoutingRuleViewerTargetKind.Outbound,
+    targetTag = outboundTag,
+)
+
+private fun ProfileRoutingRule.toViewerRequest(): RoutingRuleViewerRequest = RoutingRuleViewerRequest(
+    name = name,
+    domains = domains,
+    ips = ips,
+    port = port,
+    protocols = protocols,
+    targetKind = when (target) {
+        is ProfileRoutingTarget.Outbound -> RoutingRuleViewerTargetKind.Outbound
+        is ProfileRoutingTarget.Balancer -> RoutingRuleViewerTargetKind.Balancer
+        null -> null
+    },
+    targetTag = target?.tag,
+    additionalConditionFields = additionalConditionFields,
+    rawJson = rawJson,
+)
+
+@Composable
+private fun ProfileRoutingTarget.displayText(): String = when (this) {
+    is ProfileRoutingTarget.Outbound -> stringResource(R.string.routing_rule_target_outbound, tag)
+    is ProfileRoutingTarget.Balancer -> stringResource(R.string.routing_rule_target_balancer, tag)
 }
 
 @Composable

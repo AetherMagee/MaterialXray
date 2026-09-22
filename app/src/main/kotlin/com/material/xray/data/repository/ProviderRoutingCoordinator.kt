@@ -38,6 +38,8 @@ class ProviderRoutingCoordinator internal constructor(
     private val loadSelection: suspend () -> ProviderRoutingSelection,
     private val applyAppRouting: suspend (Long) -> Boolean,
     private val applyXrayRouting: suspend (Long) -> Boolean,
+    private val clearAppRouting: suspend () -> Boolean,
+    private val clearXrayRouting: suspend () -> Boolean,
     private val applyActiveConnectionChange: (PendingRoutingChange) -> Boolean,
 ) {
     @Inject
@@ -70,6 +72,8 @@ class ProviderRoutingCoordinator internal constructor(
         },
         applyAppRouting = subscriptionAppRoutingRepository::applyForSubscription,
         applyXrayRouting = subscriptionRoutingRepository::applyForSubscription,
+        clearAppRouting = subscriptionAppRoutingRepository::clear,
+        clearXrayRouting = subscriptionRoutingRepository::clear,
         applyActiveConnectionChange = routingChangeManager::requestActiveConnectionUpdate,
     )
 
@@ -90,8 +94,16 @@ class ProviderRoutingCoordinator internal constructor(
         selection: ProviderRoutingSelection.Selected,
         activeUpdate: ProviderRoutingActiveUpdate,
     ): ProviderRoutingRefreshResult {
-        val appRoutingChanged = selection.appRoutingProvided && applyAppRouting(selection.subscriptionId)
-        val xrayRoutingChanged = selection.xrayRoutingProvided && applyXrayRouting(selection.subscriptionId)
+        val appRoutingChanged = if (selection.appRoutingProvided) {
+            applyAppRouting(selection.subscriptionId)
+        } else {
+            clearAppRouting()
+        }
+        val xrayRoutingChanged = if (selection.xrayRoutingProvided) {
+            applyXrayRouting(selection.subscriptionId)
+        } else {
+            clearXrayRouting()
+        }
         if (!appRoutingChanged && !xrayRoutingChanged) return ProviderRoutingRefreshResult.Unchanged
 
         val change = when {

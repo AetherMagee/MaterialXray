@@ -29,6 +29,8 @@ class SubscriptionAppRoutingRepository @Inject constructor(
         return replaceActiveRouting(routing)
     }
 
+    suspend fun clear(): Boolean = replaceActiveRouting(null)
+
     private suspend fun replaceActiveRouting(routing: SubscriptionAppRouting?): Boolean {
         val targetAssignments = routing
             ?.let { buildProviderAssignments(it) }
