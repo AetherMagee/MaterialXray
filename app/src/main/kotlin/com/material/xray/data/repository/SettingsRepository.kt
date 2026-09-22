@@ -28,6 +28,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.builtins.ListSerializer
@@ -122,6 +123,11 @@ class SettingsRepository @Inject constructor(
         val ROUTING_DOMAIN_STRATEGY = stringPreferencesKey("routing_domain_strategy")
         val ROUTING_DOMAIN_MATCHER = stringPreferencesKey("routing_domain_matcher")
         val ROUTING_FALLBACK_OUTBOUND = stringPreferencesKey("routing_fallback_outbound")
+        val PROVIDER_ROUTING_RULES = stringPreferencesKey("provider_routing_rules")
+        val PROVIDER_ROUTING_RULES_VERSION = intPreferencesKey("provider_routing_rules_version")
+        val PROVIDER_ROUTING_DOMAIN_STRATEGY = stringPreferencesKey("provider_routing_domain_strategy")
+        val PROVIDER_ROUTING_DOMAIN_MATCHER = stringPreferencesKey("provider_routing_domain_matcher")
+        val PROVIDER_ROUTING_FALLBACK_OUTBOUND = stringPreferencesKey("provider_routing_fallback_outbound")
         val USE_ROOT_SERVICE = booleanPreferencesKey("use_root_service")
         val ROOT_CONNECTION_BACKEND = stringPreferencesKey("root_connection_backend")
         val NOTIFICATION_ENABLED = booleanPreferencesKey("notification_enabled")
@@ -236,7 +242,7 @@ class SettingsRepository @Inject constructor(
     val showBothLatencyResults: Flow<Boolean> = store.data.map { prefs ->
         prefs[SHOW_BOTH_LATENCY_RESULTS] ?: false
     }
-    val routingRules: Flow<List<RoutingRule>> = store.data.map { prefs ->
+    val customRoutingRules: Flow<List<RoutingRule>> = store.data.map { prefs ->
         decodeRoutingRules(
             rulesEncoded = prefs[ROUTING_RULES],
             rulesVersion = prefs[ROUTING_RULES_VERSION],
@@ -244,14 +250,54 @@ class SettingsRepository @Inject constructor(
             deletedDefaultRuleIds = prefs[DELETED_DEFAULT_ROUTING_RULE_IDS].orEmpty(),
         )
     }
-    val routingDomainStrategy: Flow<String> = store.data.map { prefs ->
+    val subscriptionRoutingRules: Flow<List<RoutingRule>> = store.data.map { prefs ->
+        decodeProviderRoutingRules(prefs[PROVIDER_ROUTING_RULES], prefs[PROVIDER_ROUTING_RULES_VERSION])
+    }
+    val routingRules: Flow<List<RoutingRule>> = combine(
+        customRoutingRules,
+        subscriptionRoutingRules,
+        routingPolicyControl,
+    ) { custom, provider, policy ->
+        custom + provider.takeIf { policy == RoutingPolicyControl.SubscriptionProvider }.orEmpty()
+    }
+    val customRoutingDomainStrategy: Flow<String> = store.data.map { prefs ->
         SubscriptionRouting.normalizeDomainStrategy(prefs[ROUTING_DOMAIN_STRATEGY])
     }
-    val routingDomainMatcher: Flow<String?> = store.data.map { prefs ->
+    val subscriptionRoutingDomainStrategy: Flow<String> = store.data.map { prefs ->
+        SubscriptionRouting.normalizeDomainStrategy(prefs[PROVIDER_ROUTING_DOMAIN_STRATEGY])
+    }
+    val routingDomainStrategy: Flow<String> = combine(
+        customRoutingDomainStrategy,
+        subscriptionRoutingDomainStrategy,
+        routingPolicyControl,
+    ) { custom, provider, policy ->
+        if (policy == RoutingPolicyControl.SubscriptionProvider) provider else custom
+    }
+    val customRoutingDomainMatcher: Flow<String?> = store.data.map { prefs ->
         SubscriptionRouting.normalizeDomainMatcher(prefs[ROUTING_DOMAIN_MATCHER])
     }
-    val routingFallbackOutbound: Flow<XrayOutbound?> = store.data.map { prefs ->
+    val subscriptionRoutingDomainMatcher: Flow<String?> = store.data.map { prefs ->
+        SubscriptionRouting.normalizeDomainMatcher(prefs[PROVIDER_ROUTING_DOMAIN_MATCHER])
+    }
+    val routingDomainMatcher: Flow<String?> = combine(
+        customRoutingDomainMatcher,
+        subscriptionRoutingDomainMatcher,
+        routingPolicyControl,
+    ) { custom, provider, policy ->
+        if (policy == RoutingPolicyControl.SubscriptionProvider) provider else custom
+    }
+    val customRoutingFallbackOutbound: Flow<XrayOutbound?> = store.data.map { prefs ->
         XrayOutbound.fromTagOrNull(prefs[ROUTING_FALLBACK_OUTBOUND])
+    }
+    val subscriptionRoutingFallbackOutbound: Flow<XrayOutbound?> = store.data.map { prefs ->
+        XrayOutbound.fromTagOrNull(prefs[PROVIDER_ROUTING_FALLBACK_OUTBOUND])
+    }
+    val routingFallbackOutbound: Flow<XrayOutbound?> = combine(
+        customRoutingFallbackOutbound,
+        subscriptionRoutingFallbackOutbound,
+        routingPolicyControl,
+    ) { custom, provider, policy ->
+        if (policy == RoutingPolicyControl.SubscriptionProvider) provider else custom
     }
     val notificationSettings: Flow<NotificationSettings> = store.data.map { prefs ->
         NotificationSettings(
@@ -534,18 +580,30 @@ class SettingsRepository @Inject constructor(
         prefs.remove(ROUTING_RULE_STATES)
     }
 
+    suspend fun setCustomRouting(routing: SubscriptionRouting) = store.edit { prefs ->
+        val normalized = routing.normalized()
+        prefs[ROUTING_RULES] = encodeRoutingRules(normalized.rules)
+        prefs[ROUTING_RULES_VERSION] = CURRENT_ROUTING_RULES_VERSION
+        prefs[DELETED_DEFAULT_ROUTING_RULE_IDS] = deletedDefaultRuleIds(normalized.rules)
+        prefs.remove(ROUTING_RULE_STATES)
+        prefs[ROUTING_DOMAIN_STRATEGY] = normalized.domainStrategy
+        normalized.domainMatcher?.let { prefs[ROUTING_DOMAIN_MATCHER] = it }
+            ?: prefs.remove(ROUTING_DOMAIN_MATCHER)
+        normalized.fallbackOutboundTag?.let { prefs[ROUTING_FALLBACK_OUTBOUND] = it }
+            ?: prefs.remove(ROUTING_FALLBACK_OUTBOUND)
+    }
+
     suspend fun setSubscriptionRouting(routing: SubscriptionRouting?) = store.edit { prefs ->
         val normalized = routing?.normalized()
         val rules = normalized?.rules.orEmpty()
-        prefs[ROUTING_RULES] = encodeRoutingRules(rules)
-        prefs[ROUTING_RULES_VERSION] = CURRENT_ROUTING_RULES_VERSION
-        prefs[DELETED_DEFAULT_ROUTING_RULE_IDS] = deletedDefaultRuleIds(rules)
-        prefs.remove(ROUTING_RULE_STATES)
-        prefs[ROUTING_DOMAIN_STRATEGY] = normalized?.domainStrategy ?: SubscriptionRouting.DEFAULT_DOMAIN_STRATEGY
-        normalized?.domainMatcher?.let { prefs[ROUTING_DOMAIN_MATCHER] = it }
-            ?: prefs.remove(ROUTING_DOMAIN_MATCHER)
-        normalized?.fallbackOutboundTag?.let { prefs[ROUTING_FALLBACK_OUTBOUND] = it }
-            ?: prefs.remove(ROUTING_FALLBACK_OUTBOUND)
+        prefs[PROVIDER_ROUTING_RULES] = encodeRoutingRules(rules)
+        prefs[PROVIDER_ROUTING_RULES_VERSION] = CURRENT_ROUTING_RULES_VERSION
+        prefs[PROVIDER_ROUTING_DOMAIN_STRATEGY] =
+            normalized?.domainStrategy ?: SubscriptionRouting.DEFAULT_DOMAIN_STRATEGY
+        normalized?.domainMatcher?.let { prefs[PROVIDER_ROUTING_DOMAIN_MATCHER] = it }
+            ?: prefs.remove(PROVIDER_ROUTING_DOMAIN_MATCHER)
+        normalized?.fallbackOutboundTag?.let { prefs[PROVIDER_ROUTING_FALLBACK_OUTBOUND] = it }
+            ?: prefs.remove(PROVIDER_ROUTING_FALLBACK_OUTBOUND)
     }
 
     suspend fun getAllAsMap(): Map<String, String> {
@@ -662,6 +720,19 @@ class SettingsRepository @Inject constructor(
             map["routing_fallback_outbound"]
                 ?.let(SubscriptionRouting::normalizeFallbackOutboundTag)
                 ?.let { prefs[ROUTING_FALLBACK_OUTBOUND] = it }
+            map["provider_routing_rules"]?.takeIf { it.isNotBlank() }?.let { prefs[PROVIDER_ROUTING_RULES] = it }
+            map["provider_routing_rules_version"]
+                ?.toIntOrNull()
+                ?.let { prefs[PROVIDER_ROUTING_RULES_VERSION] = it }
+            map["provider_routing_domain_strategy"]
+                ?.let(SubscriptionRouting::normalizeDomainStrategy)
+                ?.let { prefs[PROVIDER_ROUTING_DOMAIN_STRATEGY] = it }
+            map["provider_routing_domain_matcher"]
+                ?.let(SubscriptionRouting::normalizeDomainMatcher)
+                ?.let { prefs[PROVIDER_ROUTING_DOMAIN_MATCHER] = it }
+            map["provider_routing_fallback_outbound"]
+                ?.let(SubscriptionRouting::normalizeFallbackOutboundTag)
+                ?.let { prefs[PROVIDER_ROUTING_FALLBACK_OUTBOUND] = it }
             map["deleted_default_routing_rule_ids"]
                 ?.split(",")
                 ?.map { it.trim().trim('[', ']') }
@@ -725,15 +796,28 @@ class SettingsRepository @Inject constructor(
         }
 
         val stateOverrides = decodeRoutingRuleStates(statesEncoded)
-        return RoutingRuleCatalog.defaults().map { rule ->
-            rule.copy(enabled = stateOverrides[rule.id] ?: rule.enabled)
-        }
+        return defaultRoutingRules(stateOverrides, deletedDefaultRuleIds)
     }
 
     private fun encodeRoutingRules(rules: List<RoutingRule>): String = json.encodeToString(ListSerializer(RoutingRule.serializer()), rules)
+
+    private fun decodeProviderRoutingRules(rulesEncoded: String?, rulesVersion: Int?): List<RoutingRule> = runCatching {
+        if (rulesEncoded.isNullOrBlank() || rulesVersion != CURRENT_ROUTING_RULES_VERSION) {
+            emptyList()
+        } else {
+            json.decodeFromString(ListSerializer(RoutingRule.serializer()), rulesEncoded)
+        }
+    }.getOrDefault(emptyList())
 
     private fun deletedDefaultRuleIds(rules: List<RoutingRule>): Set<String> {
         val presentRuleIds = rules.mapTo(mutableSetOf()) { it.id }
         return RoutingRuleCatalog.defaultIds().filterNotTo(mutableSetOf()) { it in presentRuleIds }
     }
 }
+
+internal fun defaultRoutingRules(
+    stateOverrides: Map<String, Boolean>,
+    deletedDefaultRuleIds: Set<String>,
+): List<RoutingRule> = RoutingRuleCatalog.defaults()
+    .filterNot { it.id in deletedDefaultRuleIds }
+    .map { rule -> rule.copy(enabled = stateOverrides[rule.id] ?: rule.enabled) }

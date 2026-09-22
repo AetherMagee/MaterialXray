@@ -2,6 +2,7 @@ package com.material.xray.model
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
@@ -57,6 +58,33 @@ data class RoutingRule(
         forEach { add(JsonPrimitive(it)) }
     }
 }
+
+fun RoutingRule.toXrayRules(): List<JsonObject> {
+    if (operator == RoutingRuleOperator.AND) return listOf(toXrayRule())
+
+    fun base(): MutableMap<String, JsonElement> = mutableMapOf(
+        "type" to JsonPrimitive("field"),
+        "outboundTag" to JsonPrimitive(outboundTag),
+    )
+
+    val rules = buildList {
+        domains.cleanRoutingEntries().takeIf(List<String>::isNotEmpty)?.let { values ->
+            add(JsonObject(base().apply { put("domain", values.asRoutingJsonArray()) }))
+        }
+        ips.cleanRoutingEntries().takeIf(List<String>::isNotEmpty)?.let { values ->
+            add(JsonObject(base().apply { put("ip", values.asRoutingJsonArray()) }))
+        }
+        port?.takeIf(String::isNotBlank)?.let { add(JsonObject(base().apply { put("port", JsonPrimitive(it)) })) }
+        protocols.cleanRoutingEntries().takeIf(List<String>::isNotEmpty)?.let { values ->
+            add(JsonObject(base().apply { put("protocol", values.asRoutingJsonArray()) }))
+        }
+    }
+    return rules.ifEmpty { listOf(JsonObject(base())) }
+}
+
+private fun List<String>.cleanRoutingEntries(): List<String> = map(String::trim).filter(String::isNotEmpty)
+
+private fun List<String>.asRoutingJsonArray(): JsonArray = buildJsonArray { forEach { add(JsonPrimitive(it)) } }
 
 object RoutingRuleCatalog {
     private val ruDirectDomains = listOf(

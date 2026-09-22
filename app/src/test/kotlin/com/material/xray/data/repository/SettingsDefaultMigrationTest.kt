@@ -2,6 +2,7 @@ package com.material.xray.data.repository
 
 import androidx.datastore.preferences.core.mutablePreferencesOf
 import androidx.datastore.preferences.core.stringPreferencesKey
+import com.material.xray.model.RoutingPolicyControl
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -32,7 +33,7 @@ class SettingsDefaultMigrationTest {
         val migrated = migration.migrate(preferences)
 
         assertNull(migrated[SettingsRepository.XRAY_BUFFER_SIZE_KIB])
-        assertEquals(6, migrated[SETTINGS_DEFAULTS_REVISION])
+        assertEquals(8, migrated[SETTINGS_DEFAULTS_REVISION])
     }
 
     @Test
@@ -51,7 +52,7 @@ class SettingsDefaultMigrationTest {
         val migrated = SettingsDefaultMigration().migrate(preferences)
 
         assertNull(migrated[SettingsRepository.TUN_NAME])
-        assertEquals(6, migrated[SETTINGS_DEFAULTS_REVISION])
+        assertEquals(8, migrated[SETTINGS_DEFAULTS_REVISION])
     }
 
     @Test
@@ -65,7 +66,7 @@ class SettingsDefaultMigrationTest {
         val migrated = SettingsDefaultMigration().migrate(preferences)
 
         assertNull(migrated[latencyDnsServers])
-        assertEquals(6, migrated[SETTINGS_DEFAULTS_REVISION])
+        assertEquals(8, migrated[SETTINGS_DEFAULTS_REVISION])
     }
 
     @Test
@@ -127,7 +128,7 @@ class SettingsDefaultMigrationTest {
             "77.88.8.8,77.88.8.1,2a02:6b8::feed:0ff,2a02:6b8:0:1::feed:0ff",
             migrated[SettingsRepository.DOMESTIC_DNS_SERVERS],
         )
-        assertEquals(6, migrated[SETTINGS_DEFAULTS_REVISION])
+        assertEquals(8, migrated[SETTINGS_DEFAULTS_REVISION])
     }
 
     @Test
@@ -160,7 +161,7 @@ class SettingsDefaultMigrationTest {
         val migrated = SettingsDefaultMigration().migrate(preferences)
 
         assertEquals(current, migrated[SettingsRepository.DNS_SERVERS])
-        assertEquals(6, migrated[SETTINGS_DEFAULTS_REVISION])
+        assertEquals(8, migrated[SETTINGS_DEFAULTS_REVISION])
     }
 
     @Test
@@ -206,12 +207,104 @@ class SettingsDefaultMigrationTest {
 
         assertNull(migratedIpv4[SettingsRepository.DNS_SERVERS])
         assertNull(migratedDualStack[SettingsRepository.DNS_SERVERS])
-        assertEquals(6, migratedIpv4[SETTINGS_DEFAULTS_REVISION])
+        assertEquals(8, migratedIpv4[SETTINGS_DEFAULTS_REVISION])
+    }
+
+    @Test
+    fun `provider controlled routing moves into provider storage`() = runTest {
+        val preferences = mutablePreferencesOf(
+            SETTINGS_DEFAULTS_REVISION to 6,
+            SettingsRepository.ROUTING_POLICY_CONTROL to RoutingPolicyControl.SubscriptionProvider.value,
+            SettingsRepository.ROUTING_RULES to "provider-rules",
+            SettingsRepository.ROUTING_RULES_VERSION to 2,
+            SettingsRepository.ROUTING_DOMAIN_STRATEGY to "IPIfNonMatch",
+            SettingsRepository.ROUTING_DOMAIN_MATCHER to "mph",
+            SettingsRepository.ROUTING_FALLBACK_OUTBOUND to "direct",
+            SettingsRepository.ROUTING_RULE_STATES to "states",
+            SettingsRepository.DELETED_DEFAULT_ROUTING_RULE_IDS to setOf("block-ads"),
+        )
+
+        val migrated = SettingsDefaultMigration().migrate(preferences)
+
+        assertEquals("provider-rules", migrated[SettingsRepository.PROVIDER_ROUTING_RULES])
+        assertEquals(2, migrated[SettingsRepository.PROVIDER_ROUTING_RULES_VERSION])
+        assertEquals("IPIfNonMatch", migrated[SettingsRepository.PROVIDER_ROUTING_DOMAIN_STRATEGY])
+        assertEquals("mph", migrated[SettingsRepository.PROVIDER_ROUTING_DOMAIN_MATCHER])
+        assertEquals("direct", migrated[SettingsRepository.PROVIDER_ROUTING_FALLBACK_OUTBOUND])
+        assertNull(migrated[SettingsRepository.ROUTING_RULES])
+        assertNull(migrated[SettingsRepository.ROUTING_RULES_VERSION])
+        assertNull(migrated[SettingsRepository.ROUTING_RULE_STATES])
+        assertEquals(setOf("block-ads"), migrated[SettingsRepository.DELETED_DEFAULT_ROUTING_RULE_IDS])
+    }
+
+    @Test
+    fun `direct provider routing upgrade without custom state suppresses defaults`() = runTest {
+        val preferences = mutablePreferencesOf(
+            SETTINGS_DEFAULTS_REVISION to 6,
+            SettingsRepository.ROUTING_POLICY_CONTROL to RoutingPolicyControl.SubscriptionProvider.value,
+            SettingsRepository.ROUTING_RULES to "provider-rules",
+            SettingsRepository.ROUTING_RULES_VERSION to 2,
+        )
+
+        val migrated = SettingsDefaultMigration().migrate(preferences)
+
+        assertEquals("provider-rules", migrated[SettingsRepository.PROVIDER_ROUTING_RULES])
+        assertEquals(
+            setOf("ru-direct", "block-ads"),
+            migrated[SettingsRepository.DELETED_DEFAULT_ROUTING_RULE_IDS],
+        )
+    }
+
+    @Test
+    fun `user controlled routing remains in custom storage`() = runTest {
+        val preferences = mutablePreferencesOf(
+            SETTINGS_DEFAULTS_REVISION to 6,
+            SettingsRepository.ROUTING_POLICY_CONTROL to RoutingPolicyControl.User.value,
+            SettingsRepository.ROUTING_RULES to "custom-rules",
+            SettingsRepository.ROUTING_RULES_VERSION to 2,
+        )
+
+        val migrated = SettingsDefaultMigration().migrate(preferences)
+
+        assertEquals("custom-rules", migrated[SettingsRepository.ROUTING_RULES])
+        assertEquals(2, migrated[SettingsRepository.ROUTING_RULES_VERSION])
+        assertNull(migrated[SettingsRepository.PROVIDER_ROUTING_RULES])
+    }
+
+    @Test
+    fun `revision seven provider state without custom routing suppresses resurrected defaults`() = runTest {
+        val preferences = mutablePreferencesOf(
+            SETTINGS_DEFAULTS_REVISION to 7,
+            SettingsRepository.ROUTING_POLICY_CONTROL to RoutingPolicyControl.SubscriptionProvider.value,
+            SettingsRepository.PROVIDER_ROUTING_RULES to "[]",
+        )
+
+        val migrated = SettingsDefaultMigration().migrate(preferences)
+
+        assertEquals(
+            setOf("ru-direct", "block-ads"),
+            migrated[SettingsRepository.DELETED_DEFAULT_ROUTING_RULE_IDS],
+        )
+        assertEquals(8, migrated[SETTINGS_DEFAULTS_REVISION])
+    }
+
+    @Test
+    fun `revision seven repair preserves existing custom routing state`() = runTest {
+        val preferences = mutablePreferencesOf(
+            SETTINGS_DEFAULTS_REVISION to 7,
+            SettingsRepository.ROUTING_POLICY_CONTROL to RoutingPolicyControl.SubscriptionProvider.value,
+            SettingsRepository.ROUTING_RULES to "custom-rules",
+        )
+
+        val migrated = SettingsDefaultMigration().migrate(preferences)
+
+        assertEquals("custom-rules", migrated[SettingsRepository.ROUTING_RULES])
+        assertNull(migrated[SettingsRepository.DELETED_DEFAULT_ROUTING_RULE_IDS])
     }
 
     @Test
     fun `current revision does not rerun migrations`() = runTest {
-        val preferences = mutablePreferencesOf(SETTINGS_DEFAULTS_REVISION to 6)
+        val preferences = mutablePreferencesOf(SETTINGS_DEFAULTS_REVISION to 8)
 
         assertFalse(SettingsDefaultMigration().shouldMigrate(preferences))
     }
@@ -229,7 +322,7 @@ class SettingsDefaultMigrationTest {
     @Test(expected = IllegalArgumentException::class)
     fun `DataStore lifecycle rejects newer settings revision`() = runTest {
         SettingsDefaultMigration().shouldMigrate(
-            mutablePreferencesOf(SETTINGS_DEFAULTS_REVISION to 7),
+            mutablePreferencesOf(SETTINGS_DEFAULTS_REVISION to 9),
         )
     }
 

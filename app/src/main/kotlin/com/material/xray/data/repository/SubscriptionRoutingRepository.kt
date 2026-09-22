@@ -11,7 +11,18 @@ class SubscriptionRoutingRepository @Inject constructor(
     private val settingsRepository: SettingsRepository,
     private val subscriptionDao: SubscriptionDao,
 ) {
-    suspend fun apply(routing: SubscriptionRouting): Boolean = replaceActiveRouting(routing)
+    suspend fun apply(routing: SubscriptionRouting): Boolean {
+        val target = routing.normalized()
+        val current = SubscriptionRouting(
+            rules = settingsRepository.customRoutingRules.first(),
+            domainStrategy = settingsRepository.customRoutingDomainStrategy.first(),
+            domainMatcher = settingsRepository.customRoutingDomainMatcher.first(),
+            fallbackOutboundTag = settingsRepository.customRoutingFallbackOutbound.first()?.tag,
+        ).normalized()
+        if (current == target) return false
+        settingsRepository.setCustomRouting(target)
+        return true
+    }
 
     suspend fun applyForSubscription(subscriptionId: Long): Boolean {
         val subscription = subscriptionDao.getById(subscriptionId) ?: return false
@@ -24,10 +35,10 @@ class SubscriptionRoutingRepository @Inject constructor(
     private suspend fun replaceActiveRouting(routing: SubscriptionRouting?): Boolean {
         val target = routing?.normalized() ?: SubscriptionRouting(emptyList())
         val current = SubscriptionRouting(
-            rules = settingsRepository.routingRules.first(),
-            domainStrategy = settingsRepository.routingDomainStrategy.first(),
-            domainMatcher = settingsRepository.routingDomainMatcher.first(),
-            fallbackOutboundTag = settingsRepository.routingFallbackOutbound.first()?.tag,
+            rules = settingsRepository.subscriptionRoutingRules.first(),
+            domainStrategy = settingsRepository.subscriptionRoutingDomainStrategy.first(),
+            domainMatcher = settingsRepository.subscriptionRoutingDomainMatcher.first(),
+            fallbackOutboundTag = settingsRepository.subscriptionRoutingFallbackOutbound.first()?.tag,
         ).normalized()
         if (current == target) return false
         settingsRepository.setSubscriptionRouting(target)

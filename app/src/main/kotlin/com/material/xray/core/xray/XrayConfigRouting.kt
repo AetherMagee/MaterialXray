@@ -1,14 +1,11 @@
 package com.material.xray.core.xray
 
 import com.material.xray.model.RoutingRule
-import com.material.xray.model.RoutingRuleOperator
 import com.material.xray.model.SubscriptionRouting
 import com.material.xray.model.isIpv4DnsServerLiteral
 import com.material.xray.model.isIpv6DnsServerLiteral
 import com.material.xray.model.resolveDnsServersForIpv6
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
+import com.material.xray.model.toXrayRules
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
@@ -119,11 +116,7 @@ internal fun buildRouting(
                 add(lanDomainRoutingRule())
             }
             routingRules.filter { it.enabled }.forEach { rule ->
-                if (rule.operator == RoutingRuleOperator.OR) {
-                    buildOrRules(rule).forEach { add(it) }
-                } else {
-                    add(rule.toXrayRule())
-                }
+                rule.toXrayRules().forEach { add(it) }
             }
             appProxyRoutes.filter { it.applyRoutingRules }.forEach { route ->
                 add(appProxyRoutingRule(route.inboundTag, defaultRouteTarget))
@@ -215,49 +208,6 @@ private fun lanDomainRoutingRule() = buildJsonObject {
     put("type", "field")
     put("domain", buildJsonArray { add("geosite:private") })
     put("outboundTag", "direct")
-}
-
-private fun buildOrRules(rule: RoutingRule): List<JsonObject> {
-    fun base(): MutableMap<String, JsonElement> = mutableMapOf(
-        "type" to JsonPrimitive("field"),
-        "outboundTag" to JsonPrimitive(rule.outboundTag),
-    )
-
-    val rules = mutableListOf<JsonObject>()
-    rule.domains.cleanEntries().takeIf { it.isNotEmpty() }?.let { domains ->
-        rules += JsonObject(
-            base().apply {
-                put("domain", buildJsonArray { domains.forEach { add(it) } })
-            },
-        )
-    }
-    rule.ips.cleanEntries().takeIf { it.isNotEmpty() }?.let { ips ->
-        rules += JsonObject(
-            base().apply {
-                put("ip", buildJsonArray { ips.forEach { add(it) } })
-            },
-        )
-    }
-    rule.port?.takeIf { it.isNotBlank() }?.let { port ->
-        rules += JsonObject(
-            base().apply {
-                put("port", JsonPrimitive(port))
-            },
-        )
-    }
-    rule.protocols.cleanEntries().takeIf { it.isNotEmpty() }?.let { protocols ->
-        rules += JsonObject(
-            base().apply {
-                put("protocol", buildJsonArray { protocols.forEach { add(it) } })
-            },
-        )
-    }
-
-    if (rules.isEmpty()) {
-        rules += JsonObject(base())
-    }
-
-    return rules
 }
 
 private fun String.commaSeparatedValues(): List<String> = split(",").map { it.trim() }.filter { it.isNotEmpty() }

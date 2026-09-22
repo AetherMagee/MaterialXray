@@ -21,6 +21,9 @@
     <string name="routing_default_rule_block_ads_name">Block ads</string>
     <string name="routing_rules_managed_by_provider">Routing rules are managed by %1$s</string>
     <string name="routing_rules_managed_by_selected_subscription">Routing rules are managed by the selected subscription</string>
+    <string name="routing_some_rules_managed_by_provider">Some routing rules are managed by %1$s</string>
+    <string name="routing_some_rules_managed_by_selected_subscription">Some routing rules are managed by the selected subscription</string>
+    <string name="routing_profile_rule_orphaned">The provider no longer supplies the original rule. This local change is inactive.</string>
     <string name="routing_scope_custom">Custom</string>
     <string name="routing_scope_subscription_wide">Subscription-wide</string>
     <string name="routing_scope_profile_specific">Profile-specific</string>

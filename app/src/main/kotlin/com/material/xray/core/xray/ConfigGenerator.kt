@@ -1,5 +1,6 @@
 package com.material.xray.core.xray
 
+import com.material.xray.model.ProfileRoutingOverrideEngine
 import com.material.xray.model.RoutingRule
 import com.material.xray.model.ServerConfig
 import com.material.xray.model.SubscriptionRouting
@@ -47,7 +48,10 @@ class ConfigGenerator {
         val bootstrapDnsHosts = bootstrapDnsHosts(server, appProxyRoutes)
         if (server.rawConfigJson.isNotBlank()) {
             return injectTunIntoRawConfig(
-                rawJson = server.rawConfigJson,
+                rawJson = ProfileRoutingOverrideEngine.apply(
+                    server.rawConfigJson,
+                    server.profileRoutingOverrides,
+                ),
                 tunName = tunName,
                 fwmark = fwmark,
                 dnsServers = dnsServers,

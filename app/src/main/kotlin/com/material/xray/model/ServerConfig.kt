@@ -20,6 +20,7 @@ data class ServerConfig(
     val extra: Map<String, String> = emptyMap(),
     val rawUri: String = "",
     val rawConfigJson: String = "",
+    val profileRoutingOverrides: List<ProfileRoutingOverride> = emptyList(),
     @Transient val bootstrapDnsHosts: Map<String, List<String>> = emptyMap(),
 ) {
     @Serializable

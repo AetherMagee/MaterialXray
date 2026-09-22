@@ -10,6 +10,7 @@ import com.material.xray.data.parser.FetchedSubscription
 import com.material.xray.data.parser.ShareLinkParser
 import com.material.xray.data.parser.SubscriptionFetcher
 import com.material.xray.data.parser.SubscriptionUrlReplacement
+import com.material.xray.model.ProfileRoutingOverrideEngine
 import com.material.xray.model.ServerConfig
 import com.material.xray.model.SubscriptionAppRouting
 import com.material.xray.model.SubscriptionRequestIdentity
@@ -216,7 +217,8 @@ class SubscriptionRepository @Inject constructor(
         return database.withTransaction {
             val current = subscriptionDao.getById(subId) ?: return@withTransaction null
             val existingServers = serverDao.getBySubscription(subId)
-            val finalServers = mergeGuardedServersInto(existingServers, prepared.servers)
+            val refreshedServers = carryProfileRoutingOverridesInto(existingServers, prepared.servers, json)
+            val finalServers = mergeGuardedServersInto(existingServers, refreshedServers)
             serverDao.deleteBySubscription(subId)
             val insertedIds = if (finalServers.isEmpty()) emptyList() else serverDao.insertAll(finalServers)
             subscriptionDao.update(current.applyFetchedData(prepared.fetched))
@@ -429,6 +431,72 @@ internal fun mergeGuardedServersInto(
     }
 
     return (slotted + unmatchedGuarded).mapIndexed { index, server -> server.copy(sortOrder = index) }
+}
+
+/** Carries local per-rule deltas onto refreshed profiles without guarding the entire server. */
+internal fun carryProfileRoutingOverridesInto(
+    existingServers: List<ServerEntity>,
+    fetchedServers: List<ServerEntity>,
+    json: Json = Json { ignoreUnknownKeys = true },
+): List<ServerEntity> {
+    data class ExistingOverride(
+        val index: Int,
+        val entity: ServerEntity,
+        val config: ServerConfig,
+        val baseConfigJson: String,
+    )
+
+    val existingOverrides = existingServers.mapIndexedNotNull { index, entity ->
+        if (entity.guarded) return@mapIndexedNotNull null
+        val config = runCatching { json.decodeFromString<ServerConfig>(entity.configJson) }.getOrNull()
+            ?: return@mapIndexedNotNull null
+        if (config.profileRoutingOverrides.isEmpty()) return@mapIndexedNotNull null
+        ExistingOverride(
+            index = index,
+            entity = entity,
+            config = config,
+            baseConfigJson = json.encodeToString(config.copy(profileRoutingOverrides = emptyList())),
+        )
+    }
+    if (existingOverrides.isEmpty()) return fetchedServers
+
+    fun uniqueNames(servers: List<ServerEntity>): Set<String> = servers.asSequence()
+        .map { it.name.trim() }
+        .filter(String::isNotEmpty)
+        .groupingBy { it }
+        .eachCount()
+        .filterValues { it == 1 }
+        .keys
+
+    val uniqueExistingNames = uniqueNames(existingServers)
+    val uniqueFetchedNames = uniqueNames(fetchedServers)
+    val claimedExistingIndices = mutableSetOf<Int>()
+    return fetchedServers.map { fetched ->
+        val fetchedConfig = runCatching { json.decodeFromString<ServerConfig>(fetched.configJson) }.getOrNull()
+            ?: return@map fetched
+        val fetchedBaseJson = json.encodeToString(fetchedConfig.copy(profileRoutingOverrides = emptyList()))
+        val exact = existingOverrides.firstOrNull {
+            it.index !in claimedExistingIndices && it.baseConfigJson == fetchedBaseJson
+        }
+        val name = fetched.name.trim()
+        val matched = exact ?: existingOverrides.firstOrNull {
+            it.index !in claimedExistingIndices &&
+                name.isNotEmpty() &&
+                name in uniqueExistingNames &&
+                name in uniqueFetchedNames &&
+                it.entity.name.trim() == name
+        } ?: return@map fetched
+        claimedExistingIndices += matched.index
+
+        val reconciled = ProfileRoutingOverrideEngine.reconcile(
+            fetchedConfig.rawConfigJson,
+            matched.config.profileRoutingOverrides,
+        )
+        fetched.copy(
+            configJson = json.encodeToString(fetchedConfig.copy(profileRoutingOverrides = reconciled)),
+            edited = true,
+        )
+    }
 }
 
 private const val MILLIS_PER_HOUR = 60L * 60L * 1000L

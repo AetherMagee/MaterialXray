@@ -23,6 +23,9 @@
     <string name="routing_default_rule_block_ads_name">Блокировка рекламы</string>
     <string name="routing_rules_managed_by_provider">Правилами маршрутизации управляет %1$s</string>
     <string name="routing_rules_managed_by_selected_subscription">Правилами маршрутизации управляет выбранная подписка</string>
+    <string name="routing_some_rules_managed_by_provider">Некоторыми правилами маршрутизации управляет %1$s</string>
+    <string name="routing_some_rules_managed_by_selected_subscription">Некоторыми правилами маршрутизации управляет выбранная подписка</string>
+    <string name="routing_profile_rule_orphaned">Провайдер больше не предоставляет исходное правило. Это локальное изменение неактивно.</string>
     <string name="routing_scope_custom">Пользовательские</string>
     <string name="routing_scope_subscription_wide">Для всей подписки</string>
     <string name="routing_scope_profile_specific">Для отдельного профиля</string>

@@ -7,6 +7,8 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.mutablePreferencesOf
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.material.xray.model.BackupData
+import com.material.xray.model.RoutingPolicyControl
+import com.material.xray.model.RoutingRuleCatalog
 import com.material.xray.model.canonicalDnsServers
 
 internal val SETTINGS_DEFAULTS_REVISION = intPreferencesKey("__settings_defaults_revision")
@@ -101,7 +103,7 @@ private fun validateSettingsDefaultsRevision(
     }
 }
 
-private const val CURRENT_SETTINGS_DEFAULTS_REVISION = 6
+private const val CURRENT_SETTINGS_DEFAULTS_REVISION = 8
 private const val PREVIOUS_XRAY_BUFFER_SIZE_KIB = 512
 private const val PREVIOUS_TUN_NAME = "xray0"
 private const val PREVIOUS_DNS_SERVERS = "1.1.1.1,1.0.0.1"
@@ -136,7 +138,50 @@ private val SETTINGS_DEFAULT_CHANGES = listOf(
         }
     },
     dnsPresetCanonicalisationChange(revision = 6),
+    providerRoutingSeparationChange(revision = 7),
+    missingCustomRoutingRepair(revision = 8),
 )
+
+private fun providerRoutingSeparationChange(revision: Int): SettingDefaultChange = object : SettingDefaultChange {
+    override val revision = revision
+
+    override fun apply(preferences: MutablePreferences) {
+        if (
+            RoutingPolicyControl.fromValue(preferences[SettingsRepository.ROUTING_POLICY_CONTROL]) !=
+            RoutingPolicyControl.SubscriptionProvider
+        ) {
+            return
+        }
+        preferences.move(SettingsRepository.ROUTING_RULES, SettingsRepository.PROVIDER_ROUTING_RULES)
+        preferences.move(SettingsRepository.ROUTING_RULES_VERSION, SettingsRepository.PROVIDER_ROUTING_RULES_VERSION)
+        preferences.move(SettingsRepository.ROUTING_DOMAIN_STRATEGY, SettingsRepository.PROVIDER_ROUTING_DOMAIN_STRATEGY)
+        preferences.move(SettingsRepository.ROUTING_DOMAIN_MATCHER, SettingsRepository.PROVIDER_ROUTING_DOMAIN_MATCHER)
+        preferences.move(SettingsRepository.ROUTING_FALLBACK_OUTBOUND, SettingsRepository.PROVIDER_ROUTING_FALLBACK_OUTBOUND)
+        preferences.remove(SettingsRepository.ROUTING_RULE_STATES)
+    }
+}
+
+private fun missingCustomRoutingRepair(revision: Int): SettingDefaultChange = object : SettingDefaultChange {
+    override val revision = revision
+
+    override fun apply(preferences: MutablePreferences) {
+        val providerControlled =
+            RoutingPolicyControl.fromValue(preferences[SettingsRepository.ROUTING_POLICY_CONTROL]) ==
+                RoutingPolicyControl.SubscriptionProvider
+        val customRoutingAbsent =
+            preferences[SettingsRepository.ROUTING_RULES] == null &&
+                preferences[SettingsRepository.ROUTING_RULES_VERSION] == null &&
+                preferences[SettingsRepository.DELETED_DEFAULT_ROUTING_RULE_IDS] == null
+        if (providerControlled && customRoutingAbsent) {
+            preferences[SettingsRepository.DELETED_DEFAULT_ROUTING_RULE_IDS] = RoutingRuleCatalog.defaultIds()
+        }
+    }
+}
+
+private fun <T> MutablePreferences.move(from: Preferences.Key<T>, to: Preferences.Key<T>) {
+    this[from]?.let { this[to] = it }
+    remove(from)
+}
 
 /**
  * Rewrites a stored DNS setting to the current form of the preset it came from.

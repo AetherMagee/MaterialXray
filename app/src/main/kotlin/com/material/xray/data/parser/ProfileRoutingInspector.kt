@@ -1,5 +1,11 @@
 package com.material.xray.data.parser
 
+import com.material.xray.model.ProfileRoutingOverride
+import com.material.xray.model.RoutingRule
+import com.material.xray.model.RoutingRuleOperator
+import com.material.xray.model.ServerConfig
+import com.material.xray.model.XrayOutbound
+import com.material.xray.model.toXrayRules
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -24,6 +30,12 @@ internal data class ProfileRoutingRule(
     val additionalConditionFields: List<String>,
     val enabled: Boolean,
     val rawJson: String,
+    val originalRuleJson: String,
+    val originalIndex: Int,
+    val editableRule: RoutingRule?,
+    val locallyModified: Boolean,
+    val locallyEdited: Boolean,
+    val orphaned: Boolean,
 )
 
 internal sealed interface ProfileRoutingTarget {
@@ -64,35 +76,115 @@ internal object ProfileRoutingInspector {
         "network",
     )
 
-    fun inspect(rawConfigJson: String): ProfileRouting? {
-        if (rawConfigJson.isBlank()) return null
-        val root = runCatching { json.parseToJsonElement(rawConfigJson) as? JsonObject }.getOrNull() ?: return null
-        val routing = root["routing"] as? JsonObject ?: return null
-        val rules = (routing["rules"] as? JsonArray).orEmpty().mapIndexedNotNull { index, element ->
+    fun inspect(rawConfigJson: String): ProfileRouting? = inspect(rawConfigJson, emptyList())
+
+    fun inspect(config: ServerConfig): ProfileRouting? = inspect(config.rawConfigJson, config.profileRoutingOverrides)
+
+    private fun inspect(
+        rawConfigJson: String,
+        overrides: List<ProfileRoutingOverride>,
+    ): ProfileRouting? {
+        val root = runCatching { json.parseToJsonElement(rawConfigJson) as? JsonObject }.getOrNull()
+        val routing = root?.get("routing") as? JsonObject
+        if (routing == null && overrides.none(ProfileRoutingOverride::orphaned)) return null
+        val rawRules = routing?.get("rules") as? JsonArray ?: JsonArray(emptyList())
+        val matchedOverrides = overrides.matchingRules(rawRules)
+        val rules = rawRules.mapIndexedNotNull { index, element ->
             val rule = element as? JsonObject ?: return@mapIndexedNotNull null
             if (rule.isRoutineDefaultRoute()) return@mapIndexedNotNull null
-            ProfileRoutingRule(
-                id = rule.string("id") ?: rule.string("ruleTag") ?: "profile-rule-${index + 1}",
-                name = rule.string("__name__")
-                    ?: rule.string("name")
-                    ?: rule.string("ruleTag")
-                    ?: "Rule ${index + 1}",
-                target = rule.string("outboundTag")?.let(ProfileRoutingTarget::Outbound)
-                    ?: rule.string("balancerTag")?.let(ProfileRoutingTarget::Balancer),
-                domains = rule.stringList("domain"),
-                ips = rule.stringList("ip"),
-                port = rule.string("port"),
-                protocols = rule.stringList("protocol"),
-                additionalConditionFields = rule.keys.filterNot(ordinaryFields::contains).sorted(),
-                enabled = (rule["enabled"] as? JsonPrimitive)?.booleanOrNull ?: true,
-                rawJson = prettyJson.encodeToString(JsonObject.serializer(), rule),
-            )
+            describeRule(rule, index, matchedOverrides[index])
+        }
+        val orphanedRules = overrides.filter(ProfileRoutingOverride::orphaned).mapNotNull { override ->
+            val original = runCatching { json.parseToJsonElement(override.originalRuleJson) as? JsonObject }.getOrNull()
+                ?: return@mapNotNull null
+            describeRule(original, override.originalIndex, override)
         }
         return ProfileRouting(
-            rules = rules,
-            domainStrategy = routing.string("domainStrategy"),
-            domainMatcher = routing.string("domainMatcher"),
+            rules = rules + orphanedRules,
+            domainStrategy = routing?.string("domainStrategy"),
+            domainMatcher = routing?.string("domainMatcher"),
         )
+    }
+
+    private fun describeRule(
+        original: JsonObject,
+        index: Int,
+        override: ProfileRoutingOverride?,
+    ): ProfileRoutingRule {
+        val replacement = override?.replacement
+        val replacementRules = replacement?.toXrayRules()
+        val effective = replacementRules?.singleOrNull() ?: original
+        val id = original.string("id") ?: original.string("ruleTag") ?: "profile-rule-${index + 1}"
+        val name = original.displayName(index, replacement)
+        val target = effective.target(replacement)
+        val editableRule = replacement ?: effective.toEditableRule(id, name)
+        val rawElement = replacementRules?.singleOrNull() ?: replacementRules?.let(::JsonArray) ?: effective
+        return ProfileRoutingRule(
+            id = id,
+            name = name,
+            target = target,
+            domains = replacement?.domains ?: effective.stringList("domain"),
+            ips = replacement?.ips ?: effective.stringList("ip"),
+            port = replacement?.port ?: effective.string("port"),
+            protocols = replacement?.protocols ?: effective.stringList("protocol"),
+            additionalConditionFields = if (replacement != null) {
+                emptyList()
+            } else {
+                effective.keys.filterNot(ordinaryFields::contains).sorted()
+            },
+            enabled = override?.enabled ?: ((original["enabled"] as? JsonPrimitive)?.booleanOrNull ?: true),
+            rawJson = prettyJson.encodeToString(rawElement),
+            originalRuleJson = json.encodeToString(JsonObject.serializer(), original),
+            originalIndex = index,
+            editableRule = editableRule,
+            locallyModified = override != null,
+            locallyEdited = replacement != null,
+            orphaned = override?.orphaned == true,
+        )
+    }
+
+    private fun JsonObject.displayName(index: Int, replacement: RoutingRule?): String = replacement?.name
+        ?: string("__name__")
+        ?: string("name")
+        ?: string("ruleTag")
+        ?: "Rule ${index + 1}"
+
+    private fun JsonObject.target(replacement: RoutingRule?): ProfileRoutingTarget? = replacement
+        ?.let { ProfileRoutingTarget.Outbound(it.outboundTag) }
+        ?: string("outboundTag")?.let(ProfileRoutingTarget::Outbound)
+        ?: string("balancerTag")?.let(ProfileRoutingTarget::Balancer)
+
+    private fun JsonObject.toEditableRule(id: String, name: String): RoutingRule? {
+        if (string("type")?.equals("field", ignoreCase = true) == false) return null
+        val outboundTag = string("outboundTag") ?: return null
+        if (XrayOutbound.fromTagOrNull(outboundTag) == null) return null
+        if (keys.any { it !in ordinaryFields }) return null
+        return RoutingRule(
+            id = id,
+            name = name,
+            outboundTag = outboundTag,
+            domains = stringList("domain"),
+            ips = stringList("ip"),
+            port = string("port"),
+            protocols = stringList("protocol"),
+            operator = RoutingRuleOperator.AND,
+        )
+    }
+
+    private fun List<ProfileRoutingOverride>.matchingRules(rules: JsonArray): Map<Int, ProfileRoutingOverride> {
+        val availableIndices = rules.indices.toMutableSet()
+        return buildMap {
+            this@matchingRules.filterNot(ProfileRoutingOverride::orphaned).forEach { override ->
+                val original = runCatching {
+                    json.parseToJsonElement(override.originalRuleJson) as? JsonObject
+                }.getOrNull() ?: return@forEach
+                val index = override.originalIndex.takeIf { it in availableIndices && rules[it] == original }
+                    ?: availableIndices.firstOrNull { rules[it] == original }
+                    ?: return@forEach
+                put(index, override)
+                availableIndices.remove(index)
+            }
+        }
     }
 
     private fun JsonObject.string(key: String): String? = (this[key] as? JsonPrimitive)

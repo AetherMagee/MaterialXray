@@ -1,5 +1,6 @@
 package com.material.xray.core.xray
 
+import com.material.xray.model.ProfileRoutingOverride
 import com.material.xray.model.Protocol
 import com.material.xray.model.RoutingRuleCatalog
 import com.material.xray.model.ServerConfig
@@ -291,6 +292,38 @@ class ConfigGeneratorTest {
             .first().jsonObject
 
         assertEquals("direct", firstOutbound.getValue("tag").jsonPrimitive.content)
+    }
+
+    @Test
+    fun `profile routing override removes its provider rule before injection`() {
+        val originalRule = """{"type":"field","domain":["disabled.example"],"outboundTag":"proxy"}"""
+        val rawServer = vlessReality.copy(
+            rawConfigJson = """
+                {
+                  "outbounds": [{"tag":"proxy","protocol":"vless","settings":{}}],
+                  "routing": {"rules": [$originalRule]}
+                }
+            """.trimIndent(),
+            profileRoutingOverrides = listOf(
+                ProfileRoutingOverride(
+                    originalRuleJson = originalRule,
+                    originalIndex = 0,
+                    enabled = false,
+                ),
+            ),
+        )
+
+        val rules = Json.parseToJsonElement(generator.generate(rawServer)).jsonObject
+            .getValue("routing").jsonObject
+            .getValue("rules").jsonArray
+
+        assertTrue(
+            rules.none { rule ->
+                rule.jsonObject["domain"]?.jsonArray?.any {
+                    it.jsonPrimitive.content == "disabled.example"
+                } == true
+            },
+        )
     }
 
     @Test
