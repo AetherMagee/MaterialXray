@@ -146,7 +146,7 @@ private sealed interface RoutingRuleAction {
 }
 
 private sealed interface ProfileRoutingRuleAction {
-    data class Edit(val rule: ProfileRoutingRule) : ProfileRoutingRuleAction
+    data class Save(val editableRule: EditableRoutingRule, val updatedRule: RoutingRule) : ProfileRoutingRuleAction
     data class Toggle(val rule: ProfileRoutingRule, val enabled: Boolean) : ProfileRoutingRuleAction
 }
 
@@ -223,14 +223,16 @@ fun RoutingScreen(
 
     fun applyProfileRuleAction(action: ProfileRoutingRuleAction) {
         when (action) {
-            is ProfileRoutingRuleAction.Edit -> {
-                val editable = action.rule.editableRule ?: return
-                editingRule = EditableRoutingRule(
-                    rule = editable,
-                    isNew = false,
-                    profileOriginalRuleJson = action.rule.originalRuleJson,
-                    profileOriginalIndex = action.rule.originalIndex,
+            is ProfileRoutingRuleAction.Save -> {
+                saveEditedRoutingRule(
+                    editableRule = action.editableRule,
+                    updatedRule = action.updatedRule,
+                    profileRules = profileRouting?.rules.orEmpty(),
+                    onUpdateProfile = viewModel::updateProfileRule,
+                    onAdd = viewModel::addRule,
+                    onUpdate = viewModel::updateRule,
                 )
+                editingRule = null
             }
             is ProfileRoutingRuleAction.Toggle -> viewModel.setProfileRuleEnabled(action.rule, action.enabled)
         }
@@ -317,7 +319,12 @@ fun RoutingScreen(
                         if (rule.orphaned || rule.editableRule == null) {
                             onViewRule(rule.toViewerRequest())
                         } else {
-                            requestProfileRuleAction(ProfileRoutingRuleAction.Edit(rule))
+                            editingRule = EditableRoutingRule(
+                                rule = rule.editableRule,
+                                isNew = false,
+                                profileOriginalRuleJson = rule.originalRuleJson,
+                                profileOriginalIndex = rule.originalIndex,
+                            )
                         }
                     },
                     onProfileRuleToggled = { rule, enabled ->
@@ -334,15 +341,12 @@ fun RoutingScreen(
             rule = editableRule.rule,
             onDismiss = { editingRule = null },
             onSave = { updatedRule ->
-                saveEditedRoutingRule(
-                    editableRule = editableRule,
-                    updatedRule = updatedRule,
-                    profileRules = profileRouting?.rules.orEmpty(),
-                    onUpdateProfile = viewModel::updateProfileRule,
-                    onAdd = viewModel::addRule,
-                    onUpdate = viewModel::updateRule,
-                )
-                editingRule = null
+                val action = ProfileRoutingRuleAction.Save(editableRule, updatedRule)
+                if (editableRule.profileOriginalRuleJson != null) {
+                    requestProfileRuleAction(action)
+                } else {
+                    applyProfileRuleAction(action)
+                }
             },
         )
     }
