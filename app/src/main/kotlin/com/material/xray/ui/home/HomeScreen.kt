@@ -1235,7 +1235,9 @@ private fun ConnectionPanel(
     ) {
         Text(
             text = connectionHeading(connectionState, geoDataDownloadFraction),
+            modifier = Modifier.fillMaxWidth(),
             style = MaterialTheme.typography.titleLarge,
+            textAlign = TextAlign.Center,
             color = when {
                 isConnected -> MaterialTheme.colorScheme.primary
                 isRestartRequired || isInterfaceBusy -> MaterialTheme.colorScheme.error
