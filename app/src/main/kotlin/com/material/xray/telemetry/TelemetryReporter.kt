@@ -178,7 +178,7 @@ class TelemetryReporter internal constructor(
 ) {
     @Inject constructor(client: TelemetryClient) : this(client, SystemClock::elapsedRealtime)
 
-    @Volatile private var enabled = false
+    @Volatile private var enabled = client.isEnabled
     private val lastIssueAt = mutableMapOf<String, Long>()
     private var activeConnectionTrace: TelemetryTransaction? = null
     private var activeConnectionContext: TelemetryConnectionContext? = null

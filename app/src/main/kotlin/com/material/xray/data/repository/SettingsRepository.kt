@@ -23,6 +23,7 @@ import com.material.xray.model.SubscriptionRouting
 import com.material.xray.model.XrayLogLevel
 import com.material.xray.model.XrayOutbound
 import com.material.xray.model.XrayRuntimeSettings
+import com.material.xray.telemetry.DiagnosticsConsentMirror
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -80,6 +81,7 @@ class SettingsRepository @Inject constructor(
 ) {
     private val store get() = context.dataStore
     private val json = Json { ignoreUnknownKeys = true }
+    private val diagnosticsConsentMirror = DiagnosticsConsentMirror(context)
 
     companion object {
         val TUN_NAME = stringPreferencesKey("tun_name")
@@ -474,8 +476,12 @@ class SettingsRepository @Inject constructor(
     suspend fun setAppUpdateChecksEnabled(enabled: Boolean) = store.edit { prefs ->
         prefs[APP_UPDATE_CHECKS_ENABLED] = enabled
     }
-    suspend fun setDiagnosticsEnabled(enabled: Boolean) = store.edit { prefs ->
-        prefs[DIAGNOSTICS_ENABLED] = enabled
+    suspend fun setDiagnosticsEnabled(enabled: Boolean) {
+        if (!enabled) diagnosticsConsentMirror.setEnabled(false)
+        store.edit { prefs ->
+            prefs[DIAGNOSTICS_ENABLED] = enabled
+        }
+        if (enabled) diagnosticsConsentMirror.setEnabled(true)
     }
     suspend fun markDiagnosticsNoticeShown() = store.edit { prefs ->
         prefs[DIAGNOSTICS_NOTICE_SHOWN] = true

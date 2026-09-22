@@ -12,7 +12,9 @@ import com.material.xray.service.GeoDataUpdateScheduler
 import com.material.xray.service.OemAutostartManager
 import com.material.xray.service.StartupDiagnosticsLogger
 import com.material.xray.service.SubscriptionUpdateScheduler
+import com.material.xray.telemetry.DiagnosticsConsentMirror
 import com.material.xray.telemetry.TelemetryReporter
+import com.material.xray.telemetry.initializeSentryTelemetry
 import com.material.xray.ui.home.HomeDataState
 import com.material.xray.ui.settings.SettingsDataState
 import dagger.hilt.android.HiltAndroidApp
@@ -61,13 +63,20 @@ class MaterialXrayApp : Application() {
     lateinit var appScope: CoroutineScope
 
     override fun onCreate() {
+        val diagnosticsConsentMirror = DiagnosticsConsentMirror(this)
+        // This must precede Hilt's injection in super.onCreate() so opted-in users can report
+        // failures while the application graph and eager startup state are being constructed.
+        if (diagnosticsConsentMirror.isEnabled()) initializeSentryTelemetry(this)
         // Per-app locales must be applied before super.onCreate(): Hilt injects this class there,
         // which constructs HomeDataState, and that eagerly builds locale-dependent server
         // summaries. Initializing afterwards would race that first snapshot on API <= 32.
         initializeAppLocales(this)
         super.onCreate()
         appScope.launch(start = CoroutineStart.UNDISPATCHED) {
-            settingsRepository.diagnosticsEnabled.collectLatest(telemetryReporter::setEnabled)
+            settingsRepository.diagnosticsEnabled.distinctUntilChanged().collectLatest { enabled ->
+                diagnosticsConsentMirror.setEnabled(enabled)
+                telemetryReporter.setEnabled(enabled)
+            }
         }
         appScope.launch(start = CoroutineStart.UNDISPATCHED) {
             settingsRepository.geoDataUpdateIntervalHours.distinctUntilChanged().collectLatest(

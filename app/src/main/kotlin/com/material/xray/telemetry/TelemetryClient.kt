@@ -24,6 +24,8 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 interface TelemetryClient {
+    val isEnabled: Boolean
+
     fun enable()
 
     fun disable()
@@ -70,14 +72,16 @@ enum class TelemetryStatus {
 class SentryTelemetryClient @Inject constructor(
     @param:ApplicationContext private val context: Context,
 ) : TelemetryClient {
+    override val isEnabled: Boolean
+        get() = Sentry.isEnabled()
+
     override fun enable() {
-        SentryAndroid.init(context) { options -> configureTelemetryOptions(options, isDebuggable()) }
-        Sentry.setUser(User().apply { id = installationId() })
+        initializeSentryTelemetry(context)
     }
 
     override fun disable() {
         Sentry.close()
-        installationIdFile().delete()
+        context.telemetryInstallationIdFile().delete()
     }
 
     override fun setTag(key: String, value: String) = Sentry.setTag(key, value)
@@ -125,20 +129,27 @@ class SentryTelemetryClient @Inject constructor(
         }
         Sentry.captureEvent(event)
     }
-
-    private fun installationId(): String {
-        val file = installationIdFile()
-        val existing = runCatching { UUID.fromString(file.readText().trim()).toString() }.getOrNull()
-        if (existing != null) return existing
-        return UUID.randomUUID().toString().also { id ->
-            runCatching { file.writeText(id) }
-        }
-    }
-
-    private fun installationIdFile(): File = context.noBackupFilesDir.resolve(INSTALLATION_ID_FILE)
-
-    private fun isDebuggable(): Boolean = context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0
 }
+
+internal fun initializeSentryTelemetry(context: Context) {
+    if (!Sentry.isEnabled()) {
+        SentryAndroid.init(context) { options -> configureTelemetryOptions(options, context.isDebuggable()) }
+    }
+    Sentry.setUser(User().apply { id = context.telemetryInstallationId() })
+}
+
+private fun Context.telemetryInstallationId(): String {
+    val file = telemetryInstallationIdFile()
+    val existing = runCatching { UUID.fromString(file.readText().trim()).toString() }.getOrNull()
+    if (existing != null) return existing
+    return UUID.randomUUID().toString().also { id ->
+        runCatching { file.writeText(id) }
+    }
+}
+
+private fun Context.telemetryInstallationIdFile(): File = noBackupFilesDir.resolve(INSTALLATION_ID_FILE)
+
+private fun Context.isDebuggable(): Boolean = applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0
 
 private class SentryTransaction(
     private val transaction: io.sentry.ITransaction,

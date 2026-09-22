@@ -48,6 +48,20 @@ class TelemetryReporterTest {
     }
 
     @Test
+    fun `reporter adopts an early initialized client`() {
+        val client = FakeTelemetryClient(initiallyEnabled = true)
+        val reporter = TelemetryReporter(client)
+
+        reporter.recordConnectionAttempt(connection())
+        reporter.setEnabled(false)
+
+        assertEquals(0, client.enableCount)
+        assertEquals(1, client.disableCount)
+        assertEquals(1, client.transactions.size)
+        assertEquals(TelemetryStatus.Cancelled, client.transactions.single().finishedWith)
+    }
+
+    @Test
     fun `connection completion records one exhaustive outcome`() {
         val client = FakeTelemetryClient()
         val reporter = TelemetryReporter(client).apply { setEnabled(true) }
@@ -297,7 +311,9 @@ private data class RecordedChildSpan(
     val description: String,
 )
 
-private class FakeTelemetryClient : TelemetryClient {
+private class FakeTelemetryClient(initiallyEnabled: Boolean = false) : TelemetryClient {
+    override var isEnabled = initiallyEnabled
+        private set
     var enableCount = 0
     var disableCount = 0
     val metrics = mutableListOf<RecordedMetric>()
@@ -308,10 +324,12 @@ private class FakeTelemetryClient : TelemetryClient {
 
     override fun enable() {
         enableCount++
+        isEnabled = true
     }
 
     override fun disable() {
         disableCount++
+        isEnabled = false
     }
 
     override fun setTag(key: String, value: String) = Unit
