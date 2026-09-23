@@ -82,10 +82,14 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -395,10 +399,20 @@ class XrayService : VpnService() {
         )
         screenStateReceiverRegistered = true
         registerNetworkCallback()
+        val tetherPollingBackend = combine(
+            connectionStateCoordinator.state,
+            settingsRepo.tunnelTetheredClients,
+            settingsRepo.rootConnectionBackend,
+        ) { state, tetherEnabled, backend ->
+            backend.takeIf {
+                state is ConnectionState.Connected && tetherEnabled && connectionManager.isUsingRootRuntime
+            }
+        }.stateIn(scope, SharingStarted.Eagerly, null)
         scope.launch {
             while (isActive) {
+                tetherPollingBackend.filterNotNull().first()
                 delay(LOCAL_ADDRESS_CHECK_INTERVAL_MS)
-                refreshTetherLocalAddresses()
+                tetherPollingBackend.value?.let { refreshTetherLocalAddresses(it) }
             }
         }
     }
@@ -1523,13 +1537,10 @@ class XrayService : VpnService() {
 
     // Downstream hotspot/USB/Bluetooth interfaces are not default INTERNET networks. Keep
     // their exact-address rules current even when passive health monitoring is disabled.
-    private suspend fun refreshTetherLocalAddresses() {
+    private suspend fun refreshTetherLocalAddresses(backend: RootConnectionBackend) {
         if (!connectionManager.isUsingRootRuntime) return
-        val backend = settingsRepo.rootConnectionBackend.first()
         if (backend == RootConnectionBackend.Tproxy) {
             if (!connectionManager.isTetherIngressActive()) return
-        } else if (!settingsRepo.tunnelTetheredClients.first()) {
-            return
         }
         runConnectionCommand {
             val config = activeConfig ?: return@runConnectionCommand
@@ -2383,7 +2394,7 @@ class XrayService : VpnService() {
         private const val SLOW_NETWORK_STABILIZATION_LOG_THRESHOLD_MS = 500L
         private const val NETWORK_RETARGET_WAKE_LOCK_TIMEOUT_MS = 30_000L
         private const val CONNECTION_COMMAND_WAKE_LOCK_TIMEOUT_MS = 10 * 60_000L
-        private const val LOCAL_ADDRESS_CHECK_INTERVAL_MS = 2_000L
+        private const val LOCAL_ADDRESS_CHECK_INTERVAL_MS = 5_000L
         private const val NETWORK_SAFETY_CHECK_INTERVAL_MS = 60_000L
         private const val PERIODIC_ROOT_ROUTE_VERIFICATION_REASON = "periodic root route verification"
         private val NETWORK_RETARGET_RETRY_DELAYS_MS = listOf(250L, 500L, 1_000L, 2_000L, 4_000L, 8_000L)
