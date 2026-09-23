@@ -179,6 +179,9 @@ internal object DatabaseMigrations {
         20 to listOf(
             "ALTER TABLE subscriptions ADD COLUMN allowInsecureUpdates INTEGER NOT NULL DEFAULT 0",
         ),
+        21 to listOf(
+            "ALTER TABLE subscriptions ADD COLUMN lastAutoRefreshFailureAt INTEGER NOT NULL DEFAULT 0",
+        ),
     )
 
     val all: Array<Migration> = sqlByStartVersion.entries

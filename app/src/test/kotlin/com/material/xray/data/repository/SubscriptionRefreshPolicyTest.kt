@@ -29,4 +29,45 @@ class SubscriptionRefreshPolicyTest {
 
         assertFalse(subscription.isDueForRefresh(nowMillis = 2_000))
     }
+
+    @Test
+    fun failedAutomaticRefreshWaitsAnHourBeforeRetrying() {
+        val subscription = SubscriptionEntity(
+            name = "Sub",
+            url = "https://example.com",
+            lastUpdated = 1_000,
+            lastAutoRefreshFailureAt = 3_601_000,
+            autoUpdateIntervalHours = 1,
+        )
+
+        assertFalse(subscription.isDueForRefresh(nowMillis = 3_601_000 + 59 * 60_000))
+        assertTrue(subscription.isDueForRefresh(nowMillis = 3_601_000 + 60 * 60_000))
+    }
+
+    @Test
+    fun failedInvalidatedSubscriptionIsBackedOffEvenWhenAutomaticUpdatesAreDisabled() {
+        val subscription = SubscriptionEntity(
+            name = "Sub",
+            url = "https://example.com",
+            lastUpdated = 0,
+            lastAutoRefreshFailureAt = 1_000,
+            autoUpdateIntervalHours = 0,
+        )
+
+        assertFalse(subscription.isDueForRefresh(nowMillis = 2_000))
+        assertTrue(subscription.isDueForRefresh(nowMillis = 3_601_000))
+    }
+
+    @Test
+    fun successfulRefreshClearsTheEffectOfAnEarlierFailure() {
+        val subscription = SubscriptionEntity(
+            name = "Sub",
+            url = "https://example.com",
+            lastUpdated = 10_000_000,
+            lastAutoRefreshFailureAt = 9_000_000,
+            autoUpdateIntervalHours = 1,
+        )
+
+        assertTrue(subscription.isDueForRefresh(nowMillis = 13_600_000))
+    }
 }

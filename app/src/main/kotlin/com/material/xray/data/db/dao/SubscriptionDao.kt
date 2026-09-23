@@ -48,6 +48,9 @@ interface SubscriptionDao {
     @Query("UPDATE subscriptions SET autoUpdateIntervalHours = :intervalHours WHERE id = :id")
     suspend fun updateAutoUpdateInterval(id: Long, intervalHours: Int)
 
+    @Query("UPDATE subscriptions SET lastAutoRefreshFailureAt = :failedAt WHERE id = :id")
+    suspend fun recordAutoRefreshFailure(id: Long, failedAt: Long)
+
     @Query("UPDATE subscriptions SET descriptionHidden = :hidden WHERE id = :id")
     suspend fun updateDescriptionHidden(id: Long, hidden: Boolean)
 

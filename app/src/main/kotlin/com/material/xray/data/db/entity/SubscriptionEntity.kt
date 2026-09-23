@@ -10,6 +10,7 @@ data class SubscriptionEntity(
     val url: String,
     val preferJson: Boolean? = true,
     val lastUpdated: Long = 0,
+    val lastAutoRefreshFailureAt: Long = 0,
     val contentDisposition: String? = null,
     val contentType: String? = null,
     val profileTitle: String? = null,

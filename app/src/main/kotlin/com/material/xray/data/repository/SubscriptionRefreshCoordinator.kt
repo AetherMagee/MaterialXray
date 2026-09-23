@@ -29,13 +29,16 @@ class SubscriptionRefreshCoordinator @Inject constructor(
     private val operationMutex = Mutex()
 
     suspend fun refreshAll(): SubscriptionRepository.RefreshBatchResult = operationMutex.withLock {
-        refreshSubscriptions(subscriptionRepository.getAllSubscriptions())
+        refreshSubscriptions(subscriptionRepository.getAllSubscriptions(), automatic = false)
     }
 
     suspend fun refreshDueSubscriptions(
         nowMillis: Long = System.currentTimeMillis(),
     ): SubscriptionRepository.RefreshBatchResult = operationMutex.withLock {
-        refreshSubscriptions(subscriptionRepository.getAllSubscriptions().filter { it.isDueForRefresh(nowMillis) })
+        refreshSubscriptions(
+            subscriptionRepository.getAllSubscriptions().filter { it.isDueForRefresh(nowMillis) },
+            automatic = true,
+        )
     }
 
     suspend fun refreshSubscription(
@@ -89,6 +92,7 @@ class SubscriptionRefreshCoordinator @Inject constructor(
 
     private suspend fun refreshSubscriptions(
         subscriptions: List<SubscriptionEntity>,
+        automatic: Boolean,
     ): SubscriptionRepository.RefreshBatchResult {
         val successes = mutableMapOf<Long, SubscriptionRepository.RefreshResult>()
         val failures = mutableMapOf<Long, IOException>()
@@ -101,6 +105,9 @@ class SubscriptionRefreshCoordinator @Inject constructor(
                 throw error
             } catch (error: IOException) {
                 failures[subscription.id] = error
+                if (automatic) {
+                    subscriptionRepository.recordAutoRefreshFailure(subscription.id, System.currentTimeMillis())
+                }
             }
         }
         return SubscriptionRepository.RefreshBatchResult(successes = successes, failures = failures)

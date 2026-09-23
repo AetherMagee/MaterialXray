@@ -248,6 +248,10 @@ class SubscriptionRepository @Inject constructor(
         subscriptionDao.updateAutoUpdateInterval(subId, intervalHours.coerceAtLeast(0))
     }
 
+    internal suspend fun recordAutoRefreshFailure(subId: Long, failedAt: Long) {
+        subscriptionDao.recordAutoRefreshFailure(subId, failedAt)
+    }
+
     suspend fun setDescriptionHidden(subId: Long, hidden: Boolean) {
         subscriptionDao.updateDescriptionHidden(subId, hidden)
     }
@@ -371,6 +375,11 @@ class SubscriptionRepository @Inject constructor(
 }
 
 internal fun SubscriptionEntity.isDueForRefresh(nowMillis: Long): Boolean {
+    if (lastAutoRefreshFailureAt > lastUpdated &&
+        nowMillis - lastAutoRefreshFailureAt < AUTO_REFRESH_FAILURE_RETRY_INTERVAL_MILLIS
+    ) {
+        return false
+    }
     if (lastUpdated <= 0L) return true
 
     val interval = autoUpdateIntervalHours
@@ -500,3 +509,4 @@ internal fun carryProfileRoutingOverridesInto(
 }
 
 private const val MILLIS_PER_HOUR = 60L * 60L * 1000L
+private const val AUTO_REFRESH_FAILURE_RETRY_INTERVAL_MILLIS = MILLIS_PER_HOUR
