@@ -198,24 +198,46 @@ class TproxyManager internal constructor(
         val names = chainNames(appUid)
         val tools = if (state.ipv6Enabled) FirewallCommands.tools else listOf(IPV4)
         return tools.map { tool ->
-            val chain = names.prerouting
-            val rules = buildPreroutingCommands(tool, chain, plan)
+            val chain = names.tetherSlot(state.tetherChainSlot)
+            val previousChain = names.tetherSlot(state.nextTetherChainSlot())
+            val rules = buildPreroutingCommands(tool, names.prerouting, chain, plan)
                 .filter { it.startsWith("$tool -t mangle -A $chain ") }
-            FirewallRestoreBatch(tool, "mangle", listOf("$tool -t mangle -F $chain") + rules).command()
+            FirewallRestoreBatch(
+                tool,
+                "mangle",
+                listOf("$tool -t mangle -F $chain") + rules + "$tool -t mangle -R ${names.prerouting} 1 -j $chain",
+            ).command().let { restore ->
+                "$tool -t mangle -C ${names.prerouting} -j $previousChain && " +
+                    "{ $tool -t mangle -N $chain 2>/dev/null || true; } && $restore"
+            }
         }.shellAnd()
     }
 
     private fun tetherRoutingUpdateCommand(plan: TproxyTrafficPlan): String {
         val commands = mutableListOf(tetherAddressUpdateCommand(plan))
         if (!plan.runtimeState.ipv6Enabled) {
-            val chain = chainNames(appUid).prerouting
-            val forwardRules = ipv6TetherRejectRules(chain, plan).filter { it.startsWith("$IPV6 -t filter -A $chain ") }
-            val inputRules = tetherInputRuleCommands(IPV6, "${chain}I", requireNotNull(plan.runtimeState.tetherUpstreamInterface), "REJECT --reject-with icmp6-no-route")
-            commands += FirewallRestoreBatch(
+            val names = chainNames(appUid)
+            val forwardChain = names.tetherForwardSlot(plan.runtimeState.tetherChainSlot)
+            val inputChain = names.tetherInputSlot(plan.runtimeState.tetherChainSlot)
+            val forwardRules = ipv6TetherRejectRules(forwardChain, plan)
+            val inputRules = tetherInputRuleCommands(IPV6, inputChain, requireNotNull(plan.runtimeState.tetherUpstreamInterface), "REJECT --reject-with icmp6-no-route")
+            val restore = FirewallRestoreBatch(
                 IPV6,
                 "filter",
-                listOf("$IPV6 -t filter -F $chain", "$IPV6 -t filter -F ${chain}I") + forwardRules + inputRules,
+                listOf(
+                    "$IPV6 -t filter -F $forwardChain",
+                    "$IPV6 -t filter -F $inputChain",
+                ) + forwardRules + inputRules + listOf(
+                    "$IPV6 -t filter -R ${names.prerouting} 1 -j $forwardChain",
+                    "$IPV6 -t filter -R ${names.prerouting}I 1 -j $inputChain",
+                ),
             ).command()
+            val previousForwardChain = names.tetherForwardSlot(plan.runtimeState.nextTetherChainSlot())
+            val previousInputChain = names.tetherInputSlot(plan.runtimeState.nextTetherChainSlot())
+            commands += "$IPV6 -t filter -C ${names.prerouting} -j $previousForwardChain && " +
+                "$IPV6 -t filter -C ${names.prerouting}I -j $previousInputChain && " +
+                "{ $IPV6 -t filter -N $forwardChain 2>/dev/null || true; " +
+                "$IPV6 -t filter -N $inputChain 2>/dev/null || true; } && $restore"
         }
         return commands.shellAnd()
     }
@@ -397,13 +419,13 @@ class TproxyManager internal constructor(
         private fun firewallActivationCommands(plan: TproxyTrafficPlan, appUid: Int): List<FirewallRestoreBatch> {
             val state = plan.runtimeState
             val names = chainNames(appUid)
-            val ipv4 = buildPreroutingCommands(IPV4, names.prerouting, plan) +
+            val ipv4 = buildPreroutingCommands(IPV4, names.prerouting, names.tetherSlot(state.tetherChainSlot), plan) +
                 buildOutputActivationCommands(IPV4, names, plan, appUid, SLOT_A)
             val ipv6 = if (state.ipv6Enabled) {
                 FirewallRestoreBatch(
                     tool = IPV6,
                     table = "mangle",
-                    commands = buildPreroutingCommands(IPV6, names.prerouting, plan) +
+                    commands = buildPreroutingCommands(IPV6, names.prerouting, names.tetherSlot(state.tetherChainSlot), plan) +
                         buildOutputActivationCommands(IPV6, names, plan, appUid, SLOT_A),
                 )
             } else {
@@ -465,6 +487,7 @@ class TproxyManager internal constructor(
                 hasV4("OUTPUT -j ${names.output}"),
                 hasV4("${names.output} -j ${names.slot(state.outputChainSlot)}"),
                 hasV4("PREROUTING -j ${names.prerouting}"),
+                hasV4("${names.prerouting} -j ${names.tetherSlot(state.tetherChainSlot)}"),
                 hasV4("INPUT -j ${names.prerouting}L"),
                 "ip rule show | grep -q 'fwmark $prefix/$mask.*lookup ${state.routeTable}'",
                 "ip route show table ${state.routeTable} | grep -q '^local .* dev lo'",
@@ -484,7 +507,7 @@ class TproxyManager internal constructor(
                 for (protocol in listOf("tcp", "udp")) {
                     commands += hasV4("${names.prerouting}L ${listenerDestinationMatch(state)}-p $protocol -m $protocol --dport ${group.port} -m mark ! --mark $prefix/$mask -j DROP")
                     commands += hasV4(
-                        "${names.prerouting} -p $protocol -m mark --mark $mark/$groupMask -j TPROXY --on-port ${group.port} --on-ip ${
+                        "${names.tetherSlot(state.tetherChainSlot)} -p $protocol -m mark --mark $mark/$groupMask -j TPROXY --on-port ${group.port} --on-ip ${
                             tproxyOnIp(IPV4, state.ipv6Enabled, state.tetherUpstreamInterface != null)
                         } --tproxy-mark $mark/$groupMask",
                     )
@@ -507,6 +530,7 @@ class TproxyManager internal constructor(
                 commands += hasV6("OUTPUT -j ${names.output}")
                 commands += hasV6("${names.output} -j ${names.slot(state.outputChainSlot)}")
                 commands += hasV6("PREROUTING -j ${names.prerouting}")
+                commands += hasV6("${names.prerouting} -j ${names.tetherSlot(state.tetherChainSlot)}")
                 commands += hasV6("INPUT -j ${names.prerouting}L")
                 commands += "ip -6 rule show | grep -q 'fwmark $prefix/$mask.*lookup ${state.routeTable}'"
                 commands += "ip -6 route show table ${state.routeTable} | grep -q '^local .* dev lo'"
@@ -525,7 +549,7 @@ class TproxyManager internal constructor(
                     for (protocol in listOf("tcp", "udp")) {
                         commands += hasV6("${names.prerouting}L ${listenerDestinationMatch(state)}-p $protocol -m $protocol --dport ${group.port} -m mark ! --mark $prefix/$mask -j DROP")
                         commands += hasV6(
-                            "${names.prerouting} -p $protocol -m mark --mark $mark/$groupMask -j TPROXY " +
+                            "${names.tetherSlot(state.tetherChainSlot)} -p $protocol -m mark --mark $mark/$groupMask -j TPROXY " +
                                 "--on-port ${group.port} --on-ip ${tproxyOnIp(IPV6, state.ipv6Enabled)} " +
                                 "--tproxy-mark $mark/$groupMask",
                         )
@@ -546,38 +570,42 @@ class TproxyManager internal constructor(
                 commands += "case \"\$v6_slot_rules\" in *'--reject-with icmp6-no-route'*) true;; *) false;; esac"
             }
             state.tetherUpstreamInterface?.let { upstream ->
+                val tetherChain = names.tetherSlot(state.tetherChainSlot)
                 val basePort = state.groups.first().port
-                commands += hasV4("${names.prerouting} -i $upstream -j RETURN")
-                commands += hasV6("${names.prerouting} -i $upstream -j RETURN")
+                commands += hasV4("$tetherChain -i $upstream -j RETURN")
+                if (state.ipv6Enabled) commands += hasV6("$tetherChain -i $upstream -j RETURN")
                 if (state.dynamicLocalAddresses) {
-                    commands += hasV4("${names.prerouting} -m addrtype --dst-type LOCAL -j RETURN")
+                    commands += hasV4("$tetherChain -m addrtype --dst-type LOCAL -j RETURN")
                     if (state.ipv6Enabled) {
-                        commands += hasV6("${names.prerouting} -m addrtype --dst-type LOCAL -j RETURN")
+                        commands += hasV6("$tetherChain -m addrtype --dst-type LOCAL -j RETURN")
                     }
                 } else {
                     LocalAddresses.forTool(state.localAddresses, IPV4).forEach { address ->
-                        commands += hasV4("${names.prerouting} -d $address -j RETURN")
+                        commands += hasV4("$tetherChain -d $address -j RETURN")
                     }
                     if (state.ipv6Enabled) {
                         LocalAddresses.forTool(state.localAddresses, IPV6).forEach { address ->
-                            commands += hasV6("${names.prerouting} -d $address -j RETURN")
+                            commands += hasV6("$tetherChain -d $address -j RETURN")
                         }
                     }
                 }
                 for (protocol in listOf("tcp", "udp")) {
                     commands += hasV4(
-                        "${names.prerouting} -p $protocol -m $protocol --dport 53 -j TPROXY --on-port $basePort " +
+                        "$tetherChain -p $protocol -m $protocol --dport 53 -j TPROXY --on-port $basePort " +
                             "--on-ip 0.0.0.0 --tproxy-mark $baseMark/$groupMask",
                     )
                     commands += hasV4(
-                        "${names.prerouting} -p $protocol -j TPROXY --on-port $basePort --on-ip 0.0.0.0 " +
+                        "$tetherChain -p $protocol -j TPROXY --on-port $basePort --on-ip 0.0.0.0 " +
                             "--tproxy-mark $baseMark/$groupMask",
                     )
                 }
                 if (!state.ipv6Enabled) {
                     commands += hasV6("INPUT -j ${names.prerouting}I")
                     commands += hasV6("FORWARD -j ${names.prerouting}")
-                    commands += hasV6("${names.prerouting}I -i $upstream -j RETURN")
+                    commands += hasV6("${names.prerouting} -j ${names.tetherForwardSlot(state.tetherChainSlot)}")
+                    commands += hasV6("${names.prerouting}I -j ${names.tetherInputSlot(state.tetherChainSlot)}")
+                    commands += hasV6("${names.tetherInputSlot(state.tetherChainSlot)} -i $upstream -j RETURN")
+                    commands += hasV6("${names.tetherForwardSlot(state.tetherChainSlot)} -i $upstream -j RETURN")
                 }
             }
             return commands.shellAnd()
@@ -613,7 +641,7 @@ class TproxyManager internal constructor(
                 commands += "$tool -t filter -F ${names.prerouting}I 2>/dev/null || true"
                 commands += "$tool -t filter -X ${names.prerouting}I 2>/dev/null || true"
                 commands += "$tool -t filter -D FORWARD -j ${names.prerouting} 2>/dev/null || true"
-                val chains = listOf(names.output, names.slotA, names.slotB, names.prerouting, names.prerouting + "L") +
+                val chains = listOf(names.output, names.slotA, names.slotB, names.prerouting, names.tetherSlot(SLOT_A), names.tetherSlot(SLOT_B), names.prerouting + "L") +
                     names.guard.takeUnless { preserveGuard }
                 for (chain in chains.filterNotNull()) {
                     commands += "$tool -t mangle -F $chain 2>/dev/null || true"
@@ -621,6 +649,12 @@ class TproxyManager internal constructor(
                 }
                 commands += "$tool -t filter -F ${names.prerouting} 2>/dev/null || true"
                 commands += "$tool -t filter -X ${names.prerouting} 2>/dev/null || true"
+                for (slot in listOf(SLOT_A, SLOT_B)) {
+                    for (chain in listOf(names.tetherForwardSlot(slot), names.tetherInputSlot(slot))) {
+                        commands += "$tool -t filter -F $chain 2>/dev/null || true"
+                        commands += "$tool -t filter -X $chain 2>/dev/null || true"
+                    }
+                }
             }
             commands += "$IPV6 -t filter -D OUTPUT -j ${names.output} 2>/dev/null || true"
             for (chain in listOf(names.output, names.slotA, names.slotB)) {
@@ -636,7 +670,11 @@ class TproxyManager internal constructor(
                 commands += "ip -6 route del local ::/0 dev lo table $it 2>/dev/null || true"
                 commands += "ip -6 route del unreachable default table $it 2>/dev/null || true"
             }
+            val tetherSlots = listOf(SLOT_A, SLOT_B).flatMap { slot ->
+                listOf(names.tetherSlot(slot), names.tetherForwardSlot(slot), names.tetherInputSlot(slot))
+            }
             val ownedChains = listOf(names.output, names.slotA, names.slotB, names.prerouting, names.prerouting + "I", names.prerouting + "L", names.guard + "P") +
+                tetherSlots +
                 listOf(names.guard, names.guard + "I").takeUnless { preserveGuard }.orEmpty()
             commands += FirewallCommands.absentChains(ownedChains)
             return commands.joinToString("; ")
@@ -891,11 +929,14 @@ class TproxyManager internal constructor(
 
         private fun buildPreroutingCommands(
             tool: String,
+            dispatcher: String,
             chain: String,
             plan: TproxyTrafficPlan,
         ): List<String> = buildList {
             val groupMask = hex(TproxyCompatibilityDetector.GROUP_MARK_MASK)
+            add("$tool -t mangle -N $dispatcher")
             add("$tool -t mangle -N $chain")
+            add("$tool -t mangle -A $dispatcher -j $chain")
             plan.groups.forEach { group ->
                 val mark = hex(group.state.mark)
                 val onIp = tproxyOnIp(
@@ -945,7 +986,7 @@ class TproxyManager internal constructor(
             }
             // A direct connection to a wildcard listener must not depend on an address snapshot.
             // Intercepted traffic carries our mark and retains its original destination port.
-            val listenerChain = chain + "L"
+            val listenerChain = dispatcher + "L"
             add("$tool -t mangle -N $listenerChain")
             plan.groups.forEach { group ->
                 for (protocol in listOf("tcp", "udp")) {
@@ -956,7 +997,7 @@ class TproxyManager internal constructor(
                 }
             }
             add("$tool -t mangle -I INPUT 1 -j $listenerChain")
-            add("$tool -t mangle -I PREROUTING 1 -j $chain")
+            add("$tool -t mangle -I PREROUTING 1 -j $dispatcher")
         }
 
         private fun buildOutputActivationCommands(
@@ -1012,9 +1053,16 @@ class TproxyManager internal constructor(
                 add("$IPV6 -t filter -A ${names.output} -j $slotChain")
                 add("$IPV6 -t filter -I OUTPUT 1 -j ${names.output}")
                 if (plan.runtimeState.tetherUpstreamInterface != null) {
+                    val forwardChain = names.tetherForwardSlot(plan.runtimeState.tetherChainSlot)
+                    val inputChain = names.tetherInputSlot(plan.runtimeState.tetherChainSlot)
                     add("$IPV6 -t filter -N ${names.prerouting}")
-                    addAll(ipv6TetherRejectRules(names.prerouting, plan))
-                    addAll(tetherInputRules(IPV6, names.prerouting + "I", requireNotNull(plan.runtimeState.tetherUpstreamInterface), "REJECT --reject-with icmp6-no-route"))
+                    add("$IPV6 -t filter -N $forwardChain")
+                    add("$IPV6 -t filter -A ${names.prerouting} -j $forwardChain")
+                    addAll(ipv6TetherRejectRules(forwardChain, plan))
+                    add("$IPV6 -t filter -N ${names.prerouting}I")
+                    add("$IPV6 -t filter -N $inputChain")
+                    add("$IPV6 -t filter -A ${names.prerouting}I -j $inputChain")
+                    addAll(tetherInputRuleCommands(IPV6, inputChain, requireNotNull(plan.runtimeState.tetherUpstreamInterface), "REJECT --reject-with icmp6-no-route"))
                     add("$IPV6 -t filter -I INPUT 1 -j ${names.prerouting}I")
                     add("$IPV6 -t filter -I FORWARD 1 -j ${names.prerouting}")
                 }
@@ -1227,6 +1275,15 @@ class TproxyManager internal constructor(
             val prerouting: String,
         ) {
             fun slot(value: String): String = if (value == SLOT_A) slotA else slotB
+
+            fun tetherSlot(value: String): String {
+                require(value == SLOT_A || value == SLOT_B)
+                return prerouting + value.uppercase()
+            }
+
+            fun tetherForwardSlot(value: String): String = tetherSlot(value) + "F"
+
+            fun tetherInputSlot(value: String): String = tetherSlot(value) + "I"
         }
     }
 }

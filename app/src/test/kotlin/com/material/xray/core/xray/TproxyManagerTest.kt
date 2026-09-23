@@ -48,9 +48,9 @@ class TproxyManagerTest {
         val command = TproxyManager.activationCommand(dynamic, APP_UID)
         val verification = TproxyManager.verifyCommand(dynamic.runtimeState, APP_UID)
 
-        assertTrue(command.contains("-A MXP278b -m addrtype --dst-type LOCAL -j RETURN"))
-        assertFalse(command.contains("-A MXP278b -d 192.168.43.1/32 -j RETURN"))
-        assertTrue(verification.contains("has_v4 '-A MXP278b -m addrtype --dst-type LOCAL -j RETURN'"))
+        assertTrue(command.contains("-A MXP278bA -m addrtype --dst-type LOCAL -j RETURN"))
+        assertFalse(command.contains("-A MXP278bA -d 192.168.43.1/32 -j RETURN"))
+        assertTrue(verification.contains("has_v4 '-A MXP278bA -m addrtype --dst-type LOCAL -j RETURN'"))
     }
 
     @Test
@@ -82,10 +82,10 @@ class TproxyManagerTest {
     @Test
     fun `local listener ports are protected without blocking the same port on remote hosts`() {
         val command = TproxyManager.activationCommand(plan(tetherUpstreamInterface = "wlan0", tetherBypassLan = false), APP_UID)
-        assertTrue(command.contains("-A MXP278b -d 192.168.43.1/32 -j RETURN"))
-        assertFalse(command.contains("-A MXP278b -d 192.168.43.1/32 -p tcp --dport 48322 -j DROP"))
-        assertTrue(command.contains("-A MXP278b -d 127.0.0.0/8 -j RETURN"))
-        assertFalse(command.contains("-A MXP278b -p tcp --dport 48322 -j DROP"))
+        assertTrue(command.contains("-A MXP278bA -d 192.168.43.1/32 -j RETURN"))
+        assertFalse(command.contains("-A MXP278bA -d 192.168.43.1/32 -p tcp --dport 48322 -j DROP"))
+        assertTrue(command.contains("-A MXP278bA -d 127.0.0.0/8 -j RETURN"))
+        assertFalse(command.contains("-A MXP278bA -p tcp --dport 48322 -j DROP"))
         // Incoming direct connections (including unmarked self-dials) are blocked;
         // remote traffic intercepted into a managed group retains its mark and passes INPUT.
         assertTrue(command.contains("-A MXP278bL -p tcp --dport 48322 -m mark ! --mark 0x10000000/0x10000000 -j DROP"))
@@ -129,16 +129,18 @@ class TproxyManagerTest {
             RootShell.Result(0, "", "")
         }
         val base = plan(tetherUpstreamInterface = "wlan0")
-        val updated = base.copy(runtimeState = base.runtimeState.copy(localAddresses = listOf("127.0.0.1/32", "192.168.44.1/32")))
+        val updated = base.copy(runtimeState = base.runtimeState.copy(localAddresses = listOf("127.0.0.1/32", "192.168.44.1/32"), tetherChainSlot = "b"))
 
         assertTrue(manager.updateTetherAddresses(updated).success)
         val command = commands.single()
         assertTrue(command.contains("iptables-restore --noflush -w 2"))
-        assertTrue(command.contains("-F MXP278b"))
-        assertTrue(command.contains("-A MXP278b -d 192.168.44.1/32 -j RETURN"))
-        assertFalse(command.contains("-A MXP278b -d 192.168.43.1/32 -j RETURN"))
+        assertTrue(command.contains("-F MXP278bB"))
+        assertTrue(command.contains("-C MXP278b -j MXP278bA"))
+        assertTrue(command.contains("-A MXP278bB -d 192.168.44.1/32 -j RETURN"))
+        assertTrue(command.contains("-R MXP278b 1 -j MXP278bB"))
+        assertFalse(command.contains("-A MXP278bB -d 192.168.43.1/32 -j RETURN"))
         assertFalse(command.contains("-I PREROUTING"))
-        assertFalse(command.contains("-N MXP278b"))
+        assertFalse(command.contains("-N MXP278bL"))
     }
 
     @Test
@@ -148,17 +150,20 @@ class TproxyManagerTest {
             commands += command
             RootShell.Result(0, "", "")
         }
-        val updated = plan(tetherUpstreamInterface = "rmnet0")
+        val base = plan(tetherUpstreamInterface = "rmnet0")
+        val updated = base.copy(runtimeState = base.runtimeState.copy(tetherChainSlot = "b"))
 
         assertTrue(manager.updateTetherUpstream(updated, previousUpstream = "wlan0").success)
         assertEquals(6, commands.size)
         assertTrue(commands[0].contains("-A MXG278bP -i wlan0 -j ACCEPT"))
         assertTrue(commands[0].contains("-A MXG278bP -i rmnet0 -j ACCEPT"))
         assertTrue(commands[1].contains("-I FORWARD 1 -j MXG278b"))
-        assertTrue(commands[2].contains("-F MXP278b"))
-        assertTrue(commands[2].contains("-A MXP278b -i rmnet0 -j RETURN"))
-        assertTrue(commands[2].contains("-F MXP278bI"))
-        assertTrue(commands[2].contains("-A MXP278bI -i rmnet0 -j RETURN"))
+        assertTrue(commands[2].contains("-F MXP278bB"))
+        assertTrue(commands[2].contains("-A MXP278bB -i rmnet0 -j RETURN"))
+        assertTrue(commands[2].contains("-R MXP278b 1 -j MXP278bB"))
+        assertTrue(commands[2].contains("-F MXP278bBI"))
+        assertTrue(commands[2].contains("-C MXP278bI -j MXP278bAI"))
+        assertTrue(commands[2].contains("-A MXP278bBI -i rmnet0 -j RETURN"))
         assertTrue(commands[4].contains("-D PREROUTING -j MXG278bP"))
         assertTrue(commands[5].contains("-D FORWARD -j MXG278b"))
         assertFalse(commands[2].contains("-I PREROUTING"))
@@ -172,7 +177,8 @@ class TproxyManagerTest {
             RootShell.Result(if (commands.size == 3) 1 else 0, "", "update failed")
         }
 
-        assertFalse(manager.updateTetherUpstream(plan(tetherUpstreamInterface = "rmnet0"), previousUpstream = "wlan0").success)
+        val base = plan(tetherUpstreamInterface = "rmnet0")
+        assertFalse(manager.updateTetherUpstream(base.copy(runtimeState = base.runtimeState.copy(tetherChainSlot = "b")), previousUpstream = "wlan0").success)
         assertEquals(3, commands.size)
         assertTrue(commands.first().contains("-I PREROUTING 1 -j MXG278bP"))
         assertTrue(commands[1].contains("-I FORWARD 1 -j MXG278b"))
@@ -673,6 +679,9 @@ class TproxyManagerTest {
         assertTrue(command.contains("MXO${APP_UID.toString(16)}"))
         assertTrue(command.contains("fwmark 0x10000000/0x10000000"))
         assertTrue(command.contains("ip6tables -w 2 -t filter -D OUTPUT -j MXO278b"))
+        for (chain in listOf("MXP278bA", "MXP278bB", "MXP278bAF", "MXP278bAI", "MXP278bBF", "MXP278bBI")) {
+            assertTrue(command.contains("-N $chain"))
+        }
         assertFalse(command.contains("iptables-save"))
         assertFalse(command.contains("-F OUTPUT"))
         assertFalse(command.contains("route flush table"))
@@ -705,7 +714,7 @@ class TproxyManagerTest {
         assertTrue(lanReturn < publicCapture)
         assertTrue(command.contains("ip6tables -w 2 -t filter -I INPUT 1 -j MXP278bI"))
         assertTrue(command.contains("ip6tables -w 2 -t filter -I FORWARD 1 -j MXP278b"))
-        assertTrue(command.contains("ip6tables -w 2 -t filter -A MXP278b -j REJECT --reject-with icmp6-no-route"))
+        assertTrue(command.contains("ip6tables -w 2 -t filter -A MXP278bAF -j REJECT --reject-with icmp6-no-route"))
     }
 
     @Test
@@ -786,13 +795,13 @@ class TproxyManagerTest {
         )
         assertTrue(
             command.contains(
-                "has_v4 '-A MXP278b -p tcp -m tcp --dport 53 -j TPROXY --on-port 48321 " +
+                "has_v4 '-A MXP278bA -p tcp -m tcp --dport 53 -j TPROXY --on-port 48321 " +
                     "--on-ip 0.0.0.0 --tproxy-mark 0x10200000/0x1fe00000'",
             ),
         )
         assertTrue(
             command.contains(
-                "has_v4 '-A MXP278b -p udp -j TPROXY --on-port 48321 --on-ip 0.0.0.0 " +
+                "has_v4 '-A MXP278bA -p udp -j TPROXY --on-port 48321 --on-ip 0.0.0.0 " +
                     "--tproxy-mark 0x10200000/0x1fe00000'",
             ),
         )

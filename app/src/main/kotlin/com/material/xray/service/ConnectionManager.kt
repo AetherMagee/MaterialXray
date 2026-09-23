@@ -3,7 +3,7 @@ package com.material.xray.service
 import android.os.ParcelFileDescriptor
 import com.material.xray.R
 import com.material.xray.core.xray.ConfigGenerator
-import com.material.xray.core.xray.TproxyTrafficGroup
+import com.material.xray.core.xray.TetherIngressState
 import com.material.xray.core.xray.TproxyTrafficPlan
 import com.material.xray.core.xray.TunManager
 import com.material.xray.core.xray.XrayApiEndpoint
@@ -45,6 +45,7 @@ internal class ConnectionManager(
     private val serverResolver = dependencies.serverResolver
     private val tunGateway = dependencies.tunGateway
     private val tproxyGateway = dependencies.tproxyGateway
+    private val tetherIngress = TetherIngressController(tproxyGateway, log)
     private val cleanup = dependencies.cleanup
     private val stateStore = dependencies.stateStore
     private val processSupervisor = dependencies.rootProcess
@@ -1206,28 +1207,15 @@ internal class ConnectionManager(
 
     suspend fun refreshTetherAddresses(): Boolean {
         val state = stateStore.read() ?: return false
-        val current = state.tproxy?.takeIf { it.tetherUpstreamInterface != null } ?: return false
+        val current = state.tproxy?.takeIf { it.tetherIngress is TetherIngressState.Active } ?: return false
         if (!isProcessAlive(state.xrayPid)) return false
-        val addresses = tproxyGateway.readLocalAddresses(current.ipv6Enabled)
-        val updated = current.copy(localAddresses = addresses)
-        val plan = TproxyTrafficPlan(
-            runtimeState = updated,
-            groups = updated.groups.mapIndexed { index, group ->
-                TproxyTrafficGroup(group, emptySet(), isBase = index == 0)
-            },
-            bypassUids = emptySet(),
-            routeProfileIds = emptySet(),
-        )
-        val result = tproxyGateway.updateTetherAddresses(plan)
-        if (!result.success) {
-            log.append(LogSource.APP, "Tether address update failed: ${result.error}")
-            return false
-        }
-        if (!tproxyGateway.verify(updated).success) return false
+        val updated = tetherIngress.refreshAddresses(current) ?: return false
         stateStore.write(state.copy(tproxy = updated))
         log.append(LogSource.APP, "Tether addresses updated without restarting Xray")
         return true
     }
+
+    suspend fun isTetherIngressActive(): Boolean = stateStore.read()?.tproxy?.tetherIngress is TetherIngressState.Active
 
     suspend fun applyAppRoutingChanges(
         connectedState: ConnectionState.Connected,
@@ -1406,7 +1394,11 @@ internal class ConnectionManager(
                 } else {
                     tproxyGateway.readLocalAddresses(tproxyState.ipv6Enabled)
                 }
-                val updated = tproxyState.copy(tetherUpstreamInterface = physicalRoute.dev, localAddresses = addresses)
+                val updated = tproxyState.copy(
+                    tetherUpstreamInterface = physicalRoute.dev,
+                    localAddresses = addresses,
+                    tetherChainSlot = tproxyState.nextTetherChainSlot(),
+                )
                 val appPlan = appRoutingPlanner.build(
                     baseTunName = TPROXY_INTERFACE_LABEL,
                     baseRouteTable = runtimeSettings.routeTable,
@@ -1423,9 +1415,7 @@ internal class ConnectionManager(
                     tetherUpstreamInterface = physicalRoute.dev,
                     bypassLan = runtimeSettings.bypassLan,
                 )
-                val result = tproxyGateway.updateTetherUpstream(plan, tproxyState.tetherUpstreamInterface)
-                if (!result.success) {
-                    log.append(LogSource.APP, "Tether upstream update failed: ${result.error}")
+                if (!tetherIngress.retargetUpstream(plan, tproxyState.tetherUpstreamInterface)) {
                     return PhysicalRouteUpdateResult.RequiresReconnect
                 }
                 log.append(LogSource.APP, "Tether upstream changed to ${physicalRoute.dev} without restarting Xray")

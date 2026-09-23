@@ -1525,8 +1525,12 @@ class XrayService : VpnService() {
     // their exact-address rules current even when passive health monitoring is disabled.
     private suspend fun refreshTetherLocalAddresses() {
         if (!connectionManager.isUsingRootRuntime) return
-        if (!settingsRepo.tunnelTetheredClients.first()) return
         val backend = settingsRepo.rootConnectionBackend.first()
+        if (backend == RootConnectionBackend.Tproxy) {
+            if (!connectionManager.isTetherIngressActive()) return
+        } else if (!settingsRepo.tunnelTetheredClients.first()) {
+            return
+        }
         runConnectionCommand {
             val config = activeConfig ?: return@runConnectionCommand
             if (connectionStateCoordinator.state.value !is ConnectionState.Connected) return@runConnectionCommand

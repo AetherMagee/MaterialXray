@@ -16,13 +16,28 @@ data class TproxyRuntimeState(
     val routeTable: Int,
     val rulePriority: Int,
     val outputChainSlot: String,
+    val tetherChainSlot: String = "a",
     val groups: List<TproxyGroupState>,
     val ipv6Enabled: Boolean,
     val tetherUpstreamInterface: String? = null,
     val tetherBypassLan: Boolean = true,
     val localAddresses: List<String> = emptyList(),
     val dynamicLocalAddresses: Boolean = false,
-)
+) {
+    val tetherIngress: TetherIngressState
+        get() = tetherUpstreamInterface?.let { TetherIngressState.Active(it, dynamicLocalAddresses) }
+            ?: TetherIngressState.Disabled
+
+    fun nextTetherChainSlot(): String = if (tetherChainSlot == "a") "b" else "a"
+}
+
+sealed interface TetherIngressState {
+    data object Disabled : TetherIngressState
+
+    data class Preparing(val upstream: String) : TetherIngressState
+
+    data class Active(val upstream: String, val dynamicLocalAddresses: Boolean) : TetherIngressState
+}
 
 @Serializable
 data class TproxyGroupState(
