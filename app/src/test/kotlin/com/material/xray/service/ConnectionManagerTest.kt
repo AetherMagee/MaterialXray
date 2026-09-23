@@ -448,6 +448,22 @@ class ConnectionManagerTest {
     }
 
     @Test
+    fun `tether address change updates routing without restarting the core`() = runTest {
+        val harness = Harness()
+        val settings = runtimeSettings().copy(
+            rootConnectionBackend = RootConnectionBackend.Tproxy,
+            tunnelTetheredClients = true,
+        )
+        harness.manager.connect(server(), settings, preparation = ConnectionPreparation.ReusePreparedRuntime)
+        val pid = harness.stateStore.state?.xrayPid
+
+        assertTrue(harness.manager.refreshTetherAddresses())
+        assertEquals(pid, harness.stateStore.state?.xrayPid)
+        assertEquals(listOf("127.0.0.1/32"), harness.stateStore.state?.tproxy?.localAddresses)
+        assertEquals(1, harness.tproxyGateway.tetherAddressUpdateCalls)
+    }
+
+    @Test
     fun `backend switch preserves guard until replacement runtime is ready`() = runTest {
         val harness = Harness()
         val tproxySettings = runtimeSettings().copy(rootConnectionBackend = RootConnectionBackend.Tproxy)
@@ -1121,6 +1137,7 @@ class ConnectionManagerTest {
         var activateCalls = 0
         var removeGuardCalls = 0
         var activationResult = TunManager.RoutingResult(success = true)
+        var tetherAddressUpdateCalls = 0
         var verificationResult = TunManager.RoutingResult(success = true)
 
         override suspend fun createPlan(
@@ -1156,6 +1173,11 @@ class ConnectionManagerTest {
             return activationResult
         }
         override suspend fun update(plan: TproxyTrafficPlan, currentSlot: String) = TunManager.RoutingResult(success = true)
+        override suspend fun readLocalAddresses(includeIpv6: Boolean): List<String> = listOf("127.0.0.1/32")
+        override suspend fun updateTetherAddresses(plan: TproxyTrafficPlan): TunManager.RoutingResult {
+            tetherAddressUpdateCalls++
+            return TunManager.RoutingResult(success = true)
+        }
         override suspend fun verify(state: TproxyRuntimeState): TunManager.RoutingResult = verificationResult
         override suspend fun removeGuard(): Boolean {
             removeGuardCalls += 1

@@ -238,9 +238,11 @@ internal interface TproxyRoutingGateway {
     ): TproxyTrafficPlan
 
     suspend fun localAddressesChanged(): Boolean = false
+    suspend fun readLocalAddresses(includeIpv6: Boolean): List<String>
     suspend fun installGuard(plan: TproxyTrafficPlan): TunManager.RoutingResult
     suspend fun activate(plan: TproxyTrafficPlan): TunManager.RoutingResult
     suspend fun update(plan: TproxyTrafficPlan, currentSlot: String): TunManager.RoutingResult
+    suspend fun updateTetherAddresses(plan: TproxyTrafficPlan): TunManager.RoutingResult
     suspend fun verify(state: TproxyRuntimeState): TunManager.RoutingResult
     suspend fun removeGuard(): Boolean
 }
@@ -295,10 +297,12 @@ internal class TproxyManagerRoutingGateway(
     }
 
     override suspend fun localAddressesChanged(): Boolean = manager.localAddressesChanged()
+    override suspend fun readLocalAddresses(includeIpv6: Boolean): List<String> = manager.readLocalAddresses(includeIpv6)
 
     override suspend fun installGuard(plan: TproxyTrafficPlan): TunManager.RoutingResult = manager.installGuard(plan)
     override suspend fun activate(plan: TproxyTrafficPlan): TunManager.RoutingResult = manager.activate(plan)
     override suspend fun update(plan: TproxyTrafficPlan, currentSlot: String): TunManager.RoutingResult = manager.update(plan, currentSlot)
+    override suspend fun updateTetherAddresses(plan: TproxyTrafficPlan): TunManager.RoutingResult = manager.updateTetherAddresses(plan)
     override suspend fun verify(state: TproxyRuntimeState): TunManager.RoutingResult = manager.verify(state)
     override suspend fun removeGuard(): Boolean = manager.removeGuard()
 

@@ -123,6 +123,26 @@ class TproxyManager internal constructor(
         return execute(updateCommand(plan, appUid, currentSlot, nextSlot), "TPROXY app routing update")
     }
 
+    suspend fun updateTetherAddresses(plan: TproxyTrafficPlan): TunManager.RoutingResult {
+        val state = plan.runtimeState
+        require(state.tetherUpstreamInterface != null)
+        val result = execute(tetherAddressUpdateCommand(plan), "TPROXY tether address update")
+        if (result.success) localAddressTracker.markInstalled(state.localAddresses, state.ipv6Enabled)
+        return result
+    }
+
+    private fun tetherAddressUpdateCommand(plan: TproxyTrafficPlan): String {
+        val state = plan.runtimeState
+        val names = chainNames(appUid)
+        val tools = if (state.ipv6Enabled) FirewallCommands.tools else listOf(IPV4)
+        return tools.map { tool ->
+            val chain = names.prerouting
+            val rules = buildPreroutingCommands(tool, chain, plan)
+                .filter { it.startsWith("$tool -t mangle -A $chain ") }
+            FirewallRestoreBatch(tool, "mangle", listOf("$tool -t mangle -F $chain") + rules).command()
+        }.shellAnd()
+    }
+
     suspend fun verify(state: TproxyRuntimeState): TunManager.RoutingResult {
         localAddressTracker.ensureInstalled(state.localAddresses, state.ipv6Enabled)
         if (state.tetherUpstreamInterface != null && state.localAddresses.isEmpty()) {

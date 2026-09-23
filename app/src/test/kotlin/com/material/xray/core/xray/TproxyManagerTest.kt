@@ -97,6 +97,26 @@ class TproxyManagerTest {
     }
 
     @Test
+    fun `tether address refresh replaces only prerouting rules and keeps the core ports`() = runTest {
+        val commands = mutableListOf<String>()
+        val manager = TproxyManager(APP_UID) { command ->
+            commands += command
+            RootShell.Result(0, "", "")
+        }
+        val base = plan(tetherUpstreamInterface = "wlan0")
+        val updated = base.copy(runtimeState = base.runtimeState.copy(localAddresses = listOf("127.0.0.1/32", "192.168.44.1/32")))
+
+        assertTrue(manager.updateTetherAddresses(updated).success)
+        val command = commands.single()
+        assertTrue(command.contains("iptables-restore --noflush -w 2"))
+        assertTrue(command.contains("-F MXP278b"))
+        assertTrue(command.contains("-A MXP278b -d 192.168.44.1/32 -j RETURN"))
+        assertFalse(command.contains("-A MXP278b -d 192.168.43.1/32 -j RETURN"))
+        assertFalse(command.contains("-I PREROUTING"))
+        assertFalse(command.contains("-N MXP278b"))
+    }
+
+    @Test
     fun `IPv6 changes are ignored when IPv6 routing is disabled`() = runTest {
         var output = "1: lo inet 127.0.0.1/8\n2: rmnet1 inet 198.51.100.2/30\n2: rmnet1 inet6 2001:db8::1/64"
         val manager = TproxyManager(APP_UID) { command ->

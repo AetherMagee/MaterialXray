@@ -1533,7 +1533,9 @@ class XrayService : VpnService() {
             try {
                 if (connectionManager.localAddressesChanged(backend)) {
                     logBuffer.append(LogSource.APP, "Local interface addresses changed; refreshing tether routing")
-                    restartRuntime(config, ConnectionState.ApplyingRoutingChanges)
+                    if (backend != RootConnectionBackend.Tproxy || !connectionManager.refreshTetherAddresses()) {
+                        restartRuntime(config, ConnectionState.ApplyingRoutingChanges)
+                    }
                 }
             } catch (error: java.io.IOException) {
                 logBuffer.append(LogSource.APP, "Could not refresh local addresses; retaining installed rules: ${error.message}")
