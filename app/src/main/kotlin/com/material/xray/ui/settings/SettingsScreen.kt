@@ -9,6 +9,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Process
 import android.provider.Settings
+import android.text.format.Formatter
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -46,13 +47,14 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.DragIndicator
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -89,6 +91,8 @@ import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
@@ -726,21 +730,37 @@ private fun SettingsScreenContent(
                         label = { Text(stringResource(R.string.settings_geoip_url_label)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
-                        supportingText = { Text(stringResource(R.string.settings_geoip_url_supporting_text)) },
+                        supportingText = {
+                            if (geoipUpdating) {
+                                GeoDataDownloadStatus(geoDataDownloadProgress[GeoDataAsset.GEOIP])
+                            } else {
+                                Text(stringResource(R.string.settings_geoip_url_supporting_text))
+                            }
+                        },
+                        trailingIcon = {
+                            IconButton(
+                                onClick = { viewModel.updateGeoipAsset(editingGeoipUrl) },
+                                enabled = !geoDataOperationInProgress,
+                            ) {
+                                if (geoipUpdating) {
+                                    val description = stringResource(R.string.settings_geoip_updating)
+                                    GeoDataCircularProgress(
+                                        progress = geoDataDownloadProgress[GeoDataAsset.GEOIP],
+                                        description = description,
+                                    )
+                                } else {
+                                    Icon(
+                                        Icons.Default.Refresh,
+                                        contentDescription = stringResource(R.string.settings_update_geoip),
+                                    )
+                                }
+                            }
+                        },
                     )
                     if (hasGeoipUrlChanges) {
                         Button(onClick = { viewModel.setGeoipUrl(editingGeoipUrl) }) {
                             Text(stringResource(R.string.settings_save))
                         }
-                    }
-                    OutlinedButton(
-                        onClick = { viewModel.updateGeoipAsset(editingGeoipUrl) },
-                        enabled = !geoDataOperationInProgress,
-                    ) {
-                        Text(stringResource(if (geoipUpdating) R.string.settings_updating else R.string.settings_update))
-                    }
-                    if (geoipUpdating) {
-                        GeoDataUpdateProgress(geoDataDownloadProgress[GeoDataAsset.GEOIP])
                     }
                 }
             }
@@ -756,21 +776,37 @@ private fun SettingsScreenContent(
                         label = { Text(stringResource(R.string.settings_geosite_url_label)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
-                        supportingText = { Text(stringResource(R.string.settings_geosite_url_supporting_text)) },
+                        supportingText = {
+                            if (geositeUpdating) {
+                                GeoDataDownloadStatus(geoDataDownloadProgress[GeoDataAsset.GEOSITE])
+                            } else {
+                                Text(stringResource(R.string.settings_geosite_url_supporting_text))
+                            }
+                        },
+                        trailingIcon = {
+                            IconButton(
+                                onClick = { viewModel.updateGeositeAsset(editingGeositeUrl) },
+                                enabled = !geoDataOperationInProgress,
+                            ) {
+                                if (geositeUpdating) {
+                                    val description = stringResource(R.string.settings_geosite_updating)
+                                    GeoDataCircularProgress(
+                                        progress = geoDataDownloadProgress[GeoDataAsset.GEOSITE],
+                                        description = description,
+                                    )
+                                } else {
+                                    Icon(
+                                        Icons.Default.Refresh,
+                                        contentDescription = stringResource(R.string.settings_update_geosite),
+                                    )
+                                }
+                            }
+                        },
                     )
                     if (hasGeositeUrlChanges) {
                         Button(onClick = { viewModel.setGeositeUrl(editingGeositeUrl) }) {
                             Text(stringResource(R.string.settings_save))
                         }
-                    }
-                    OutlinedButton(
-                        onClick = { viewModel.updateGeositeAsset(editingGeositeUrl) },
-                        enabled = !geoDataOperationInProgress,
-                    ) {
-                        Text(stringResource(if (geositeUpdating) R.string.settings_updating else R.string.settings_update))
-                    }
-                    if (geositeUpdating) {
-                        GeoDataUpdateProgress(geoDataDownloadProgress[GeoDataAsset.GEOSITE])
                     }
                 }
             }
@@ -1697,16 +1733,38 @@ private fun AdvancedIntegerSetting(
 }
 
 @Composable
-private fun GeoDataUpdateProgress(progress: GeoDataDownloadProgress?) {
+private fun GeoDataCircularProgress(progress: GeoDataDownloadProgress?, description: String) {
     val fraction = progress?.fraction
     if (fraction == null) {
-        LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+        CircularProgressIndicator(
+            modifier = Modifier.size(24.dp).semantics { contentDescription = description },
+            strokeWidth = 2.dp,
+        )
     } else {
-        LinearProgressIndicator(
+        CircularProgressIndicator(
             progress = { fraction },
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.size(24.dp).semantics { contentDescription = description },
+            strokeWidth = 2.dp,
         )
     }
+}
+
+@Composable
+private fun GeoDataDownloadStatus(progress: GeoDataDownloadProgress?) {
+    val context = LocalContext.current
+    val text = when {
+        progress == null -> stringResource(R.string.settings_updating)
+        progress.totalBytes != null && progress.totalBytes > 0L -> stringResource(
+            R.string.settings_geodata_download_progress_with_total,
+            Formatter.formatShortFileSize(context, progress.bytesDownloaded),
+            Formatter.formatShortFileSize(context, progress.totalBytes),
+        )
+        else -> stringResource(
+            R.string.settings_geodata_download_progress,
+            Formatter.formatShortFileSize(context, progress.bytesDownloaded),
+        )
+    }
+    Text(text)
 }
 
 @Composable

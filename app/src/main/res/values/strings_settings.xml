@@ -167,6 +167,12 @@
     <string name="settings_notification_field_separator" translatable="false">" • "</string>
     <string name="settings_geoip_updated">GeoIP updated</string>
     <string name="settings_geosite_updated">GeoSite updated</string>
+    <string name="settings_update_geoip">Update GeoIP</string>
+    <string name="settings_update_geosite">Update GeoSite</string>
+    <string name="settings_geoip_updating">Updating GeoIP</string>
+    <string name="settings_geosite_updating">Updating GeoSite</string>
+    <string name="settings_geodata_download_progress">Downloaded %1$s</string>
+    <string name="settings_geodata_download_progress_with_total">Downloaded %1$s of %2$s</string>
     <string name="settings_asset_update_failed">Update failed</string>
     <string name="settings_asset_update_failed_with_detail">Update failed: %1$s</string>
 </resources>

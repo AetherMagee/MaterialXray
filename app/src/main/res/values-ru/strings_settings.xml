@@ -164,6 +164,12 @@
     <string name="settings_no_custom_notification_fields">Дополнительные поля не выбраны</string>
     <string name="settings_geoip_updated">GeoIP обновлён</string>
     <string name="settings_geosite_updated">GeoSite обновлён</string>
+    <string name="settings_update_geoip">Обновить GeoIP</string>
+    <string name="settings_update_geosite">Обновить GeoSite</string>
+    <string name="settings_geoip_updating">Обновление GeoIP</string>
+    <string name="settings_geosite_updating">Обновление GeoSite</string>
+    <string name="settings_geodata_download_progress">Загружено %1$s</string>
+    <string name="settings_geodata_download_progress_with_total">Загружено %1$s из %2$s</string>
     <string name="settings_asset_update_failed">Не удалось обновить</string>
     <string name="settings_asset_update_failed_with_detail">Не удалось обновить: %1$s</string>
 </resources>
