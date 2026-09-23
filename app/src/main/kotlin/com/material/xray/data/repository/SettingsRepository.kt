@@ -130,7 +130,6 @@ class SettingsRepository @Inject constructor(
         val PROVIDER_ROUTING_FALLBACK_OUTBOUND = stringPreferencesKey("provider_routing_fallback_outbound")
         val USE_ROOT_SERVICE = booleanPreferencesKey("use_root_service")
         val ROOT_CONNECTION_BACKEND = stringPreferencesKey("root_connection_backend")
-        val NOTIFICATION_ENABLED = booleanPreferencesKey("notification_enabled")
         val NOTIFICATION_UPDATE_INTERVAL_MS = intPreferencesKey("notification_update_interval_ms")
         val NOTIFICATION_STYLE = stringPreferencesKey("notification_style")
         val NOTIFICATION_SHOW_TRAFFIC_SPEED = booleanPreferencesKey("notification_show_traffic_speed")
@@ -301,14 +300,13 @@ class SettingsRepository @Inject constructor(
     }
     val notificationSettings: Flow<NotificationSettings> = store.data.map { prefs ->
         NotificationSettings(
-            enabled = prefs[NOTIFICATION_ENABLED] ?: true,
             updateIntervalMs = (prefs[NOTIFICATION_UPDATE_INTERVAL_MS] ?: NotificationSettings.DEFAULT_UPDATE_INTERVAL_MS)
                 .coerceIn(NotificationSettings.MIN_UPDATE_INTERVAL_MS, NotificationSettings.MAX_UPDATE_INTERVAL_MS),
             style = NotificationStyle.fromValue(prefs[NOTIFICATION_STYLE]),
-            showTrafficSpeed = prefs[NOTIFICATION_SHOW_TRAFFIC_SPEED] ?: false,
+            showTrafficSpeed = prefs[NOTIFICATION_SHOW_TRAFFIC_SPEED] ?: true,
             showRamUsage = prefs[NOTIFICATION_SHOW_RAM_USAGE] ?: false,
             showConnectionCount = prefs[NOTIFICATION_SHOW_CONNECTION_COUNT] ?: false,
-            showPing = prefs[NOTIFICATION_SHOW_PING] ?: false,
+            showPing = prefs[NOTIFICATION_SHOW_PING] ?: true,
             showSessionTraffic = prefs[NOTIFICATION_SHOW_SESSION_TRAFFIC] ?: false,
             fieldOrder = decodeNotificationFieldOrder(prefs[NOTIFICATION_FIELD_ORDER]),
         )
@@ -358,15 +356,14 @@ class SettingsRepository @Inject constructor(
             floatingConnectButton = prefs[FLOATING_CONNECT_BUTTON] ?: false,
             showAdvancedOptions = showAdvancedOptions,
             notificationSettings = NotificationSettings(
-                enabled = prefs[NOTIFICATION_ENABLED] ?: true,
                 updateIntervalMs =
                 (prefs[NOTIFICATION_UPDATE_INTERVAL_MS] ?: NotificationSettings.DEFAULT_UPDATE_INTERVAL_MS)
                     .coerceIn(NotificationSettings.MIN_UPDATE_INTERVAL_MS, NotificationSettings.MAX_UPDATE_INTERVAL_MS),
                 style = NotificationStyle.fromValue(prefs[NOTIFICATION_STYLE]),
-                showTrafficSpeed = prefs[NOTIFICATION_SHOW_TRAFFIC_SPEED] ?: false,
+                showTrafficSpeed = prefs[NOTIFICATION_SHOW_TRAFFIC_SPEED] ?: true,
                 showRamUsage = prefs[NOTIFICATION_SHOW_RAM_USAGE] ?: false,
                 showConnectionCount = prefs[NOTIFICATION_SHOW_CONNECTION_COUNT] ?: false,
-                showPing = prefs[NOTIFICATION_SHOW_PING] ?: false,
+                showPing = prefs[NOTIFICATION_SHOW_PING] ?: true,
                 showSessionTraffic = prefs[NOTIFICATION_SHOW_SESSION_TRAFFIC] ?: false,
                 fieldOrder = decodeNotificationFieldOrder(prefs[NOTIFICATION_FIELD_ORDER]),
             ),
@@ -483,9 +480,6 @@ class SettingsRepository @Inject constructor(
     }
     suspend fun setRootConnectionBackend(backend: RootConnectionBackend) = store.edit { prefs ->
         prefs[ROOT_CONNECTION_BACKEND] = backend.persistedValue
-    }
-    suspend fun setNotificationEnabled(enabled: Boolean) = store.edit { prefs ->
-        prefs[NOTIFICATION_ENABLED] = enabled
     }
     suspend fun setNotificationUpdateIntervalMs(intervalMs: Int) = store.edit { prefs ->
         prefs[NOTIFICATION_UPDATE_INTERVAL_MS] = intervalMs.coerceIn(
@@ -669,7 +663,6 @@ class SettingsRepository @Inject constructor(
             map["root_connection_backend"]?.let { value ->
                 prefs[ROOT_CONNECTION_BACKEND] = RootConnectionBackend.fromValue(value).persistedValue
             }
-            map["notification_enabled"]?.toBooleanStrictOrNull()?.let { prefs[NOTIFICATION_ENABLED] = it }
             map["notification_update_interval_ms"]
                 ?.toIntOrNull()
                 ?.coerceIn(NotificationSettings.MIN_UPDATE_INTERVAL_MS, NotificationSettings.MAX_UPDATE_INTERVAL_MS)
@@ -760,7 +753,7 @@ class SettingsRepository @Inject constructor(
                 NotificationField.entries.firstOrNull { it.name == value.trim() }
             }
             .orEmpty()
-        return (savedFields + NotificationField.entries).distinct()
+        return (savedFields + NotificationSettings.DEFAULT_FIELD_ORDER).distinct()
     }
 
     private fun encodeNotificationFieldOrder(fields: List<NotificationField>): String = (fields + NotificationField.entries)

@@ -59,7 +59,6 @@
     <string name="settings_floating_connect_button_title">Плавающая кнопка подключения</string>
     <string name="settings_floating_connect_button_description">Показывать небольшую кнопку в углу вместо большой кнопки питания</string>
     <string name="settings_notification_title">Уведомление</string>
-    <string name="settings_customize_service_notification">Изменить уведомление службы</string>
     <string name="settings_notification_permission_unavailable">Уведомления недоступны</string>
     <string name="settings_notification_permission_unavailable_description">Разрешите уведомления, чтобы видеть состояние подключения, сведения о трафике и ошибки</string>
     <string name="settings_notification_permission_title">Разрешить уведомления MaterialXray?</string>
@@ -161,7 +160,7 @@
     <string name="settings_notification_fields_title">Поля уведомления</string>
     <string name="settings_notification_fields_reorder_instructions">Перетаскивайте поля за маркер, чтобы изменить порядок их отображения в уведомлении.</string>
     <string name="settings_drag_to_reorder">Перетащите, чтобы изменить порядок</string>
-    <string name="settings_no_custom_notification_fields">Дополнительные поля не выбраны</string>
+    <string name="settings_no_custom_notification_fields">Поля не выбраны; показано состояние подключения</string>
     <string name="settings_geoip_updated">GeoIP обновлён</string>
     <string name="settings_geosite_updated">GeoSite обновлён</string>
     <string name="settings_update_geoip">Обновить GeoIP</string>

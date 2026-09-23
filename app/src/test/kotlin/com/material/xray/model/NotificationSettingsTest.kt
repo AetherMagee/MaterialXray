@@ -7,8 +7,20 @@ import org.junit.Test
 
 class NotificationSettingsTest {
     @Test
+    fun `defaults show ping then traffic speed in a compact notification every second`() {
+        val settings = NotificationSettings()
+
+        assertEquals(NotificationStyle.Compact, settings.style)
+        assertEquals(1_000, settings.updateIntervalMs)
+        assertEquals(
+            listOf(NotificationField.Ping, NotificationField.TrafficSpeed),
+            settings.normalizedFieldOrder().filter(settings::isFieldEnabled),
+        )
+    }
+
+    @Test
     fun `a ping-only notification does not start the metrics poll`() {
-        val settings = NotificationSettings(showPing = true)
+        val settings = NotificationSettings(showTrafficSpeed = false, showPing = true)
 
         assertTrue(settings.anyFieldEnabled)
         assertTrue(settings.needsPingProbe)
@@ -17,21 +29,20 @@ class NotificationSettingsTest {
 
     @Test
     fun `session traffic is served by the metrics poll`() {
-        val settings = NotificationSettings(showSessionTraffic = true)
+        val settings = NotificationSettings(showTrafficSpeed = false, showPing = false, showSessionTraffic = true)
 
         assertTrue(settings.needsMetricsPoll)
         assertFalse(settings.needsPingProbe)
     }
 
     @Test
-    fun `a disabled notification asks for no work regardless of its fields`() {
+    fun `a notification with no fields asks for no work`() {
         val settings = NotificationSettings(
-            enabled = false,
-            showTrafficSpeed = true,
-            showPing = true,
-            showSessionTraffic = true,
+            showTrafficSpeed = false,
+            showPing = false,
         )
 
+        assertFalse(settings.anyFieldEnabled)
         assertFalse(settings.needsMetricsPoll)
         assertFalse(settings.needsPingProbe)
     }

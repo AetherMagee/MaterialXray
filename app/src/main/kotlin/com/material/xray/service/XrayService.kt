@@ -2112,7 +2112,7 @@ class XrayService : VpnService() {
             )
         }
         val settings = notificationSettings
-        if (!settings.enabled || !settings.anyFieldEnabled) return baseText
+        if (!settings.anyFieldEnabled) return baseText
 
         val metrics = notificationMetrics
         val separator = if (settings.style == NotificationStyle.Compact) {

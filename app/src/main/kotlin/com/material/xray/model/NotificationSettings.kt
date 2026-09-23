@@ -1,15 +1,14 @@
 package com.material.xray.model
 
 data class NotificationSettings(
-    val enabled: Boolean = true,
     val updateIntervalMs: Int = DEFAULT_UPDATE_INTERVAL_MS,
     val style: NotificationStyle = NotificationStyle.default,
-    val showTrafficSpeed: Boolean = false,
+    val showTrafficSpeed: Boolean = true,
     val showRamUsage: Boolean = false,
     val showConnectionCount: Boolean = false,
-    val showPing: Boolean = false,
+    val showPing: Boolean = true,
     val showSessionTraffic: Boolean = false,
-    val fieldOrder: List<NotificationField> = NotificationField.entries,
+    val fieldOrder: List<NotificationField> = DEFAULT_FIELD_ORDER,
 ) {
     val anyFieldEnabled: Boolean
         get() = showTrafficSpeed || showRamUsage || showConnectionCount || showPing || showSessionTraffic
@@ -19,10 +18,10 @@ data class NotificationSettings(
      * slower schedule, so a notification that only shows a ping should not start the poll.
      */
     val needsMetricsPoll: Boolean
-        get() = enabled && (showTrafficSpeed || showRamUsage || showConnectionCount || showSessionTraffic)
+        get() = showTrafficSpeed || showRamUsage || showConnectionCount || showSessionTraffic
 
     val needsPingProbe: Boolean
-        get() = enabled && showPing
+        get() = showPing
 
     fun isFieldEnabled(field: NotificationField): Boolean = when (field) {
         NotificationField.TrafficSpeed -> showTrafficSpeed
@@ -32,12 +31,19 @@ data class NotificationSettings(
         NotificationField.SessionTraffic -> showSessionTraffic
     }
 
-    fun normalizedFieldOrder(): List<NotificationField> = (fieldOrder + NotificationField.entries).distinct()
+    fun normalizedFieldOrder(): List<NotificationField> = (fieldOrder + DEFAULT_FIELD_ORDER).distinct()
 
     companion object {
         const val MIN_UPDATE_INTERVAL_MS = 100
         const val MAX_UPDATE_INTERVAL_MS = 5_000
         const val DEFAULT_UPDATE_INTERVAL_MS = 1_000
+        val DEFAULT_FIELD_ORDER = listOf(
+            NotificationField.Ping,
+            NotificationField.TrafficSpeed,
+            NotificationField.RamUsage,
+            NotificationField.ConnectionCount,
+            NotificationField.SessionTraffic,
+        )
     }
 }
 
@@ -55,7 +61,7 @@ enum class NotificationStyle {
     ;
 
     companion object {
-        val default = Normal
+        val default = Compact
 
         fun fromValue(value: String?): NotificationStyle = entries.firstOrNull { it.name == value } ?: default
     }

@@ -269,9 +269,6 @@ class SettingsViewModel @Inject constructor(
         reloadActiveConnectionIfConnected()
     }
 
-    fun setNotificationEnabled(enabled: Boolean) = viewModelScope.launch {
-        settingsRepo.setNotificationEnabled(enabled)
-    }
     fun setNotificationUpdateIntervalMs(intervalMs: Int) = viewModelScope.launch {
         settingsRepo.setNotificationUpdateIntervalMs(intervalMs)
     }

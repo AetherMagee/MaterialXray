@@ -446,7 +446,6 @@ private fun SettingsScreenContent(
 
                     NotificationSettingsSection(
                         settings = notificationSettings,
-                        onEnabledChange = viewModel::setNotificationEnabled,
                         onConfigureFields = { showNotificationFieldsDialog = true },
                         onConfigureStyle = { showFieldStyleDialog = true },
                         onConfigureFrequency = { showUpdateFrequencyDialog = true },
@@ -1299,7 +1298,6 @@ private fun SettingsNestedSection(
 @Composable
 private fun NotificationSettingsSection(
     settings: NotificationSettings,
-    onEnabledChange: (Boolean) -> Unit,
     onConfigureFields: () -> Unit,
     onConfigureStyle: () -> Unit,
     onConfigureFrequency: () -> Unit,
@@ -1308,28 +1306,14 @@ private fun NotificationSettingsSection(
     var showAccessDialog by remember { mutableStateOf(false) }
     val accessState = rememberSystemState { notificationAccess(it) }
     val access = accessState.value
-    val effectiveEnabled = settings.enabled && access == NotificationAccess.Available
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
-    ) { granted ->
+    ) { _ ->
         context.recordNotificationPermissionRequest()
         accessState.refresh()
-        if (granted) onEnabledChange(true)
     }
 
     SettingsNestedSection(title = stringResource(R.string.settings_notification_title)) {
-        SettingsSwitchRow(
-            title = stringResource(R.string.settings_customize_service_notification),
-            checked = effectiveEnabled,
-            onCheckedChange = { enabled ->
-                when {
-                    !enabled -> onEnabledChange(false)
-                    access == NotificationAccess.Available -> onEnabledChange(true)
-                    else -> showAccessDialog = true
-                }
-            },
-        )
-
         if (access != NotificationAccess.Available) {
             SettingsActionRow(
                 title = stringResource(R.string.settings_notification_permission_unavailable),
@@ -1338,27 +1322,25 @@ private fun NotificationSettingsSection(
             )
         }
 
-        if (settings.enabled) {
-            SettingsActionRow(
-                title = stringResource(R.string.settings_configure_notification_fields),
-                subtitle = notificationFieldSummary(settings),
-                onClick = onConfigureFields,
-            )
-            SettingsActionRow(
-                title = stringResource(R.string.settings_notification_field_style),
-                subtitle = stringResource(settings.style.labelResource),
-                onClick = onConfigureStyle,
-            )
-            SettingsActionRow(
-                title = stringResource(R.string.settings_notification_update_frequency),
-                subtitle = pluralStringResource(
-                    R.plurals.settings_notification_update_frequency_summary,
-                    settings.updateIntervalMs,
-                    settings.updateIntervalMs,
-                ),
-                onClick = onConfigureFrequency,
-            )
-        }
+        SettingsActionRow(
+            title = stringResource(R.string.settings_configure_notification_fields),
+            subtitle = notificationFieldSummary(settings),
+            onClick = onConfigureFields,
+        )
+        SettingsActionRow(
+            title = stringResource(R.string.settings_notification_field_style),
+            subtitle = stringResource(settings.style.labelResource),
+            onClick = onConfigureStyle,
+        )
+        SettingsActionRow(
+            title = stringResource(R.string.settings_notification_update_frequency),
+            subtitle = pluralStringResource(
+                R.plurals.settings_notification_update_frequency_summary,
+                settings.updateIntervalMs,
+                settings.updateIntervalMs,
+            ),
+            onClick = onConfigureFrequency,
+        )
     }
 
     if (showAccessDialog) {
@@ -1371,7 +1353,7 @@ private fun NotificationSettingsSection(
                     onClick = {
                         showAccessDialog = false
                         when (access) {
-                            NotificationAccess.Available -> onEnabledChange(true)
+                            NotificationAccess.Available -> Unit
                             NotificationAccess.Requestable,
                             NotificationAccess.Rationale,
                             -> permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
