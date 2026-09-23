@@ -81,8 +81,8 @@
     <string name="settings_send_hardware_id_locked">Требуется подписке выбранного сервера, отключить нельзя</string>
     <string name="settings_show_advanced_options">Показывать расширенные параметры</string>
     <string name="settings_diagnostics_title">Диагностика и статистика использования</string>
-    <string name="settings_diagnostics_description">Отправлять анонимные данные о сбоях, ANR, результатах подключений и надёжности ядра</string>
-    <string name="diagnostics_default_notice">MaterialXray по умолчанию отправляет анонимные диагностические данные и статистику использования. Конфиденциальная информация не передаётся. Это можно отключить в настройках.</string>
+    <string name="settings_diagnostics_description">Отправлять приватные данные о сбоях, ANR, результатах подключений и надёжности ядра</string>
+    <string name="diagnostics_default_notice">MaterialXray по умолчанию отправляет приватные диагностические данные и статистику использования. Конфиденциальная информация не передаётся. Это можно отключить в настройках.</string>
     <string name="diagnostics_dismiss">Закрыть</string>
     <string name="settings_section_data">Данные</string>
     <string name="settings_export">Экспорт</string>

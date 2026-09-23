@@ -79,8 +79,8 @@
     <string name="settings_send_hardware_id_locked">Required by the subscription of the selected server and cannot be turned off</string>
     <string name="settings_show_advanced_options">Show advanced options</string>
     <string name="settings_diagnostics_title">Diagnostics and usage statistics</string>
-    <string name="settings_diagnostics_description">Send anonymous crash, ANR, connection outcome, and core reliability data</string>
-    <string name="diagnostics_default_notice">MaterialXray sends anonymous diagnostics and usage statistics by default. No sensitive information is shared. You can turn this off in Settings.</string>
+    <string name="settings_diagnostics_description">Send private crash and core reliability data</string>
+    <string name="diagnostics_default_notice">MaterialXray sends private diagnostics and usage statistics by default. No sensitive information is shared. You can turn this off in Settings.</string>
     <string name="diagnostics_dismiss">Dismiss</string>
     <string name="settings_section_data">Data</string>
     <string name="settings_export">Export</string>
