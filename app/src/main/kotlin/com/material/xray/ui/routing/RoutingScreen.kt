@@ -10,7 +10,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -19,29 +18,22 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.sizeIn
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
@@ -52,7 +44,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -68,20 +59,14 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.Saver
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -93,47 +78,17 @@ import com.material.xray.data.parser.ProfileRoutingTarget
 import com.material.xray.model.RoutingPolicyControl
 import com.material.xray.model.RoutingRule
 import com.material.xray.model.RoutingRuleCatalog
-import com.material.xray.model.RoutingRuleOperator
-import com.material.xray.model.XrayOutbound
 import com.material.xray.ui.apps.AppBypassContent
 import com.material.xray.ui.apps.AppRoutingMenuActions
 import com.material.xray.ui.components.AppBarTitle
-import com.material.xray.ui.components.DropdownOption
-import com.material.xray.ui.components.ReadOnlyDropdownField
 import com.material.xray.ui.components.ScrollFadeEdges
 import com.material.xray.ui.components.SegmentedTabRow
-import com.material.xray.ui.text.catchAllEffectResource
-import com.material.xray.ui.text.descriptionResource
-import java.util.Locale
 import kotlinx.coroutines.launch
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.decodeFromString
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
 
 private enum class RoutingTab(@StringRes val titleResource: Int) {
     Rules(R.string.routing_tab_rules),
     Apps(R.string.routing_tab_apps),
 }
-
-@Serializable
-private data class EditableRoutingRule(
-    val rule: RoutingRule,
-    val isNew: Boolean,
-    val profileOriginalRuleJson: String? = null,
-    val profileOriginalIndex: Int? = null,
-)
-
-/** Persists an in-progress rule edit across configuration changes and process death. */
-private val editableRoutingRuleSaver: Saver<EditableRoutingRule?, String> = jsonSaver()
-
-/** Persists the rule pending catch-all confirmation across configuration changes. */
-private val routingRuleSaver: Saver<RoutingRule?, String> = jsonSaver()
-
-private inline fun <reified T : Any> jsonSaver(): Saver<T?, String> = Saver(
-    save = { value -> value?.let { Json.encodeToString(it) } },
-    restore = { saved -> runCatching { Json.decodeFromString<T>(saved) }.getOrNull() },
-)
 
 private sealed interface RoutingRuleAction {
     data object Add : RoutingRuleAction
@@ -146,37 +101,17 @@ private sealed interface RoutingRuleAction {
 }
 
 private sealed interface ProfileRoutingRuleAction {
-    data class Save(val editableRule: EditableRoutingRule, val updatedRule: RoutingRule) : ProfileRoutingRuleAction
     data class Toggle(val rule: ProfileRoutingRule, val enabled: Boolean) : ProfileRoutingRuleAction
 }
 
-private val protocolOptions = listOf("http", "tls", "quic", "bittorrent")
 private val defaultRoutingRulesById = RoutingRuleCatalog.defaults().associateBy(RoutingRule::id)
-
-private data class MatchModeOption(
-    val value: RoutingRuleOperator,
-    @param:StringRes val labelResource: Int,
-    @param:StringRes val descriptionResource: Int,
-)
-
-private val matchModeOptions = listOf(
-    MatchModeOption(
-        value = RoutingRuleOperator.AND,
-        labelResource = R.string.routing_match_all_label,
-        descriptionResource = R.string.routing_match_all_description,
-    ),
-    MatchModeOption(
-        value = RoutingRuleOperator.OR,
-        labelResource = R.string.routing_match_any_label,
-        descriptionResource = R.string.routing_match_any_description,
-    ),
-)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RoutingScreen(
     showTitleBarLogo: Boolean,
     onViewRule: (RoutingRuleViewerRequest) -> Unit,
+    onEditRule: (EditableRoutingRule) -> Unit,
     viewModel: RoutingViewModel = hiltViewModel(),
 ) {
     val rules by viewModel.rules.collectAsStateWithLifecycle()
@@ -188,9 +123,6 @@ fun RoutingScreen(
     val coroutineScope = rememberCoroutineScope()
     var previousTab by remember { mutableIntStateOf(pagerState.currentPage) }
     var selectedRuleIds by remember { mutableStateOf(emptySet<String>()) }
-    var editingRule by rememberSaveable(stateSaver = editableRoutingRuleSaver) {
-        mutableStateOf<EditableRoutingRule?>(null)
-    }
     var pendingProfileAction by remember { mutableStateOf<ProfileRoutingRuleAction?>(null) }
     var confirmResetToDefault by remember { mutableStateOf(false) }
     val selectionMode by remember { derivedStateOf { selectedRuleIds.isNotEmpty() } }
@@ -200,19 +132,21 @@ fun RoutingScreen(
     fun applyRuleAction(action: RoutingRuleAction) {
         when (action) {
             RoutingRuleAction.Add -> {
-                editingRule = EditableRoutingRule(
-                    rule = RoutingRule(
-                        id = "custom-${System.currentTimeMillis()}",
-                        name = newRuleName,
-                        outboundTag = "proxy",
+                onEditRule(
+                    EditableRoutingRule(
+                        rule = RoutingRule(
+                            id = "custom-${System.currentTimeMillis()}",
+                            name = newRuleName,
+                            outboundTag = "proxy",
+                        ),
+                        isNew = true,
                     ),
-                    isNew = true,
                 )
             }
             RoutingRuleAction.EnableAll -> viewModel.setAllRulesEnabled(true)
             RoutingRuleAction.DisableAll -> viewModel.setAllRulesEnabled(false)
             RoutingRuleAction.ResetToDefault -> confirmResetToDefault = true
-            is RoutingRuleAction.Edit -> editingRule = EditableRoutingRule(rule = action.rule, isNew = false)
+            is RoutingRuleAction.Edit -> onEditRule(EditableRoutingRule(rule = action.rule, isNew = false))
             is RoutingRuleAction.Toggle -> viewModel.updateRule(action.rule.copy(enabled = action.enabled))
             is RoutingRuleAction.Delete -> {
                 viewModel.deleteRules(action.ruleIds)
@@ -223,17 +157,6 @@ fun RoutingScreen(
 
     fun applyProfileRuleAction(action: ProfileRoutingRuleAction) {
         when (action) {
-            is ProfileRoutingRuleAction.Save -> {
-                saveEditedRoutingRule(
-                    editableRule = action.editableRule,
-                    updatedRule = action.updatedRule,
-                    profileRules = profileRouting?.rules.orEmpty(),
-                    onUpdateProfile = viewModel::updateProfileRule,
-                    onAdd = viewModel::addRule,
-                    onUpdate = viewModel::updateRule,
-                )
-                editingRule = null
-            }
             is ProfileRoutingRuleAction.Toggle -> viewModel.setProfileRuleEnabled(action.rule, action.enabled)
         }
     }
@@ -319,11 +242,14 @@ fun RoutingScreen(
                         if (rule.orphaned || rule.editableRule == null) {
                             onViewRule(rule.toViewerRequest())
                         } else {
-                            editingRule = EditableRoutingRule(
-                                rule = rule.editableRule,
-                                isNew = false,
-                                profileOriginalRuleJson = rule.originalRuleJson,
-                                profileOriginalIndex = rule.originalIndex,
+                            onEditRule(
+                                EditableRoutingRule(
+                                    rule = rule.editableRule,
+                                    isNew = false,
+                                    profileOriginalRuleJson = rule.originalRuleJson,
+                                    profileOriginalIndex = rule.originalIndex,
+                                    rawJson = rule.rawJson,
+                                ),
                             )
                         }
                     },
@@ -334,21 +260,6 @@ fun RoutingScreen(
                 RoutingTab.Apps -> AppBypassContent(active = selectedTab == RoutingTab.Apps.ordinal)
             }
         }
-    }
-
-    editingRule?.let { editableRule ->
-        EditRoutingRuleDialog(
-            rule = editableRule.rule,
-            onDismiss = { editingRule = null },
-            onSave = { updatedRule ->
-                val action = ProfileRoutingRuleAction.Save(editableRule, updatedRule)
-                if (editableRule.profileOriginalRuleJson != null) {
-                    requestProfileRuleAction(action)
-                } else {
-                    applyProfileRuleAction(action)
-                }
-            },
-        )
     }
 
     if (pendingProfileAction != null) {
@@ -380,26 +291,6 @@ fun RoutingScreen(
                 }
             },
         )
-    }
-}
-
-private fun saveEditedRoutingRule(
-    editableRule: EditableRoutingRule,
-    updatedRule: RoutingRule,
-    profileRules: List<ProfileRoutingRule>,
-    onUpdateProfile: (ProfileRoutingRule, RoutingRule) -> Unit,
-    onAdd: (RoutingRule) -> Unit,
-    onUpdate: (RoutingRule) -> Unit,
-) {
-    if (editableRule.profileOriginalRuleJson != null) {
-        profileRules.firstOrNull {
-            it.originalIndex == editableRule.profileOriginalIndex &&
-                it.originalRuleJson == editableRule.profileOriginalRuleJson
-        }?.let { profileRule -> onUpdateProfile(profileRule, updatedRule) }
-    } else if (editableRule.isNew) {
-        onAdd(updatedRule)
-    } else {
-        onUpdate(updatedRule)
     }
 }
 
@@ -793,7 +684,7 @@ private fun ProfileRoutingRuleCard(
 }
 
 @Composable
-private fun AutomaticRuleRoutingDialog(
+internal fun AutomaticRuleRoutingDialog(
     providerName: String?,
     onDismiss: () -> Unit,
     onSwitchToManual: () -> Unit,
@@ -836,281 +727,6 @@ private fun AutomaticRuleRoutingDialog(
             }
         },
     )
-}
-
-@Composable
-private fun EditRoutingRuleDialog(
-    rule: RoutingRule,
-    onDismiss: () -> Unit,
-    onSave: (RoutingRule) -> Unit,
-) {
-    var name by rememberSaveable(rule.id, stateSaver = TextFieldValue.Saver) {
-        mutableStateOf(TextFieldValue(rule.name))
-    }
-    var domains by rememberSaveable(rule.id, stateSaver = TextFieldValue.Saver) {
-        mutableStateOf(TextFieldValue(rule.domains.joinToString(", ")))
-    }
-    var ips by rememberSaveable(rule.id, stateSaver = TextFieldValue.Saver) {
-        mutableStateOf(TextFieldValue(rule.ips.joinToString(", ")))
-    }
-    var port by rememberSaveable(rule.id, stateSaver = TextFieldValue.Saver) {
-        mutableStateOf(TextFieldValue(rule.port.orEmpty()))
-    }
-    var selectedOutbound by rememberSaveable(rule.id) { mutableStateOf(rule.outboundTag) }
-    var selectedOperator by rememberSaveable(rule.id) { mutableStateOf(rule.operator) }
-    var selectedProtocols by rememberSaveable(rule.id) { mutableStateOf(rule.protocols.toSet()) }
-    var pendingCatchAllRule by rememberSaveable(rule.id, stateSaver = routingRuleSaver) {
-        mutableStateOf<RoutingRule?>(null)
-    }
-    val availableProtocolOptions = remember(rule.protocols) { (protocolOptions + rule.protocols).distinct() }
-    val outboundOption = remember(selectedOutbound) { XrayOutbound.fromTag(selectedOutbound) }
-    val matchModeOption = remember(selectedOperator) { matchModeOptions.first { it.value == selectedOperator } }
-    val outboundDescription = stringResource(outboundOption.descriptionResource)
-    val matchModeLabel = stringResource(matchModeOption.labelResource)
-    val matchModeDescription = stringResource(matchModeOption.descriptionResource)
-    val outboundOptions = XrayOutbound.entries.map { option ->
-        DropdownOption(
-            value = option.tag,
-            label = option.tag,
-            description = stringResource(option.descriptionResource),
-        )
-    }
-    val localizedMatchModeOptions = matchModeOptions.map { option ->
-        DropdownOption(
-            value = option.value.name,
-            label = stringResource(option.labelResource),
-            description = stringResource(option.descriptionResource),
-        )
-    }
-    val scrollState = rememberScrollState()
-
-    fun editedRule(): RoutingRule = rule.copy(
-        name = name.text.trim().ifEmpty { rule.name },
-        outboundTag = selectedOutbound,
-        domains = splitCsv(domains.text),
-        ips = splitCsv(ips.text),
-        port = port.text.trim().ifEmpty { null },
-        protocols = availableProtocolOptions.filter { it in selectedProtocols },
-        operator = selectedOperator,
-    )
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        confirmButton = {
-            Button(
-                onClick = {
-                    val edited = editedRule()
-                    if (edited.matchesAllTraffic()) {
-                        pendingCatchAllRule = edited
-                    } else {
-                        onSave(edited)
-                    }
-                },
-            ) {
-                Text(stringResource(R.string.routing_save))
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.routing_cancel))
-            }
-        },
-        title = { Text(stringResource(R.string.routing_edit_rule_title)) },
-        text = {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .sizeIn(maxHeight = 520.dp),
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .verticalScroll(scrollState)
-                        .padding(end = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    OutlinedTextField(
-                        value = name,
-                        onValueChange = { name = it },
-                        label = { Text(stringResource(R.string.routing_name_label)) },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-
-                    ReadOnlyDropdownField(
-                        label = stringResource(R.string.routing_outbound_tag_label),
-                        selectedText = outboundOption.tag,
-                        supportingText = outboundDescription,
-                        options = outboundOptions,
-                        onSelected = { selectedOutbound = it },
-                    )
-
-                    ReadOnlyDropdownField(
-                        label = stringResource(R.string.routing_match_mode_label),
-                        selectedText = matchModeLabel,
-                        supportingText = matchModeDescription,
-                        options = localizedMatchModeOptions,
-                        onSelected = { selectedOperator = RoutingRuleOperator.valueOf(it) },
-                    )
-
-                    OutlinedTextField(
-                        value = domains,
-                        onValueChange = { domains = it },
-                        label = { Text(stringResource(R.string.routing_domains_label)) },
-                        supportingText = { Text(stringResource(R.string.routing_domains_supporting_text)) },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    OutlinedTextField(
-                        value = ips,
-                        onValueChange = { ips = it },
-                        label = { Text(stringResource(R.string.routing_ips_label)) },
-                        supportingText = { Text(stringResource(R.string.routing_ips_supporting_text)) },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    OutlinedTextField(
-                        value = port,
-                        onValueChange = { port = it },
-                        label = { Text(stringResource(R.string.routing_port_label)) },
-                        supportingText = { Text(stringResource(R.string.routing_port_supporting_text)) },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-
-                    Text(stringResource(R.string.routing_protocols_label), style = MaterialTheme.typography.labelLarge)
-                    Text(
-                        stringResource(R.string.routing_protocols_empty_description),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    availableProtocolOptions.forEach { protocol ->
-                        val checked = protocol in selectedProtocols
-                        Surface(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = MaterialTheme.shapes.small,
-                            color = if (checked) {
-                                MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f)
-                            } else {
-                                MaterialTheme.colorScheme.surfaceContainerLow
-                            },
-                            border = BorderStroke(
-                                1.dp,
-                                if (checked) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.outlineVariant,
-                            ),
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .toggleable(
-                                        value = checked,
-                                        onValueChange = { enabled ->
-                                            selectedProtocols = if (enabled) {
-                                                selectedProtocols + protocol
-                                            } else {
-                                                selectedProtocols - protocol
-                                            }
-                                        },
-                                    )
-                                    .padding(horizontal = 12.dp, vertical = 10.dp),
-                                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Checkbox(
-                                    checked = checked,
-                                    onCheckedChange = null,
-                                )
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = protocol.uppercase(Locale.ROOT),
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        fontWeight = FontWeight.SemiBold,
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-                DialogScrollbar(
-                    scrollValue = scrollState.value,
-                    maxScrollValue = scrollState.maxValue,
-                    modifier = Modifier
-                        .align(Alignment.CenterEnd)
-                        .fillMaxHeight()
-                        .width(4.dp),
-                )
-            }
-        },
-    )
-
-    pendingCatchAllRule?.let { candidate ->
-        CatchAllRuleWarningDialog(
-            outbound = XrayOutbound.fromTag(candidate.outboundTag),
-            onKeepEditing = { pendingCatchAllRule = null },
-            onSaveAnyway = {
-                pendingCatchAllRule = null
-                onSave(candidate)
-            },
-        )
-    }
-}
-
-@Composable
-private fun CatchAllRuleWarningDialog(
-    outbound: XrayOutbound,
-    onKeepEditing: () -> Unit,
-    onSaveAnyway: () -> Unit,
-) {
-    AlertDialog(
-        onDismissRequest = onKeepEditing,
-        icon = { Icon(Icons.Default.Warning, contentDescription = null) },
-        title = { Text(stringResource(R.string.routing_catch_all_warning_title)) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(stringResource(R.string.routing_catch_all_warning_description))
-                Text(
-                    text = stringResource(outbound.catchAllEffectResource),
-                    fontWeight = FontWeight.SemiBold,
-                )
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onSaveAnyway) {
-                Text(stringResource(R.string.routing_catch_all_save_anyway))
-            }
-        },
-        dismissButton = {
-            Button(onClick = onKeepEditing) {
-                Text(stringResource(R.string.routing_catch_all_keep_editing))
-            }
-        },
-    )
-}
-
-@Composable
-private fun DialogScrollbar(
-    scrollValue: Int,
-    maxScrollValue: Int,
-    modifier: Modifier = Modifier,
-) {
-    val trackColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
-    val thumbColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.82f)
-
-    Canvas(modifier = modifier) {
-        val radius = size.width / 2f
-        drawRoundRect(
-            color = trackColor,
-            cornerRadius = CornerRadius(radius, radius),
-        )
-        if (maxScrollValue <= 0 || size.height <= 0f) return@Canvas
-
-        val contentHeight = size.height + maxScrollValue
-        val thumbHeight = (size.height * size.height / contentHeight).coerceAtLeast(32.dp.toPx())
-        val thumbOffset = (scrollValue / maxScrollValue.toFloat()) * (size.height - thumbHeight)
-        drawRoundRect(
-            color = thumbColor,
-            topLeft = Offset(0f, thumbOffset),
-            size = Size(size.width, thumbHeight),
-            cornerRadius = CornerRadius(radius, radius),
-        )
-    }
 }
 
 @Composable
@@ -1229,5 +845,3 @@ private fun routingRuleDisplayName(rule: RoutingRule): String {
 }
 
 private fun Set<String>.toggle(id: String): Set<String> = if (id in this) this - id else this + id
-
-private fun splitCsv(value: String): List<String> = value.split(",").map { it.trim() }.filter { it.isNotEmpty() }

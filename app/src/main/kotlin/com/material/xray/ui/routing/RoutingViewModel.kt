@@ -87,7 +87,7 @@ class RoutingViewModel @Inject constructor(
 
     fun addRule(rule: RoutingRule) {
         viewModelScope.launch {
-            settingsRepository.setRoutingRules(rules.value + rule)
+            settingsRepository.setRoutingRules(settingsRepository.customRoutingRules.first() + rule)
             routingChangeManager.markPendingChanges()
         }
     }

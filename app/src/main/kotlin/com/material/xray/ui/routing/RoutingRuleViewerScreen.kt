@@ -167,7 +167,7 @@ private fun fullRuleContentText(request: RoutingRuleViewerRequest): String {
 }
 
 @Composable
-private fun HighlightedJson(rawJson: String) {
+internal fun HighlightedJson(rawJson: String) {
     val formattedJson = remember(rawJson) { rawJson.prettyPrintedOrSelf() }
     val colors = rememberJsonSyntaxColors()
     val highlighted = remember(formattedJson, colors) {

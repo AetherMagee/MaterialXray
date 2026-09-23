@@ -5,6 +5,7 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
@@ -45,9 +46,12 @@ import com.material.xray.ui.configviewer.ConfigViewerRequest
 import com.material.xray.ui.configviewer.ConfigViewerScreen
 import com.material.xray.ui.home.HomeScreen
 import com.material.xray.ui.logs.LogsScreen
+import com.material.xray.ui.routing.EditableRoutingRule
+import com.material.xray.ui.routing.RoutingRuleEditorScreen
 import com.material.xray.ui.routing.RoutingRuleViewerRequest
 import com.material.xray.ui.routing.RoutingRuleViewerScreen
 import com.material.xray.ui.routing.RoutingScreen
+import com.material.xray.ui.routing.RoutingViewModel
 import com.material.xray.ui.settings.SettingsScreen
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
@@ -121,6 +125,9 @@ fun MainNavigation(
     var routingRuleViewerRequest by rememberSaveable(stateSaver = RoutingRuleViewerRequestSaver) {
         mutableStateOf<RoutingRuleViewerRequest?>(null)
     }
+    var routingRuleEditorRequest by rememberSaveable(stateSaver = RoutingRuleEditorRequestSaver) {
+        mutableStateOf<EditableRoutingRule?>(null)
+    }
     BackHandler(enabled = configViewerRequest != null) { configViewerRequest = null }
 
     Box {
@@ -193,8 +200,13 @@ fun MainNavigation(
                     RoutingScreen(
                         showTitleBarLogo = showTitleBarLogo,
                         onViewRule = { request ->
+                            routingRuleEditorRequest = null
                             routingRuleViewerRequest = request
                             navController.navigate(ROUTING_RULE_VIEWER_ROUTE) { launchSingleTop = true }
+                        },
+                        onEditRule = { request ->
+                            routingRuleViewerRequest = null
+                            routingRuleEditorRequest = request
                         },
                     )
                 }
@@ -207,8 +219,8 @@ fun MainNavigation(
                         RoutingRuleViewerScreen(
                             request = request,
                             onBack = {
-                                routingRuleViewerRequest = null
                                 navController.popBackStack()
+                                routingRuleViewerRequest = null
                             },
                         )
                     }
@@ -225,6 +237,26 @@ fun MainNavigation(
         ) { request ->
             if (request != null) {
                 ConfigViewerScreen(request = request, onBack = { configViewerRequest = null })
+            }
+        }
+
+        AnimatedContent(
+            targetState = routingRuleEditorRequest,
+            transitionSpec = {
+                (
+                    fadeIn(tween(ROUTING_EDITOR_ENTER_MS)) +
+                        slideInVertically(tween(ROUTING_EDITOR_ENTER_MS)) { height -> height / 16 }
+                    ) togetherWith
+                    fadeOut(tween(ROUTING_EDITOR_EXIT_MS)) using null
+            },
+            label = "routingRuleEditor",
+        ) { request ->
+            if (request != null) {
+                RoutingRuleEditorScreen(
+                    editableRule = request,
+                    viewModel = hiltViewModel<RoutingViewModel>(requireNotNull(navBackStackEntry)),
+                    onBack = { routingRuleEditorRequest = null },
+                )
             }
         }
     }
@@ -252,9 +284,16 @@ private val RoutingRuleViewerRequestSaver: Saver<RoutingRuleViewerRequest?, Stri
     restore = { saved -> runCatching { Json.decodeFromString<RoutingRuleViewerRequest>(saved) }.getOrNull() },
 )
 
+private val RoutingRuleEditorRequestSaver: Saver<EditableRoutingRule?, String> = Saver(
+    save = { request -> request?.let { Json.encodeToString(it) } },
+    restore = { saved -> runCatching { Json.decodeFromString<EditableRoutingRule>(saved) }.getOrNull() },
+)
+
 private const val RUNNING_CONFIG_TAG = "running"
 private const val SERVER_CONFIG_TAG = "server"
 private const val CONFIG_VIEWER_FADE_MS = 180
+private const val ROUTING_EDITOR_ENTER_MS = 200
+private const val ROUTING_EDITOR_EXIT_MS = 140
 private const val ROUTING_RULE_VIEWER_ROUTE = "routing/rule"
 
 private val CompactNavigationBarHeight = 68.dp
