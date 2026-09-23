@@ -57,8 +57,8 @@ interface ServerDao {
     suspend fun updateGuarded(id: Long, guarded: Boolean)
 
     @Transaction
-    suspend fun updateSortOrders(serverIds: List<Long>) {
-        serverIds.forEachIndexed { sortOrder, serverId ->
+    suspend fun updateSortOrders(changes: Map<Long, Int>) {
+        changes.forEach { (serverId, sortOrder) ->
             updateSortOrder(serverId, sortOrder)
         }
     }

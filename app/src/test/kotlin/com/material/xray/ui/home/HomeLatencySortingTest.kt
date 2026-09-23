@@ -26,6 +26,19 @@ class HomeLatencySortingTest {
     }
 
     @Test
+    fun `unchanged latency order does not write sort positions`() {
+        assertEquals(emptyMap<Long, Int>(), changedServerSortOrders(listOf(1, 2, 3), listOf(1, 2, 3)))
+    }
+
+    @Test
+    fun `only moved servers need sort position writes`() {
+        assertEquals(
+            mapOf(1L to 1, 2L to 0),
+            changedServerSortOrders(listOf(1, 2, 3), listOf(2, 1, 3)),
+        )
+    }
+
+    @Test
     fun `uses only the selected latency method when dual results are disabled`() {
         assertEquals(
             listOf(PingMethod.Httping),

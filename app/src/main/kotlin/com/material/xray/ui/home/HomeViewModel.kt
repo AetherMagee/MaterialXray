@@ -716,6 +716,7 @@ class HomeViewModel @Inject constructor(
         methods: List<PingMethod>,
         sortDuringTest: Boolean,
     ) = supervisorScope {
+        var persistedOrder = servers.sortedBy { it.sortOrder }.map { it.id }
         val probeJobs = servers.map { server ->
             launch { runLatencyProbe(runId, server, primaryMethod, methods) }
         }
@@ -723,7 +724,7 @@ class HomeViewModel @Inject constructor(
             launch {
                 while (isActive) {
                     delay(LATENCY_SORT_INTERVAL_MILLIS)
-                    updateServerSortOrder(runId, servers)
+                    persistedOrder = updateServerSortOrder(runId, servers, persistedOrder)
                 }
             }
         } else {
@@ -732,14 +733,19 @@ class HomeViewModel @Inject constructor(
 
         probeJobs.joinAll()
         sortingJob?.cancelAndJoin()
-        if (sortDuringTest) updateServerSortOrder(runId, servers)
+        if (sortDuringTest) updateServerSortOrder(runId, servers, persistedOrder)
     }
 
-    private suspend fun updateServerSortOrder(runId: Long, servers: List<ServerEntity>) {
-        if (latencyRunId != runId) return
-        serverRepo.updateSortOrders(
-            sortedServerIdsByLatency(servers.map { it.id }, latencyByServerId.value),
-        )
+    private suspend fun updateServerSortOrder(
+        runId: Long,
+        servers: List<ServerEntity>,
+        persistedOrder: List<Long>,
+    ): List<Long> {
+        if (latencyRunId != runId) return persistedOrder
+        val sortedOrder = sortedServerIdsByLatency(servers.map { it.id }, latencyByServerId.value)
+        val changes = changedServerSortOrders(persistedOrder, sortedOrder)
+        if (changes.isNotEmpty()) serverRepo.updateSortOrders(changes)
+        return sortedOrder
     }
 
     private suspend fun runLatencyProbe(
@@ -871,6 +877,14 @@ internal fun sortedServerIdsByLatency(
         { serverId -> latencyByServerId[serverId]?.latencyMs?.takeIf { it >= 0 } ?: 0 },
     ),
 )
+
+internal fun changedServerSortOrders(current: List<Long>, sorted: List<Long>): Map<Long, Int> {
+    if (current == sorted) return emptyMap()
+    val currentPositions = current.withIndex().associate { (index, serverId) -> serverId to index }
+    return sorted.mapIndexedNotNull { index, serverId ->
+        if (currentPositions[serverId] == index) null else serverId to index
+    }.toMap()
+}
 
 internal fun latencyMethods(primaryMethod: PingMethod, showBoth: Boolean): List<PingMethod> = if (showBoth) {
     listOf(PingMethod.Tcping, PingMethod.Httping)

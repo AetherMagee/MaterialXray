@@ -42,7 +42,7 @@ class ServerRepository @Inject constructor(
         serverDao.updateGuarded(id, guarded)
     }
 
-    suspend fun updateSortOrders(serverIds: List<Long>) {
-        serverDao.updateSortOrders(serverIds)
+    suspend fun updateSortOrders(changes: Map<Long, Int>) {
+        serverDao.updateSortOrders(changes)
     }
 }
