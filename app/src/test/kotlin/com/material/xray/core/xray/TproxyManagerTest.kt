@@ -42,6 +42,31 @@ class TproxyManagerTest {
     }
 
     @Test
+    fun `dynamic local destination matching removes address snapshot rules`() {
+        val base = plan(tetherUpstreamInterface = "wlan0")
+        val dynamic = base.copy(runtimeState = base.runtimeState.copy(localAddresses = emptyList(), dynamicLocalAddresses = true))
+        val command = TproxyManager.activationCommand(dynamic, APP_UID)
+        val verification = TproxyManager.verifyCommand(dynamic.runtimeState, APP_UID)
+
+        assertTrue(command.contains("-A MXP278b -m addrtype --dst-type LOCAL -j RETURN"))
+        assertFalse(command.contains("-A MXP278b -d 192.168.43.1/32 -j RETURN"))
+        assertTrue(verification.contains("has_v4 '-A MXP278b -m addrtype --dst-type LOCAL -j RETURN'"))
+    }
+
+    @Test
+    fun `local destination probe checks kernel support and can fall back`() = runTest {
+        val commands = mutableListOf<String>()
+        val manager = TproxyManager(APP_UID) { command ->
+            commands += command
+            RootShell.Result(if (command.startsWith("ip6tables")) 1 else 0, "", "")
+        }
+
+        assertFalse(manager.supportsDynamicLocalAddresses(includeIpv6 = true))
+        assertEquals(2, commands.size)
+        assertTrue(commands.all { it.contains("-m addrtype --dst-type LOCAL") && it.contains("-X MXD278b") })
+    }
+
+    @Test
     fun `INPUT guard preserves device services and blocks intercepted traffic until activation`() {
         val command = TproxyManager.guardInstallCommand(plan(tetherUpstreamInterface = "wlan0", tetherBypassLan = false), APP_UID)
         val inputRules = command.substringAfter("iptables -w 2 -t filter -N MXG278bI")

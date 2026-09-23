@@ -29,12 +29,28 @@ class TproxyManager internal constructor(
     private var useIndividualCommands = false
     private var guardCoversTethering = false
     private val localAddressTracker = LocalAddressChangeTracker()
+    private var dynamicLocalAddresses = false
 
     internal suspend fun readLocalAddresses(includeIpv6: Boolean): List<String> = LocalAddresses.read(includeIpv6, executeCommand)
 
-    suspend fun localAddressesChanged(): Boolean = localAddressTracker.hasStableChange(
-        readLocalAddresses(localAddressTracker.includeIpv6),
-    )
+    suspend fun localAddressesChanged(): Boolean {
+        if (dynamicLocalAddresses) return false
+        return localAddressTracker.hasStableChange(readLocalAddresses(localAddressTracker.includeIpv6))
+    }
+
+    suspend fun supportsDynamicLocalAddresses(includeIpv6: Boolean): Boolean {
+        val tools = if (includeIpv6) FirewallCommands.tools else listOf(IPV4)
+        return tools.all { tool -> executeCommand(localAddressMatchProbeCommand(tool, appUid)).isSuccess }
+    }
+
+    private fun localAddressMatchProbeCommand(tool: String, appUid: Int): String {
+        require(tool in FirewallCommands.tools)
+        val chain = "MXD${appUid.toString(16)}"
+        return "$tool -t mangle -N $chain && " +
+            "{ $tool -t mangle -A $chain -m addrtype --dst-type LOCAL -j RETURN; result=\$?; " +
+            "$tool -t mangle -F $chain; flushed=\$?; $tool -t mangle -X $chain; removed=\$?; " +
+            "[ \$result -eq 0 ] && [ \$flushed -eq 0 ] && [ \$removed -eq 0 ]; }"
+    }
 
     suspend fun installGuard(plan: TproxyTrafficPlan): TunManager.RoutingResult {
         if (useIndividualCommands) return installGuardIndividually(plan, hasCompleteGuard(plan))
@@ -54,6 +70,7 @@ class TproxyManager internal constructor(
 
     suspend fun activate(plan: TproxyTrafficPlan): TunManager.RoutingResult {
         val state = plan.runtimeState
+        dynamicLocalAddresses = state.dynamicLocalAddresses
         localAddressTracker.markInstalled(state.localAddresses, state.ipv6Enabled)
         val inspection = executeCommand(activationInspectionCommand(state))
         if (!inspection.isSuccess) return inspection.toRoutingResult("TPROXY namespace inspection")
@@ -144,8 +161,9 @@ class TproxyManager internal constructor(
     }
 
     suspend fun verify(state: TproxyRuntimeState): TunManager.RoutingResult {
+        dynamicLocalAddresses = state.dynamicLocalAddresses
         localAddressTracker.ensureInstalled(state.localAddresses, state.ipv6Enabled)
-        if (state.tetherUpstreamInterface != null && state.localAddresses.isEmpty()) {
+        if (state.tetherUpstreamInterface != null && !state.dynamicLocalAddresses && state.localAddresses.isEmpty()) {
             return TunManager.RoutingResult(false, "Local interface addresses were not captured during routing setup")
         }
         return execute(verifyCommand(state, appUid), "TPROXY routing verification")
@@ -189,6 +207,7 @@ class TproxyManager internal constructor(
             tetherUpstreamInterface: String? = null,
             tetherBypassLan: Boolean = true,
             localAddresses: List<String> = emptyList(),
+            dynamicLocalAddresses: Boolean = false,
         ): TproxyRuntimeState {
             require(groups.isNotEmpty())
             require(groups.size == ports.size)
@@ -214,6 +233,7 @@ class TproxyManager internal constructor(
                 tetherUpstreamInterface = tetherUpstreamInterface,
                 tetherBypassLan = tetherBypassLan,
                 localAddresses = localAddresses,
+                dynamicLocalAddresses = dynamicLocalAddresses,
             )
         }
 
@@ -468,6 +488,12 @@ class TproxyManager internal constructor(
             state.tetherUpstreamInterface?.let { upstream ->
                 val basePort = state.groups.first().port
                 commands += hasV4("${names.prerouting} -i $upstream -j RETURN")
+                if (state.dynamicLocalAddresses) {
+                    commands += hasV4("${names.prerouting} -m addrtype --dst-type LOCAL -j RETURN")
+                    if (state.ipv6Enabled) {
+                        commands += hasV6("${names.prerouting} -m addrtype --dst-type LOCAL -j RETURN")
+                    }
+                }
                 for (protocol in listOf("tcp", "udp")) {
                     commands += hasV4(
                         "${names.prerouting} -p $protocol -m $protocol --dport 53 -j TPROXY --on-port $basePort " +
@@ -825,8 +851,12 @@ class TproxyManager internal constructor(
                             "--on-port ${base.state.port} --tproxy-mark $mark/$groupMask",
                     )
                 }
-                localAddresses.forEach { address ->
-                    add("$tool -t mangle -A $chain -d $address -j RETURN")
+                if (plan.runtimeState.dynamicLocalAddresses) {
+                    add("$tool -t mangle -A $chain -m addrtype --dst-type LOCAL -j RETURN")
+                } else {
+                    localAddresses.forEach { address ->
+                        add("$tool -t mangle -A $chain -d $address -j RETURN")
+                    }
                 }
                 tetherBypassCidrs(tool, plan.runtimeState.tetherBypassLan).forEach { cidr ->
                     add("$tool -t mangle -A $chain -d $cidr -j RETURN")

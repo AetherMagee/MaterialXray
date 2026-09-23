@@ -21,6 +21,7 @@ data class TproxyRuntimeState(
     val tetherUpstreamInterface: String? = null,
     val tetherBypassLan: Boolean = true,
     val localAddresses: List<String> = emptyList(),
+    val dynamicLocalAddresses: Boolean = false,
 )
 
 @Serializable

@@ -270,6 +270,11 @@ internal class TproxyManagerRoutingGateway(
         }
         val routeIdentities = listOf(BASE_TPROXY_ROUTE_KEY to BASE_TPROXY_INBOUND_TAG) +
             appRoutingPlan.proxyServerIds.zip(inboundTags)
+        val dynamicLocalAddresses = existingState?.dynamicLocalAddresses ?: if (tetherUpstreamInterface != null) {
+            manager.supportsDynamicLocalAddresses(allowIpv6)
+        } else {
+            false
+        }
         val state = existingState ?: TproxyManager.createRuntimeState(
             routeTable = routeTable + TPROXY_ROUTE_TABLE_OFFSET,
             groups = routeIdentities,
@@ -277,7 +282,8 @@ internal class TproxyManagerRoutingGateway(
             allowIpv6 = allowIpv6,
             tetherUpstreamInterface = tetherUpstreamInterface,
             tetherBypassLan = bypassLan,
-            localAddresses = if (tetherUpstreamInterface != null) manager.readLocalAddresses(allowIpv6) else emptyList(),
+            localAddresses = if (tetherUpstreamInterface != null && !dynamicLocalAddresses) manager.readLocalAddresses(allowIpv6) else emptyList(),
+            dynamicLocalAddresses = dynamicLocalAddresses,
         )
         require(state.groups.map { it.routeKey } == routeIdentities.map { it.first }) {
             "TPROXY traffic group topology changed"
