@@ -322,10 +322,10 @@ class ConnectionManagerTest {
         assertTrue(config.getValue("inbounds").jsonArray.none { it.jsonObject["protocol"]?.jsonPrimitive?.content == "tun" })
         assertEquals("0.0.0.0", config.getValue("inbounds").jsonArray.single().jsonObject["listen"]?.jsonPrimitive?.content)
         assertTrue(
-            config.getValue("outbounds").jsonArray.any { outbound ->
+            config.getValue("outbounds").jsonArray.none { outbound ->
                 outbound.jsonObject["streamSettings"]?.jsonObject
                     ?.get("sockopt")?.jsonObject
-                    ?.get("interface")?.jsonPrimitive?.content == "wlan0"
+                    ?.containsKey("interface") == true
             },
         )
     }
@@ -429,7 +429,7 @@ class ConnectionManagerTest {
     }
 
     @Test
-    fun `tethered TPROXY requires reconnect when its upstream interface changes`() = runTest {
+    fun `tethered TPROXY updates upstream without reconnecting`() = runTest {
         val harness = Harness()
         val settings = runtimeSettings().copy(
             rootConnectionBackend = RootConnectionBackend.Tproxy,
@@ -437,14 +437,22 @@ class ConnectionManagerTest {
         )
         harness.manager.connect(server(), settings, preparation = ConnectionPreparation.ReusePreparedRuntime)
         val connected = harness.stateCoordinator.state.value as ConnectionState.Connected
+        val config = Json.parseToJsonElement(requireNotNull(harness.binary.configJson)).jsonObject
+        config.getValue("outbounds").jsonArray.forEach { outbound ->
+            val sockopt = outbound.jsonObject["streamSettings"]?.jsonObject?.get("sockopt")?.jsonObject
+            assertFalse(sockopt?.containsKey("interface") == true)
+        }
 
+        val route = TunManager.PhysicalRoute(dev = "rmnet0", gateway = null, table = "main")
         val result = harness.manager.updatePhysicalBypassRoute(
             connected,
-            TunManager.PhysicalRoute(dev = "rmnet0", gateway = null, table = "main"),
+            route,
             settings,
         )
 
-        assertEquals(PhysicalRouteUpdateResult.RequiresReconnect, result)
+        assertEquals(PhysicalRouteUpdateResult.Applied(route), result)
+        assertEquals("rmnet0", harness.stateStore.state?.tproxy?.tetherUpstreamInterface)
+        assertEquals(1, harness.tproxyGateway.tetherUpstreamUpdateCalls)
     }
 
     @Test
@@ -1138,6 +1146,7 @@ class ConnectionManagerTest {
         var removeGuardCalls = 0
         var activationResult = TunManager.RoutingResult(success = true)
         var tetherAddressUpdateCalls = 0
+        var tetherUpstreamUpdateCalls = 0
         var verificationResult = TunManager.RoutingResult(success = true)
 
         override suspend fun createPlan(
@@ -1176,6 +1185,10 @@ class ConnectionManagerTest {
         override suspend fun readLocalAddresses(includeIpv6: Boolean): List<String> = listOf("127.0.0.1/32")
         override suspend fun updateTetherAddresses(plan: TproxyTrafficPlan): TunManager.RoutingResult {
             tetherAddressUpdateCalls++
+            return TunManager.RoutingResult(success = true)
+        }
+        override suspend fun updateTetherUpstream(plan: TproxyTrafficPlan, previousUpstream: String): TunManager.RoutingResult {
+            tetherUpstreamUpdateCalls++
             return TunManager.RoutingResult(success = true)
         }
         override suspend fun verify(state: TproxyRuntimeState): TunManager.RoutingResult = verificationResult

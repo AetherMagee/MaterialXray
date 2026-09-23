@@ -653,10 +653,9 @@ internal class ConnectionManager(
                 acceptNonLoopback = tproxyPlan.runtimeState.tetherUpstreamInterface != null,
             )
         }
-        // Local TPROXY has no physical bypass route: Xray's GID-exempt sockets can follow Android's
-        // current default route. Binding them to this snapshot would force a core restart whenever
-        // Wi-Fi and cellular exchange interfaces. Tethering still needs the explicit upstream.
-        val localTproxy = tproxyPlan != null && tproxyPlan.runtimeState.tetherUpstreamInterface == null
+        // Xray's GID-exempt sockets follow Android's current default route in both local and
+        // tethered TPROXY. The tether firewall still tracks the upstream separately.
+        val unboundTproxy = tproxyPlan != null
 
         // A hand-edited config replaces generation wholesale, but not the identifiers this connect
         // just allocated: the API endpoint and the inbounds have to be the current ones or the
@@ -668,7 +667,7 @@ internal class ConnectionManager(
                 xrayApiEndpoint,
                 effectiveInbounds,
                 clearOutboundMarks = tproxyPlan != null,
-                clearOutboundInterfaces = localTproxy,
+                clearOutboundInterfaces = unboundTproxy,
             )
         ) {
             return null
@@ -681,7 +680,7 @@ internal class ConnectionManager(
             rootBackend = rootBackend,
             fwmark = runtimeSettings.fwmark.takeIf { managesSystemRouting && tproxyPlan == null } ?: 0,
             appRoutingPlan = appRoutingPlan,
-            physicalRoute = physicalRoute.takeUnless { localTproxy },
+            physicalRoute = physicalRoute.takeUnless { unboundTproxy },
             xrayApiEndpoint = xrayApiEndpoint,
             syntheticDnsAddress = syntheticDnsAddress,
             inbounds = effectiveInbounds,
@@ -1400,17 +1399,46 @@ internal class ConnectionManager(
         val persistedState = stateStore.read()
         if (persistedState?.rootConnectionBackend == RootConnectionBackend.Tproxy) {
             val tproxyState = persistedState.tproxy ?: return PhysicalRouteUpdateResult.RequiresReconnect
-            // Tether firewall rules name the upstream interface and must be rebuilt. Local TPROXY
-            // outbounds are deliberately unbound, so only the diagnostic route snapshot changes.
-            if (tproxyState.tetherUpstreamInterface != null && connectedState.physicalInterface != physicalRoute.dev) {
-                return PhysicalRouteUpdateResult.RequiresReconnect
-            }
             if (!processSupervisor.isAlive(connectedState.corePid)) return PhysicalRouteUpdateResult.RequiresReconnect
+            val updatedTproxy = if (tproxyState.tetherUpstreamInterface != null && tproxyState.tetherUpstreamInterface != physicalRoute.dev) {
+                val addresses = if (tproxyState.dynamicLocalAddresses) {
+                    emptyList()
+                } else {
+                    tproxyGateway.readLocalAddresses(tproxyState.ipv6Enabled)
+                }
+                val updated = tproxyState.copy(tetherUpstreamInterface = physicalRoute.dev, localAddresses = addresses)
+                val appPlan = appRoutingPlanner.build(
+                    baseTunName = TPROXY_INTERFACE_LABEL,
+                    baseRouteTable = runtimeSettings.routeTable,
+                    includeProxyRoutes = false,
+                    includeTunRoutes = true,
+                    includeDefaultSelectedRoute = !runtimeSettings.usesProxyAsRoutingDefault(),
+                    allowIpv6 = runtimeSettings.allowIpv6,
+                )
+                val plan = tproxyGateway.createPlan(
+                    appRoutingPlan = appPlan,
+                    routeTable = runtimeSettings.routeTable,
+                    allowIpv6 = runtimeSettings.allowIpv6,
+                    existingState = updated,
+                    tetherUpstreamInterface = physicalRoute.dev,
+                    bypassLan = runtimeSettings.bypassLan,
+                )
+                val result = tproxyGateway.updateTetherUpstream(plan, tproxyState.tetherUpstreamInterface)
+                if (!result.success) {
+                    log.append(LogSource.APP, "Tether upstream update failed: ${result.error}")
+                    return PhysicalRouteUpdateResult.RequiresReconnect
+                }
+                log.append(LogSource.APP, "Tether upstream changed to ${physicalRoute.dev} without restarting Xray")
+                updated
+            } else {
+                tproxyState
+            }
             stateStore.write(
                 persistedState.copy(
                     physicalInterface = physicalRoute.dev,
                     physicalGateway = physicalRoute.gateway,
                     physicalTable = physicalRoute.table,
+                    tproxy = updatedTproxy,
                 ),
             )
             return PhysicalRouteUpdateResult.Applied(physicalRoute)

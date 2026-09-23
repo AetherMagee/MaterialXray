@@ -142,6 +142,43 @@ class TproxyManagerTest {
     }
 
     @Test
+    fun `tether upstream refresh guards traffic and swaps rules without changing listeners`() = runTest {
+        val commands = mutableListOf<String>()
+        val manager = TproxyManager(APP_UID) { command ->
+            commands += command
+            RootShell.Result(0, "", "")
+        }
+        val updated = plan(tetherUpstreamInterface = "rmnet0")
+
+        assertTrue(manager.updateTetherUpstream(updated, previousUpstream = "wlan0").success)
+        assertEquals(6, commands.size)
+        assertTrue(commands[0].contains("-A MXG278bP -i wlan0 -j ACCEPT"))
+        assertTrue(commands[0].contains("-A MXG278bP -i rmnet0 -j ACCEPT"))
+        assertTrue(commands[1].contains("-I FORWARD 1 -j MXG278b"))
+        assertTrue(commands[2].contains("-F MXP278b"))
+        assertTrue(commands[2].contains("-A MXP278b -i rmnet0 -j RETURN"))
+        assertTrue(commands[2].contains("-F MXP278bI"))
+        assertTrue(commands[2].contains("-A MXP278bI -i rmnet0 -j RETURN"))
+        assertTrue(commands[4].contains("-D PREROUTING -j MXG278bP"))
+        assertTrue(commands[5].contains("-D FORWARD -j MXG278b"))
+        assertFalse(commands[2].contains("-I PREROUTING"))
+    }
+
+    @Test
+    fun `failed upstream refresh retains transition guard for reconnect`() = runTest {
+        val commands = mutableListOf<String>()
+        val manager = TproxyManager(APP_UID) { command ->
+            commands += command
+            RootShell.Result(if (commands.size == 3) 1 else 0, "", "update failed")
+        }
+
+        assertFalse(manager.updateTetherUpstream(plan(tetherUpstreamInterface = "rmnet0"), previousUpstream = "wlan0").success)
+        assertEquals(3, commands.size)
+        assertTrue(commands.first().contains("-I PREROUTING 1 -j MXG278bP"))
+        assertTrue(commands[1].contains("-I FORWARD 1 -j MXG278b"))
+    }
+
+    @Test
     fun `IPv6 changes are ignored when IPv6 routing is disabled`() = runTest {
         var output = "1: lo inet 127.0.0.1/8\n2: rmnet1 inet 198.51.100.2/30\n2: rmnet1 inet6 2001:db8::1/64"
         val manager = TproxyManager(APP_UID) { command ->
@@ -224,7 +261,7 @@ class TproxyManagerTest {
         assertTrue(manager.activate(plan()).success)
         assertEquals(5, commands.size)
         assertFalse(commands[2].contains("-D OUTPUT -j MXG278b"))
-        assertFalse(commands[2].contains("-F MXG278b"))
+        assertFalse(commands[2].contains("-F MXG278b 2>/dev/null"))
         assertEquals(commands[0], commands[3])
         assertFalse(commands[4].contains("iptables-restore"))
     }
