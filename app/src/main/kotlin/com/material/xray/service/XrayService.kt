@@ -319,6 +319,7 @@ class XrayService : VpnService() {
                 telemetryReporter.recordConnectionState(state)
                 handleStateSideEffects(state)
                 updateNotification()
+                XrayTileService.requestStateRefresh(this@XrayService)
             }
         }
 
@@ -2035,7 +2036,6 @@ class XrayService : VpnService() {
     }
 
     private fun updateNotification(overrideText: String? = null) {
-        XrayTileService.requestStateRefresh(this)
         val state = connectionStateCoordinator.state.value
         if (state is ConnectionState.Disconnected) {
             lastNotificationContent = null
@@ -2078,6 +2078,7 @@ class XrayService : VpnService() {
         lastNotificationContent = null
         createNotificationChannel()
         updateNotification()
+        XrayTileService.requestStateRefresh(this)
     }
 
     private fun showConnectionFailureNotification(message: String) {
