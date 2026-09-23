@@ -45,9 +45,9 @@ data class HomeData(
  * Process-wide holder for the Home screen data.
  *
  * The snapshot is shared eagerly in the application scope, which serves two purposes:
- * - Warm-up: constructing this holder (it is injected by [com.material.xray.MaterialXrayApp])
- *   opens the database and the settings store during application startup, before the first
- *   composition subscribes, so a cold start usually has the data ready by the first frame.
+ * - Warm-up: [com.material.xray.MainActivity] injects this holder before its first composition,
+ *   so a UI launch opens the database and builds its initial snapshot while the splash screen
+ *   is visible. Headless worker starts do not load the Home screen's server list.
  * - Readiness: [data] is `null` until the first snapshot is built, which lets
  *   [com.material.xray.MainActivity] keep the splash screen visible until the Home screen can
  *   render fully populated, and lets the UI distinguish "not loaded yet" from "no subscriptions".

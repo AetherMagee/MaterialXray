@@ -172,7 +172,7 @@ class HomeViewModel @Inject constructor(
     private val _uiEvents = Channel<HomeUiEvent>(Channel.BUFFERED)
     val uiEvents: Flow<HomeUiEvent> = _uiEvents.receiveAsFlow()
 
-    // The home data is shared process-wide and loaded eagerly on app startup, so on a typical
+    // The home data is shared process-wide and loaded eagerly on Activity startup, so on a typical
     // cold start every flow derived from it below starts out with the loaded snapshot as its
     // initial value instead of an empty placeholder, and the first composed frame is already
     // fully populated. `null` means the snapshot has not been built yet.

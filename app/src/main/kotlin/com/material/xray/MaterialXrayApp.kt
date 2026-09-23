@@ -15,8 +15,6 @@ import com.material.xray.service.SubscriptionUpdateScheduler
 import com.material.xray.telemetry.DiagnosticsConsentMirror
 import com.material.xray.telemetry.TelemetryReporter
 import com.material.xray.telemetry.initializeSentryTelemetry
-import com.material.xray.ui.home.HomeDataState
-import com.material.xray.ui.settings.SettingsDataState
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
@@ -48,17 +46,6 @@ class MaterialXrayApp : Application() {
 
     @Inject lateinit var telemetryReporter: TelemetryReporter
 
-    /**
-     * Injected for its construction side effect: building the holder eagerly starts loading the
-     * home screen data (Room and DataStore) during application startup, before the first
-     * composition subscribes, so [MainActivity] can dismiss its splash screen with a fully
-     * populated first frame.
-     */
-    @Inject lateinit var homeDataState: HomeDataState
-
-    /** Eagerly starts the atomic Settings snapshot before that tab is first opened. */
-    @Inject lateinit var settingsDataState: SettingsDataState
-
     @Inject @ApplicationScope
     lateinit var appScope: CoroutineScope
 
@@ -67,9 +54,8 @@ class MaterialXrayApp : Application() {
         // This must precede Hilt's injection in super.onCreate() so opted-in users can report
         // failures while the application graph and eager startup state are being constructed.
         if (diagnosticsConsentMirror.isEnabled()) initializeSentryTelemetry(this)
-        // Per-app locales must be applied before super.onCreate(): Hilt injects this class there,
-        // which constructs HomeDataState, and that eagerly builds locale-dependent server
-        // summaries. Initializing afterwards would race that first snapshot on API <= 32.
+        // Initialize locales before Hilt constructs UI data when MainActivity starts, so its
+        // first locale-dependent server summaries use the selected language on API <= 32.
         initializeAppLocales(this)
         super.onCreate()
         appScope.launch(start = CoroutineStart.UNDISPATCHED) {
