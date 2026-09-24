@@ -144,6 +144,7 @@ android {
     namespace = "com.material.xray"
     compileSdk = 37
     compileSdkMinor = 0
+    buildToolsVersion = "37.0.0"
 
     defaultConfig {
         applicationId = "com.material.xray"
@@ -157,6 +158,8 @@ android {
             abiFilters += "arm64-v8a"
         }
     }
+
+    ndkVersion = "30.0.16248370"
 
     externalNativeBuild {
         cmake {
