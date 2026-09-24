@@ -3,13 +3,11 @@ package com.material.xray.ui.settings
 import android.Manifest
 import android.app.Activity
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.content.res.Resources
 import android.net.Uri
 import android.os.Build
 import android.os.Process
 import android.provider.Settings
-import android.text.format.Formatter
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -21,57 +19,35 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.selection.toggleable
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.DragIndicator
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -96,20 +72,11 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
-import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.selected
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
-import androidx.core.app.ActivityCompat
-import androidx.core.app.NotificationManagerCompat
-import androidx.core.content.ContextCompat
 import androidx.core.os.LocaleListCompat
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
@@ -118,52 +85,23 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import com.material.xray.R
 import com.material.xray.core.locale.setAppLocales
-import com.material.xray.core.xray.GeoDataAsset
-import com.material.xray.core.xray.GeoDataDownloadProgress
-import com.material.xray.core.xray.TproxyCompatibility
 import com.material.xray.data.repository.BackupSummary
 import com.material.xray.data.repository.SettingsSnapshot
-import com.material.xray.model.AppUpdateCheckStatus
-import com.material.xray.model.ConnectionState
 import com.material.xray.model.GeoDataUpdateInterval
-import com.material.xray.model.LauncherIcon
 import com.material.xray.model.NotificationField
 import com.material.xray.model.NotificationSettings
 import com.material.xray.model.NotificationStyle
-import com.material.xray.model.RootConnectionBackend
-import com.material.xray.model.RoutingPolicyControl
-import com.material.xray.model.ThemePreset
-import com.material.xray.model.XrayLogLevel
-import com.material.xray.model.XrayOutbound
 import com.material.xray.model.XrayRuntimeSettings
-import com.material.xray.model.ipv6DnsServers
-import com.material.xray.model.isInProgress
-import com.material.xray.service.OemAutostartGuidance
 import com.material.xray.ui.components.DropdownOption
 import com.material.xray.ui.components.ReadOnlyDropdownField
 import com.material.xray.ui.components.ScrolledTopAppBar
+import com.material.xray.ui.components.SelectableOptionRow
 import com.material.xray.ui.components.SettingsSwitchRow
 import com.material.xray.ui.components.rememberSystemState
 import com.material.xray.ui.text.descriptionResource
 import com.material.xray.ui.text.labelResource
-import com.material.xray.ui.theme.CatppuccinDarkColorScheme
-import com.material.xray.ui.theme.CatppuccinLightColorScheme
 import com.material.xray.ui.theme.DefaultBlueDarkColorScheme
 import com.material.xray.ui.theme.DefaultBlueLightColorScheme
-import com.material.xray.ui.theme.DraculaDarkColorScheme
-import com.material.xray.ui.theme.DraculaLightColorScheme
-import com.material.xray.ui.theme.EverforestDarkColorScheme
-import com.material.xray.ui.theme.EverforestLightColorScheme
-import com.material.xray.ui.theme.GruvboxDarkColorScheme
-import com.material.xray.ui.theme.GruvboxLightColorScheme
-import com.material.xray.ui.theme.NordDarkColorScheme
-import com.material.xray.ui.theme.NordLightColorScheme
-import com.material.xray.ui.theme.RosePineDarkColorScheme
-import com.material.xray.ui.theme.RosePineLightColorScheme
-import com.material.xray.ui.theme.SolarizedDarkColorScheme
-import com.material.xray.ui.theme.SolarizedLightColorScheme
-import com.material.xray.ui.theme.TokyoNightDarkColorScheme
-import com.material.xray.ui.theme.TokyoNightLightColorScheme
 import java.util.Locale
 import kotlinx.coroutines.flow.collect
 import org.xmlpull.v1.XmlPullParser
@@ -211,69 +149,6 @@ fun SettingsScreen(showTitleBarLogo: Boolean, viewModel: SettingsViewModel = hil
 
 private const val SUBPAGE_FADE_MS = 180
 
-@Composable
-private fun ThemePresetSwatch(
-    preset: ThemePreset,
-    selected: Boolean,
-    accentColor: Color,
-    iconTint: Color?,
-    onClick: () -> Unit,
-) {
-    val label = stringResource(preset.labelResource)
-    Column(
-        modifier = Modifier
-            .widthIn(min = 64.dp)
-            .selectable(
-                selected = selected,
-                role = Role.RadioButton,
-                onClick = onClick,
-            )
-            .semantics {
-                contentDescription = label
-                this.selected = selected
-            }
-            .padding(horizontal = 4.dp, vertical = 4.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        Box(
-            modifier = Modifier
-                .size(48.dp)
-                .border(
-                    width = if (selected) 2.dp else 1.dp,
-                    color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
-                    shape = CircleShape,
-                ),
-            contentAlignment = Alignment.Center,
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(accentColor),
-                contentAlignment = Alignment.Center,
-            ) {
-                if (preset == ThemePreset.Dynamic) {
-                    Icon(
-                        imageVector = Icons.Outlined.Palette,
-                        contentDescription = null,
-                        tint = iconTint ?: MaterialTheme.colorScheme.onPrimary,
-                        modifier = Modifier.size(24.dp),
-                    )
-                }
-            }
-        }
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-            textAlign = TextAlign.Center,
-        )
-    }
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Suppress("CyclomaticComplexMethod")
 @Composable
@@ -295,6 +170,8 @@ private fun SettingsScreenContent(
     val backupImportSummary by viewModel.backupImportSummary.collectAsStateWithLifecycle()
     val appUpdateCheckStatus by viewModel.appUpdateCheckStatus.collectAsStateWithLifecycle()
     val oemAutostartGuidance by viewModel.oemAutostartGuidance.collectAsStateWithLifecycle()
+    val selectedSubscriptionRequiresHwid by viewModel.selectedSubscriptionRequiresHwid.collectAsStateWithLifecycle()
+
     val tunName = settings.tunName
     val dnsServers = settings.dnsServers
     val domesticDnsServers = settings.domesticDnsServers
@@ -309,7 +186,6 @@ private fun SettingsScreenContent(
     val xrayMemoryRestartThresholdMiB = settings.xrayMemoryRestartThresholdMiB
     val passiveHealthMonitoringEnabled = settings.passiveHealthMonitoringEnabled
     val xrayLogLevel = settings.xrayLogLevel
-    val geoDataOperationInProgress = geoipUpdating || geositeUpdating || geoDataClearing
     val defaultOutbound = settings.defaultOutbound
     val launcherIcon = settings.launcherIcon
     val themePreset = settings.themePreset
@@ -328,10 +204,17 @@ private fun SettingsScreenContent(
     val showBothLatencyResults = settings.showBothLatencyResults
     val appUpdateChecksEnabled = settings.appUpdateChecksEnabled
     val diagnosticsEnabled = settings.diagnosticsEnabled
-    val darkTheme = isSystemInDarkTheme()
+    val geoDataOperationInProgress = geoipUpdating || geositeUpdating || geoDataClearing
+    val rootServiceAvailable = rootAvailable != false
+    val rootServiceActive = useRootService && rootAvailable == true
+    val darkTheme = androidx.compose.foundation.isSystemInDarkTheme()
     val context = LocalContext.current
     val dynamicColorScheme = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-        if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+        if (darkTheme) {
+            androidx.compose.material3.dynamicDarkColorScheme(context)
+        } else {
+            androidx.compose.material3.dynamicLightColorScheme(context)
+        }
     } else if (darkTheme) {
         DefaultBlueDarkColorScheme
     } else {
@@ -339,16 +222,20 @@ private fun SettingsScreenContent(
     }
     val resources = LocalResources.current
     val lifecycleOwner = LocalLifecycleOwner.current
-    rememberSystemState { viewModel.refreshOemAutostartGuidance() }
+    val notificationAccessState = rememberSystemState { notificationAccess(it) }
     val scrollState = rememberLazyListState()
+    val themeScrollState = rememberScrollState()
+    val supportedLocales = remember(resources) { resources.loadSupportedAppLocales() }
+    val selectedLocale = AppCompatDelegate.getApplicationLocales()[0]
+
     var showRootAccessDeniedDialog by rememberSaveable { mutableStateOf(false) }
     var showNotificationFieldsDialog by rememberSaveable { mutableStateOf(false) }
     var showFieldStyleDialog by rememberSaveable { mutableStateOf(false) }
     var showUpdateFrequencyDialog by rememberSaveable { mutableStateOf(false) }
     var showResetDatabaseDialog by rememberSaveable { mutableStateOf(false) }
     var showOpenSourceLicensesDialog by rememberSaveable { mutableStateOf(false) }
-    val rootServiceAvailable = rootAvailable != false
-    val rootServiceActive = useRootService && rootAvailable == true
+    var showNotificationAccessDialog by rememberSaveable { mutableStateOf(false) }
+    var showAppLanguageDialog by rememberSaveable { mutableStateOf(false) }
 
     var editingTunName by rememberSaveable(tunName) { mutableStateOf(tunName) }
     var editingXrayBufferSizeKiB by rememberSaveable(xrayBufferSizeKiB) { mutableStateOf(xrayBufferSizeKiB.toString()) }
@@ -362,6 +249,7 @@ private fun SettingsScreenContent(
         mutableStateOf(geoDataUpdateIntervalHours.toString())
     }
     var editingLatencyCheckUrl by rememberSaveable(latencyCheckUrl) { mutableStateOf(latencyCheckUrl) }
+
     val topAppBarScrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
     val hasTunNameChanges by remember(editingTunName, tunName) { derivedStateOf { editingTunName != tunName } }
     val parsedXrayBufferSizeKiB by remember(editingXrayBufferSizeKiB) {
@@ -417,8 +305,20 @@ private fun SettingsScreenContent(
         derivedStateOf { editingLatencyCheckUrl.trim() != latencyCheckUrl }
     }
     val xrayCoreVersionText = xrayCoreVersionText(xrayCoreVersion)
-    val appUpdateCheckInProgress = appUpdateCheckStatus?.isInProgress == true
     val appUpdateCheckDescription = appUpdateCheckStatus?.let { appUpdateCheckDescription(it) }
+    val appVersion = remember(context) {
+        runCatching {
+            @Suppress("DEPRECATION")
+            context.packageManager.getPackageInfo(context.packageName, 0).versionName
+        }.getOrNull()
+    }
+    val appVersionText = if (appVersion == null) {
+        stringResource(R.string.settings_app_version_unknown, stringResource(R.string.app_name))
+    } else {
+        stringResource(R.string.settings_app_version, stringResource(R.string.app_name), appVersion)
+    }
+    val appLanguageName = selectedLocale?.nativeDisplayName()
+        ?: stringResource(R.string.settings_app_language_system_default)
 
     val exportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/json"),
@@ -427,6 +327,15 @@ private fun SettingsScreenContent(
     val importLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument(),
     ) { uri -> uri?.let { viewModel.prepareBackupImport(it) } }
+
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { _ ->
+        context.recordNotificationPermissionRequest()
+        notificationAccessState.refresh()
+    }
+
+    rememberSystemState { viewModel.refreshOemAutostartGuidance() }
 
     LaunchedEffect(viewModel, context, resources) {
         lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -485,694 +394,174 @@ private fun SettingsScreenContent(
             contentPadding = PaddingValues(vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            item(key = "service") {
-                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    SettingsServiceSection(
-                        rootAvailable = rootAvailable,
-                        rootServiceAvailable = rootServiceAvailable,
-                        rootServiceActive = rootServiceActive,
-                        useRootService = useRootService,
-                        rootConnectionBackend = rootConnectionBackend,
-                        tunnelTetheredClients = tunnelTetheredClients,
-                        tproxyCompatibility = tproxyCompatibility,
-                        autoConnect = autoConnect,
-                        oemAutostartGuidance = oemAutostartGuidance,
-                        onUseRootServiceChange = viewModel::setUseRootService,
-                        onRootConnectionBackendChange = viewModel::setRootConnectionBackend,
-                        onTunnelTetheredClientsChange = viewModel::setTunnelTetheredClients,
-                        onRetryTproxyCompatibility = viewModel::retryTproxyCompatibilityCheck,
-                        onAutoConnectChange = viewModel::setAutoConnect,
-                        onOpenOemAutostartSettings = viewModel::openOemAutostartSettings,
-                    )
-                }
-            }
+            serviceSection(
+                rootAvailable = rootAvailable,
+                rootServiceAvailable = rootServiceAvailable,
+                rootServiceActive = rootServiceActive,
+                useRootService = useRootService,
+                rootConnectionBackend = rootConnectionBackend,
+                tunnelTetheredClients = tunnelTetheredClients,
+                tproxyCompatibility = tproxyCompatibility,
+                autoConnect = autoConnect,
+                oemAutostartGuidance = oemAutostartGuidance,
+                onUseRootServiceChange = viewModel::setUseRootService,
+                onRootConnectionBackendChange = viewModel::setRootConnectionBackend,
+                onTunnelTetheredClientsChange = viewModel::setTunnelTetheredClients,
+                onRetryTproxyCompatibility = viewModel::retryTproxyCompatibilityCheck,
+                onAutoConnectChange = viewModel::setAutoConnect,
+                onOpenOemAutostartSettings = viewModel::openOemAutostartSettings,
+            )
+            routingSection(
+                bypassLan = bypassLan,
+                allowIpv6 = allowIpv6,
+                dnsServers = dnsServers,
+                domesticDnsServers = domesticDnsServers,
+                routingPolicyControl = routingPolicyControl,
+                ipv6SelectionEnabled = isIpv6SelectionEnabled(
+                    rootServiceActive = rootServiceActive,
+                    backend = rootConnectionBackend,
+                    compatibility = tproxyCompatibility,
+                ),
+                onBypassLanChange = viewModel::setBypassLan,
+                onAllowIpv6Change = viewModel::setAllowIpv6,
+                onRoutingPolicyControlChange = viewModel::setRoutingPolicyControl,
+            )
+            connectionDnsSection(onOpenDnsSettings = onOpenDnsSettings)
+            connectionHardwareIdSection(
+                subscriptionSendHardwareId = subscriptionSendHardwareId,
+                hwidLockedBySubscription = selectedSubscriptionRequiresHwid && subscriptionSendHardwareId,
+                onSubscriptionSendHardwareIdChange = viewModel::setSubscriptionSendHardwareId,
+            )
 
-            item(key = "appearance_header") {
-                Column(
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                ) {
-                    HorizontalDivider()
-                    Text(stringResource(R.string.settings_section_appearance), style = MaterialTheme.typography.titleMedium)
-                }
-            }
-            item(key = "appearance") {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        text = stringResource(R.string.settings_theme_title),
-                        style = MaterialTheme.typography.titleSmall,
-                        modifier = Modifier.padding(horizontal = 16.dp),
-                    )
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState())
-                            .padding(horizontal = 16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        ThemePreset.entries.forEach { preset ->
-                            val accentColor = when (preset) {
-                                ThemePreset.Dynamic -> dynamicColorScheme.primary
-                                ThemePreset.TokyoNight -> if (darkTheme) {
-                                    TokyoNightDarkColorScheme.primary
-                                } else {
-                                    TokyoNightLightColorScheme.primary
-                                }
-                                ThemePreset.Gruvbox -> if (darkTheme) {
-                                    GruvboxDarkColorScheme.primary
-                                } else {
-                                    GruvboxLightColorScheme.primary
-                                }
-                                ThemePreset.Nord -> if (darkTheme) {
-                                    NordDarkColorScheme.primary
-                                } else {
-                                    NordLightColorScheme.primary
-                                }
-                                ThemePreset.Catppuccin -> if (darkTheme) {
-                                    CatppuccinDarkColorScheme.primary
-                                } else {
-                                    CatppuccinLightColorScheme.primary
-                                }
-                                ThemePreset.Dracula -> if (darkTheme) {
-                                    DraculaDarkColorScheme.primary
-                                } else {
-                                    DraculaLightColorScheme.primary
-                                }
-                                ThemePreset.Solarized -> if (darkTheme) {
-                                    SolarizedDarkColorScheme.primary
-                                } else {
-                                    SolarizedLightColorScheme.primary
-                                }
-                                ThemePreset.RosePine -> if (darkTheme) {
-                                    RosePineDarkColorScheme.primary
-                                } else {
-                                    RosePineLightColorScheme.primary
-                                }
-                                ThemePreset.Everforest -> if (darkTheme) {
-                                    EverforestDarkColorScheme.primary
-                                } else {
-                                    EverforestLightColorScheme.primary
-                                }
-                            }
-                            ThemePresetSwatch(
-                                preset = preset,
-                                selected = preset == themePreset,
-                                accentColor = accentColor,
-                                iconTint = if (preset == ThemePreset.Dynamic) dynamicColorScheme.onPrimary else null,
-                                onClick = { viewModel.setThemePreset(preset) },
-                            )
-                        }
-                    }
-                    if (darkTheme) {
-                        SettingsSwitchRow(
-                            title = stringResource(R.string.settings_oled_dark_title),
-                            description = stringResource(R.string.settings_oled_dark_description),
-                            checked = oledDark,
-                            onCheckedChange = viewModel::setOledDark,
-                        )
-                    }
+            serversSection(
+                sortOutboundsByLatency = sortOutboundsByLatency,
+                showBothLatencyResults = showBothLatencyResults,
+                showAdvancedOptions = showAdvancedOptions,
+                editingLatencyCheckUrl = editingLatencyCheckUrl,
+                hasLatencyCheckUrlChanges = hasLatencyCheckUrlChanges,
+                onSortOutboundsByLatencyChange = viewModel::setSortOutboundsByLatency,
+                onShowBothLatencyResultsChange = viewModel::setShowBothLatencyResults,
+                onEditingLatencyCheckUrlChange = { editingLatencyCheckUrl = it },
+                onSaveLatencyCheckUrl = { viewModel.setLatencyCheckUrl(editingLatencyCheckUrl) },
+            )
 
-                    AppLanguageSetting()
-
-                    SettingsSwitchRow(
-                        title = stringResource(R.string.settings_show_title_bar_logo),
-                        checked = showTitleBarLogo,
-                        onCheckedChange = viewModel::setShowTitleBarLogo,
-                    )
-
-                    SettingsSwitchRow(
-                        title = stringResource(R.string.settings_floating_connect_button_title),
-                        description = stringResource(R.string.settings_floating_connect_button_description),
-                        checked = floatingConnectButton,
-                        onCheckedChange = viewModel::setFloatingConnectButton,
-                    )
-
-                    SettingsSwitchRow(
-                        title = stringResource(R.string.settings_sort_outbounds_by_latency_title),
-                        description = stringResource(R.string.settings_sort_outbounds_by_latency_description),
-                        checked = sortOutboundsByLatency,
-                        onCheckedChange = viewModel::setSortOutboundsByLatency,
-                    )
-
-                    SettingsSwitchRow(
-                        title = stringResource(R.string.settings_show_both_latency_results_title),
-                        description = stringResource(R.string.settings_show_both_latency_results_description),
-                        checked = showBothLatencyResults,
-                        onCheckedChange = viewModel::setShowBothLatencyResults,
-                    )
-
-                    NotificationSettingsSection(
-                        settings = notificationSettings,
-                        onConfigureFields = { showNotificationFieldsDialog = true },
-                        onConfigureStyle = { showFieldStyleDialog = true },
-                        onConfigureFrequency = { showUpdateFrequencyDialog = true },
-                    )
-
-                    SettingsNestedSection(title = stringResource(R.string.settings_app_icon_title)) {
-                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            LauncherIcon.entries.forEach { icon ->
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(vertical = 4.dp)
-                                        .selectable(
-                                            selected = icon == launcherIcon,
-                                            role = Role.RadioButton,
-                                            onClick = { viewModel.setLauncherIcon(icon) },
-                                        )
-                                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(stringResource(icon.labelResource), style = MaterialTheme.typography.bodyLarge)
-                                    }
-                                    RadioButton(selected = icon == launcherIcon, onClick = null)
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            item(key = "routing_header") {
-                Column(
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                ) {
-                    HorizontalDivider()
-                    Text(stringResource(R.string.settings_section_routing), style = MaterialTheme.typography.titleMedium)
-                }
-            }
-
-            item(key = "routing") {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    SettingsNestedSection(title = stringResource(R.string.settings_connectivity_title)) {
-                        SettingsSwitchRow(
-                            title = stringResource(R.string.settings_bypass_lan_title),
-                            description = stringResource(R.string.settings_bypass_lan_description),
-                            checked = bypassLan,
-                            onCheckedChange = { viewModel.setBypassLan(it) },
-                        )
-
-                        SettingsSwitchRow(
-                            title = stringResource(R.string.settings_allow_ipv6_connections),
-                            checked = allowIpv6,
-                            onCheckedChange = { viewModel.setAllowIpv6(it) },
-                            enabled = isIpv6SelectionEnabled(rootServiceActive, rootConnectionBackend, tproxyCompatibility),
-                        )
-
-                        // The resolver lists carry both address families, so this only happens on a
-                        // hand-written list. Worth saying here, because the switch looks like it
-                        // applies to DNS and in that state it cannot.
-                        if (allowIpv6 && hasIpv4OnlyDnsServers(dnsServers, domesticDnsServers)) {
-                            SettingsNotice(text = stringResource(R.string.settings_allow_ipv6_dns_ipv4_only))
-                        }
-                    }
-
-                    SettingsNestedSection(title = stringResource(R.string.settings_routing_policy_title)) {
-                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            RoutingPolicyControl.entries.forEach { policy ->
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(vertical = 4.dp)
-                                        .selectable(
-                                            selected = policy == routingPolicyControl,
-                                            role = Role.RadioButton,
-                                            onClick = { viewModel.setRoutingPolicyControl(policy) },
-                                        )
-                                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(stringResource(policy.labelResource), style = MaterialTheme.typography.bodyLarge)
-                                        Text(
-                                            stringResource(policy.descriptionResource),
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        )
-                                    }
-                                    RadioButton(
-                                        selected = policy == routingPolicyControl,
-                                        onClick = null,
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            item(key = "core_header") {
-                Column(
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                ) {
-                    HorizontalDivider()
-                    Text(stringResource(R.string.settings_section_core), style = MaterialTheme.typography.titleMedium)
-                }
-            }
-
-            if (rootServiceActive && rootConnectionBackend == RootConnectionBackend.Tun) {
-                item(key = "tun_name") {
-                    Column(
-                        modifier = Modifier.padding(horizontal = 16.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp),
-                    ) {
-                        RootTunNameSetting(
-                            visible = true,
-                            editingTunName = editingTunName,
-                            hasTunNameChanges = hasTunNameChanges,
-                            onEditingTunNameChange = { editingTunName = it },
-                            onSave = { viewModel.setTunName(editingTunName) },
-                        )
-                    }
-                }
-            }
-
-            if (showAdvancedOptions) {
-                item(key = "xray_buffer") {
-                    Column(
-                        modifier = Modifier.padding(horizontal = 16.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp),
-                    ) {
-                        AdvancedIntegerSetting(
-                            value = editingXrayBufferSizeKiB,
-                            onValueChange = { editingXrayBufferSizeKiB = it },
-                            label = stringResource(R.string.settings_xray_buffer_size_label),
-                            supportingText = stringResource(
-                                R.string.settings_xray_buffer_size_supporting_text,
-                                XrayRuntimeSettings.MIN_XRAY_BUFFER_SIZE_KIB,
-                                XrayRuntimeSettings.MAX_XRAY_BUFFER_SIZE_KIB,
-                                XrayRuntimeSettings.DEFAULT_XRAY_BUFFER_SIZE_KIB,
-                            ),
-                            suffix = stringResource(R.string.settings_kib_abbreviation),
-                            isValid = isXrayBufferSizeKiBValid,
-                            hasChanges = hasXrayBufferSizeKiBChanges,
-                            onSave = { parsedXrayBufferSizeKiB?.let(viewModel::setXrayBufferSizeKiB) },
-                        )
-                    }
-                }
-                if (shouldShowTunMtu(rootServiceActive, rootConnectionBackend)) {
-                    item(key = "tun_mtu") {
-                        Column(
-                            modifier = Modifier.padding(horizontal = 16.dp),
-                            verticalArrangement = Arrangement.spacedBy(16.dp),
-                        ) {
-                            TunMtuSetting(
-                                visible = true,
-                                value = editingTunMtu,
-                                onValueChange = { editingTunMtu = it },
-                                isValid = isTunMtuValid,
-                                hasChanges = hasTunMtuChanges,
-                                onSave = { parsedTunMtu?.let(viewModel::setTunMtu) },
-                            )
-                        }
-                    }
-                }
-                item(key = "memory_restart_threshold") {
-                    Column(
-                        modifier = Modifier.padding(horizontal = 16.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp),
-                    ) {
-                        AdvancedIntegerSetting(
-                            value = editingXrayMemoryRestartThresholdMiB,
-                            onValueChange = { editingXrayMemoryRestartThresholdMiB = it },
-                            label = stringResource(R.string.settings_xray_memory_restart_threshold_label),
-                            supportingText = stringResource(
-                                R.string.settings_xray_memory_restart_threshold_supporting_text,
-                                XrayRuntimeSettings.MIN_XRAY_MEMORY_RESTART_THRESHOLD_MIB,
-                                XrayRuntimeSettings.MAX_XRAY_MEMORY_RESTART_THRESHOLD_MIB,
-                                XrayRuntimeSettings.DEFAULT_XRAY_MEMORY_RESTART_THRESHOLD_MIB,
-                            ),
-                            suffix = stringResource(R.string.settings_mib_abbreviation),
-                            isValid = isXrayMemoryRestartThresholdMiBValid,
-                            hasChanges = hasXrayMemoryRestartThresholdMiBChanges,
-                            onSave = {
-                                parsedXrayMemoryRestartThresholdMiB
-                                    ?.let(viewModel::setXrayMemoryRestartThresholdMiB)
-                            },
-                        )
-                    }
-                }
-                item(key = "passive_health_monitoring") {
-                    SettingsSwitchRow(
-                        title = stringResource(R.string.settings_passive_health_monitoring_title),
-                        description = stringResource(R.string.settings_passive_health_monitoring_description),
-                        checked = passiveHealthMonitoringEnabled,
-                        onCheckedChange = viewModel::setPassiveHealthMonitoringEnabled,
-                    )
-                }
-                item(key = "default_outbound") {
-                    ReadOnlyDropdownField(
-                        label = stringResource(R.string.settings_default_outbound_label),
-                        selectedText = stringResource(defaultOutbound.labelResource),
-                        supportingText = stringResource(defaultOutbound.descriptionResource),
-                        options = XrayOutbound.entries.map { outbound ->
-                            DropdownOption(
-                                value = outbound,
-                                label = stringResource(outbound.labelResource),
-                                description = stringResource(outbound.descriptionResource),
-                            )
-                        },
-                        onSelected = viewModel::setDefaultOutbound,
-                        modifier = Modifier.padding(horizontal = 16.dp),
-                    )
-                }
-            }
-
-            item(key = "dns") {
-                SettingsActionRow(
-                    title = stringResource(R.string.settings_dns_title),
-                    subtitle = stringResource(R.string.settings_dns_row_subtitle),
-                    onClick = onOpenDnsSettings,
-                )
-            }
-
-            if (showAdvancedOptions) {
-                item(key = "log_level") {
-                    ReadOnlyDropdownField(
-                        label = stringResource(R.string.settings_xray_log_level_label),
-                        selectedText = stringResource(xrayLogLevel.labelResource),
-                        supportingText = stringResource(
-                            R.string.settings_default_value,
-                            stringResource(XrayLogLevel.default.labelResource),
-                        ),
-                        options = XrayLogLevel.entries.map { level ->
-                            DropdownOption(value = level, label = stringResource(level.labelResource))
-                        },
-                        onSelected = viewModel::setXrayLogLevel,
-                        modifier = Modifier.padding(horizontal = 16.dp),
-                    )
-                }
-            }
-
-            item(key = "geo_data_update_interval") {
-                Column(
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                ) {
-                    AdvancedIntegerSetting(
-                        value = editingGeoDataUpdateIntervalHours,
-                        onValueChange = { editingGeoDataUpdateIntervalHours = it },
-                        label = stringResource(R.string.settings_geo_data_update_interval_label),
-                        supportingText = stringResource(
-                            R.string.settings_geo_data_update_interval_supporting_text,
-                            GeoDataUpdateInterval.MIN_HOURS,
-                            GeoDataUpdateInterval.MAX_HOURS,
-                            GeoDataUpdateInterval.DEFAULT_HOURS,
-                        ),
-                        suffix = stringResource(R.string.settings_hours_abbreviation),
-                        isValid = isGeoDataUpdateIntervalHoursValid,
-                        hasChanges = hasGeoDataUpdateIntervalHoursChanges,
-                        onSave = {
-                            parsedGeoDataUpdateIntervalHours
-                                ?.let(viewModel::setGeoDataUpdateIntervalHours)
-                        },
-                    )
-                }
-            }
-
-            item(key = "geoip") {
-                Column(
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                ) {
-                    OutlinedTextField(
-                        value = editingGeoipUrl,
-                        onValueChange = { editingGeoipUrl = it },
-                        label = { Text(stringResource(R.string.settings_geoip_url_label)) },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                        supportingText = {
-                            if (geoipUpdating) {
-                                GeoDataDownloadStatus(geoDataDownloadProgress[GeoDataAsset.GEOIP])
-                            } else {
-                                Text(stringResource(R.string.settings_geoip_url_supporting_text))
-                            }
-                        },
-                        trailingIcon = {
-                            IconButton(
-                                onClick = { viewModel.updateGeoipAsset(editingGeoipUrl) },
-                                enabled = !geoDataOperationInProgress,
-                            ) {
-                                if (geoipUpdating) {
-                                    val description = stringResource(R.string.settings_geoip_updating)
-                                    GeoDataCircularProgress(
-                                        progress = geoDataDownloadProgress[GeoDataAsset.GEOIP],
-                                        description = description,
-                                    )
-                                } else {
-                                    Icon(
-                                        Icons.Default.Refresh,
-                                        contentDescription = stringResource(R.string.settings_update_geoip),
-                                    )
-                                }
-                            }
-                        },
-                    )
-                    if (hasGeoipUrlChanges) {
-                        Button(onClick = { viewModel.setGeoipUrl(editingGeoipUrl) }) {
-                            Text(stringResource(R.string.settings_save))
-                        }
-                    }
-                }
-            }
-
-            item(key = "geosite") {
-                Column(
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                ) {
-                    OutlinedTextField(
-                        value = editingGeositeUrl,
-                        onValueChange = { editingGeositeUrl = it },
-                        label = { Text(stringResource(R.string.settings_geosite_url_label)) },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                        supportingText = {
-                            if (geositeUpdating) {
-                                GeoDataDownloadStatus(geoDataDownloadProgress[GeoDataAsset.GEOSITE])
-                            } else {
-                                Text(stringResource(R.string.settings_geosite_url_supporting_text))
-                            }
-                        },
-                        trailingIcon = {
-                            IconButton(
-                                onClick = { viewModel.updateGeositeAsset(editingGeositeUrl) },
-                                enabled = !geoDataOperationInProgress,
-                            ) {
-                                if (geositeUpdating) {
-                                    val description = stringResource(R.string.settings_geosite_updating)
-                                    GeoDataCircularProgress(
-                                        progress = geoDataDownloadProgress[GeoDataAsset.GEOSITE],
-                                        description = description,
-                                    )
-                                } else {
-                                    Icon(
-                                        Icons.Default.Refresh,
-                                        contentDescription = stringResource(R.string.settings_update_geosite),
-                                    )
-                                }
-                            }
-                        },
-                    )
-                    if (hasGeositeUrlChanges) {
-                        Button(onClick = { viewModel.setGeositeUrl(editingGeositeUrl) }) {
-                            Text(stringResource(R.string.settings_save))
-                        }
-                    }
-                }
-            }
-
-            if (showAdvancedOptions) {
-                item(key = "latency_check_url") {
-                    Column(
-                        modifier = Modifier.padding(horizontal = 16.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp),
-                    ) {
-                        OutlinedTextField(
-                            value = editingLatencyCheckUrl,
-                            onValueChange = { editingLatencyCheckUrl = it },
-                            label = { Text(stringResource(R.string.settings_latency_check_url_label)) },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth(),
-                            supportingText = { Text(stringResource(R.string.settings_latency_check_url_supporting_text)) },
-                        )
-                        if (hasLatencyCheckUrlChanges) {
-                            Button(onClick = { viewModel.setLatencyCheckUrl(editingLatencyCheckUrl) }) {
-                                Text(stringResource(R.string.settings_save))
-                            }
-                        }
-                    }
-                }
-            }
-
-            item(key = "data_header") {
-                Column(
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                ) {
-                    HorizontalDivider()
-                    Text(stringResource(R.string.settings_section_data), style = MaterialTheme.typography.titleMedium)
-                }
-            }
-            item(key = "backup") {
-                Row(
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    OutlinedButton(
-                        enabled = !backupBusy,
-                        onClick = { exportLauncher.launch("material-xray-backup.json") },
-                    ) {
-                        Text(stringResource(R.string.settings_export))
-                    }
-                    OutlinedButton(
-                        enabled = !backupBusy,
-                        onClick = { importLauncher.launch(arrayOf("application/json")) },
-                    ) {
-                        Text(stringResource(R.string.settings_import))
-                    }
-                }
-            }
-            if (showAdvancedOptions) {
-                item(key = "clear_geodata") {
-                    OutlinedButton(
-                        onClick = viewModel::clearGeoData,
-                        enabled = connectionState is ConnectionState.Disconnected && !geoDataOperationInProgress,
-                        modifier = Modifier.padding(horizontal = 16.dp),
-                    ) {
-                        Text(
-                            stringResource(
-                                if (geoDataClearing) {
-                                    R.string.settings_clearing_geodata
-                                } else {
-                                    R.string.settings_clear_geodata
-                                },
+            appearanceSection(
+                darkTheme = darkTheme,
+                dynamicColorScheme = dynamicColorScheme,
+                themeScrollState = themeScrollState,
+                themePreset = themePreset,
+                oledDark = oledDark,
+                appLanguageName = appLanguageName,
+                launcherIcon = launcherIcon,
+                showTitleBarLogo = showTitleBarLogo,
+                floatingConnectButton = floatingConnectButton,
+                onThemePresetChange = viewModel::setThemePreset,
+                onOledDarkChange = viewModel::setOledDark,
+                onAppLanguageClick = {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        context.startActivity(
+                            Intent(
+                                Settings.ACTION_APP_LOCALE_SETTINGS,
+                                Uri.parse("package:${context.packageName}"),
                             ),
                         )
-                    }
-                }
-                item(key = "database_reset") {
-                    SettingsActionRow(
-                        title = stringResource(R.string.settings_reset_internal_database),
-                        subtitle = stringResource(
-                            if (databaseResetting) {
-                                R.string.settings_resetting_internal_database
-                            } else {
-                                R.string.settings_reset_internal_database_description
-                            },
-                        ),
-                        enabled = !databaseResetting,
-                        onClick = { showResetDatabaseDialog = true },
-                    )
-                }
-            }
-
-            item(key = "settings_header") {
-                Column(
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                ) {
-                    HorizontalDivider()
-                    Text(stringResource(R.string.settings_title), style = MaterialTheme.typography.titleMedium)
-                }
-            }
-            item(key = "app_settings") {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    // A provider may pin its hardware ID policy onto the selected server; while
-                    // that policy is active the toggle cannot be turned off from Settings.
-                    val selectedSubscriptionRequiresHwid =
-                        viewModel.selectedSubscriptionRequiresHwid.collectAsStateWithLifecycle().value
-                    val hwidLockedBySubscription = selectedSubscriptionRequiresHwid && subscriptionSendHardwareId
-                    SettingsSwitchRow(
-                        title = stringResource(R.string.settings_send_hardware_id_title),
-                        description = stringResource(
-                            if (hwidLockedBySubscription) {
-                                R.string.settings_send_hardware_id_locked
-                            } else {
-                                R.string.settings_send_hardware_id_description
-                            },
-                        ),
-                        checked = subscriptionSendHardwareId,
-                        onCheckedChange = viewModel::setSubscriptionSendHardwareId,
-                        enabled = !hwidLockedBySubscription,
-                    )
-                    SettingsSwitchRow(
-                        title = stringResource(R.string.settings_diagnostics_title),
-                        description = stringResource(R.string.settings_diagnostics_description),
-                        checked = diagnosticsEnabled,
-                        onCheckedChange = viewModel::setDiagnosticsEnabled,
-                    )
-                    SettingsSwitchRow(
-                        title = stringResource(R.string.settings_show_advanced_options),
-                        checked = showAdvancedOptions,
-                        onCheckedChange = viewModel::setShowAdvancedOptions,
-                    )
-                }
-            }
-
-            item(key = "about_header") {
-                Column(
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                ) {
-                    HorizontalDivider()
-                    Text(stringResource(R.string.settings_section_about), style = MaterialTheme.typography.titleMedium)
-                }
-            }
-            item(key = "update_checks") {
-                SettingsSwitchRow(
-                    title = stringResource(R.string.settings_app_update_checks_title),
-                    description = stringResource(R.string.settings_app_update_checks_description),
-                    checked = appUpdateChecksEnabled,
-                    onCheckedChange = viewModel::setAppUpdateChecksEnabled,
-                )
-            }
-            item(key = "check_for_updates") {
-                SettingsActionRow(
-                    title = stringResource(R.string.settings_check_for_updates),
-                    subtitle = appUpdateCheckDescription,
-                    enabled = !appUpdateCheckInProgress,
-                    inProgress = appUpdateCheckInProgress,
-                    onClick = viewModel::checkForAppUpdate,
-                )
-            }
-            item(key = "licenses") {
-                SettingsActionRow(
-                    title = stringResource(R.string.settings_open_source_licenses),
-                    subtitle = stringResource(R.string.settings_open_source_licenses_description),
-                    onClick = { showOpenSourceLicensesDialog = true },
-                )
-            }
-            item(key = "app_version") {
-                val appVersion = remember(context) {
-                    runCatching {
-                        @Suppress("DEPRECATION")
-                        context.packageManager.getPackageInfo(context.packageName, 0).versionName
-                    }.getOrNull()
-                }
-                Text(
-                    text = if (appVersion == null) {
-                        stringResource(R.string.settings_app_version_unknown, stringResource(R.string.app_name))
                     } else {
-                        stringResource(R.string.settings_app_version, stringResource(R.string.app_name), appVersion)
-                    },
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            }
-            item(key = "xray_version") {
-                Text(
-                    xrayCoreVersionText,
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+                        showAppLanguageDialog = true
+                    }
+                },
+                onLauncherIconChange = viewModel::setLauncherIcon,
+                onShowTitleBarLogoChange = viewModel::setShowTitleBarLogo,
+                onFloatingConnectButtonChange = viewModel::setFloatingConnectButton,
+            )
+
+            notificationSection(
+                settings = notificationSettings,
+                access = notificationAccessState.value,
+                onRequestAccess = { showNotificationAccessDialog = true },
+                onConfigureFields = { showNotificationFieldsDialog = true },
+                onConfigureStyle = { showFieldStyleDialog = true },
+                onConfigureFrequency = { showUpdateFrequencyDialog = true },
+            )
+
+            coreSection(
+                rootServiceActive = rootServiceActive,
+                rootConnectionBackend = rootConnectionBackend,
+                showAdvancedOptions = showAdvancedOptions,
+                editingTunName = editingTunName,
+                hasTunNameChanges = hasTunNameChanges,
+                editingXrayBufferSizeKiB = editingXrayBufferSizeKiB,
+                isXrayBufferSizeKiBValid = isXrayBufferSizeKiBValid,
+                hasXrayBufferSizeKiBChanges = hasXrayBufferSizeKiBChanges,
+                editingTunMtu = editingTunMtu,
+                isTunMtuValid = isTunMtuValid,
+                hasTunMtuChanges = hasTunMtuChanges,
+                editingXrayMemoryRestartThresholdMiB = editingXrayMemoryRestartThresholdMiB,
+                isXrayMemoryRestartThresholdMiBValid = isXrayMemoryRestartThresholdMiBValid,
+                hasXrayMemoryRestartThresholdMiBChanges = hasXrayMemoryRestartThresholdMiBChanges,
+                passiveHealthMonitoringEnabled = passiveHealthMonitoringEnabled,
+                defaultOutbound = defaultOutbound,
+                xrayLogLevel = xrayLogLevel,
+                onEditingTunNameChange = { editingTunName = it },
+                onSaveTunName = { viewModel.setTunName(editingTunName) },
+                onShowAdvancedOptionsChange = viewModel::setShowAdvancedOptions,
+                onEditingXrayBufferSizeKiBChange = { editingXrayBufferSizeKiB = it },
+                onSaveXrayBufferSizeKiB = { parsedXrayBufferSizeKiB?.let(viewModel::setXrayBufferSizeKiB) },
+                onEditingTunMtuChange = { editingTunMtu = it },
+                onSaveTunMtu = { parsedTunMtu?.let(viewModel::setTunMtu) },
+                onEditingXrayMemoryRestartThresholdMiBChange = { editingXrayMemoryRestartThresholdMiB = it },
+                onSaveXrayMemoryRestartThresholdMiB = {
+                    parsedXrayMemoryRestartThresholdMiB?.let(viewModel::setXrayMemoryRestartThresholdMiB)
+                },
+                onPassiveHealthMonitoringEnabledChange = viewModel::setPassiveHealthMonitoringEnabled,
+                onDefaultOutboundChange = viewModel::setDefaultOutbound,
+                onXrayLogLevelChange = viewModel::setXrayLogLevel,
+            )
+
+            dataSection(
+                showAdvancedOptions = showAdvancedOptions,
+                diagnosticsEnabled = diagnosticsEnabled,
+                geoipUpdating = geoipUpdating,
+                geositeUpdating = geositeUpdating,
+                geoDataClearing = geoDataClearing,
+                geoDataOperationInProgress = geoDataOperationInProgress,
+                connectionState = connectionState,
+                geoDataDownloadProgress = geoDataDownloadProgress,
+                editingGeoDataUpdateIntervalHours = editingGeoDataUpdateIntervalHours,
+                isGeoDataUpdateIntervalHoursValid = isGeoDataUpdateIntervalHoursValid,
+                hasGeoDataUpdateIntervalHoursChanges = hasGeoDataUpdateIntervalHoursChanges,
+                editingGeoipUrl = editingGeoipUrl,
+                hasGeoipUrlChanges = hasGeoipUrlChanges,
+                editingGeositeUrl = editingGeositeUrl,
+                hasGeositeUrlChanges = hasGeositeUrlChanges,
+                backupBusy = backupBusy,
+                databaseResetting = databaseResetting,
+                onDiagnosticsEnabledChange = viewModel::setDiagnosticsEnabled,
+                onEditingGeoDataUpdateIntervalHoursChange = { editingGeoDataUpdateIntervalHours = it },
+                onSaveGeoDataUpdateIntervalHours = {
+                    parsedGeoDataUpdateIntervalHours?.let(viewModel::setGeoDataUpdateIntervalHours)
+                },
+                onEditingGeoipUrlChange = { editingGeoipUrl = it },
+                onSaveGeoipUrl = { viewModel.setGeoipUrl(editingGeoipUrl) },
+                onUpdateGeoipAsset = viewModel::updateGeoipAsset,
+                onEditingGeositeUrlChange = { editingGeositeUrl = it },
+                onSaveGeositeUrl = { viewModel.setGeositeUrl(editingGeositeUrl) },
+                onUpdateGeositeAsset = viewModel::updateGeositeAsset,
+                onExportBackup = { exportLauncher.launch("material-xray-backup.json") },
+                onImportBackup = { importLauncher.launch(arrayOf("application/json")) },
+                onClearGeoData = viewModel::clearGeoData,
+                onResetDatabase = { showResetDatabaseDialog = true },
+            )
+
+            aboutSection(
+                appUpdateChecksEnabled = appUpdateChecksEnabled,
+                appUpdateCheckStatus = appUpdateCheckStatus,
+                appUpdateCheckDescription = appUpdateCheckDescription,
+                appVersionText = appVersionText,
+                xrayCoreVersionText = xrayCoreVersionText,
+                onAppUpdateChecksEnabledChange = viewModel::setAppUpdateChecksEnabled,
+                onCheckForUpdates = viewModel::checkForAppUpdate,
+                onOpenLicenses = { showOpenSourceLicensesDialog = true },
+            )
         }
     }
 
@@ -1204,6 +593,39 @@ private fun SettingsScreenContent(
     if (showOpenSourceLicensesDialog) {
         OpenSourceLicensesDialog(onDismiss = { showOpenSourceLicensesDialog = false })
     }
+    if (showNotificationAccessDialog) {
+        NotificationPermissionDialog(
+            access = notificationAccessState.value,
+            onDismiss = { showNotificationAccessDialog = false },
+            onAllow = {
+                when (notificationAccessState.value) {
+                    NotificationAccess.Available -> Unit
+                    NotificationAccess.Requestable,
+                    NotificationAccess.Rationale,
+                    -> notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+
+                    NotificationAccess.SystemSettings -> context.openNotificationSettings()
+                }
+            },
+        )
+    }
+    if (showAppLanguageDialog) {
+        AppLanguageDialog(
+            supportedLocales = supportedLocales,
+            selectedLocale = selectedLocale,
+            onDismiss = { showAppLanguageDialog = false },
+            onSelect = { locale ->
+                showAppLanguageDialog = false
+                setAppLocales(
+                    if (locale == null) {
+                        LocaleListCompat.getEmptyLocaleList()
+                    } else {
+                        LocaleListCompat.create(locale)
+                    },
+                )
+            },
+        )
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -1221,7 +643,9 @@ private fun SettingsLoadingScreen(showTitleBarLogo: Boolean) {
         },
     ) { padding ->
         Column(
-            modifier = Modifier.fillMaxSize().padding(padding),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
@@ -1246,377 +670,6 @@ private fun BackupOperationEventEffect(viewModel: SettingsViewModel) {
         }
     }
 }
-
-@Composable
-private fun SettingsServiceSection(
-    rootAvailable: Boolean?,
-    rootServiceAvailable: Boolean,
-    rootServiceActive: Boolean,
-    useRootService: Boolean,
-    rootConnectionBackend: RootConnectionBackend,
-    tunnelTetheredClients: Boolean,
-    tproxyCompatibility: TproxyCompatibility,
-    autoConnect: Boolean,
-    oemAutostartGuidance: OemAutostartGuidance,
-    onUseRootServiceChange: (Boolean) -> Unit,
-    onRootConnectionBackendChange: (RootConnectionBackend) -> Unit,
-    onTunnelTetheredClientsChange: (Boolean) -> Unit,
-    onRetryTproxyCompatibility: () -> Unit,
-    onAutoConnectChange: (Boolean) -> Unit,
-    onOpenOemAutostartSettings: () -> Unit,
-) {
-    Text(
-        text = stringResource(R.string.settings_section_service),
-        modifier = Modifier.padding(horizontal = 16.dp),
-        style = MaterialTheme.typography.titleMedium,
-    )
-
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        SettingsSwitchRow(
-            title = stringResource(R.string.settings_use_root_service),
-            description = stringResource(R.string.settings_unavailable).takeIf { rootAvailable == false },
-            checked = useRootService && rootAvailable != false,
-            onCheckedChange = onUseRootServiceChange,
-            enabled = rootServiceAvailable,
-            titleColor = if (rootAvailable == false) {
-                MaterialTheme.colorScheme.onSurfaceVariant
-            } else {
-                MaterialTheme.colorScheme.onSurface
-            },
-        )
-
-        if (rootServiceActive) {
-            val tproxySelectable = tproxyCompatibility !is TproxyCompatibility.Unsupported
-            val supportingText = tproxyCompatibilitySupportingText(tproxyCompatibility)
-            SettingsNestedSection(title = stringResource(R.string.settings_root_connection_backend)) {
-                RootConnectionBackend.entries.forEach { backend ->
-                    val enabled = backend == RootConnectionBackend.Tun || tproxySelectable
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 4.dp)
-                            .selectable(
-                                selected = backend == rootConnectionBackend,
-                                enabled = enabled,
-                                role = Role.RadioButton,
-                                onClick = { onRootConnectionBackendChange(backend) },
-                            )
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                stringResource(backend.labelResource),
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = if (enabled) {
-                                    MaterialTheme.colorScheme.onSurface
-                                } else {
-                                    MaterialTheme.colorScheme.onSurfaceVariant
-                                },
-                            )
-                            Text(
-                                stringResource(backend.descriptionResource),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        RadioButton(
-                            selected = backend == rootConnectionBackend,
-                            onClick = null,
-                            enabled = enabled,
-                        )
-                    }
-                }
-                supportingText?.let { text ->
-                    Text(
-                        text,
-                        modifier = Modifier.padding(horizontal = 16.dp),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-            if (tproxyCompatibility is TproxyCompatibility.Unsupported) {
-                TextButton(
-                    onClick = onRetryTproxyCompatibility,
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                ) {
-                    Text(stringResource(R.string.settings_retry_compatibility_check))
-                }
-            }
-
-            SettingsSwitchRow(
-                title = stringResource(R.string.settings_tunnel_tethered_clients_title),
-                description = stringResource(R.string.settings_tunnel_tethered_clients_description),
-                checked = tunnelTetheredClients,
-                onCheckedChange = onTunnelTetheredClientsChange,
-            )
-        }
-
-        SettingsSwitchRow(
-            title = stringResource(R.string.settings_auto_connect_on_boot),
-            checked = autoConnect,
-            onCheckedChange = onAutoConnectChange,
-            enabled = !useRootService || rootServiceActive,
-        )
-        if (autoConnect && oemAutostartGuidance.required && !oemAutostartGuidance.granted) {
-            OemAutostartBanner(
-                directSettingsAvailable = oemAutostartGuidance.directSettingsAvailable,
-                onOpenSettings = onOpenOemAutostartSettings,
-            )
-        }
-    }
-}
-
-/**
- * A note attached to the setting above it, for something the control itself cannot say.
- *
- * [action] is optional because some notes are only an explanation and have nothing to act on.
- */
-@Composable
-private fun SettingsNotice(
-    text: String,
-    action: @Composable (ColumnScope.() -> Unit)? = null,
-) {
-    Column(
-        modifier = Modifier
-            .padding(horizontal = 16.dp)
-            .clip(RoundedCornerShape(16.dp))
-            .background(MaterialTheme.colorScheme.tertiaryContainer)
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onTertiaryContainer,
-        )
-        action?.invoke(this)
-    }
-}
-
-@Composable
-private fun OemAutostartBanner(directSettingsAvailable: Boolean, onOpenSettings: () -> Unit) {
-    SettingsNotice(
-        text = stringResource(
-            if (directSettingsAvailable) {
-                R.string.settings_oem_autostart_required
-            } else {
-                R.string.settings_oem_autostart_external_required
-            },
-        ),
-        action = {
-            TextButton(
-                onClick = onOpenSettings,
-                modifier = Modifier.align(Alignment.End),
-            ) {
-                Text(
-                    stringResource(
-                        if (directSettingsAvailable) {
-                            R.string.settings_open_autostart_settings
-                        } else {
-                            R.string.settings_open_app_settings
-                        },
-                    ),
-                )
-            }
-        },
-    )
-}
-
-@Composable
-private fun tproxyCompatibilitySupportingText(compatibility: TproxyCompatibility): String? = when (compatibility) {
-    TproxyCompatibility.Unknown,
-    TproxyCompatibility.Checking,
-    -> null
-    is TproxyCompatibility.Supported -> null
-    is TproxyCompatibility.Unsupported -> stringResource(R.string.settings_tproxy_unsupported)
-}
-
-/** Whether IPv6 is allowed but no configured resolver can be reached over it. */
-internal fun hasIpv4OnlyDnsServers(dnsServers: String, domesticDnsServers: String): Boolean {
-    val lists = listOf(dnsServers, domesticDnsServers)
-    // An empty list hands that lookup to the OS resolver, which a dual-stack network may well have
-    // given an IPv6 address. That is an unknown rather than an absence, so there is nothing to claim.
-    if (lists.any(String::isBlank)) return false
-    return lists.none { ipv6DnsServers(it).isNotEmpty() }
-}
-
-internal fun shouldShowTunMtu(
-    rootServiceActive: Boolean,
-    backend: RootConnectionBackend,
-): Boolean = !rootServiceActive || backend == RootConnectionBackend.Tun
-
-@Composable
-private fun SettingsNestedSection(
-    title: String,
-    content: @Composable () -> Unit,
-) {
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        Text(
-            text = title,
-            modifier = Modifier.padding(start = 16.dp, top = 4.dp, end = 16.dp),
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.primary,
-        )
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            content()
-        }
-    }
-}
-
-@Composable
-private fun NotificationSettingsSection(
-    settings: NotificationSettings,
-    onConfigureFields: () -> Unit,
-    onConfigureStyle: () -> Unit,
-    onConfigureFrequency: () -> Unit,
-) {
-    val context = LocalContext.current
-    var showAccessDialog by remember { mutableStateOf(false) }
-    val accessState = rememberSystemState { notificationAccess(it) }
-    val access = accessState.value
-    val permissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission(),
-    ) { _ ->
-        context.recordNotificationPermissionRequest()
-        accessState.refresh()
-    }
-
-    SettingsNestedSection(title = stringResource(R.string.settings_notification_title)) {
-        if (access != NotificationAccess.Available) {
-            SettingsActionRow(
-                title = stringResource(R.string.settings_notification_permission_unavailable),
-                subtitle = stringResource(R.string.settings_notification_permission_unavailable_description),
-                onClick = { showAccessDialog = true },
-            )
-        }
-
-        SettingsActionRow(
-            title = stringResource(R.string.settings_configure_notification_fields),
-            subtitle = notificationFieldSummary(settings),
-            onClick = onConfigureFields,
-        )
-        SettingsActionRow(
-            title = stringResource(R.string.settings_notification_field_style),
-            subtitle = stringResource(settings.style.labelResource),
-            onClick = onConfigureStyle,
-        )
-        SettingsActionRow(
-            title = stringResource(R.string.settings_notification_update_frequency),
-            subtitle = pluralStringResource(
-                R.plurals.settings_notification_update_frequency_summary,
-                settings.updateIntervalMs,
-                settings.updateIntervalMs,
-            ),
-            onClick = onConfigureFrequency,
-        )
-    }
-
-    if (showAccessDialog) {
-        AlertDialog(
-            onDismissRequest = { showAccessDialog = false },
-            title = { Text(stringResource(R.string.settings_notification_permission_title)) },
-            text = { Text(stringResource(R.string.settings_notification_permission_message)) },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showAccessDialog = false
-                        when (access) {
-                            NotificationAccess.Available -> Unit
-                            NotificationAccess.Requestable,
-                            NotificationAccess.Rationale,
-                            -> permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-
-                            NotificationAccess.SystemSettings -> context.openNotificationSettings()
-                        }
-                    },
-                ) {
-                    Text(
-                        stringResource(
-                            if (access == NotificationAccess.SystemSettings) {
-                                R.string.settings_open_notification_settings
-                            } else {
-                                R.string.settings_allow_notifications
-                            },
-                        ),
-                    )
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showAccessDialog = false }) {
-                    Text(stringResource(R.string.settings_cancel))
-                }
-            },
-        )
-    }
-}
-
-private fun notificationAccess(context: android.content.Context): NotificationAccess {
-    val permissionRequired = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
-    val permissionGranted = !permissionRequired ||
-        ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
-    val activity = context as? Activity
-    return resolveNotificationAccess(
-        permissionRequired = permissionRequired,
-        permissionGranted = permissionGranted,
-        notificationsEnabled = NotificationManagerCompat.from(context).areNotificationsEnabled(),
-        shouldShowRationale = activity != null &&
-            ActivityCompat.shouldShowRequestPermissionRationale(activity, Manifest.permission.POST_NOTIFICATIONS),
-        permissionRequested = context.wasNotificationPermissionRequested(),
-    )
-}
-
-internal fun resolveNotificationAccess(
-    permissionRequired: Boolean,
-    permissionGranted: Boolean,
-    notificationsEnabled: Boolean,
-    shouldShowRationale: Boolean,
-    permissionRequested: Boolean,
-): NotificationAccess = when {
-    !permissionRequired || permissionGranted -> {
-        if (notificationsEnabled) NotificationAccess.Available else NotificationAccess.SystemSettings
-    }
-    shouldShowRationale -> NotificationAccess.Rationale
-    permissionRequested -> NotificationAccess.SystemSettings
-    else -> NotificationAccess.Requestable
-}
-
-private fun android.content.Context.openNotificationSettings() {
-    startActivity(
-        Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
-            .putExtra(Settings.EXTRA_APP_PACKAGE, packageName),
-    )
-}
-
-private fun android.content.Context.recordNotificationPermissionRequest() {
-    getSharedPreferences(NOTIFICATION_PERMISSION_PREFS, android.content.Context.MODE_PRIVATE)
-        .edit()
-        .putBoolean(NOTIFICATION_PERMISSION_REQUESTED, true)
-        .apply()
-}
-
-private fun android.content.Context.wasNotificationPermissionRequested(): Boolean = getSharedPreferences(
-    NOTIFICATION_PERMISSION_PREFS,
-    android.content.Context.MODE_PRIVATE,
-).getBoolean(NOTIFICATION_PERMISSION_REQUESTED, false)
-
-internal enum class NotificationAccess {
-    Available,
-    Requestable,
-    Rationale,
-    SystemSettings,
-}
-
-private const val NOTIFICATION_PERMISSION_PREFS = "notification_permission"
-private const val NOTIFICATION_PERMISSION_REQUESTED = "requested"
 
 @Composable
 private fun SettingsDialogs(
@@ -1813,252 +866,6 @@ private fun legalDocuments(): List<LegalDocument> = listOf(
 )
 
 @Composable
-private fun RootTunNameSetting(
-    visible: Boolean,
-    editingTunName: String,
-    hasTunNameChanges: Boolean,
-    onEditingTunNameChange: (String) -> Unit,
-    onSave: () -> Unit,
-) {
-    if (!visible) return
-
-    OutlinedTextField(
-        value = editingTunName,
-        onValueChange = onEditingTunNameChange,
-        label = { Text(stringResource(R.string.settings_tun_interface_name_label)) },
-        singleLine = true,
-        modifier = Modifier.fillMaxWidth(),
-        supportingText = { Text(stringResource(R.string.settings_tun_interface_name_automatic)) },
-    )
-    if (hasTunNameChanges) {
-        Button(onClick = onSave) { Text(stringResource(R.string.settings_save)) }
-    }
-}
-
-@Composable
-private fun TunMtuSetting(
-    visible: Boolean,
-    value: String,
-    onValueChange: (String) -> Unit,
-    isValid: Boolean,
-    hasChanges: Boolean,
-    onSave: () -> Unit,
-) {
-    if (!visible) return
-    AdvancedIntegerSetting(
-        value = value,
-        onValueChange = onValueChange,
-        label = stringResource(R.string.settings_tun_mtu_label),
-        supportingText = stringResource(
-            R.string.settings_tun_mtu_supporting_text,
-            XrayRuntimeSettings.MIN_TUN_MTU,
-            XrayRuntimeSettings.MAX_TUN_MTU,
-            XrayRuntimeSettings.DEFAULT_TUN_MTU,
-        ),
-        suffix = stringResource(R.string.settings_bytes_abbreviation),
-        isValid = isValid,
-        hasChanges = hasChanges,
-        onSave = onSave,
-    )
-}
-
-@Composable
-private fun AdvancedIntegerSetting(
-    value: String,
-    onValueChange: (String) -> Unit,
-    label: String,
-    supportingText: String,
-    suffix: String,
-    isValid: Boolean,
-    hasChanges: Boolean,
-    onSave: () -> Unit,
-) {
-    OutlinedTextField(
-        value = value,
-        onValueChange = { newValue -> onValueChange(newValue.filter(Char::isDigit).take(5)) },
-        label = { Text(label) },
-        supportingText = { Text(supportingText) },
-        suffix = { Text(suffix) },
-        isError = value.isNotEmpty() && !isValid,
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-        singleLine = true,
-        modifier = Modifier.fillMaxWidth(),
-    )
-    if (hasChanges) {
-        Button(onClick = onSave, enabled = isValid) {
-            Text(stringResource(R.string.settings_save))
-        }
-    }
-}
-
-@Composable
-private fun GeoDataCircularProgress(progress: GeoDataDownloadProgress?, description: String) {
-    val fraction = progress?.fraction
-    if (fraction == null) {
-        CircularProgressIndicator(
-            modifier = Modifier.size(24.dp).semantics { contentDescription = description },
-            strokeWidth = 2.dp,
-        )
-    } else {
-        CircularProgressIndicator(
-            progress = { fraction },
-            modifier = Modifier.size(24.dp).semantics { contentDescription = description },
-            strokeWidth = 2.dp,
-        )
-    }
-}
-
-@Composable
-private fun GeoDataDownloadStatus(progress: GeoDataDownloadProgress?) {
-    val context = LocalContext.current
-    val text = when {
-        progress == null -> stringResource(R.string.settings_updating)
-        progress.totalBytes != null && progress.totalBytes > 0L -> stringResource(
-            R.string.settings_geodata_download_progress_with_total,
-            Formatter.formatShortFileSize(context, progress.bytesDownloaded),
-            Formatter.formatShortFileSize(context, progress.totalBytes),
-        )
-        else -> stringResource(
-            R.string.settings_geodata_download_progress,
-            Formatter.formatShortFileSize(context, progress.bytesDownloaded),
-        )
-    }
-    Text(text)
-}
-
-@Composable
-private fun SettingsActionRow(
-    title: String,
-    subtitle: String? = null,
-    onClick: () -> Unit,
-    enabled: Boolean = true,
-    inProgress: Boolean = false,
-) {
-    val contentEnabled = enabled || inProgress
-    val titleColor = if (contentEnabled) {
-        MaterialTheme.colorScheme.onSurface
-    } else {
-        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-    }
-    val subtitleColor = if (contentEnabled) {
-        MaterialTheme.colorScheme.onSurfaceVariant
-    } else {
-        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
-    }
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(enabled = enabled, onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.bodyLarge, color = titleColor)
-            if (subtitle != null) {
-                Text(
-                    subtitle,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = subtitleColor,
-                )
-            }
-        }
-        if (inProgress) {
-            CircularProgressIndicator(
-                modifier = Modifier.size(24.dp),
-                strokeWidth = 2.dp,
-            )
-        } else {
-            Icon(
-                imageVector = Icons.Filled.ChevronRight,
-                contentDescription = null,
-                tint = subtitleColor,
-            )
-        }
-    }
-}
-
-@Composable
-private fun appUpdateCheckDescription(status: AppUpdateCheckStatus): String = when (status) {
-    AppUpdateCheckStatus.Starting -> stringResource(R.string.settings_update_check_starting)
-    is AppUpdateCheckStatus.Fetching -> stringResource(R.string.settings_update_check_fetching, status.url)
-    is AppUpdateCheckStatus.RetryingAfterHttpError -> stringResource(
-        R.string.settings_update_check_retry_http,
-        status.url,
-        status.statusCode,
-        status.nextUrl,
-    )
-    is AppUpdateCheckStatus.RetryingAfterConnectionFailure -> stringResource(
-        R.string.settings_update_check_retry_connection,
-        status.url,
-        status.nextUrl,
-    )
-    is AppUpdateCheckStatus.RetryingAfterInvalidResponse -> stringResource(
-        R.string.settings_update_check_retry_invalid_response,
-        status.url,
-        status.statusCode,
-        status.nextUrl,
-    )
-    is AppUpdateCheckStatus.ReleaseReceived -> stringResource(
-        R.string.settings_update_check_comparing,
-        status.url,
-        status.statusCode,
-    )
-    AppUpdateCheckStatus.UpToDate -> stringResource(R.string.settings_update_check_up_to_date)
-    is AppUpdateCheckStatus.UpdateAvailable -> stringResource(
-        R.string.settings_update_check_available,
-        status.version,
-    )
-    AppUpdateCheckStatus.Failed -> stringResource(R.string.settings_update_check_failed)
-}
-
-@Composable
-private fun AppLanguageSetting() {
-    val context = LocalContext.current
-    val resources = LocalResources.current
-    var showDialog by remember { mutableStateOf(false) }
-    val supportedLocales = remember(resources) { resources.loadSupportedAppLocales() }
-    val selectedLocale = AppCompatDelegate.getApplicationLocales()[0]
-    val selectedLanguageName = selectedLocale?.nativeDisplayName()
-        ?: stringResource(R.string.settings_app_language_system_default)
-
-    SettingsActionRow(
-        title = stringResource(R.string.settings_app_language_title),
-        subtitle = selectedLanguageName,
-        onClick = {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                context.startActivity(
-                    Intent(
-                        Settings.ACTION_APP_LOCALE_SETTINGS,
-                        Uri.parse("package:${context.packageName}"),
-                    ),
-                )
-            } else {
-                showDialog = true
-            }
-        },
-    )
-
-    if (showDialog) {
-        AppLanguageDialog(
-            supportedLocales = supportedLocales,
-            selectedLocale = selectedLocale,
-            onDismiss = { showDialog = false },
-            onSelect = { locale ->
-                showDialog = false
-                setAppLocales(
-                    if (locale == null) {
-                        LocaleListCompat.getEmptyLocaleList()
-                    } else {
-                        LocaleListCompat.create(locale)
-                    },
-                )
-            },
-        )
-    }
-}
-
-@Composable
 private fun AppLanguageDialog(
     supportedLocales: List<Locale>,
     selectedLocale: Locale?,
@@ -2070,16 +877,18 @@ private fun AppLanguageDialog(
         title = { Text(stringResource(R.string.settings_app_language_dialog_title)) },
         text = {
             Column {
-                AppLanguageOption(
-                    label = stringResource(R.string.settings_app_language_system_default),
+                SelectableOptionRow(
+                    title = stringResource(R.string.settings_app_language_system_default),
+                    description = null,
                     selected = selectedLocale == null,
-                    onClick = { onSelect(null) },
+                    onSelected = { onSelect(null) },
                 )
                 supportedLocales.forEach { locale ->
-                    AppLanguageOption(
-                        label = locale.nativeDisplayName(),
+                    SelectableOptionRow(
+                        title = locale.nativeDisplayName(),
+                        description = null,
                         selected = locale == selectedLocale,
-                        onClick = { onSelect(locale) },
+                        onSelected = { onSelect(locale) },
                     )
                 }
             }
@@ -2090,30 +899,6 @@ private fun AppLanguageDialog(
             }
         },
     )
-}
-
-@Composable
-private fun AppLanguageOption(
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .selectable(
-                selected = selected,
-                role = Role.RadioButton,
-                onClick = onClick,
-            )
-            .padding(vertical = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        RadioButton(selected = selected, onClick = null)
-        Text(label, style = MaterialTheme.typography.bodyLarge)
-    }
 }
 
 private fun Resources.loadSupportedAppLocales(): List<Locale> {
@@ -2152,34 +937,15 @@ private fun FieldStyleDialog(
         text = {
             Column {
                 NotificationStyle.entries.forEach { style ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
-                            .clickable {
-                                onSelect(style)
-                                onDismiss()
-                            }
-                            .padding(vertical = 8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        RadioButton(
-                            selected = style == selected,
-                            onClick = {
-                                onSelect(style)
-                                onDismiss()
-                            },
-                        )
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(stringResource(style.labelResource), style = MaterialTheme.typography.bodyLarge)
-                            Text(
-                                stringResource(style.descriptionResource),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
+                    SelectableOptionRow(
+                        title = stringResource(style.labelResource),
+                        description = stringResource(style.descriptionResource),
+                        selected = style == selected,
+                        onSelected = {
+                            onSelect(style)
+                            onDismiss()
+                        },
+                    )
                 }
             }
         },
@@ -2286,14 +1052,16 @@ private fun ReorderableFieldList(
         order.forEach { field ->
             key(field) {
                 val dragging = field == draggingField
-                Row(
+                SettingsSwitchRow(
+                    title = stringResource(field.labelResource),
+                    description = stringResource(field.descriptionResource),
+                    checked = isEnabled(field),
+                    onCheckedChange = { onToggle(field, it) },
                     modifier = Modifier
-                        .fillMaxWidth()
                         .onGloballyPositioned { heights[field] = it.size.height }
                         .zIndex(if (dragging) 1f else 0f)
                         .graphicsLayer { translationY = if (dragging) dragOffsetY else 0f }
-                        .padding(vertical = 4.dp)
-                        .clip(RoundedCornerShape(12.dp))
+                        .clip(MaterialTheme.shapes.small)
                         .background(
                             if (dragging) {
                                 MaterialTheme.colorScheme.surfaceVariant
@@ -2301,86 +1069,55 @@ private fun ReorderableFieldList(
                                 Color.Transparent
                             },
                         )
-                        .heightIn(min = 52.dp)
-                        .toggleable(
-                            value = isEnabled(field),
-                            role = Role.Switch,
-                            onValueChange = { onToggle(field, it) },
-                        )
-                        .padding(vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.DragIndicator,
-                        contentDescription = stringResource(R.string.settings_drag_to_reorder),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier
-                            .padding(end = 4.dp)
-                            .pointerInput(field) {
-                                detectDragGestures(
-                                    onDragStart = {
-                                        draggingField = field
-                                        dragOffsetY = 0f
-                                    },
-                                    onDragEnd = {
-                                        draggingField = null
-                                        dragOffsetY = 0f
-                                        onReordered()
-                                    },
-                                    onDragCancel = {
-                                        draggingField = null
-                                        dragOffsetY = 0f
-                                    },
-                                    onDrag = { change, dragAmount ->
-                                        change.consume()
-                                        dragOffsetY += dragAmount.y
-                                        val current = order.indexOf(field)
-                                        if (dragAmount.y < 0 && current > 0) {
-                                            val above = order[current - 1]
-                                            val threshold = (heights[above] ?: 0) / 2f
-                                            if (-dragOffsetY > threshold) {
-                                                order.add(current - 1, order.removeAt(current))
-                                                dragOffsetY += (heights[above] ?: 0)
+                        .heightIn(min = 52.dp),
+                    leadingContent = {
+                        Icon(
+                            imageVector = Icons.Filled.DragIndicator,
+                            contentDescription = stringResource(R.string.settings_drag_to_reorder),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier
+                                .padding(end = 4.dp)
+                                .pointerInput(field) {
+                                    detectDragGestures(
+                                        onDragStart = {
+                                            draggingField = field
+                                            dragOffsetY = 0f
+                                        },
+                                        onDragEnd = {
+                                            draggingField = null
+                                            dragOffsetY = 0f
+                                            onReordered()
+                                        },
+                                        onDragCancel = {
+                                            draggingField = null
+                                            dragOffsetY = 0f
+                                        },
+                                        onDrag = { change, dragAmount ->
+                                            change.consume()
+                                            dragOffsetY += dragAmount.y
+                                            val current = order.indexOf(field)
+                                            if (dragAmount.y < 0 && current > 0) {
+                                                val above = order[current - 1]
+                                                val threshold = (heights[above] ?: 0) / 2f
+                                                if (-dragOffsetY > threshold) {
+                                                    order.add(current - 1, order.removeAt(current))
+                                                    dragOffsetY += (heights[above] ?: 0)
+                                                }
+                                            } else if (dragAmount.y > 0 && current < order.lastIndex) {
+                                                val below = order[current + 1]
+                                                val threshold = (heights[below] ?: 0) / 2f
+                                                if (dragOffsetY > threshold) {
+                                                    order.add(current + 1, order.removeAt(current))
+                                                    dragOffsetY -= (heights[below] ?: 0)
+                                                }
                                             }
-                                        } else if (dragAmount.y > 0 && current < order.lastIndex) {
-                                            val below = order[current + 1]
-                                            val threshold = (heights[below] ?: 0) / 2f
-                                            if (dragOffsetY > threshold) {
-                                                order.add(current + 1, order.removeAt(current))
-                                                dragOffsetY -= (heights[below] ?: 0)
-                                            }
-                                        }
-                                    },
-                                )
-                            },
-                    )
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(stringResource(field.labelResource), style = MaterialTheme.typography.bodyLarge)
-                        Text(
-                            stringResource(field.descriptionResource),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        },
+                                    )
+                                },
                         )
-                    }
-                    Switch(
-                        checked = isEnabled(field),
-                        onCheckedChange = null,
-                    )
-                }
+                    },
+                )
             }
         }
-    }
-}
-
-@Composable
-private fun notificationFieldSummary(settings: NotificationSettings): String {
-    val enabledFields = settings.normalizedFieldOrder()
-        .filter(settings::isFieldEnabled)
-        .map { stringResource(it.labelResource) }
-    return if (enabledFields.isEmpty()) {
-        stringResource(R.string.settings_no_custom_notification_fields)
-    } else {
-        enabledFields.joinToString(stringResource(R.string.settings_notification_field_separator))
     }
 }

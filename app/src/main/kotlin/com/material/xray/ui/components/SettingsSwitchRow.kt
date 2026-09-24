@@ -33,6 +33,7 @@ fun SettingsSwitchRow(
     // Dimming the title is separate from disabling the row, because a row can be disabled while
     // its availability is still being determined, and that must not yet read as unavailable.
     titleColor: Color = MaterialTheme.colorScheme.onSurface,
+    leadingContent: (@Composable () -> Unit)? = null,
 ) {
     Row(
         modifier = modifier
@@ -48,6 +49,7 @@ fun SettingsSwitchRow(
         horizontalArrangement = Arrangement.spacedBy(16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        leadingContent?.invoke()
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = title,

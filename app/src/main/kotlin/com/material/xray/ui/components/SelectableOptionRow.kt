@@ -28,17 +28,29 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun SelectableOptionRow(
     title: String,
-    description: String,
+    description: String?,
     selected: Boolean,
     onSelected: () -> Unit,
     modifier: Modifier = Modifier,
+    enabled: Boolean = true,
 ) {
+    val titleColor = if (enabled) {
+        MaterialTheme.colorScheme.onSurface
+    } else {
+        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+    }
+    val descriptionColor = if (enabled) {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+    }
     Row(
         modifier = modifier
             .fillMaxWidth()
             .heightIn(min = 48.dp)
             .selectable(
                 selected = selected,
+                enabled = enabled,
                 onClick = onSelected,
                 role = Role.RadioButton,
             )
@@ -46,20 +58,23 @@ fun SelectableOptionRow(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        SelectionIndicator(selected = selected)
+        SelectionIndicator(selected = selected, enabled = enabled)
         Column(
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
             Text(
                 text = title,
+                color = titleColor,
                 fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
             )
-            Text(
-                text = description,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            if (description != null) {
+                Text(
+                    text = description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = descriptionColor,
+                )
+            }
         }
     }
 }
@@ -69,20 +84,33 @@ fun SelectableOptionRow(
  * of a RadioButton; the row it sits in owns the interaction.
  */
 @Composable
-private fun SelectionIndicator(selected: Boolean) {
+private fun SelectionIndicator(
+    selected: Boolean,
+    enabled: Boolean,
+) {
     val primary = MaterialTheme.colorScheme.primary
     val outline = MaterialTheme.colorScheme.outline
+    val contentColor = if (enabled) {
+        primary
+    } else {
+        primary.copy(alpha = 0.38f)
+    }
+    val outlineColor = if (enabled) {
+        outline
+    } else {
+        outline.copy(alpha = 0.38f)
+    }
 
     Canvas(modifier = Modifier.size(20.dp)) {
         val strokeWidth = 2.dp.toPx()
         drawCircle(
-            color = if (selected) primary else outline,
+            color = if (selected) contentColor else outlineColor,
             radius = size.minDimension / 2 - strokeWidth / 2,
             style = Stroke(width = strokeWidth),
         )
         if (selected) {
             drawCircle(
-                color = primary,
+                color = contentColor,
                 radius = size.minDimension * 0.28f,
             )
         }

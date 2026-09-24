@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="settings_title">Settings</string>
+    <string name="settings_section_connection">Connection</string>
+    <string name="settings_section_servers">Servers</string>
+    <string name="settings_section_core_data">Core and data</string>
     <string name="settings_section_routing">Routing</string>
     <string name="settings_connectivity_title">Connectivity</string>
     <string name="settings_bypass_lan_title">Bypass LAN</string>

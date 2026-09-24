@@ -42,7 +42,7 @@ import com.material.xray.ui.components.ScrolledTopAppBar
 import com.material.xray.ui.components.SettingsSwitchRow
 
 /**
- * The DNS settings subpage, reached from the Core section of the settings list.
+ * The DNS settings subpage, reached from the Connection section of the settings list.
  *
  * DNS gets a page of its own because the two resolver lists only make sense next to an explanation
  * of which names each one answers, and that does not fit under a text field. It reuses
