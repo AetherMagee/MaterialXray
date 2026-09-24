@@ -20,6 +20,7 @@ import com.material.xray.model.RoutingPolicyControl
 import com.material.xray.model.RoutingRule
 import com.material.xray.model.RoutingRuleCatalog
 import com.material.xray.model.SubscriptionRouting
+import com.material.xray.model.ThemePreset
 import com.material.xray.model.XrayLogLevel
 import com.material.xray.model.XrayOutbound
 import com.material.xray.model.XrayRuntimeSettings
@@ -53,6 +54,8 @@ data class SettingsSnapshot(
     val xrayLogLevel: XrayLogLevel,
     val defaultOutbound: XrayOutbound,
     val launcherIcon: LauncherIcon,
+    val themePreset: ThemePreset,
+    val oledDark: Boolean,
     val showTitleBarLogo: Boolean,
     val floatingConnectButton: Boolean,
     val showAdvancedOptions: Boolean,
@@ -111,6 +114,8 @@ class SettingsRepository @Inject constructor(
         val LAST_XRAY_LOG_LEVEL = stringPreferencesKey("last_xray_log_level")
         val DEFAULT_OUTBOUND = stringPreferencesKey("default_outbound")
         val LAUNCHER_ICON = stringPreferencesKey("launcher_icon")
+        val THEME_PRESET = stringPreferencesKey("theme_preset")
+        val OLED_DARK = booleanPreferencesKey("oled_dark")
         val SHOW_TITLE_BAR_LOGO = booleanPreferencesKey("show_title_bar_logo")
         val FLOATING_CONNECT_BUTTON = booleanPreferencesKey("floating_connect_button")
         val SHOW_ADVANCED_OPTIONS = booleanPreferencesKey("show_advanced_options")
@@ -197,6 +202,12 @@ class SettingsRepository @Inject constructor(
     }
     val launcherIcon: Flow<LauncherIcon> = store.data.map { prefs ->
         LauncherIcon.fromValue(prefs[LAUNCHER_ICON])
+    }
+    val themePreset: Flow<ThemePreset> = store.data.map { prefs ->
+        ThemePreset.fromValue(prefs[THEME_PRESET])
+    }
+    val oledDark: Flow<Boolean> = store.data.map { prefs ->
+        prefs[OLED_DARK] ?: false
     }
     val showTitleBarLogo: Flow<Boolean> = store.data.map { prefs ->
         prefs[SHOW_TITLE_BAR_LOGO] ?: true
@@ -352,6 +363,8 @@ class SettingsRepository @Inject constructor(
             },
             defaultOutbound = XrayOutbound.fromTag(prefs[DEFAULT_OUTBOUND]),
             launcherIcon = LauncherIcon.fromValue(prefs[LAUNCHER_ICON]),
+            themePreset = ThemePreset.fromValue(prefs[THEME_PRESET]),
+            oledDark = prefs[OLED_DARK] ?: false,
             showTitleBarLogo = prefs[SHOW_TITLE_BAR_LOGO] ?: true,
             floatingConnectButton = prefs[FLOATING_CONNECT_BUTTON] ?: false,
             showAdvancedOptions = showAdvancedOptions,
@@ -450,6 +463,12 @@ class SettingsRepository @Inject constructor(
     }
     suspend fun setLauncherIcon(icon: LauncherIcon) = store.edit { prefs ->
         prefs[LAUNCHER_ICON] = icon.value
+    }
+    suspend fun setThemePreset(preset: ThemePreset) = store.edit { prefs ->
+        prefs[THEME_PRESET] = preset.value
+    }
+    suspend fun setOledDark(enabled: Boolean) = store.edit { prefs ->
+        prefs[OLED_DARK] = enabled
     }
     suspend fun setShowTitleBarLogo(enabled: Boolean) = store.edit { prefs ->
         prefs[SHOW_TITLE_BAR_LOGO] = enabled
@@ -651,6 +670,8 @@ class SettingsRepository @Inject constructor(
             }
             map["default_outbound"]?.let { prefs[DEFAULT_OUTBOUND] = XrayOutbound.fromTag(it).tag }
             map["launcher_icon"]?.let { prefs[LAUNCHER_ICON] = LauncherIcon.fromValue(it).value }
+            map["theme_preset"]?.let { prefs[THEME_PRESET] = ThemePreset.fromValue(it).value }
+            map["oled_dark"]?.toBooleanStrictOrNull()?.let { prefs[OLED_DARK] = it }
             map["show_title_bar_logo"]?.toBooleanStrictOrNull()?.let { prefs[SHOW_TITLE_BAR_LOGO] = it }
             map["floating_connect_button"]?.toBooleanStrictOrNull()?.let { prefs[FLOATING_CONNECT_BUTTON] = it }
             showAdvancedOptions?.let { prefs[SHOW_ADVANCED_OPTIONS] = it }

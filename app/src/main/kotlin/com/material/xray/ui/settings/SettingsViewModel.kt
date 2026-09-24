@@ -23,6 +23,7 @@ import com.material.xray.model.NotificationField
 import com.material.xray.model.NotificationStyle
 import com.material.xray.model.RootConnectionBackend
 import com.material.xray.model.RoutingPolicyControl
+import com.material.xray.model.ThemePreset
 import com.material.xray.model.XrayLogLevel
 import com.material.xray.model.XrayOutbound
 import com.material.xray.model.XrayRuntimeSettings
@@ -254,6 +255,14 @@ class SettingsViewModel @Inject constructor(
     fun setLauncherIcon(icon: LauncherIcon) = viewModelScope.launch {
         if (icon == currentSettings().launcherIcon) return@launch
         settingsRuntimeManager.setLauncherIcon(icon)
+    }
+    fun setThemePreset(preset: ThemePreset) = viewModelScope.launch {
+        if (preset == currentSettings().themePreset) return@launch
+        settingsRepo.setThemePreset(preset)
+    }
+    fun setOledDark(enabled: Boolean) = viewModelScope.launch {
+        if (enabled == currentSettings().oledDark) return@launch
+        settingsRepo.setOledDark(enabled)
     }
     fun setShowTitleBarLogo(enabled: Boolean) = viewModelScope.launch {
         if (enabled == currentSettings().showTitleBarLogo) return@launch

@@ -21,8 +21,11 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -36,11 +39,13 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -48,6 +53,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.DragIndicator
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -64,6 +70,8 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.dynamicDarkColorScheme
+import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -92,8 +100,11 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.core.app.ActivityCompat
@@ -121,6 +132,7 @@ import com.material.xray.model.NotificationSettings
 import com.material.xray.model.NotificationStyle
 import com.material.xray.model.RootConnectionBackend
 import com.material.xray.model.RoutingPolicyControl
+import com.material.xray.model.ThemePreset
 import com.material.xray.model.XrayLogLevel
 import com.material.xray.model.XrayOutbound
 import com.material.xray.model.XrayRuntimeSettings
@@ -134,6 +146,24 @@ import com.material.xray.ui.components.SettingsSwitchRow
 import com.material.xray.ui.components.rememberSystemState
 import com.material.xray.ui.text.descriptionResource
 import com.material.xray.ui.text.labelResource
+import com.material.xray.ui.theme.CatppuccinDarkColorScheme
+import com.material.xray.ui.theme.CatppuccinLightColorScheme
+import com.material.xray.ui.theme.DefaultBlueDarkColorScheme
+import com.material.xray.ui.theme.DefaultBlueLightColorScheme
+import com.material.xray.ui.theme.DraculaDarkColorScheme
+import com.material.xray.ui.theme.DraculaLightColorScheme
+import com.material.xray.ui.theme.EverforestDarkColorScheme
+import com.material.xray.ui.theme.EverforestLightColorScheme
+import com.material.xray.ui.theme.GruvboxDarkColorScheme
+import com.material.xray.ui.theme.GruvboxLightColorScheme
+import com.material.xray.ui.theme.NordDarkColorScheme
+import com.material.xray.ui.theme.NordLightColorScheme
+import com.material.xray.ui.theme.RosePineDarkColorScheme
+import com.material.xray.ui.theme.RosePineLightColorScheme
+import com.material.xray.ui.theme.SolarizedDarkColorScheme
+import com.material.xray.ui.theme.SolarizedLightColorScheme
+import com.material.xray.ui.theme.TokyoNightDarkColorScheme
+import com.material.xray.ui.theme.TokyoNightLightColorScheme
 import java.util.Locale
 import kotlinx.coroutines.flow.collect
 import org.xmlpull.v1.XmlPullParser
@@ -181,6 +211,69 @@ fun SettingsScreen(showTitleBarLogo: Boolean, viewModel: SettingsViewModel = hil
 
 private const val SUBPAGE_FADE_MS = 180
 
+@Composable
+private fun ThemePresetSwatch(
+    preset: ThemePreset,
+    selected: Boolean,
+    accentColor: Color,
+    iconTint: Color?,
+    onClick: () -> Unit,
+) {
+    val label = stringResource(preset.labelResource)
+    Column(
+        modifier = Modifier
+            .widthIn(min = 64.dp)
+            .selectable(
+                selected = selected,
+                role = Role.RadioButton,
+                onClick = onClick,
+            )
+            .semantics {
+                contentDescription = label
+                this.selected = selected
+            }
+            .padding(horizontal = 4.dp, vertical = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(48.dp)
+                .border(
+                    width = if (selected) 2.dp else 1.dp,
+                    color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+                    shape = CircleShape,
+                ),
+            contentAlignment = Alignment.Center,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(accentColor),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (preset == ThemePreset.Dynamic) {
+                    Icon(
+                        imageVector = Icons.Outlined.Palette,
+                        contentDescription = null,
+                        tint = iconTint ?: MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size(24.dp),
+                    )
+                }
+            }
+        }
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center,
+        )
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Suppress("CyclomaticComplexMethod")
 @Composable
@@ -219,6 +312,8 @@ private fun SettingsScreenContent(
     val geoDataOperationInProgress = geoipUpdating || geositeUpdating || geoDataClearing
     val defaultOutbound = settings.defaultOutbound
     val launcherIcon = settings.launcherIcon
+    val themePreset = settings.themePreset
+    val oledDark = settings.oledDark
     val showTitleBarLogo = settings.showTitleBarLogo
     val floatingConnectButton = settings.floatingConnectButton
     val showAdvancedOptions = settings.showAdvancedOptions
@@ -233,7 +328,15 @@ private fun SettingsScreenContent(
     val showBothLatencyResults = settings.showBothLatencyResults
     val appUpdateChecksEnabled = settings.appUpdateChecksEnabled
     val diagnosticsEnabled = settings.diagnosticsEnabled
+    val darkTheme = isSystemInDarkTheme()
     val context = LocalContext.current
+    val dynamicColorScheme = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+    } else if (darkTheme) {
+        DefaultBlueDarkColorScheme
+    } else {
+        DefaultBlueLightColorScheme
+    }
     val resources = LocalResources.current
     val lifecycleOwner = LocalLifecycleOwner.current
     rememberSystemState { viewModel.refreshOemAutostartGuidance() }
@@ -415,6 +518,80 @@ private fun SettingsScreenContent(
             }
             item(key = "appearance") {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = stringResource(R.string.settings_theme_title),
+                        style = MaterialTheme.typography.titleSmall,
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState())
+                            .padding(horizontal = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        ThemePreset.entries.forEach { preset ->
+                            val accentColor = when (preset) {
+                                ThemePreset.Dynamic -> dynamicColorScheme.primary
+                                ThemePreset.TokyoNight -> if (darkTheme) {
+                                    TokyoNightDarkColorScheme.primary
+                                } else {
+                                    TokyoNightLightColorScheme.primary
+                                }
+                                ThemePreset.Gruvbox -> if (darkTheme) {
+                                    GruvboxDarkColorScheme.primary
+                                } else {
+                                    GruvboxLightColorScheme.primary
+                                }
+                                ThemePreset.Nord -> if (darkTheme) {
+                                    NordDarkColorScheme.primary
+                                } else {
+                                    NordLightColorScheme.primary
+                                }
+                                ThemePreset.Catppuccin -> if (darkTheme) {
+                                    CatppuccinDarkColorScheme.primary
+                                } else {
+                                    CatppuccinLightColorScheme.primary
+                                }
+                                ThemePreset.Dracula -> if (darkTheme) {
+                                    DraculaDarkColorScheme.primary
+                                } else {
+                                    DraculaLightColorScheme.primary
+                                }
+                                ThemePreset.Solarized -> if (darkTheme) {
+                                    SolarizedDarkColorScheme.primary
+                                } else {
+                                    SolarizedLightColorScheme.primary
+                                }
+                                ThemePreset.RosePine -> if (darkTheme) {
+                                    RosePineDarkColorScheme.primary
+                                } else {
+                                    RosePineLightColorScheme.primary
+                                }
+                                ThemePreset.Everforest -> if (darkTheme) {
+                                    EverforestDarkColorScheme.primary
+                                } else {
+                                    EverforestLightColorScheme.primary
+                                }
+                            }
+                            ThemePresetSwatch(
+                                preset = preset,
+                                selected = preset == themePreset,
+                                accentColor = accentColor,
+                                iconTint = if (preset == ThemePreset.Dynamic) dynamicColorScheme.onPrimary else null,
+                                onClick = { viewModel.setThemePreset(preset) },
+                            )
+                        }
+                    }
+                    if (darkTheme) {
+                        SettingsSwitchRow(
+                            title = stringResource(R.string.settings_oled_dark_title),
+                            description = stringResource(R.string.settings_oled_dark_description),
+                            checked = oledDark,
+                            onCheckedChange = viewModel::setOledDark,
+                        )
+                    }
+
                     AppLanguageSetting()
 
                     SettingsSwitchRow(

@@ -46,6 +46,7 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.material.xray.core.locale.notifyAppLocaleChanged
 import com.material.xray.data.repository.SettingsRepository
+import com.material.xray.model.ThemePreset
 import com.material.xray.ui.home.HomeDataState
 import com.material.xray.ui.navigation.MainNavigation
 import com.material.xray.ui.settings.SettingsDataState
@@ -92,8 +93,11 @@ class MainActivity : AppCompatActivity() {
             )
         }
         setContent {
-            MaterialXrayTheme {
-                val settings by settingsDataState.data.collectAsStateWithLifecycle()
+            val settings by settingsDataState.data.collectAsStateWithLifecycle()
+            MaterialXrayTheme(
+                preset = settings?.themePreset ?: ThemePreset.Dynamic,
+                oledDark = settings?.oledDark ?: false,
+            ) {
                 var diagnosticsNoticeVisible by remember { mutableStateOf(false) }
                 val scope = rememberCoroutineScope()
                 LaunchedEffect(settings?.diagnosticsNoticeShown) {
