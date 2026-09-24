@@ -11,38 +11,21 @@ import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateBounds
-import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.indication
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -52,42 +35,23 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.TextAutoSize
-import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.DragIndicator
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Speed
-import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.SystemUpdate
-import androidx.compose.material.icons.outlined.Dns
-import androidx.compose.material.icons.outlined.Edit
-import androidx.compose.material.icons.outlined.NetworkPing
-import androidx.compose.material.icons.outlined.Shield
-import androidx.compose.material.icons.outlined.SwapVert
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButtonDefaults
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -104,7 +68,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -115,43 +78,24 @@ import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.LookaheadScope
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.LinkAnnotation
-import androidx.compose.ui.text.LinkInteractionListener
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.TextLinkStyles
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.zIndex
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -162,7 +106,6 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import com.material.xray.R
-import com.material.xray.data.db.entity.ServerEntity
 import com.material.xray.data.db.entity.SubscriptionEntity
 import com.material.xray.data.repository.ProviderRoutingAvailability
 import com.material.xray.model.AppUpdate
@@ -171,7 +114,6 @@ import com.material.xray.model.ConnectionState
 import com.material.xray.model.PingMethod
 import com.material.xray.model.RoutingPolicyControl
 import com.material.xray.model.ServerConfig
-import com.material.xray.model.SessionTrafficMetrics
 import com.material.xray.model.SubscriptionUserAgentMode
 import com.material.xray.service.AppUpdateInstallProgress
 import com.material.xray.service.AppUpdateInstallStage
@@ -179,17 +121,15 @@ import com.material.xray.service.ConnectionEvent
 import com.material.xray.ui.components.DropdownOption
 import com.material.xray.ui.components.ReadOnlyDropdownField
 import com.material.xray.ui.components.ScrolledTopAppBar
-import com.material.xray.ui.components.SelectableOptionRow
 import com.material.xray.ui.components.SettingsSwitchRow
 import com.material.xray.ui.components.rememberSystemState
 import com.material.xray.ui.text.descriptionResource
 import com.material.xray.ui.text.labelResource
-import java.util.Locale
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.StateFlow
 
 @OptIn(ExperimentalMaterial3Api::class)
+@Suppress("CyclomaticComplexMethod")
 @Composable
 fun HomeScreen(
     showTitleBarLogo: Boolean,
@@ -218,6 +158,9 @@ fun HomeScreen(
     var showQrScanner by remember { mutableStateOf(false) }
     var keepQrScannerDialog by remember { mutableStateOf(false) }
     var showReorderDialog by remember { mutableStateOf(false) }
+    var showPingMethodDialog by remember { mutableStateOf(false) }
+    var pingMethodDialogSubscriptionId by remember { mutableStateOf<Long?>(null) }
+    var pendingDescriptionLink by remember { mutableStateOf<PendingSubscriptionLink?>(null) }
     var editingSubscriptionId by rememberSaveable { mutableStateOf<Long?>(null) }
     val editingSubscription = uiState.subscriptions?.find { it.id == editingSubscriptionId }
     // Drop a parked edit id once the loaded list no longer contains it, so a later subscription
@@ -230,9 +173,29 @@ fun HomeScreen(
             editingSubscriptionId = null
         }
     }
+    LaunchedEffect(uiState.subscriptions, pingMethodDialogSubscriptionId) {
+        val id = pingMethodDialogSubscriptionId ?: return@LaunchedEffect
+        val subscriptions = uiState.subscriptions
+        if (subscriptions == null || subscriptions.none { it.id == id }) {
+            showPingMethodDialog = false
+            pingMethodDialogSubscriptionId = null
+        }
+    }
+    LaunchedEffect(uiState.subscriptions, pendingDescriptionLink) {
+        val pending = pendingDescriptionLink ?: return@LaunchedEffect
+        val subscriptions = uiState.subscriptions
+        if (subscriptions == null ||
+            subscriptions.none {
+                it.id == pending.subscriptionId && it.announce?.trim().orEmpty() == pending.description
+            }
+        ) {
+            pendingDescriptionLink = null
+        }
+    }
     var removeSubscriptionRequest by remember { mutableStateOf<Pair<SubscriptionEntity, Int>?>(null) }
     var showRootFallbackDialog by remember { mutableStateOf(false) }
     val context = LocalContext.current
+    val uriHandler = LocalUriHandler.current
     val collapsedSubscriptionIds = remember(context) {
         context.collapsedSubscriptionIds().toMutableStateList()
     }
@@ -454,7 +417,17 @@ fun HomeScreen(
                             onReorder = { showReorderDialog = true },
                             onRefresh = { viewModel.refreshSubscription(subscription) },
                             onTestAll = { viewModel.testSubscriptionLatencies(subscription) },
-                            onDefaultPingMethodSelected = { viewModel.setDefaultPingMethod(it) },
+                            onPingMethodRequested = {
+                                showPingMethodDialog = true
+                                pingMethodDialogSubscriptionId = subscription.id
+                            },
+                            onDescriptionUrlClick = { url ->
+                                pendingDescriptionLink = PendingSubscriptionLink(
+                                    subscriptionId = subscription.id,
+                                    description = subscription.announce?.trim().orEmpty(),
+                                    url = url,
+                                )
+                            },
                             onApplyRouting = { viewModel.requestApplySubscriptionRouting(subscription) },
                             onDescriptionHiddenChange = { hidden ->
                                 viewModel.setSubscriptionDescriptionHidden(subscription.id, hidden)
@@ -504,6 +477,27 @@ fun HomeScreen(
             } else {
                 viewModel.addLink(trimmed)
             }
+        },
+    )
+    PingMethodDialogHost(
+        visible = showPingMethodDialog,
+        selectedMethod = uiState.defaultPingMethod,
+        onDismiss = {
+            showPingMethodDialog = false
+            pingMethodDialogSubscriptionId = null
+        },
+        onSelected = { method ->
+            viewModel.setDefaultPingMethod(method)
+            showPingMethodDialog = false
+            pingMethodDialogSubscriptionId = null
+        },
+    )
+    SubscriptionDescriptionDialogHost(
+        url = pendingDescriptionLink?.url,
+        onDismiss = { pendingDescriptionLink = null },
+        onConfirm = { url ->
+            pendingDescriptionLink = null
+            uriHandler.openUri(url)
         },
     )
     ApplySubscriptionRoutingDialogHost(
@@ -572,108 +566,6 @@ fun HomeScreen(
 }
 
 @Composable
-private fun HwidRequiredDialogHost(
-    visible: Boolean,
-    onDismiss: () -> Unit,
-    onConfirm: () -> Unit,
-) {
-    if (!visible) return
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(
-                stringResource(R.string.home_hwid_required_title),
-                modifier = Modifier.fillMaxWidth(),
-                textAlign = TextAlign.Center,
-            )
-        },
-        text = { Text(stringResource(R.string.home_hwid_required_body)) },
-        confirmButton = {
-            TextButton(onClick = onConfirm) {
-                Text(stringResource(R.string.home_hwid_required_confirm))
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.home_hwid_required_cancel))
-            }
-        },
-    )
-}
-
-@Composable
-private fun DiscardEditedActiveConfigDialogHost(
-    visible: Boolean,
-    onDismiss: () -> Unit,
-    onConfirm: () -> Unit,
-) {
-    if (!visible) return
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.home_discard_edited_config_title)) },
-        text = { Text(stringResource(R.string.home_discard_edited_config_body)) },
-        confirmButton = {
-            TextButton(onClick = onConfirm) {
-                Text(stringResource(R.string.home_discard_edited_config_confirm))
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.home_discard_edited_config_cancel))
-            }
-        },
-    )
-}
-
-@Composable
-private fun AddSubscriptionDialogHost(
-    visible: Boolean,
-    onDismiss: () -> Unit,
-    onConfirm: (String, String, Boolean, Boolean, SubscriptionUserAgentMode, String, String) -> Unit,
-) {
-    if (!visible) return
-
-    AddSubscriptionDialog(
-        onDismiss = onDismiss,
-        onConfirm = onConfirm,
-    )
-}
-
-@Composable
-private fun QrScannerDialogHost(
-    keepDialog: Boolean,
-    visible: Boolean,
-    onVisibleChange: (Boolean) -> Unit,
-    onLinkScanned: (String) -> Unit,
-) {
-    if (!keepDialog) return
-
-    Dialog(
-        onDismissRequest = { onVisibleChange(false) },
-        properties = DialogProperties(
-            usePlatformDefaultWidth = false,
-            decorFitsSystemWindows = false,
-        ),
-    ) {
-        AnimatedVisibility(
-            visible = visible,
-            enter = fadeIn(animationSpec = tween(durationMillis = QR_SCANNER_TRANSITION_MS)),
-            exit = fadeOut(animationSpec = tween(durationMillis = QR_SCANNER_TRANSITION_MS)),
-        ) {
-            QrScannerOverlay(
-                onQrCodeScanned = { link ->
-                    onVisibleChange(false)
-                    onLinkScanned(link)
-                },
-                onClose = { onVisibleChange(false) },
-            )
-        }
-    }
-}
-
-@Composable
 private fun QrScannerPermissionGate(onGranted: () -> Unit): () -> Unit {
     val context = LocalContext.current
     var promptAccess by remember { mutableStateOf<CameraPermissionAccess?>(null) }
@@ -693,35 +585,15 @@ private fun QrScannerPermissionGate(onGranted: () -> Unit): () -> Unit {
     }
 
     promptAccess?.let { requestedAccess ->
-        AlertDialog(
-            onDismissRequest = { promptAccess = null },
-            title = { Text(stringResource(R.string.home_camera_permission_title)) },
-            text = { Text(stringResource(R.string.home_camera_permission_message)) },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        promptAccess = null
-                        if (requestedAccess == CameraPermissionAccess.SystemSettings) {
-                            context.openAppSettings()
-                        } else {
-                            permissionLauncher.launch(Manifest.permission.CAMERA)
-                        }
-                    },
-                ) {
-                    Text(
-                        stringResource(
-                            if (requestedAccess == CameraPermissionAccess.SystemSettings) {
-                                R.string.home_open_app_settings
-                            } else {
-                                R.string.home_allow_camera
-                            },
-                        ),
-                    )
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { promptAccess = null }) {
-                    Text(stringResource(R.string.home_action_cancel))
+        CameraPermissionDialogHost(
+            requestedAccess = requestedAccess,
+            onDismiss = { promptAccess = null },
+            onConfirm = {
+                promptAccess = null
+                if (requestedAccess == CameraPermissionAccess.SystemSettings) {
+                    context.openAppSettings()
+                } else {
+                    permissionLauncher.launch(Manifest.permission.CAMERA)
                 }
             },
         )
@@ -808,76 +680,7 @@ internal enum class CameraPermissionAccess {
 }
 
 @Composable
-private fun ApplySubscriptionRoutingDialogHost(
-    visible: Boolean,
-    onDismiss: () -> Unit,
-    onConfirm: () -> Unit,
-) {
-    if (!visible) return
-
-    ApplySubscriptionRoutingDialog(
-        onDismiss = onDismiss,
-        onConfirm = onConfirm,
-    )
-}
-
-@Composable
-private fun RootFallbackDialogHost(
-    visible: Boolean,
-    onDismiss: () -> Unit,
-    onConfirm: () -> Unit,
-) {
-    if (!visible) return
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        text = { Text(stringResource(R.string.home_root_fallback_message)) },
-        confirmButton = {
-            TextButton(onClick = onConfirm) {
-                Text(stringResource(R.string.home_action_continue))
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.home_action_cancel))
-            }
-        },
-    )
-}
-
-@Composable
-private fun RemoveSubscriptionDialogHost(
-    request: Pair<SubscriptionEntity, Int>?,
-    onDismiss: () -> Unit,
-    onConfirm: (SubscriptionEntity) -> Unit,
-) {
-    val (subscription, serverCount) = request ?: return
-
-    RemoveSubscriptionDialog(
-        serverCount = serverCount,
-        onDismiss = onDismiss,
-        onConfirm = { onConfirm(subscription) },
-    )
-}
-
-@Composable
-private fun ReorderSubscriptionsDialogHost(
-    visible: Boolean,
-    subscriptions: List<SubscriptionEntity>,
-    onDismiss: () -> Unit,
-    onConfirm: (List<Long>) -> Unit,
-) {
-    if (!visible || subscriptions.size < 2) return
-
-    ReorderSubscriptionsDialog(
-        subscriptions = subscriptions,
-        onDismiss = onDismiss,
-        onConfirm = onConfirm,
-    )
-}
-
-@Composable
-private fun ReorderSubscriptionsDialog(
+internal fun ReorderSubscriptionsDialog(
     subscriptions: List<SubscriptionEntity>,
     onDismiss: () -> Unit,
     onConfirm: (List<Long>) -> Unit,
@@ -1020,58 +823,6 @@ private fun ReorderableSubscriptionList(order: SnapshotStateList<SubscriptionEnt
 }
 
 @Composable
-private fun EditSubscriptionDialogHost(
-    subscription: SubscriptionEntity?,
-    onDismiss: () -> Unit,
-    onConfirm: (SubscriptionEntity, String, String, Boolean, Boolean, Int, SubscriptionUserAgentMode, String, String) -> Unit,
-) {
-    subscription ?: return
-
-    EditSubscriptionDialog(
-        subscription = subscription,
-        onDismiss = onDismiss,
-        onConfirm = { name, url, preferJson, allowInsecureUpdates, autoUpdateIntervalHours, userAgentMode, customUserAgent, customHeaders ->
-            onConfirm(
-                subscription,
-                name,
-                url,
-                preferJson,
-                allowInsecureUpdates,
-                autoUpdateIntervalHours,
-                userAgentMode,
-                customUserAgent,
-                customHeaders,
-            )
-        },
-    )
-}
-
-@Composable
-private fun InstallPermissionRationaleDialogHost(
-    visible: Boolean,
-    onDismiss: () -> Unit,
-    onConfirm: () -> Unit,
-) {
-    if (!visible) return
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.home_app_update_permission_title)) },
-        text = { Text(stringResource(R.string.home_app_update_permission_message)) },
-        confirmButton = {
-            TextButton(onClick = onConfirm) {
-                Text(stringResource(R.string.home_app_update_permission_continue))
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.home_app_update_permission_not_now))
-            }
-        },
-    )
-}
-
-@Composable
 private fun collectHomeUiState(viewModel: HomeViewModel): HomeUiState {
     val connectionState by viewModel.connectionState.collectAsStateWithLifecycle()
     val connectionProgress by viewModel.connectionProgress.collectAsStateWithLifecycle()
@@ -1120,44 +871,6 @@ private fun collectHomeUiState(viewModel: HomeViewModel): HomeUiState {
     )
 }
 
-@Composable
-private fun buildConnectionUiState(
-    connectionState: ConnectionState,
-    selectedServer: ServerConfig?,
-    alwaysOnVpn: Boolean,
-): ConnectionUiState {
-    val isConnected = connectionState is ConnectionState.Connected
-    val isRestartRequired = connectionState is ConnectionState.RestartRequired
-    val isInterfaceBusy = connectionState is ConnectionState.InterfaceBusy
-    val isTransitioning = connectionState is ConnectionState.Connecting ||
-        connectionState is ConnectionState.ApplyingRoutingChanges ||
-        connectionState is ConnectionState.UpdatingRoutingData ||
-        connectionState is ConnectionState.Disconnecting
-    val selectedServerName = selectedServer?.name ?: stringResource(R.string.home_no_server_selected)
-    val stopLike = isConnected && !alwaysOnVpn || isRestartRequired || isInterfaceBusy
-
-    return ConnectionUiState(
-        isConnected = isConnected,
-        isRestartRequired = isRestartRequired,
-        isInterfaceBusy = isInterfaceBusy,
-        isTransitioning = isTransitioning,
-        isAlwaysOnVpn = alwaysOnVpn,
-        buttonColor = when {
-            stopLike -> MaterialTheme.colorScheme.error
-            isTransitioning -> MaterialTheme.colorScheme.tertiary
-            else -> MaterialTheme.colorScheme.primary
-        },
-        // The compact button fills with the role colour itself rather than the softer *Container
-        // pair: it is small and floats over scrolling content, so it needs the contrast.
-        fabContentColor = when {
-            stopLike -> MaterialTheme.colorScheme.onError
-            isTransitioning -> MaterialTheme.colorScheme.onTertiary
-            else -> MaterialTheme.colorScheme.onPrimary
-        },
-        displayServerName = (connectionState as? ConnectionState.Connected)?.serverName ?: selectedServerName,
-    )
-}
-
 private data class HomeUiState(
     val connectionState: ConnectionState,
     val connectionProgress: ConnectionProgress?,
@@ -1185,360 +898,11 @@ private data class HomeUiState(
     val pendingHwidServerSelection: Long?,
 )
 
-private data class ConnectionUiState(
-    val isConnected: Boolean,
-    val isRestartRequired: Boolean,
-    val isInterfaceBusy: Boolean,
-    val isTransitioning: Boolean,
-    val isAlwaysOnVpn: Boolean,
-    val buttonColor: Color,
-    val fabContentColor: Color,
-    val displayServerName: String,
+private data class PendingSubscriptionLink(
+    val subscriptionId: Long,
+    val description: String,
+    val url: String,
 )
-
-@Composable
-private fun ConnectionPanel(
-    connectionState: ConnectionState,
-    connectionProgress: ConnectionProgress?,
-    geoDataDownloadFraction: Float?,
-    showProgressDetails: Boolean,
-    selectedServerName: String,
-    activeBalancer: ActiveBalancerState?,
-    pingMs: StateFlow<Int?>,
-    sessionTraffic: StateFlow<SessionTrafficMetrics?>,
-    buttonColor: Color,
-    isConnected: Boolean,
-    isRestartRequired: Boolean,
-    isInterfaceBusy: Boolean,
-    isTransitioning: Boolean,
-    isAlwaysOnVpn: Boolean,
-    canStart: Boolean,
-    compact: Boolean,
-    onClick: () -> Unit,
-    onViewConfig: () -> Unit,
-) {
-    val buttonEnabled = (canStart || isConnected || isRestartRequired || isInterfaceBusy) && !isTransitioning
-    val containerColor = if (buttonEnabled) {
-        buttonColor.copy(alpha = 0.15f)
-    } else {
-        buttonColor.copy(alpha = 0.10f)
-    }
-    val contentColor = if (buttonEnabled) {
-        buttonColor
-    } else {
-        buttonColor.copy(alpha = 0.75f)
-    }
-
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text(
-            text = connectionHeading(connectionState, geoDataDownloadFraction),
-            modifier = Modifier.fillMaxWidth(),
-            style = MaterialTheme.typography.titleLarge,
-            textAlign = TextAlign.Center,
-            color = when {
-                isConnected -> MaterialTheme.colorScheme.primary
-                isRestartRequired || isInterfaceBusy -> MaterialTheme.colorScheme.error
-                connectionState is ConnectionState.Error -> MaterialTheme.colorScheme.error
-                else -> MaterialTheme.colorScheme.onSurface
-            },
-        )
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Text(
-            text = when {
-                isInterfaceBusy -> stringResource(R.string.home_connection_interface_busy_detail)
-                isRestartRequired -> stringResource(R.string.home_connection_restart_required_detail)
-                else -> selectedServerName
-            },
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-            maxLines = if (isRestartRequired || isInterfaceBusy) 4 else 1,
-            overflow = TextOverflow.Ellipsis,
-            textAlign = TextAlign.Center,
-        )
-        // The row is normally held open even when empty so the panel does not jump as progress
-        // text and uptime come and go. Idle-and-disconnected has nothing coming, so the compact
-        // layout drops it rather than leave a gap.
-        if (!compact || connectionState !is ConnectionState.Disconnected) {
-            Box(
-                modifier = Modifier.height(
-                    with(LocalDensity.current) { MaterialTheme.typography.bodySmall.lineHeight.toDp() },
-                ),
-                contentAlignment = Alignment.Center,
-            ) {
-                when {
-                    showProgressDetails && connectionProgress != null -> Text(
-                        text = connectionProgressText(connectionProgress),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        textAlign = TextAlign.Center,
-                    )
-                    connectionState is ConnectionState.Connected -> CoreUptime(startTime = connectionState.startTime)
-                }
-            }
-        }
-
-        if (!compact) {
-            Spacer(modifier = Modifier.height(24.dp))
-
-            Surface(
-                color = containerColor,
-                contentColor = contentColor,
-                shape = CircleShape,
-                modifier = Modifier
-                    .size(124.dp)
-                    .clip(CircleShape)
-                    .combinedClickable(
-                        enabled = buttonEnabled,
-                        onClick = onClick,
-                        onLongClick = {
-                            if (isConnected) {
-                                onViewConfig()
-                            }
-                        },
-                    ),
-            ) {
-                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                    if (isTransitioning) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(54.dp),
-                            strokeWidth = 4.dp,
-                            color = buttonColor,
-                        )
-                    } else {
-                        Text(
-                            text = stringResource(
-                                connectionActionLabel(
-                                    isConnected = isConnected,
-                                    isAlwaysOnVpn = isAlwaysOnVpn,
-                                    isRestartRequired = isRestartRequired,
-                                    isInterfaceBusy = isInterfaceBusy,
-                                ),
-                            ),
-                            modifier = Modifier.padding(horizontal = 8.dp),
-                            style = MaterialTheme.typography.titleLarge,
-                            textAlign = TextAlign.Center,
-                            color = contentColor,
-                            maxLines = 1,
-                            autoSize = TextAutoSize.StepBased(
-                                minFontSize = 10.sp,
-                                maxFontSize = MaterialTheme.typography.titleLarge.fontSize,
-                                stepSize = 1.sp,
-                            ),
-                        )
-                    }
-                }
-            }
-        }
-
-        AnimatedVisibility(visible = connectionState.showsConnectionStats()) {
-            ConnectionStatsBanner(
-                activeBalancer = activeBalancer,
-                pingMs = pingMs,
-                sessionTraffic = sessionTraffic,
-                modifier = Modifier.padding(top = 16.dp),
-            )
-        }
-
-        Spacer(modifier = Modifier.height(10.dp))
-    }
-}
-
-@Composable
-private fun connectionHeading(connectionState: ConnectionState, geoDataDownloadFraction: Float?): String = when (connectionState) {
-    is ConnectionState.Connected -> stringResource(R.string.home_connection_connected)
-    is ConnectionState.Connecting -> stringResource(R.string.home_connection_connecting)
-    ConnectionState.ApplyingRoutingChanges -> stringResource(R.string.home_connection_applying_routing)
-    ConnectionState.UpdatingRoutingData -> geoDataDownloadFraction?.let { fraction ->
-        stringResource(
-            R.string.home_connection_updating_routing_percent,
-            (fraction * 100).roundToInt(),
-        )
-    } ?: stringResource(R.string.home_connection_updating_routing)
-    is ConnectionState.RestartRequired -> stringResource(R.string.home_connection_restart_required)
-    is ConnectionState.InterfaceBusy -> stringResource(R.string.home_connection_interface_busy)
-    is ConnectionState.Disconnecting -> stringResource(R.string.home_connection_disconnecting)
-    is ConnectionState.Error -> stringResource(R.string.home_connection_error)
-    ConnectionState.Disconnected -> stringResource(R.string.home_connection_disconnected)
-}
-
-internal fun ConnectionState.showsConnectionStats(): Boolean = this is ConnectionState.Connected ||
-    this == ConnectionState.ApplyingRoutingChanges
-
-/**
- * Compact alternative to the large power button, anchored in the corner of the home screen.
- * Kept as a [Surface] rather than a [androidx.compose.material3.FloatingActionButton] so it can
- * express a disabled state and keep the long-press shortcut to the running config.
- */
-@Composable
-private fun ConnectionFab(
-    visible: Boolean,
-    state: ConnectionUiState,
-    canStart: Boolean,
-    onClick: () -> Unit,
-    onViewConfig: () -> Unit,
-) {
-    if (!visible) return
-    val enabled = (canStart || state.isConnected || state.isRestartRequired || state.isInterfaceBusy) &&
-        !state.isTransitioning
-    val actionLabel = stringResource(
-        connectionActionLabel(
-            isConnected = state.isConnected,
-            isAlwaysOnVpn = state.isAlwaysOnVpn,
-            isRestartRequired = state.isRestartRequired,
-            isInterfaceBusy = state.isInterfaceBusy,
-        ),
-    )
-    val shape = FloatingActionButtonDefaults.shape
-
-    Surface(
-        color = if (enabled) state.buttonColor else MaterialTheme.colorScheme.surfaceContainerHighest,
-        contentColor = if (enabled) {
-            state.fabContentColor
-        } else {
-            MaterialTheme.colorScheme.onSurface.copy(alpha = DISABLED_FAB_CONTENT_ALPHA)
-        },
-        shape = shape,
-        shadowElevation = 6.dp,
-        modifier = Modifier
-            .size(64.dp)
-            .clip(shape)
-            .combinedClickable(
-                enabled = enabled,
-                role = Role.Button,
-                onClickLabel = actionLabel,
-                onClick = onClick,
-                onLongClick = {
-                    if (state.isConnected) {
-                        onViewConfig()
-                    }
-                },
-            ),
-    ) {
-        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-            if (state.isTransitioning) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(26.dp),
-                    strokeWidth = 3.dp,
-                    color = state.fabContentColor,
-                )
-            } else {
-                Icon(
-                    imageVector = connectionActionIcon(
-                        isConnected = state.isConnected,
-                        isAlwaysOnVpn = state.isAlwaysOnVpn,
-                        isRestartRequired = state.isRestartRequired,
-                        isInterfaceBusy = state.isInterfaceBusy,
-                    ),
-                    contentDescription = actionLabel,
-                    modifier = Modifier.size(30.dp),
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun connectionProgressText(progress: ConnectionProgress): String = when (progress) {
-    ConnectionProgress.PreparingRuntime -> stringResource(R.string.home_connection_progress_preparing_runtime)
-    ConnectionProgress.PreparingCore -> stringResource(R.string.home_connection_progress_preparing_core)
-    ConnectionProgress.UpdatingRoutingData -> stringResource(R.string.home_connection_progress_updating_routing_data)
-    ConnectionProgress.ResolvingEntryServer -> stringResource(R.string.home_connection_progress_resolving_entry_server)
-    ConnectionProgress.GeneratingConfiguration -> stringResource(R.string.home_connection_progress_generating_configuration)
-    ConnectionProgress.StartingCore -> stringResource(R.string.home_connection_progress_starting_core)
-    ConnectionProgress.ConfiguringTunnel -> stringResource(R.string.home_connection_progress_configuring_tunnel)
-    ConnectionProgress.ConfiguringRouting -> stringResource(R.string.home_connection_progress_configuring_routing)
-    ConnectionProgress.WaitingForCore -> stringResource(R.string.home_connection_progress_waiting_for_core)
-    ConnectionProgress.StoppingCore -> stringResource(R.string.home_connection_progress_stopping_core)
-    ConnectionProgress.CleaningRuntime -> stringResource(R.string.home_connection_progress_cleaning_runtime)
-    ConnectionProgress.InspectingSavedRuntime -> stringResource(R.string.home_connection_progress_inspecting_saved_runtime)
-    ConnectionProgress.VerifyingRuntime -> stringResource(R.string.home_connection_progress_verifying_runtime)
-    ConnectionProgress.RestoringControlApi -> stringResource(R.string.home_connection_progress_restoring_control_api)
-    ConnectionProgress.UpdatingNetworkRoute -> stringResource(R.string.home_connection_progress_updating_network_route)
-    ConnectionProgress.UpdatingAppRouting -> stringResource(R.string.home_connection_progress_updating_app_routing)
-}
-
-@Composable
-private fun CoreUptime(startTime: Long) {
-    val lifecycleOwner = LocalLifecycleOwner.current
-    var currentTime by remember(startTime) { mutableLongStateOf(System.currentTimeMillis()) }
-
-    LaunchedEffect(startTime, lifecycleOwner) {
-        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
-            while (true) {
-                currentTime = System.currentTimeMillis()
-                delay(CORE_UPTIME_REFRESH_INTERVAL_MS)
-            }
-        }
-    }
-
-    Text(
-        text = formatCoreUptime(currentTime - startTime),
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        maxLines = 1,
-    )
-}
-
-internal fun formatCoreUptime(elapsedMillis: Long): String {
-    val totalSeconds = elapsedMillis.coerceAtLeast(0L) / 1_000L
-    val days = totalSeconds / 86_400L
-    val hours = totalSeconds % 86_400L / 3_600L
-    val minutes = totalSeconds % 3_600L / 60L
-    val seconds = totalSeconds % 60L
-    return when {
-        days > 0L -> String.format(Locale.ROOT, "%02d:%02d:%02d:%02d", days, hours, minutes, seconds)
-        hours > 0L -> String.format(Locale.ROOT, "%02d:%02d:%02d", hours, minutes, seconds)
-        else -> String.format(Locale.ROOT, "%02d:%02d", minutes, seconds)
-    }
-}
-
-private fun ConnectionUiState.handleClick(
-    context: Context,
-    useRootService: Boolean,
-    disconnect: () -> Unit,
-    connectRoot: () -> Unit,
-    connectVpn: () -> Unit,
-) {
-    when {
-        isConnected && isAlwaysOnVpn -> context.startActivity(Intent(Settings.ACTION_VPN_SETTINGS))
-        isConnected -> disconnect()
-        !isTransitioning && useRootService -> connectRoot()
-        !isTransitioning -> connectVpn()
-    }
-}
-
-@StringRes
-private fun connectionActionLabel(
-    isConnected: Boolean,
-    isAlwaysOnVpn: Boolean,
-    isRestartRequired: Boolean,
-    isInterfaceBusy: Boolean,
-): Int = when {
-    isConnected && isAlwaysOnVpn -> R.string.home_action_always_on
-    isConnected -> R.string.home_action_stop
-    isRestartRequired || isInterfaceBusy -> R.string.home_action_restart
-    else -> R.string.home_action_start
-}
-
-/** Icon counterpart to [connectionActionLabel], for the compact button that has no room for text. */
-private fun connectionActionIcon(
-    isConnected: Boolean,
-    isAlwaysOnVpn: Boolean,
-    isRestartRequired: Boolean,
-    isInterfaceBusy: Boolean,
-): ImageVector = when {
-    isConnected && isAlwaysOnVpn -> Icons.Default.Settings
-    isConnected -> Icons.Default.Stop
-    isRestartRequired || isInterfaceBusy -> Icons.Default.RestartAlt
-    else -> Icons.Default.PlayArrow
-}
 
 /** The floating button overlays the list, so the last item needs room to scroll clear of it. */
 private fun homeListContentPadding(floatingConnectButton: Boolean) = PaddingValues(
@@ -1720,883 +1084,9 @@ private fun AddSubscriptionActionButton(
     }
 }
 
-@Composable
-private fun SubscriptionCard(
-    subscription: SubscriptionEntity,
-    isRefreshing: Boolean,
-    servers: List<ServerListItem>,
-    selectedServerId: Long,
-    defaultPingMethod: PingMethod,
-    canApplyRouting: Boolean,
-    canCollapse: Boolean,
-    expanded: Boolean,
-    canReorder: Boolean,
-    onExpandedChange: (Boolean) -> Unit,
-    onDelete: () -> Unit,
-    onEdit: () -> Unit,
-    onReorder: () -> Unit,
-    onRefresh: () -> Unit,
-    onTestAll: () -> Unit,
-    onDefaultPingMethodSelected: (PingMethod) -> Unit,
-    onApplyRouting: () -> Unit,
-    onDescriptionHiddenChange: (Boolean) -> Unit,
-    onServerSelected: (Long) -> Unit,
-    onTestLatency: (ServerEntity) -> Unit,
-    onOpenServerConfig: (Long, String) -> Unit,
-) {
-    val resources = LocalResources.current
-    val locale = resources.configuration.locales[0]
-    val metadata = remember(
-        subscription.announce,
-        subscription.subscriptionUploadBytes,
-        subscription.subscriptionDownloadBytes,
-        subscription.subscriptionTotalBytes,
-        subscription.subscriptionExpireAt,
-        subscription.autoUpdateIntervalHours,
-        locale,
-    ) {
-        buildSubscriptionMetadataUiState(subscription, resources)
-    }
-
-    ElevatedCard(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-    ) {
-        Column(modifier = Modifier.fillMaxWidth()) {
-            SubscriptionHeader(
-                subscription = subscription,
-                isRefreshing = isRefreshing,
-                metadata = metadata,
-                defaultPingMethod = defaultPingMethod,
-                canCollapse = canCollapse,
-                expanded = expanded,
-                onExpandedChange = onExpandedChange,
-                onRefresh = onRefresh,
-                onTestAll = onTestAll,
-                onDefaultPingMethodSelected = onDefaultPingMethodSelected,
-                onDelete = onDelete,
-                onEdit = onEdit,
-                canReorder = canReorder,
-                onReorder = onReorder,
-                canApplyRouting = canApplyRouting,
-                onApplyRouting = onApplyRouting,
-                onDescriptionHiddenChange = onDescriptionHiddenChange,
-            )
-            AnimatedVisibility(visible = !canCollapse || expanded) {
-                Column {
-                    if (metadata.hasVisibleSubscriptionSection()) {
-                        Spacer(modifier = Modifier.height(SubscriptionBlockGap))
-                    }
-                    SubscriptionMetadataSection(
-                        subscription = subscription,
-                        metadata = metadata,
-                    )
-
-                    if (servers.isEmpty()) {
-                        Text(
-                            stringResource(R.string.home_no_servers_in_subscription),
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
-                    } else {
-                        LookaheadScope {
-                            Column {
-                                servers.forEachIndexed { index, server ->
-                                    key(server.entity.id) {
-                                        Column(modifier = Modifier.animateBounds(this@LookaheadScope)) {
-                                            if (index > 0) {
-                                                HorizontalDivider(
-                                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f),
-                                                )
-                                            }
-                                            ServerRow(
-                                                server = server,
-                                                isSelected = server.entity.id == selectedServerId,
-                                                onClick = { onServerSelected(server.entity.id) },
-                                                onTestLatency = { onTestLatency(server.entity) },
-                                                onOpenConfig = {
-                                                    onOpenServerConfig(server.entity.id, server.entity.name)
-                                                },
-                                                contentPadding = ServerRowDefaults.contentPadding,
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun SubscriptionMetadataSection(
-    subscription: SubscriptionEntity,
-    metadata: SubscriptionMetadataUiState,
-) {
-    val limitedTraffic = metadata.traffic?.takeUnless { it.quotaText == null }
-
-    val hasVisibleMetadata = metadata.announcement.isNotEmpty() ||
-        limitedTraffic != null
-    if (!hasVisibleMetadata) return
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .animateContentSize(animationSpec = tween(durationMillis = 180))
-            .padding(start = 16.dp, top = 0.dp, end = 16.dp, bottom = SubscriptionMetadataGap),
-        verticalArrangement = Arrangement.spacedBy(SubscriptionMetadataGap),
-    ) {
-        AnimatedVisibility(
-            visible = metadata.announcement.isNotEmpty() && !subscription.descriptionHidden,
-            enter = fadeIn(animationSpec = tween(durationMillis = 120)),
-            exit = fadeOut(animationSpec = tween(durationMillis = 90)),
-        ) {
-            SubscriptionDescriptionText(description = metadata.announcement)
-        }
-
-        if (limitedTraffic != null) {
-            SubscriptionTrafficUsage(
-                state = limitedTraffic,
-                expiry = metadata.expiry,
-            )
-        }
-    }
-}
-
-private fun SubscriptionMetadataUiState.hasVisibleSubscriptionSection(): Boolean {
-    val limitedTraffic = traffic?.takeUnless { it.quotaText == null }
-    return announcement.isNotEmpty() ||
-        limitedTraffic != null
-}
-
-@Composable
-private fun SubscriptionTrafficUsage(
-    state: SubscriptionTrafficUiState,
-    expiry: SubscriptionExpiryUiState?,
-) {
-    val expiredStatusText = stringResource(R.string.home_subscription_expired_inline)
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(5.dp),
-    ) {
-        Text(
-            text = state.summary,
-            modifier = Modifier.fillMaxWidth(),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurface,
-            fontWeight = FontWeight.Medium,
-            textAlign = TextAlign.Center,
-        )
-        LinearProgressIndicator(
-            progress = { state.progress },
-            modifier = Modifier.fillMaxWidth(),
-        )
-        if (expiry != null) {
-            Text(
-                text = remember(expiry.standaloneText, expiredStatusText) {
-                    expiry.standaloneText.withMetadataEmphasis(expiredStatusText)
-                },
-                modifier = Modifier.align(Alignment.End),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}
-
-@Composable
-private fun SubscriptionHeader(
-    subscription: SubscriptionEntity,
-    isRefreshing: Boolean,
-    metadata: SubscriptionMetadataUiState,
-    defaultPingMethod: PingMethod,
-    canCollapse: Boolean,
-    expanded: Boolean,
-    onExpandedChange: (Boolean) -> Unit,
-    onRefresh: () -> Unit,
-    onTestAll: () -> Unit,
-    onDefaultPingMethodSelected: (PingMethod) -> Unit,
-    onDelete: () -> Unit,
-    onEdit: () -> Unit,
-    canReorder: Boolean,
-    onReorder: () -> Unit,
-    canApplyRouting: Boolean,
-    onApplyRouting: () -> Unit,
-    onDescriptionHiddenChange: (Boolean) -> Unit,
-) {
-    var showMenu by remember { mutableStateOf(false) }
-    var showPingMethodDialog by remember { mutableStateOf(false) }
-    val resources = LocalResources.current
-    val uriHandler = LocalUriHandler.current
-    val supportUrl = subscription.supportUrl?.trim().orEmpty()
-    val hasDescription = subscription.announce?.trim()?.isNotEmpty() == true
-    val headerDetailText = metadata.headerDetailText(resources)
-    val expiredStatusText = stringResource(R.string.home_subscription_expired_inline)
-    val expansionActionDescription = if (canCollapse) {
-        stringResource(
-            if (expanded) R.string.home_subscription_collapse else R.string.home_subscription_expand,
-            subscription.name,
-        )
-    } else {
-        null
-    }
-    val arrowInteractionSource = remember { MutableInteractionSource() }
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(start = if (canCollapse) 0.dp else 16.dp, top = 6.dp, end = 8.dp, bottom = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(0.dp),
-    ) {
-        if (canCollapse) {
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .clickable(
-                        interactionSource = arrowInteractionSource,
-                        indication = null,
-                        role = Role.Button,
-                        onClickLabel = expansionActionDescription,
-                    ) { onExpandedChange(!expanded) },
-                contentAlignment = Alignment.Center,
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .indication(arrowInteractionSource, LocalIndication.current),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                        contentDescription = expansionActionDescription,
-                        modifier = Modifier.size(24.dp),
-                    )
-                }
-            }
-        }
-        val titleInteractionSource = remember { MutableInteractionSource() }
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .heightIn(min = 48.dp)
-                .then(
-                    if (canCollapse) {
-                        Modifier.clickable(
-                            interactionSource = titleInteractionSource,
-                            indication = null,
-                            role = Role.Button,
-                            onClickLabel = expansionActionDescription,
-                        ) { onExpandedChange(!expanded) }
-                    } else {
-                        Modifier
-                    },
-                ),
-            verticalArrangement = Arrangement.Center,
-        ) {
-            Text(
-                text = subscription.name,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-            if (!headerDetailText.isNullOrBlank()) {
-                Text(
-                    text = remember(headerDetailText, expiredStatusText) {
-                        headerDetailText.withMetadataEmphasis(expiredStatusText)
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-        }
-        IconButton(onClick = onRefresh, enabled = !isRefreshing) {
-            if (isRefreshing) {
-                val updatingDescription = stringResource(
-                    R.string.home_subscription_updating_content_description,
-                    subscription.name,
-                )
-                CircularProgressIndicator(
-                    modifier = Modifier
-                        .size(24.dp)
-                        .semantics { contentDescription = updatingDescription },
-                    strokeWidth = 2.dp,
-                )
-            } else {
-                Icon(
-                    Icons.Default.Refresh,
-                    contentDescription = stringResource(
-                        R.string.home_subscription_refresh_content_description,
-                        subscription.name,
-                    ),
-                )
-            }
-        }
-        Box(
-            modifier = Modifier
-                .size(48.dp)
-                .clip(CircleShape)
-                .combinedClickable(
-                    role = Role.Button,
-                    onClick = onTestAll,
-                    onLongClick = { showPingMethodDialog = true },
-                ),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                Icons.Default.Speed,
-                contentDescription = stringResource(
-                    R.string.home_subscription_test_content_description,
-                    subscription.name,
-                    defaultPingMethod.value,
-                ),
-            )
-        }
-        Box {
-            IconButton(onClick = { showMenu = true }) {
-                Icon(
-                    Icons.Default.MoreVert,
-                    contentDescription = stringResource(R.string.home_subscription_menu_content_description),
-                )
-            }
-            DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.home_action_edit)) },
-                    leadingIcon = {
-                        Icon(painterResource(R.drawable.edit_24px), contentDescription = null)
-                    },
-                    onClick = {
-                        showMenu = false
-                        onEdit()
-                    },
-                )
-                if (canReorder) {
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.home_action_reorder)) },
-                        leadingIcon = {
-                            Icon(Icons.Outlined.SwapVert, contentDescription = null)
-                        },
-                        onClick = {
-                            showMenu = false
-                            onReorder()
-                        },
-                    )
-                }
-                if (supportUrl.isNotEmpty()) {
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.home_action_support)) },
-                        leadingIcon = {
-                            Icon(painterResource(R.drawable.support_24px), contentDescription = null)
-                        },
-                        onClick = {
-                            showMenu = false
-                            uriHandler.openUri(supportUrl)
-                        },
-                    )
-                }
-                if (hasDescription) {
-                    DropdownMenuItem(
-                        text = {
-                            Text(
-                                stringResource(
-                                    if (subscription.descriptionHidden) {
-                                        R.string.home_subscription_show_description
-                                    } else {
-                                        R.string.home_subscription_hide_description
-                                    },
-                                ),
-                            )
-                        },
-                        leadingIcon = {
-                            Icon(
-                                painterResource(
-                                    if (subscription.descriptionHidden) {
-                                        R.drawable.visibility_24px
-                                    } else {
-                                        R.drawable.visibility_off_24px
-                                    },
-                                ),
-                                contentDescription = null,
-                            )
-                        },
-                        onClick = {
-                            showMenu = false
-                            onDescriptionHiddenChange(!subscription.descriptionHidden)
-                        },
-                    )
-                }
-                if (canApplyRouting) {
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.home_subscription_apply_routing)) },
-                        leadingIcon = {
-                            Icon(painterResource(R.drawable.cloud_download_24px), contentDescription = null)
-                        },
-                        onClick = {
-                            showMenu = false
-                            onApplyRouting()
-                        },
-                    )
-                }
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.home_action_remove)) },
-                    leadingIcon = {
-                        Icon(painterResource(R.drawable.delete_forever_24px), contentDescription = null)
-                    },
-                    onClick = {
-                        showMenu = false
-                        onDelete()
-                    },
-                )
-            }
-        }
-    }
-
-    if (showPingMethodDialog) {
-        PingMethodDialog(
-            selectedMethod = defaultPingMethod,
-            onDismiss = { showPingMethodDialog = false },
-            onSelected = { method ->
-                onDefaultPingMethodSelected(method)
-                showPingMethodDialog = false
-            },
-        )
-    }
-}
-
-@Composable
-private fun PingMethodDialog(
-    selectedMethod: PingMethod,
-    onDismiss: () -> Unit,
-    onSelected: (PingMethod) -> Unit,
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.home_action_close))
-            }
-        },
-        title = { Text(stringResource(R.string.home_choose_ping_method_title)) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                PingMethod.entries.forEach { method ->
-                    SelectableOptionRow(
-                        title = stringResource(method.labelResource),
-                        description = stringResource(method.descriptionResource),
-                        selected = method == selectedMethod,
-                        onSelected = { onSelected(method) },
-                    )
-                }
-            }
-        },
-    )
-}
-
-@Composable
-private fun SubscriptionDescriptionText(description: String) {
-    val linkColor = MaterialTheme.colorScheme.primary
-    val textColor = MaterialTheme.colorScheme.onSurfaceVariant
-    val uriHandler = LocalUriHandler.current
-    var pendingUrl by remember(description) { mutableStateOf<String?>(null) }
-    val annotatedDescription = remember(description, linkColor) {
-        description.withUrlLinks(linkColor) { url ->
-            pendingUrl = url
-        }
-    }
-
-    SelectionContainer {
-        Text(
-            text = annotatedDescription,
-            style = MaterialTheme.typography.bodySmall,
-            color = textColor,
-        )
-    }
-
-    pendingUrl?.let { url ->
-        AlertDialog(
-            onDismissRequest = { pendingUrl = null },
-            title = { Text(stringResource(R.string.home_open_link_title)) },
-            text = {
-                SelectionContainer {
-                    Text(
-                        text = url,
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        pendingUrl = null
-                        uriHandler.openUri(url)
-                    },
-                ) {
-                    Text(stringResource(R.string.home_action_open))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { pendingUrl = null }) {
-                    Text(stringResource(R.string.home_action_cancel))
-                }
-            },
-        )
-    }
-}
-
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-private fun ServerRow(
-    server: ServerListItem,
-    isSelected: Boolean,
-    onClick: () -> Unit,
-    onTestLatency: () -> Unit,
-    onOpenConfig: () -> Unit,
-    contentPadding: PaddingValues = ServerRowDefaults.contentPadding,
-) {
-    val latency = server.latency
-    val latencyColor = if (latency?.let(::latencyShowsError) == true) {
-        MaterialTheme.colorScheme.error
-    } else {
-        MaterialTheme.colorScheme.onSurfaceVariant
-    }
-
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .combinedClickable(onClick = onClick, onLongClick = onTestLatency),
-        color = if (isSelected) {
-            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f)
-        } else {
-            MaterialTheme.colorScheme.surfaceContainer
-        },
-    ) {
-        // IntrinsicSize.Min gives the row a height the chevron can fill, so its tap target and
-        // ripple cover the whole strip at the row's end instead of a small circle inside it.
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(IntrinsicSize.Min),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Row(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(contentPadding),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                CompactSelectionDot(isSelected = isSelected)
-                Column(modifier = Modifier.weight(1f)) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    ) {
-                        Text(
-                            text = server.entity.name,
-                            modifier = Modifier.weight(1f, fill = false),
-                            style = MaterialTheme.typography.titleMedium,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        if (server.entity.edited) {
-                            ServerStateBadge(Icons.Outlined.Edit, R.string.home_server_edited)
-                        }
-                        if (server.entity.guarded) {
-                            ServerStateBadge(Icons.Outlined.Shield, R.string.home_server_guarded)
-                        }
-                    }
-                    Text(
-                        text = server.endpointSummary,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                if (latency != null) {
-                    Surface(
-                        shape = MaterialTheme.shapes.small,
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                        color = MaterialTheme.colorScheme.surface,
-                    ) {
-                        LatencyBadgeContent(
-                            latency = latency,
-                            color = latencyColor,
-                        )
-                    }
-                }
-            }
-            Box(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .clickable(
-                        onClick = onOpenConfig,
-                        onClickLabel = stringResource(R.string.config_viewer_open),
-                    )
-                    .padding(horizontal = ServerRowDefaults.chevronHorizontalPadding),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                    contentDescription = stringResource(R.string.config_viewer_open),
-                    modifier = Modifier.size(ServerRowDefaults.chevronIconSize),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun ServerStateBadge(icon: ImageVector, @StringRes descriptionRes: Int) {
-    Icon(
-        imageVector = icon,
-        contentDescription = stringResource(descriptionRes),
-        modifier = Modifier.size(14.dp),
-        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
-}
-
-@Composable
-private fun LatencyBadgeContent(
-    latency: ServerLatencyState,
-    color: Color,
-) {
-    val tcpingLatencyMs = latency.tcpingLatencyMs
-    val httpingLatencyMs = latency.httpingLatencyMs
-    if (latency.latencyMs == LATENCY_TESTING) {
-        ShimmeringText(
-            text = stringResource(R.string.home_latency_testing),
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-            color = color,
-            style = MaterialTheme.typography.labelMedium,
-        )
-    } else if (tcpingLatencyMs != null && httpingLatencyMs != null) {
-        Row(
-            modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
-            horizontalArrangement = Arrangement.spacedBy(1.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            LatencyValue(tcpingLatencyMs, PingMethod.Tcping, Icons.Outlined.NetworkPing, color)
-            Text(
-                text = ",",
-                color = color,
-                style = MaterialTheme.typography.labelMedium.copy(letterSpacing = (-0.25).sp),
-            )
-            LatencyValue(httpingLatencyMs, PingMethod.Httping, Icons.Outlined.Dns, color)
-        }
-    } else {
-        Text(
-            text = if (latency.latencyMs < 0) {
-                stringResource(R.string.home_latency_not_available)
-            } else {
-                stringResource(R.string.home_latency_milliseconds, latency.latencyMs)
-            },
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-            color = color,
-            style = MaterialTheme.typography.labelMedium,
-        )
-    }
-}
-
-@Composable
-private fun ShimmeringText(
-    text: String,
-    color: Color,
-    style: TextStyle,
-    modifier: Modifier = Modifier,
-) {
-    val transition = rememberInfiniteTransition(label = "latency-shimmer")
-    val progress by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = LATENCY_SHIMMER_DURATION_MS, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart,
-        ),
-        label = "latency-shimmer-progress",
-    )
-    val shimmerWidth = with(LocalDensity.current) { 32.dp.toPx() }
-    val travelDistance = with(LocalDensity.current) { 120.dp.toPx() }
-    val startX = -shimmerWidth + progress * (travelDistance + shimmerWidth)
-    val brush = Brush.linearGradient(
-        colors = listOf(color.copy(alpha = 0.45f), color, color.copy(alpha = 0.45f)),
-        start = Offset(startX, 0f),
-        end = Offset(startX + shimmerWidth, 0f),
-    )
-
-    Text(
-        text = text,
-        modifier = modifier,
-        style = style.copy(brush = brush),
-    )
-}
-
-@Composable
-private fun LatencyValue(
-    latencyMs: Int,
-    method: PingMethod?,
-    icon: ImageVector,
-    color: Color,
-) {
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(1.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = if (latencyMs < 0) {
-                stringResource(R.string.home_latency_not_available)
-            } else {
-                stringResource(R.string.home_latency_milliseconds_compact, latencyMs)
-            },
-            color = color,
-            style = MaterialTheme.typography.labelMedium.copy(letterSpacing = (-0.25).sp),
-        )
-        Icon(
-            imageVector = icon,
-            contentDescription = method?.let { stringResource(it.labelResource) },
-            modifier = Modifier.size(13.dp),
-            tint = color,
-        )
-    }
-}
-
-internal fun latencyShowsError(latency: ServerLatencyState): Boolean {
-    val httpingLatencyMs = latency.httpingLatencyMs
-    if (latency.latencyMs == LATENCY_TESTING) return false
-    return if (latency.tcpingLatencyMs != null && httpingLatencyMs != null) {
-        httpingLatencyMs < 0
-    } else {
-        latency.latencyMs < 0
-    }
-}
-
-private object ServerRowDefaults {
-    // No end padding: the chevron's own strip supplies the row's end inset.
-    val contentPadding = PaddingValues(start = 12.dp, top = 10.dp, end = 0.dp, bottom = 10.dp)
-
-    val chevronHorizontalPadding = 7.dp
-    val chevronIconSize = 20.dp
-}
-
-private const val LATENCY_SHIMMER_DURATION_MS = 850
-
-@Composable
-private fun CompactSelectionDot(isSelected: Boolean) {
-    Surface(
-        modifier = Modifier.size(18.dp),
-        shape = CircleShape,
-        color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(
-            width = 2.dp,
-            color = if (isSelected) {
-                MaterialTheme.colorScheme.primary
-            } else {
-                MaterialTheme.colorScheme.outline
-            },
-        ),
-    ) {
-        if (isSelected) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(4.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary),
-            )
-        }
-    }
-}
-
-private fun String.withMetadataEmphasis(expiredStatusText: String) = buildAnnotatedString {
-    metadataTextSegments(this@withMetadataEmphasis, expiredStatusText).forEach { segment ->
-        if (segment.emphasized) {
-            withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
-                append(segment.value)
-            }
-        } else {
-            append(segment.value)
-        }
-    }
-}
-
-private fun String.withUrlLinks(
-    linkColor: androidx.compose.ui.graphics.Color,
-    onUrlClick: (String) -> Unit,
-): AnnotatedString = buildAnnotatedString {
-    var cursor = 0
-    val linkStyles = TextLinkStyles(
-        style = SpanStyle(
-            color = linkColor,
-            textDecoration = TextDecoration.Underline,
-        ),
-    )
-
-    subscriptionUrlRegex.findAll(this@withUrlLinks).forEach { match ->
-        val start = match.range.first
-        val end = this@withUrlLinks.trimmedUrlEnd(match)
-        if (end <= start) return@forEach
-
-        if (cursor < start) {
-            append(this@withUrlLinks.substring(cursor, start))
-        }
-
-        val url = this@withUrlLinks.substring(start, end)
-        val linkStart = length
-        append(url)
-        addLink(
-            LinkAnnotation.Clickable(
-                tag = url.normalizedSubscriptionUrl(),
-                styles = linkStyles,
-                linkInteractionListener = LinkInteractionListener { link ->
-                    (link as? LinkAnnotation.Clickable)?.tag?.let(onUrlClick)
-                },
-            ),
-            start = linkStart,
-            end = length,
-        )
-        cursor = end
-    }
-
-    if (cursor < this@withUrlLinks.length) {
-        append(this@withUrlLinks.substring(cursor))
-    }
-}
-
-private fun String.trimmedUrlEnd(match: MatchResult): Int {
-    var end = match.range.last + 1
-    while (end > match.range.first && this[end - 1] in trailingUrlPunctuation) {
-        end--
-    }
-    return end
-}
-
-private fun String.normalizedSubscriptionUrl(): String = if (startsWith("http://", ignoreCase = true) || startsWith("https://", ignoreCase = true)) {
-    this
-} else {
-    "https://$this"
-}
-
-private val subscriptionUrlRegex = Regex(
-    pattern = """(?i)(?<![@\w])(?:https?://[^\s<>"']+|(?:www\.|(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,})(?:/[^\s<>"']*)?)""",
-)
-private val trailingUrlPunctuation = setOf('.', ',', ';', ':', '!', '?', ')', ']', '}')
-private val SubscriptionBlockGap = 6.dp
-private val SubscriptionMetadataGap = 10.dp
-
 /** 64dp button plus its 16dp scaffold inset, so list content can scroll clear of it. */
 private val FloatingConnectButtonClearance = 80.dp
-private const val DISABLED_FAB_CONTENT_ALPHA = 0.38f
-private const val QR_SCANNER_TRANSITION_MS = 180
-private const val CORE_UPTIME_REFRESH_INTERVAL_MS = 1_000L
+internal const val QR_SCANNER_TRANSITION_MS = 180
 private const val CAMERA_PERMISSION_PREFS = "camera_permission"
 private const val CAMERA_PERMISSION_REQUESTED = "requested"
 private const val HOME_UI_PREFS = "home_ui"
@@ -2637,7 +1127,7 @@ private fun autoUpdateIntervalLabel(intervalHours: Int): String = when (interval
 }
 
 @Composable
-private fun EditSubscriptionDialog(
+internal fun EditSubscriptionDialog(
     subscription: SubscriptionEntity,
     onDismiss: () -> Unit,
     onConfirm: (String, String, Boolean, Boolean, Int, SubscriptionUserAgentMode, String, String) -> Unit,
@@ -2751,7 +1241,7 @@ private fun EditSubscriptionDialog(
 }
 
 @Composable
-private fun ApplySubscriptionRoutingDialog(
+internal fun ApplySubscriptionRoutingDialog(
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
 ) {
@@ -2773,7 +1263,7 @@ private fun ApplySubscriptionRoutingDialog(
 }
 
 @Composable
-private fun RemoveSubscriptionDialog(
+internal fun RemoveSubscriptionDialog(
     serverCount: Int,
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
@@ -2804,7 +1294,7 @@ private fun RemoveSubscriptionDialog(
 }
 
 @Composable
-private fun AddSubscriptionDialog(
+internal fun AddSubscriptionDialog(
     onDismiss: () -> Unit,
     onConfirm: (String, String, Boolean, Boolean, SubscriptionUserAgentMode, String, String) -> Unit,
 ) {
