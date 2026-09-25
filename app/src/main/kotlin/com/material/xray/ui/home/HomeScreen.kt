@@ -328,6 +328,31 @@ fun HomeScreen(
                 },
             )
         },
+        bottomBar = {
+            if (!floatingConnectButton) {
+                ConnectionPanel(
+                    connectionState = uiState.connectionState,
+                    connectionProgress = uiState.connectionProgress,
+                    geoDataDownloadFraction = uiState.geoDataDownloadFraction,
+                    showProgressDetails = uiState.showAdvancedOptions,
+                    selectedServerName = connectionUiState.displayServerName,
+                    activeBalancer = uiState.activeBalancer,
+                    pingMs = viewModel.activeServerPingMs,
+                    sessionTraffic = viewModel.sessionTraffic,
+                    buttonColor = connectionUiState.buttonColor,
+                    isConnected = connectionUiState.isConnected,
+                    isRestartRequired = connectionUiState.isRestartRequired,
+                    isInterfaceBusy = connectionUiState.isInterfaceBusy,
+                    isTransitioning = connectionUiState.isTransitioning,
+                    isAlwaysOnVpn = connectionUiState.isAlwaysOnVpn,
+                    canStart = uiState.selectedServer != null,
+                    compact = false,
+                    onClick = onConnectionClick,
+                    onViewConfig = onViewRunningConfig,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                )
+            }
+        },
         floatingActionButton = {
             ConnectionFab(
                 visible = floatingConnectButton,
@@ -352,35 +377,37 @@ fun HomeScreen(
                 }
             }
 
-            item {
-                ConnectionPanel(
-                    connectionState = uiState.connectionState,
-                    connectionProgress = uiState.connectionProgress,
-                    geoDataDownloadFraction = uiState.geoDataDownloadFraction,
-                    showProgressDetails = uiState.showAdvancedOptions,
-                    selectedServerName = connectionUiState.displayServerName,
-                    activeBalancer = uiState.activeBalancer,
-                    pingMs = viewModel.activeServerPingMs,
-                    sessionTraffic = viewModel.sessionTraffic,
-                    buttonColor = connectionUiState.buttonColor,
-                    isConnected = connectionUiState.isConnected,
-                    isRestartRequired = connectionUiState.isRestartRequired,
-                    isInterfaceBusy = connectionUiState.isInterfaceBusy,
-                    isTransitioning = connectionUiState.isTransitioning,
-                    isAlwaysOnVpn = connectionUiState.isAlwaysOnVpn,
-                    canStart = uiState.selectedServer != null,
-                    compact = floatingConnectButton,
-                    onClick = onConnectionClick,
-                    onViewConfig = onViewRunningConfig,
-                )
-            }
-
             uiState.availableUpdate?.let { update ->
-                item(contentType = "appUpdate") {
+                item(key = "appUpdate", contentType = "appUpdate") {
                     AppUpdateBanner(
                         update = update,
                         installProgress = uiState.appUpdateInstallProgress,
                         onInstall = { viewModel.installAppUpdate(update) },
+                    )
+                }
+            }
+
+            if (floatingConnectButton) {
+                item(key = "connectionPanel", contentType = "connectionPanel") {
+                    ConnectionPanel(
+                        connectionState = uiState.connectionState,
+                        connectionProgress = uiState.connectionProgress,
+                        geoDataDownloadFraction = uiState.geoDataDownloadFraction,
+                        showProgressDetails = uiState.showAdvancedOptions,
+                        selectedServerName = connectionUiState.displayServerName,
+                        activeBalancer = uiState.activeBalancer,
+                        pingMs = viewModel.activeServerPingMs,
+                        sessionTraffic = viewModel.sessionTraffic,
+                        buttonColor = connectionUiState.buttonColor,
+                        isConnected = connectionUiState.isConnected,
+                        isRestartRequired = connectionUiState.isRestartRequired,
+                        isInterfaceBusy = connectionUiState.isInterfaceBusy,
+                        isTransitioning = connectionUiState.isTransitioning,
+                        isAlwaysOnVpn = connectionUiState.isAlwaysOnVpn,
+                        canStart = uiState.selectedServer != null,
+                        compact = true,
+                        onClick = onConnectionClick,
+                        onViewConfig = onViewRunningConfig,
                     )
                 }
             }

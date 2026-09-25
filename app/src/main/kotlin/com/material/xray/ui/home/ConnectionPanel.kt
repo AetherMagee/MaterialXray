@@ -134,6 +134,7 @@ internal fun ConnectionPanel(
     compact: Boolean,
     onClick: () -> Unit,
     onViewConfig: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val buttonEnabled = (canStart || isConnected || isRestartRequired || isInterfaceBusy) && !isTransitioning
     val buttonContentColor = when {
@@ -152,7 +153,7 @@ internal fun ConnectionPanel(
 
     if (compact) {
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             ConnectionStatusRow(
@@ -173,53 +174,71 @@ internal fun ConnectionPanel(
             )
         }
     } else {
+        val showProgress = connectionState is ConnectionState.Connected ||
+            (isTransitioning && showProgressDetails && connectionProgress != null)
+
         Card(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = modifier.fillMaxWidth(),
             shape = MaterialTheme.shapes.extraLarge,
             colors = CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.surfaceContainer,
                 contentColor = MaterialTheme.colorScheme.onSurface,
             ),
         ) {
-            Column(
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                ConnectionStatusRow(
-                    heading = connectionHeading(connectionState, geoDataDownloadFraction),
-                    tone = connectionState.badgeTone(),
-                    detailText = connectionDetailText(isInterfaceBusy, isRestartRequired, selectedServerName),
-                    serverTextStyle = MaterialTheme.typography.titleMedium,
-                    maxLines = if (isRestartRequired || isInterfaceBusy) 4 else 1,
-                    serverFontWeight = FontWeight.SemiBold,
-                )
-
-                if (
-                    (showProgressDetails && connectionProgress != null) ||
-                    connectionState is ConnectionState.Connected
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    Box(
-                        modifier = Modifier.height(
-                            with(LocalDensity.current) { MaterialTheme.typography.bodySmall.lineHeight.toDp() },
-                        ),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        when {
-                            showProgressDetails && connectionProgress != null -> Text(
-                                text = connectionProgressText(connectionProgress),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                textAlign = TextAlign.Center,
-                            )
-                            connectionState is ConnectionState.Connected -> CoreUptime(
-                                startTime = connectionState.startTime,
-                            )
+                    ConnectionStatusRow(
+                        heading = connectionHeading(connectionState, geoDataDownloadFraction),
+                        tone = connectionState.badgeTone(),
+                        detailText = connectionDetailText(isInterfaceBusy, isRestartRequired, selectedServerName),
+                        serverTextStyle = MaterialTheme.typography.titleMedium,
+                        maxLines = if (isRestartRequired || isInterfaceBusy) 4 else 1,
+                        serverFontWeight = FontWeight.SemiBold,
+                    )
+
+                    if (showProgress) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(
+                                    with(LocalDensity.current) {
+                                        MaterialTheme.typography.bodySmall.lineHeight.toDp()
+                                    },
+                                ),
+                            contentAlignment = Alignment.CenterStart,
+                        ) {
+                            when {
+                                showProgressDetails && connectionProgress != null -> Text(
+                                    text = connectionProgressText(connectionProgress),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    textAlign = TextAlign.Start,
+                                )
+                                connectionState is ConnectionState.Connected -> CoreUptime(
+                                    startTime = connectionState.startTime,
+                                )
+                            }
                         }
+                    }
+
+                    AnimatedVisibility(visible = connectionState.showsConnectionStats()) {
+                        ConnectionStatsContent(
+                            activeBalancer = activeBalancer,
+                            pingMs = pingMs,
+                            sessionTraffic = sessionTraffic,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
                     }
                 }
 
@@ -227,7 +246,8 @@ internal fun ConnectionPanel(
                     onClick = onClick,
                     enabled = buttonEnabled,
                     modifier = Modifier
-                        .height(64.dp)
+                        .width(120.dp)
+                        .height(56.dp)
                         .combinedClickable(
                             enabled = buttonEnabled,
                             role = Role.Button,
@@ -244,7 +264,7 @@ internal fun ConnectionPanel(
                         containerColor = buttonColor,
                         contentColor = buttonContentColor,
                     ),
-                    contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
                 ) {
                     if (isTransitioning) {
                         CircularProgressIndicator(
@@ -278,15 +298,6 @@ internal fun ConnectionPanel(
                             )
                         }
                     }
-                }
-
-                AnimatedVisibility(visible = connectionState.showsConnectionStats()) {
-                    ConnectionStatsContent(
-                        activeBalancer = activeBalancer,
-                        pingMs = pingMs,
-                        sessionTraffic = sessionTraffic,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
                 }
             }
         }
