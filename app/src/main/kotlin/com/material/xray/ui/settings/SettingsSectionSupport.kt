@@ -7,11 +7,13 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
@@ -23,7 +25,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.material.xray.R
@@ -32,19 +39,56 @@ import com.material.xray.R
 @Composable
 internal fun SettingsSectionHeader(
     title: String,
+    expanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
     showDivider: Boolean = true,
 ) {
+    val stateDescription = stringResource(
+        if (expanded) R.string.settings_section_expanded else R.string.settings_section_collapsed,
+    )
+    val actionLabel = stringResource(
+        if (expanded) R.string.settings_section_collapse else R.string.settings_section_expand,
+    )
+
     Column(
         modifier = Modifier.padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         if (showDivider) {
             HorizontalDivider()
         }
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleMedium,
-        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 48.dp)
+                .clickable(
+                    role = Role.Button,
+                    onClickLabel = actionLabel,
+                    onClick = { onExpandedChange(!expanded) },
+                )
+                .semantics(mergeDescendants = true) {
+                    contentDescription = title
+                    this.stateDescription = stateDescription
+                }
+                .padding(vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = title,
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.titleMedium,
+            )
+            Icon(
+                imageVector = Icons.Filled.ExpandMore,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .size(24.dp)
+                    .graphicsLayer {
+                        rotationZ = if (expanded) 180f else 0f
+                    },
+            )
+        }
     }
 }
 

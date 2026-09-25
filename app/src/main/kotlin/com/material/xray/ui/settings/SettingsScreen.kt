@@ -228,6 +228,14 @@ private fun SettingsScreenContent(
     val supportedLocales = remember(resources) { resources.loadSupportedAppLocales() }
     val selectedLocale = AppCompatDelegate.getApplicationLocales()[0]
 
+    var serviceExpanded by rememberSaveable { mutableStateOf(true) }
+    var serversExpanded by rememberSaveable { mutableStateOf(false) }
+    var appearanceExpanded by rememberSaveable { mutableStateOf(false) }
+    var notificationsExpanded by rememberSaveable { mutableStateOf(false) }
+    var coreExpanded by rememberSaveable { mutableStateOf(false) }
+    var dataExpanded by rememberSaveable { mutableStateOf(false) }
+    var aboutExpanded by rememberSaveable { mutableStateOf(false) }
+
     var showRootAccessDeniedDialog by rememberSaveable { mutableStateOf(false) }
     var showNotificationFieldsDialog by rememberSaveable { mutableStateOf(false) }
     var showFieldStyleDialog by rememberSaveable { mutableStateOf(false) }
@@ -410,28 +418,32 @@ private fun SettingsScreenContent(
                 onRetryTproxyCompatibility = viewModel::retryTproxyCompatibilityCheck,
                 onAutoConnectChange = viewModel::setAutoConnect,
                 onOpenOemAutostartSettings = viewModel::openOemAutostartSettings,
+                expanded = serviceExpanded,
+                onExpandedChange = { serviceExpanded = it },
             )
-            routingSection(
-                bypassLan = bypassLan,
-                allowIpv6 = allowIpv6,
-                dnsServers = dnsServers,
-                domesticDnsServers = domesticDnsServers,
-                routingPolicyControl = routingPolicyControl,
-                ipv6SelectionEnabled = isIpv6SelectionEnabled(
-                    rootServiceActive = rootServiceActive,
-                    backend = rootConnectionBackend,
-                    compatibility = tproxyCompatibility,
-                ),
-                onBypassLanChange = viewModel::setBypassLan,
-                onAllowIpv6Change = viewModel::setAllowIpv6,
-                onRoutingPolicyControlChange = viewModel::setRoutingPolicyControl,
-            )
-            connectionDnsSection(onOpenDnsSettings = onOpenDnsSettings)
-            connectionHardwareIdSection(
-                subscriptionSendHardwareId = subscriptionSendHardwareId,
-                hwidLockedBySubscription = selectedSubscriptionRequiresHwid && subscriptionSendHardwareId,
-                onSubscriptionSendHardwareIdChange = viewModel::setSubscriptionSendHardwareId,
-            )
+            if (serviceExpanded) {
+                routingSection(
+                    bypassLan = bypassLan,
+                    allowIpv6 = allowIpv6,
+                    dnsServers = dnsServers,
+                    domesticDnsServers = domesticDnsServers,
+                    routingPolicyControl = routingPolicyControl,
+                    ipv6SelectionEnabled = isIpv6SelectionEnabled(
+                        rootServiceActive = rootServiceActive,
+                        backend = rootConnectionBackend,
+                        compatibility = tproxyCompatibility,
+                    ),
+                    onBypassLanChange = viewModel::setBypassLan,
+                    onAllowIpv6Change = viewModel::setAllowIpv6,
+                    onRoutingPolicyControlChange = viewModel::setRoutingPolicyControl,
+                )
+                connectionDnsSection(onOpenDnsSettings = onOpenDnsSettings)
+                connectionHardwareIdSection(
+                    subscriptionSendHardwareId = subscriptionSendHardwareId,
+                    hwidLockedBySubscription = selectedSubscriptionRequiresHwid && subscriptionSendHardwareId,
+                    onSubscriptionSendHardwareIdChange = viewModel::setSubscriptionSendHardwareId,
+                )
+            }
 
             serversSection(
                 sortOutboundsByLatency = sortOutboundsByLatency,
@@ -443,6 +455,8 @@ private fun SettingsScreenContent(
                 onShowBothLatencyResultsChange = viewModel::setShowBothLatencyResults,
                 onEditingLatencyCheckUrlChange = { editingLatencyCheckUrl = it },
                 onSaveLatencyCheckUrl = { viewModel.setLatencyCheckUrl(editingLatencyCheckUrl) },
+                expanded = serversExpanded,
+                onExpandedChange = { serversExpanded = it },
             )
 
             appearanceSection(
@@ -472,6 +486,8 @@ private fun SettingsScreenContent(
                 onLauncherIconChange = viewModel::setLauncherIcon,
                 onShowTitleBarLogoChange = viewModel::setShowTitleBarLogo,
                 onFloatingConnectButtonChange = viewModel::setFloatingConnectButton,
+                expanded = appearanceExpanded,
+                onExpandedChange = { appearanceExpanded = it },
             )
 
             notificationSection(
@@ -481,6 +497,8 @@ private fun SettingsScreenContent(
                 onConfigureFields = { showNotificationFieldsDialog = true },
                 onConfigureStyle = { showFieldStyleDialog = true },
                 onConfigureFrequency = { showUpdateFrequencyDialog = true },
+                expanded = notificationsExpanded,
+                onExpandedChange = { notificationsExpanded = it },
             )
 
             coreSection(
@@ -515,6 +533,8 @@ private fun SettingsScreenContent(
                 onPassiveHealthMonitoringEnabledChange = viewModel::setPassiveHealthMonitoringEnabled,
                 onDefaultOutboundChange = viewModel::setDefaultOutbound,
                 onXrayLogLevelChange = viewModel::setXrayLogLevel,
+                expanded = coreExpanded,
+                onExpandedChange = { coreExpanded = it },
             )
 
             dataSection(
@@ -550,6 +570,8 @@ private fun SettingsScreenContent(
                 onImportBackup = { importLauncher.launch(arrayOf("application/json")) },
                 onClearGeoData = viewModel::clearGeoData,
                 onResetDatabase = { showResetDatabaseDialog = true },
+                expanded = dataExpanded,
+                onExpandedChange = { dataExpanded = it },
             )
 
             aboutSection(
@@ -561,6 +583,8 @@ private fun SettingsScreenContent(
                 onAppUpdateChecksEnabledChange = viewModel::setAppUpdateChecksEnabled,
                 onCheckForUpdates = viewModel::checkForAppUpdate,
                 onOpenLicenses = { showOpenSourceLicensesDialog = true },
+                expanded = aboutExpanded,
+                onExpandedChange = { aboutExpanded = it },
             )
         }
     }

@@ -113,13 +113,18 @@ fun LazyListScope.coreSection(
     onPassiveHealthMonitoringEnabledChange: (Boolean) -> Unit,
     onDefaultOutboundChange: (XrayOutbound) -> Unit,
     onXrayLogLevelChange: (XrayLogLevel) -> Unit,
+    expanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
 ) {
-    item(key = "core_data_header") {
+    item(key = "core_header") {
         SettingsSectionHeader(
-            title = stringResource(R.string.settings_section_core_data),
+            title = stringResource(R.string.settings_section_core),
+            expanded = expanded,
+            onExpandedChange = onExpandedChange,
             showDivider = true,
         )
     }
+    if (!expanded) return
 
     if (rootServiceActive && rootConnectionBackend == RootConnectionBackend.Tun) {
         item(key = "core_tun_name") {

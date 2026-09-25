@@ -20,13 +20,18 @@ fun LazyListScope.serversSection(
     onShowBothLatencyResultsChange: (Boolean) -> Unit,
     onEditingLatencyCheckUrlChange: (String) -> Unit,
     onSaveLatencyCheckUrl: () -> Unit,
+    expanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
 ) {
     item(key = "servers_header") {
         SettingsSectionHeader(
             title = stringResource(R.string.settings_section_servers),
+            expanded = expanded,
+            onExpandedChange = onExpandedChange,
             showDivider = true,
         )
     }
+    if (!expanded) return
 
     item(key = "servers_sort_by_latency") {
         SettingsSwitchRow(

@@ -101,7 +101,19 @@ fun LazyListScope.dataSection(
     onImportBackup: () -> Unit,
     onClearGeoData: () -> Unit,
     onResetDatabase: () -> Unit,
+    expanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
 ) {
+    item(key = "data_header") {
+        SettingsSectionHeader(
+            title = stringResource(R.string.settings_section_data),
+            expanded = expanded,
+            onExpandedChange = onExpandedChange,
+            showDivider = true,
+        )
+    }
+    if (!expanded) return
+
     item(key = "data_geo_interval") {
         AdvancedIntegerSetting(
             value = editingGeoDataUpdateIntervalHours,

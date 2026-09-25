@@ -29,13 +29,18 @@ internal fun LazyListScope.notificationSection(
     onConfigureFields: () -> Unit,
     onConfigureStyle: () -> Unit,
     onConfigureFrequency: () -> Unit,
+    expanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
 ) {
     item(key = "notification_header") {
         SettingsSectionHeader(
             title = stringResource(R.string.settings_notification_title),
+            expanded = expanded,
+            onExpandedChange = onExpandedChange,
             showDivider = true,
         )
     }
+    if (!expanded) return
 
     if (access != NotificationAccess.Available) {
         item(key = "notification_permission") {

@@ -60,13 +60,18 @@ fun LazyListScope.aboutSection(
     onAppUpdateChecksEnabledChange: (Boolean) -> Unit,
     onCheckForUpdates: () -> Unit,
     onOpenLicenses: () -> Unit,
+    expanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
 ) {
     item(key = "about_header") {
         SettingsSectionHeader(
             title = stringResource(R.string.settings_section_about),
+            expanded = expanded,
+            onExpandedChange = onExpandedChange,
             showDivider = true,
         )
     }
+    if (!expanded) return
 
     item(key = "about_update_checks") {
         SettingsSwitchRow(

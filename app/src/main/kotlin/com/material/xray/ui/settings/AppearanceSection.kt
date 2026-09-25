@@ -59,13 +59,18 @@ fun LazyListScope.appearanceSection(
     onLauncherIconChange: (LauncherIcon) -> Unit,
     onShowTitleBarLogoChange: (Boolean) -> Unit,
     onFloatingConnectButtonChange: (Boolean) -> Unit,
+    expanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
 ) {
     item(key = "appearance_header") {
         SettingsSectionHeader(
             title = stringResource(R.string.settings_section_appearance),
+            expanded = expanded,
+            onExpandedChange = onExpandedChange,
             showDivider = true,
         )
     }
+    if (!expanded) return
 
     item(key = "appearance_theme") {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {

@@ -77,13 +77,18 @@ fun LazyListScope.serviceSection(
     onRetryTproxyCompatibility: () -> Unit,
     onAutoConnectChange: (Boolean) -> Unit,
     onOpenOemAutostartSettings: () -> Unit,
+    expanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
 ) {
     item(key = "connection_header") {
         SettingsSectionHeader(
             title = stringResource(R.string.settings_section_connection),
+            expanded = expanded,
+            onExpandedChange = onExpandedChange,
             showDivider = false,
         )
     }
+    if (!expanded) return
 
     item(key = "connection_root_service") {
         SettingsSwitchRow(

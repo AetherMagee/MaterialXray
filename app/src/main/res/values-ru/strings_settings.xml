@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="settings_title">Настройки</string>
+    <string name="settings_section_expand">Развернуть</string>
+    <string name="settings_section_collapse">Свернуть</string>
+    <string name="settings_section_expanded">Развёрнуто</string>
+    <string name="settings_section_collapsed">Свёрнуто</string>
     <string name="settings_section_connection">Подключение</string>
     <string name="settings_section_servers">Серверы</string>
     <string name="settings_section_core_data">Ядро и данные</string>

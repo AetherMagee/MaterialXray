@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="settings_title">Settings</string>
+    <string name="settings_section_expand">Expand</string>
+    <string name="settings_section_collapse">Collapse</string>
+    <string name="settings_section_expanded">Expanded</string>
+    <string name="settings_section_collapsed">Collapsed</string>
     <string name="settings_section_connection">Connection</string>
     <string name="settings_section_servers">Servers</string>
     <string name="settings_section_core_data">Core and data</string>
