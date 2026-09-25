@@ -4,6 +4,7 @@ import android.app.Application
 import android.util.Log
 import com.material.xray.core.launcher.LauncherIconManager
 import com.material.xray.core.locale.initializeAppLocales
+import com.material.xray.data.db.DatabaseOpenChecker
 import com.material.xray.data.repository.BackupManager
 import com.material.xray.data.repository.SettingsRepository
 import com.material.xray.di.ApplicationScope
@@ -39,6 +40,8 @@ class MaterialXrayApp : Application() {
     @Inject lateinit var launcherIconManager: LauncherIconManager
 
     @Inject lateinit var backupManager: BackupManager
+
+    @Inject lateinit var databaseOpenChecker: DatabaseOpenChecker
 
     @Inject lateinit var startupDiagnosticsLogger: StartupDiagnosticsLogger
 
@@ -76,15 +79,16 @@ class MaterialXrayApp : Application() {
             }
         }
         appScope.launch {
+            if (!databaseOpenChecker.canRead()) return@launch
             runCatching { backupManager.recoverInterruptedRestore() }
                 .onFailure { error -> Log.e(LOG_TAG, "Unable to recover interrupted backup restore", error) }
             runCatching { startupDiagnosticsLogger.logIfMissing() }
                 .onFailure { error -> Log.e(LOG_TAG, "Unable to record startup diagnostics", error) }
             launcherIconManager.apply(settingsRepository.launcherIcon.first())
             appUpdateScheduler.setEnabled(settingsRepository.appUpdateChecksEnabled.first())
+            subscriptionUpdateScheduler.schedulePeriodicUpdates()
+            subscriptionUpdateScheduler.enqueueDueCheckNow(STARTUP_BACKGROUND_WORK_DELAY_SECONDS)
         }
-        subscriptionUpdateScheduler.schedulePeriodicUpdates()
-        subscriptionUpdateScheduler.enqueueDueCheckNow(STARTUP_BACKGROUND_WORK_DELAY_SECONDS)
     }
 
     private companion object {

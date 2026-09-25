@@ -1,5 +1,6 @@
 package com.material.xray
 
+import android.app.ActivityManager
 import android.content.Intent
 import android.content.res.Configuration
 import android.graphics.Color
@@ -17,6 +18,7 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -26,6 +28,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -44,26 +47,41 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.lifecycleScope
 import com.material.xray.core.locale.notifyAppLocaleChanged
+import com.material.xray.data.db.DatabaseOpenChecker
 import com.material.xray.data.repository.SettingsRepository
+import com.material.xray.service.RecoveryResetManager
 import com.material.xray.ui.home.HomeDataState
 import com.material.xray.ui.navigation.MainNavigation
+import com.material.xray.ui.recovery.DatabaseRecoveryScreen
 import com.material.xray.ui.settings.SettingsDataState
 import com.material.xray.ui.theme.MaterialXrayTheme
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
+import javax.inject.Provider
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
 
-    @Inject lateinit var homeDataState: HomeDataState
+    @Inject lateinit var databaseOpenChecker: DatabaseOpenChecker
 
-    @Inject lateinit var settingsDataState: SettingsDataState
+    @Inject lateinit var homeDataStateProvider: Provider<HomeDataState>
+
+    @Inject lateinit var settingsDataStateProvider: Provider<SettingsDataState>
 
     @Inject lateinit var settingsRepository: SettingsRepository
 
+    @Inject lateinit var recoveryResetManager: RecoveryResetManager
+
+    private var homeDataState: HomeDataState? = null
+    private var settingsDataState: SettingsDataState? = null
+    private var databaseReadiness by mutableStateOf(DatabaseReadiness.Checking)
+    private var resetFailed by mutableStateOf(false)
+    private var resetting by mutableStateOf(false)
     private var pendingSubscriptionLink by mutableStateOf<String?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -86,40 +104,28 @@ class MainActivity : AppCompatActivity() {
         val splashShownAtMillis = SystemClock.uptimeMillis()
         splashScreen.setKeepOnScreenCondition {
             keepSplashOnScreen(
-                initialDataLoaded = homeDataState.data.value != null &&
-                    settingsDataState.data.value != null,
+                initialDataLoaded = databaseReadiness == DatabaseReadiness.Failed ||
+                    (homeDataState?.data?.value != null && settingsDataState?.data?.value != null),
                 elapsedMillis = SystemClock.uptimeMillis() - splashShownAtMillis,
             )
         }
+        openDatabase()
         setContent {
             MaterialXrayTheme {
-                val settings by settingsDataState.data.collectAsStateWithLifecycle()
-                var diagnosticsNoticeVisible by remember { mutableStateOf(false) }
-                val scope = rememberCoroutineScope()
-                LaunchedEffect(settings?.diagnosticsNoticeShown) {
-                    if (settings?.diagnosticsNoticeShown == false) {
-                        diagnosticsNoticeVisible = true
-                        delay(DIAGNOSTICS_NOTICE_DURATION_MS)
-                        diagnosticsNoticeVisible = false
-                        settingsRepository.markDiagnosticsNoticeShown()
+                when (databaseReadiness) {
+                    DatabaseReadiness.Checking -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator()
                     }
-                }
-                Box {
-                    MainNavigation(
-                        pendingSubscriptionLink = pendingSubscriptionLink,
-                        onSubscriptionLinkHandled = { pendingSubscriptionLink = null },
+                    DatabaseReadiness.Failed -> DatabaseRecoveryScreen(
+                        resetFailed = resetFailed,
+                        resetting = resetting,
+                        onRetry = ::retryDatabaseOpen,
+                        onReset = ::clearAppData,
                     )
-                    DiagnosticsNotice(
-                        visible = diagnosticsNoticeVisible,
-                        onDismiss = {
-                            diagnosticsNoticeVisible = false
-                            scope.launch { settingsRepository.markDiagnosticsNoticeShown() }
-                        },
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .navigationBarsPadding()
-                            .padding(start = 16.dp, end = 16.dp, bottom = 76.dp),
-                    )
+                    DatabaseReadiness.Ready -> {
+                        val loadedSettingsDataState = requireNotNull(settingsDataState)
+                        MainContent(loadedSettingsDataState)
+                    }
                 }
             }
         }
@@ -129,6 +135,76 @@ class MainActivity : AppCompatActivity() {
         super.onNewIntent(intent)
         pendingSubscriptionLink = subscriptionLinkFromDeepLink(intent.dataString)
     }
+
+    private fun retryDatabaseOpen() {
+        if (databaseReadiness != DatabaseReadiness.Failed || resetting) return
+        openDatabase()
+    }
+
+    private fun openDatabase() {
+        databaseReadiness = DatabaseReadiness.Checking
+        lifecycleScope.launch {
+            if (databaseOpenChecker.canRead()) {
+                homeDataState = homeDataStateProvider.get()
+                settingsDataState = settingsDataStateProvider.get()
+                databaseReadiness = DatabaseReadiness.Ready
+            } else {
+                databaseReadiness = DatabaseReadiness.Failed
+            }
+        }
+    }
+
+    private fun clearAppData() {
+        if (resetting) return
+        resetting = true
+        resetFailed = false
+        lifecycleScope.launch {
+            try {
+                resetFailed = !recoveryResetManager.prepareForReset() ||
+                    !getSystemService(ActivityManager::class.java).clearApplicationUserData()
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Exception) {
+                resetFailed = true
+            } finally {
+                resetting = false
+            }
+        }
+    }
+
+    @Composable
+    private fun MainContent(settingsDataState: SettingsDataState) {
+        val settings by settingsDataState.data.collectAsStateWithLifecycle()
+        var diagnosticsNoticeVisible by remember { mutableStateOf(false) }
+        val scope = rememberCoroutineScope()
+        LaunchedEffect(settings?.diagnosticsNoticeShown) {
+            if (settings?.diagnosticsNoticeShown == false) {
+                diagnosticsNoticeVisible = true
+                delay(DIAGNOSTICS_NOTICE_DURATION_MS)
+                diagnosticsNoticeVisible = false
+                settingsRepository.markDiagnosticsNoticeShown()
+            }
+        }
+        Box {
+            MainNavigation(
+                pendingSubscriptionLink = pendingSubscriptionLink,
+                onSubscriptionLinkHandled = { pendingSubscriptionLink = null },
+            )
+            DiagnosticsNotice(
+                visible = diagnosticsNoticeVisible,
+                onDismiss = {
+                    diagnosticsNoticeVisible = false
+                    scope.launch { settingsRepository.markDiagnosticsNoticeShown() }
+                },
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .navigationBarsPadding()
+                    .padding(start = 16.dp, end = 16.dp, bottom = 76.dp),
+            )
+        }
+    }
+
+    private enum class DatabaseReadiness { Checking, Ready, Failed }
 }
 
 @Composable
