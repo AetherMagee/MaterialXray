@@ -9,7 +9,6 @@ import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkHorizontally
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -502,20 +501,11 @@ private fun RoutingRulesTab(
                     },
                     label = "routingRuleContainerColor",
                 )
-                val borderColor by animateColorAsState(
-                    targetValue = if (selected) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.outlineVariant
-                    },
-                    label = "routingRuleBorderColor",
-                )
                 val contentText = routingRuleContentText(rule)
 
                 Surface(
                     color = containerColor,
                     shape = MaterialTheme.shapes.medium,
-                    border = BorderStroke(1.dp, borderColor),
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(MaterialTheme.shapes.medium)
@@ -616,7 +606,6 @@ private fun SubscriptionRoutingRuleRow(rule: RoutingRule, onClick: () -> Unit) {
     Surface(
         color = MaterialTheme.colorScheme.surfaceContainer,
         shape = MaterialTheme.shapes.medium,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         modifier = Modifier
             .fillMaxWidth()
             .clip(MaterialTheme.shapes.medium)
@@ -662,7 +651,6 @@ private fun ProfileRoutingRuleRow(
     Surface(
         color = MaterialTheme.colorScheme.surfaceContainer,
         shape = MaterialTheme.shapes.medium,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         modifier = Modifier
             .fillMaxWidth()
             .alpha(if (rule.orphaned) 0.55f else 1f)

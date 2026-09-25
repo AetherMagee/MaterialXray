@@ -1,7 +1,6 @@
 package com.material.xray.ui.home
 
 import androidx.compose.animation.animateBounds
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -277,7 +276,6 @@ internal fun HomeStateBadge(
         shape = MaterialTheme.shapes.small,
         color = containerColor,
         contentColor = contentColor,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
         Row(
             modifier = Modifier.padding(
