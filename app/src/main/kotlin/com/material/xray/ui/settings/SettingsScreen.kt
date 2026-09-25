@@ -222,6 +222,7 @@ private fun SettingsScreenContent(
     val showTitleBarLogo = settings.showTitleBarLogo
     val floatingConnectButton = settings.floatingConnectButton
     val showAdvancedOptions = settings.showAdvancedOptions
+    val routeMxrayTrafficThroughXray = settings.routeMxrayTrafficThroughXray
     val notificationSettings = settings.notificationSettings
     val subscriptionSendHardwareId = settings.subscriptionSendHardwareId
     val routingPolicyControl = settings.routingPolicyControl
@@ -576,6 +577,14 @@ private fun SettingsScreenContent(
             }
 
             if (showAdvancedOptions) {
+                item(key = "route_mxray_traffic") {
+                    SettingsSwitchRow(
+                        title = stringResource(R.string.settings_route_mxray_traffic_title),
+                        description = stringResource(R.string.settings_route_mxray_traffic_description),
+                        checked = routeMxrayTrafficThroughXray,
+                        onCheckedChange = viewModel::setRouteMxrayTrafficThroughXray,
+                    )
+                }
                 item(key = "xray_buffer") {
                     Column(
                         modifier = Modifier.padding(horizontal = 16.dp),

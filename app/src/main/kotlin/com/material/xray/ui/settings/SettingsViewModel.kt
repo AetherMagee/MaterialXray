@@ -268,6 +268,11 @@ class SettingsViewModel @Inject constructor(
         settingsRepo.setShowAdvancedOptions(enabled)
         reloadActiveConnectionIfConnected()
     }
+    fun setRouteMxrayTrafficThroughXray(enabled: Boolean) = viewModelScope.launch {
+        if (enabled == currentSettings().routeMxrayTrafficThroughXray) return@launch
+        settingsRepo.setRouteMxrayTrafficThroughXray(enabled)
+        reloadActiveConnectionIfConnected()
+    }
 
     fun setNotificationUpdateIntervalMs(intervalMs: Int) = viewModelScope.launch {
         settingsRepo.setNotificationUpdateIntervalMs(intervalMs)

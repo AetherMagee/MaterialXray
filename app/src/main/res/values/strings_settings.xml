@@ -77,6 +77,8 @@
     <string name="settings_send_hardware_id_description">Include a stable x-hwid header so providers can recognise this device</string>
     <string name="settings_send_hardware_id_locked">Required by the subscription of the selected server and cannot be turned off</string>
     <string name="settings_show_advanced_options">Show advanced options</string>
+    <string name="settings_route_mxray_traffic_title">Route MXray traffic through Xray</string>
+    <string name="settings_route_mxray_traffic_description">Send app updates, subscriptions, and data downloads through the active connection. Server latency checks always bypass it.</string>
     <string name="settings_diagnostics_title">Diagnostics and usage statistics</string>
     <string name="settings_diagnostics_description">Send private crash and core reliability data</string>
     <string name="diagnostics_default_notice">MaterialXray sends private diagnostics and usage statistics by default. No sensitive information is shared. You can turn this off in Settings.</string>

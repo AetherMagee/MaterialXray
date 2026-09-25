@@ -646,13 +646,26 @@ internal class ConnectionManager(
         tproxyPlan: TproxyTrafficPlan?,
         syntheticDnsAddress: String?,
     ): GeneratedXrayConfig? {
-        val effectiveInbounds = tproxyPlan?.runtimeState?.groups?.map { group ->
+        val tproxyInbounds = tproxyPlan?.runtimeState?.groups?.map { group ->
             XrayInbound.Tproxy(
                 port = group.port,
                 tag = group.inboundTag,
                 allowIpv6 = runtimeSettings.allowIpv6,
                 acceptNonLoopback = tproxyPlan.runtimeState.tetherUpstreamInterface != null,
             )
+        }
+        val effectiveInbounds = if (runtimeSettings.routeMxrayTrafficThroughXray) {
+            val trafficInbounds: List<XrayInbound> = tproxyInbounds ?: buildList {
+                add(XrayInbound.Tun(runtimeSettings.tunName, "tun-in", runtimeSettings.tunMtu))
+                appRoutingPlan.proxyRoutes.forEach { route ->
+                    add(XrayInbound.Tun(route.tunName, route.inboundTag, runtimeSettings.tunMtu))
+                }
+            }
+            trafficInbounds + XrayInbound.PrivateHttp(
+                path = "${environment.binDir}/mxray-http-${java.util.UUID.randomUUID().toString().take(12)}.sock",
+            )
+        } else {
+            tproxyInbounds
         }
         // Xray's GID-exempt sockets follow Android's current default route in both local and
         // tethered TPROXY. The tether firewall still tracks the upstream separately.

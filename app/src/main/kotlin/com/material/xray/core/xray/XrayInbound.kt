@@ -19,19 +19,16 @@ sealed interface XrayInbound {
         val acceptNonLoopback: Boolean = false,
     ) : XrayInbound
 
-    /** Loopback-only, authenticated HTTP proxy used by short-lived helper cores. */
-    data class Http(
-        val port: Int,
-        override val tag: String,
-        val username: String,
-        val password: String,
-    ) : XrayInbound {
-        override fun toString(): String = "Http(port=$port, tag=$tag, username=$username, password=***)"
-    }
+    data class PrivateHttp(
+        val path: String,
+        override val tag: String = XRAY_APP_HTTP_INBOUND_TAG,
+    ) : XrayInbound
 }
 
 internal fun XrayInbound.toJson(): JsonObject = when (this) {
     is XrayInbound.Tun -> buildTunInbound(name, tag, mtu)
     is XrayInbound.Tproxy -> buildTproxyInbound(port, tag, allowIpv6, acceptNonLoopback)
-    is XrayInbound.Http -> buildHttpInbound(port, tag, username, password)
+    is XrayInbound.PrivateHttp -> buildPrivateHttpInbound(path, tag)
 }
+
+internal const val XRAY_APP_HTTP_INBOUND_TAG = "mxray-http-in"

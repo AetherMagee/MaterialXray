@@ -131,34 +131,24 @@ class ConfigGeneratorTest {
     }
 
     @Test
-    fun `generates loopback-only authenticated HTTP inbound`() {
+    fun `generates private HTTP socket without a network port`() {
         val config = generator.generate(
             vlessReality,
-            inbounds = listOf(XrayInbound.Http(port = 41_234, tag = "http-in", username = "u1", password = "p1")),
+            inbounds = listOf(
+                XrayInbound.Tun("tun0", "tun-in"),
+                XrayInbound.PrivateHttp("/data/user/0/com.material.xray/files/bin/mxray-http.sock"),
+            ),
         )
         val json = Json.parseToJsonElement(config).jsonObject
-        val inbound = json.getValue("inbounds").jsonArray.single().jsonObject
+        val inbound = json.getValue("inbounds").jsonArray.last().jsonObject
 
         assertEquals("http", inbound.getValue("protocol").jsonPrimitive.content)
-        assertEquals("127.0.0.1", inbound.getValue("listen").jsonPrimitive.content)
-        assertEquals(41_234, inbound.getValue("port").jsonPrimitive.int)
-        assertEquals("http-in", inbound.getValue("tag").jsonPrimitive.content)
-        val account = inbound.getValue("settings").jsonObject.getValue("accounts").jsonArray.single().jsonObject
-        assertEquals("u1", account.getValue("user").jsonPrimitive.content)
-        assertEquals("p1", account.getValue("pass").jsonPrimitive.content)
-        val firstRule = json.getValue("routing").jsonObject.getValue("rules").jsonArray.first().jsonObject
-        assertEquals(listOf("http-in"), firstRule.getValue("inboundTag").jsonArray.map { it.jsonPrimitive.content })
-    }
-
-    @Test
-    fun `HTTP inbound rejects blank credentials`() {
-        val result = runCatching {
-            generator.generate(
-                vlessReality,
-                inbounds = listOf(XrayInbound.Http(port = 41_234, tag = "http-in", username = "", password = "p1")),
-            )
-        }
-        assertTrue(result.exceptionOrNull() is IllegalArgumentException)
+        assertEquals(
+            "/data/user/0/com.material.xray/files/bin/mxray-http.sock,0666",
+            inbound.getValue("listen").jsonPrimitive.content,
+        )
+        assertTrue("port" !in inbound)
+        assertEquals(XRAY_APP_HTTP_INBOUND_TAG, inbound.getValue("tag").jsonPrimitive.content)
     }
 
     @Test

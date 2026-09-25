@@ -56,6 +56,7 @@ data class SettingsSnapshot(
     val showTitleBarLogo: Boolean,
     val floatingConnectButton: Boolean,
     val showAdvancedOptions: Boolean,
+    val routeMxrayTrafficThroughXray: Boolean = true,
     val notificationSettings: NotificationSettings,
     val subscriptionSendHardwareId: Boolean,
     val routingPolicyControl: RoutingPolicyControl,
@@ -114,6 +115,7 @@ class SettingsRepository @Inject constructor(
         val SHOW_TITLE_BAR_LOGO = booleanPreferencesKey("show_title_bar_logo")
         val FLOATING_CONNECT_BUTTON = booleanPreferencesKey("floating_connect_button")
         val SHOW_ADVANCED_OPTIONS = booleanPreferencesKey("show_advanced_options")
+        val ROUTE_MXRAY_TRAFFIC_THROUGH_XRAY = booleanPreferencesKey("route_mxray_traffic_through_xray")
         val APP_SPECIFIC_SERVER_NOTE_SHOWN = booleanPreferencesKey("app_specific_server_note_shown")
         val ROUTING_POLICY_CONTROL = stringPreferencesKey("routing_policy_control")
         val ROUTING_RULES = stringPreferencesKey("routing_rules")
@@ -203,6 +205,9 @@ class SettingsRepository @Inject constructor(
     }
     val showAdvancedOptions: Flow<Boolean> = store.data.map { prefs ->
         prefs[SHOW_ADVANCED_OPTIONS] ?: false
+    }
+    val routeMxrayTrafficThroughXray: Flow<Boolean> = store.data.map { prefs ->
+        prefs[ROUTE_MXRAY_TRAFFIC_THROUGH_XRAY] ?: true
     }
     val appSpecificServerNoteShown: Flow<Boolean> = store.data.map { prefs ->
         prefs[APP_SPECIFIC_SERVER_NOTE_SHOWN] ?: false
@@ -355,6 +360,7 @@ class SettingsRepository @Inject constructor(
             showTitleBarLogo = prefs[SHOW_TITLE_BAR_LOGO] ?: true,
             floatingConnectButton = prefs[FLOATING_CONNECT_BUTTON] ?: false,
             showAdvancedOptions = showAdvancedOptions,
+            routeMxrayTrafficThroughXray = prefs[ROUTE_MXRAY_TRAFFIC_THROUGH_XRAY] ?: true,
             notificationSettings = NotificationSettings(
                 updateIntervalMs =
                 (prefs[NOTIFICATION_UPDATE_INTERVAL_MS] ?: NotificationSettings.DEFAULT_UPDATE_INTERVAL_MS)
@@ -405,6 +411,7 @@ class SettingsRepository @Inject constructor(
         routingDomainStrategy = routingDomainStrategy.first(),
         routingDomainMatcher = routingDomainMatcher.first(),
         routingFallbackOutbound = routingFallbackOutbound.first(),
+        routeMxrayTrafficThroughXray = routeMxrayTrafficThroughXray.first(),
     )
 
     suspend fun setTunName(name: String) = store.edit { it[TUN_NAME] = name }
@@ -456,6 +463,9 @@ class SettingsRepository @Inject constructor(
     }
     suspend fun setFloatingConnectButton(enabled: Boolean) = store.edit { prefs ->
         prefs[FLOATING_CONNECT_BUTTON] = enabled
+    }
+    suspend fun setRouteMxrayTrafficThroughXray(enabled: Boolean) = store.edit { prefs ->
+        prefs[ROUTE_MXRAY_TRAFFIC_THROUGH_XRAY] = enabled
     }
     suspend fun setShowAdvancedOptions(enabled: Boolean) = store.edit { prefs ->
         val wasEnabled = prefs[SHOW_ADVANCED_OPTIONS] ?: false

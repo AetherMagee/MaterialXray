@@ -197,6 +197,24 @@ class ConnectionManagerTest {
     }
 
     @Test
+    fun `MXray HTTP inbound is omitted when routing toggle is off`() = runTest {
+        val harness = Harness()
+
+        harness.manager.connect(
+            server(),
+            runtimeSettings().copy(routeMxrayTrafficThroughXray = false),
+            preparation = ConnectionPreparation.ReusePreparedRuntime,
+        )
+
+        val config = Json.parseToJsonElement(requireNotNull(harness.binary.configJson)).jsonObject
+        assertTrue(
+            config.getValue("inbounds").jsonArray.none { inbound ->
+                inbound.jsonObject["tag"]?.jsonPrimitive?.content == "mxray-http-in"
+            },
+        )
+    }
+
+    @Test
     fun `routing-only change replaces live rules and persists generated config`() = runTest {
         val harness = Harness()
         val settings = runtimeSettings()
@@ -320,7 +338,9 @@ class ConnectionManagerTest {
         assertEquals("wlan0", harness.stateStore.state?.tproxy?.tetherUpstreamInterface)
         val config = Json.parseToJsonElement(requireNotNull(harness.binary.configJson)).jsonObject
         assertTrue(config.getValue("inbounds").jsonArray.none { it.jsonObject["protocol"]?.jsonPrimitive?.content == "tun" })
-        assertEquals("0.0.0.0", config.getValue("inbounds").jsonArray.single().jsonObject["listen"]?.jsonPrimitive?.content)
+        val inbounds = config.getValue("inbounds").jsonArray.map { it.jsonObject }
+        assertEquals("0.0.0.0", inbounds.single { it["protocol"]?.jsonPrimitive?.content == "tunnel" }["listen"]?.jsonPrimitive?.content)
+        assertTrue(inbounds.any { it["tag"]?.jsonPrimitive?.content == "mxray-http-in" })
         assertTrue(
             config.getValue("outbounds").jsonArray.none { outbound ->
                 outbound.jsonObject["streamSettings"]?.jsonObject
