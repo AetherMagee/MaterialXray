@@ -38,7 +38,6 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -494,9 +493,6 @@ private fun RoutingRulesTab(
                 key = { _, rule -> rule.id },
                 contentType = { _, _ -> "routingRule" },
             ) { index, rule ->
-                if (index > 0) {
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                }
                 val selected = rule.id in selectedRuleIds
                 val containerColor by animateColorAsState(
                     targetValue = if (selected) {
@@ -590,9 +586,6 @@ private fun RoutingRulesTab(
                     key = { index, rule -> "subscription-$index-${rule.id}" },
                     contentType = { _, _ -> "subscriptionRoutingRule" },
                 ) { index, rule ->
-                    if (index > 0) {
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                    }
                     SubscriptionRoutingRuleRow(rule = rule, onClick = { onSubscriptionRuleClick(rule) })
                 }
             }
@@ -605,9 +598,6 @@ private fun RoutingRulesTab(
                     key = { index, rule -> "profile-$index-${rule.id}" },
                     contentType = { _, _ -> "profileRoutingRule" },
                 ) { index, rule ->
-                    if (index > 0) {
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                    }
                     ProfileRoutingRuleRow(
                         rule = rule,
                         onClick = { onProfileRuleClick(rule) },
