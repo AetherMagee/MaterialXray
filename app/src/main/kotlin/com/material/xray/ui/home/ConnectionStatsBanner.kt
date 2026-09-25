@@ -55,6 +55,32 @@ internal fun ConnectionStatsBanner(
     sessionTraffic: StateFlow<SessionTrafficMetrics?>,
     modifier: Modifier = Modifier,
 ) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.extraLarge,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainer,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+        ),
+    ) {
+        ConnectionStatsContent(
+            activeBalancer = activeBalancer,
+            pingMs = pingMs,
+            sessionTraffic = sessionTraffic,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+        )
+    }
+}
+
+@Composable
+internal fun ConnectionStatsContent(
+    activeBalancer: ActiveBalancerState?,
+    pingMs: StateFlow<Int?>,
+    sessionTraffic: StateFlow<SessionTrafficMetrics?>,
+    modifier: Modifier = Modifier,
+) {
     val locale = LocalLocale.current.platformLocale
     val ping = if (activeBalancer == null) {
         val measuredPing by pingMs.collectAsStateWithLifecycle()
@@ -65,46 +91,35 @@ internal fun ConnectionStatsBanner(
     }
     val traffic by sessionTraffic.collectAsStateWithLifecycle()
 
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.extraLarge,
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainer,
-            contentColor = MaterialTheme.colorScheme.onSurface,
-        ),
-    ) {
-        Column(
-            modifier = Modifier.animateContentSize().padding(horizontal = 16.dp, vertical = 12.dp),
-        ) {
-            activeBalancer?.let { BalancerHeader(state = it) }
+    Column(modifier = modifier.animateContentSize()) {
+        activeBalancer?.let { BalancerHeader(state = it) }
 
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    StatCell(
-                        icon = Icons.Outlined.Bolt,
-                        label = stringResource(
-                            if ((activeBalancer?.servers?.size ?: 0) > 1) R.string.home_stats_average_ping else R.string.home_stats_ping,
-                        ),
-                        value = ping?.let { stringResource(R.string.home_stats_ping_value, it) },
-                        asStateBadge = true,
-                        modifier = Modifier.weight(1f),
-                    )
-                    StatCell(
-                        icon = Icons.Outlined.ArrowDownward,
-                        label = stringResource(R.string.home_stats_download),
-                        value = traffic?.let { formatRate(it.downlinkBps, locale) },
-                        modifier = Modifier.weight(1f),
-                    )
-                    StatCell(
-                        icon = Icons.Outlined.ArrowUpward,
-                        label = stringResource(R.string.home_stats_upload),
-                        value = traffic?.let { formatRate(it.uplinkBps, locale) },
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-
-                SessionTotalsRow(traffic = traffic, locale = locale)
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                StatCell(
+                    icon = Icons.Outlined.Bolt,
+                    label = stringResource(
+                        if ((activeBalancer?.servers?.size ?: 0) > 1) R.string.home_stats_average_ping else R.string.home_stats_ping,
+                    ),
+                    value = ping?.let { stringResource(R.string.home_stats_ping_value, it) },
+                    asStateBadge = true,
+                    modifier = Modifier.weight(1f),
+                )
+                StatCell(
+                    icon = Icons.Outlined.ArrowDownward,
+                    label = stringResource(R.string.home_stats_download),
+                    value = traffic?.let { formatRate(it.downlinkBps, locale) },
+                    modifier = Modifier.weight(1f),
+                )
+                StatCell(
+                    icon = Icons.Outlined.ArrowUpward,
+                    label = stringResource(R.string.home_stats_upload),
+                    value = traffic?.let { formatRate(it.uplinkBps, locale) },
+                    modifier = Modifier.weight(1f),
+                )
             }
+
+            SessionTotalsRow(traffic = traffic, locale = locale)
         }
     }
 }

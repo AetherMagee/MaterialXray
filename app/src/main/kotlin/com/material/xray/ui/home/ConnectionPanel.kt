@@ -6,6 +6,7 @@ import android.provider.Settings
 import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -25,6 +26,8 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -43,6 +46,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -146,130 +150,18 @@ internal fun ConnectionPanel(
         ),
     )
 
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        if (compact) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                HomeStateBadge(
-                    text = connectionHeading(connectionState, geoDataDownloadFraction),
-                    tone = connectionState.badgeTone(),
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = when {
-                        isInterfaceBusy -> stringResource(R.string.home_connection_interface_busy_detail)
-                        isRestartRequired -> stringResource(R.string.home_connection_restart_required_detail)
-                        else -> selectedServerName
-                    },
-                    modifier = Modifier.weight(1f),
-                    style = MaterialTheme.typography.bodyLarge,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-        } else {
-            HomeStateBadge(
-                text = connectionHeading(connectionState, geoDataDownloadFraction),
+    if (compact) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            ConnectionStatusRow(
+                heading = connectionHeading(connectionState, geoDataDownloadFraction),
                 tone = connectionState.badgeTone(),
+                detailText = connectionDetailText(isInterfaceBusy, isRestartRequired, selectedServerName),
+                serverTextStyle = MaterialTheme.typography.bodyLarge,
+                maxLines = 1,
             )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Text(
-                text = when {
-                    isInterfaceBusy -> stringResource(R.string.home_connection_interface_busy_detail)
-                    isRestartRequired -> stringResource(R.string.home_connection_restart_required_detail)
-                    else -> selectedServerName
-                },
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = if (isRestartRequired || isInterfaceBusy) 4 else 1,
-                overflow = TextOverflow.Ellipsis,
-                textAlign = TextAlign.Center,
-            )
-
-            Box(
-                modifier = Modifier.height(
-                    with(LocalDensity.current) { MaterialTheme.typography.bodySmall.lineHeight.toDp() },
-                ),
-                contentAlignment = Alignment.Center,
-            ) {
-                when {
-                    showProgressDetails && connectionProgress != null -> Text(
-                        text = connectionProgressText(connectionProgress),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        textAlign = TextAlign.Center,
-                    )
-                    connectionState is ConnectionState.Connected -> CoreUptime(startTime = connectionState.startTime)
-                }
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            Button(
-                onClick = onClick,
-                enabled = buttonEnabled,
-                modifier = Modifier
-                    .height(64.dp)
-                    .combinedClickable(
-                        enabled = buttonEnabled,
-                        role = Role.Button,
-                        onClickLabel = actionLabel,
-                        onClick = onClick,
-                        onLongClick = {
-                            if (isConnected) {
-                                onViewConfig()
-                            }
-                        },
-                    ),
-                shape = MaterialTheme.shapes.extraLarge,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = buttonColor,
-                    contentColor = buttonContentColor,
-                ),
-                contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp),
-            ) {
-                if (isTransitioning) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(24.dp),
-                        strokeWidth = 2.dp,
-                        color = buttonContentColor,
-                    )
-                } else {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = connectionActionIcon(
-                                isConnected = isConnected,
-                                isAlwaysOnVpn = isAlwaysOnVpn,
-                                isRestartRequired = isRestartRequired,
-                                isInterfaceBusy = isInterfaceBusy,
-                            ),
-                            contentDescription = null,
-                            modifier = Modifier.size(24.dp),
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = actionLabel,
-                            style = MaterialTheme.typography.titleMedium,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            autoSize = TextAutoSize.StepBased(
-                                minFontSize = 10.sp,
-                                maxFontSize = MaterialTheme.typography.titleMedium.fontSize,
-                                stepSize = 1.sp,
-                            ),
-                        )
-                    }
-                }
-            }
         }
 
         AnimatedVisibility(visible = connectionState.showsConnectionStats()) {
@@ -279,6 +171,124 @@ internal fun ConnectionPanel(
                 sessionTraffic = sessionTraffic,
                 modifier = Modifier.padding(top = 16.dp),
             )
+        }
+    } else {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = MaterialTheme.shapes.extraLarge,
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                contentColor = MaterialTheme.colorScheme.onSurface,
+            ),
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                ConnectionStatusRow(
+                    heading = connectionHeading(connectionState, geoDataDownloadFraction),
+                    tone = connectionState.badgeTone(),
+                    detailText = connectionDetailText(isInterfaceBusy, isRestartRequired, selectedServerName),
+                    serverTextStyle = MaterialTheme.typography.titleMedium,
+                    maxLines = if (isRestartRequired || isInterfaceBusy) 4 else 1,
+                    serverFontWeight = FontWeight.SemiBold,
+                )
+
+                if (
+                    (showProgressDetails && connectionProgress != null) ||
+                    connectionState is ConnectionState.Connected
+                ) {
+                    Box(
+                        modifier = Modifier.height(
+                            with(LocalDensity.current) { MaterialTheme.typography.bodySmall.lineHeight.toDp() },
+                        ),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        when {
+                            showProgressDetails && connectionProgress != null -> Text(
+                                text = connectionProgressText(connectionProgress),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                textAlign = TextAlign.Center,
+                            )
+                            connectionState is ConnectionState.Connected -> CoreUptime(
+                                startTime = connectionState.startTime,
+                            )
+                        }
+                    }
+                }
+
+                Button(
+                    onClick = onClick,
+                    enabled = buttonEnabled,
+                    modifier = Modifier
+                        .height(64.dp)
+                        .combinedClickable(
+                            enabled = buttonEnabled,
+                            role = Role.Button,
+                            onClickLabel = actionLabel,
+                            onClick = onClick,
+                            onLongClick = {
+                                if (isConnected) {
+                                    onViewConfig()
+                                }
+                            },
+                        ),
+                    shape = MaterialTheme.shapes.extraLarge,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = buttonColor,
+                        contentColor = buttonContentColor,
+                    ),
+                    contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp),
+                ) {
+                    if (isTransitioning) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp),
+                            strokeWidth = 2.dp,
+                            color = buttonContentColor,
+                        )
+                    } else {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = connectionActionIcon(
+                                    isConnected = isConnected,
+                                    isAlwaysOnVpn = isAlwaysOnVpn,
+                                    isRestartRequired = isRestartRequired,
+                                    isInterfaceBusy = isInterfaceBusy,
+                                ),
+                                contentDescription = null,
+                                modifier = Modifier.size(24.dp),
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = actionLabel,
+                                style = MaterialTheme.typography.titleMedium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                autoSize = TextAutoSize.StepBased(
+                                    minFontSize = 10.sp,
+                                    maxFontSize = MaterialTheme.typography.titleMedium.fontSize,
+                                    stepSize = 1.sp,
+                                ),
+                            )
+                        }
+                    }
+                }
+
+                AnimatedVisibility(visible = connectionState.showsConnectionStats()) {
+                    ConnectionStatsContent(
+                        activeBalancer = activeBalancer,
+                        pingMs = pingMs,
+                        sessionTraffic = sessionTraffic,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            }
         }
     }
 }
@@ -293,6 +303,45 @@ private fun ConnectionState.badgeTone(): HomeStateBadgeTone = when {
         this is ConnectionState.RestartRequired ||
         this is ConnectionState.InterfaceBusy -> HomeStateBadgeTone.Error
     else -> HomeStateBadgeTone.Neutral
+}
+
+/** Badge with the connection heading plus the server or state detail line, shared by both layouts. */
+@Composable
+private fun ConnectionStatusRow(
+    heading: String,
+    tone: HomeStateBadgeTone,
+    detailText: String,
+    serverTextStyle: TextStyle,
+    maxLines: Int,
+    serverFontWeight: FontWeight? = null,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        HomeStateBadge(text = heading, tone = tone)
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            text = detailText,
+            modifier = Modifier.weight(1f),
+            style = serverTextStyle,
+            fontWeight = serverFontWeight,
+            maxLines = maxLines,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Start,
+        )
+    }
+}
+
+@Composable
+private fun connectionDetailText(
+    isInterfaceBusy: Boolean,
+    isRestartRequired: Boolean,
+    selectedServerName: String,
+): String = when {
+    isInterfaceBusy -> stringResource(R.string.home_connection_interface_busy_detail)
+    isRestartRequired -> stringResource(R.string.home_connection_restart_required_detail)
+    else -> selectedServerName
 }
 
 @Composable

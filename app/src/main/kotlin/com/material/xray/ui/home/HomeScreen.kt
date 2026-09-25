@@ -157,6 +157,7 @@ fun HomeScreen(
     }
 
     var showAddDialog by rememberSaveable { mutableStateOf(false) }
+    var showAddMenu by rememberSaveable { mutableStateOf(false) }
     var showQrScanner by remember { mutableStateOf(false) }
     var keepQrScannerDialog by remember { mutableStateOf(false) }
     var showReorderDialog by remember { mutableStateOf(false) }
@@ -308,6 +309,23 @@ fun HomeScreen(
                 title = stringResource(R.string.app_name),
                 scrollBehavior = topAppBarScrollBehavior,
                 showLogo = showTitleBarLogo,
+                actions = {
+                    Box {
+                        IconButton(onClick = { showAddMenu = true }) {
+                            Icon(
+                                painter = painterResource(R.drawable.ic_add_24),
+                                contentDescription = stringResource(R.string.home_add_server_or_subscription),
+                            )
+                        }
+                        AddSubscriptionMenu(
+                            expanded = showAddMenu,
+                            onDismissRequest = { showAddMenu = false },
+                            onPasteFromClipboard = pasteFromClipboard,
+                            onScanQrCode = openQrScanner,
+                            onAddManually = { showAddDialog = true },
+                        )
+                    }
+                },
             )
         },
         floatingActionButton = {
@@ -465,14 +483,6 @@ fun HomeScreen(
                             onServerSelected = { viewModel.selectServer(it) },
                             onTestLatency = { viewModel.testLatency(it) },
                             onOpenServerConfig = onOpenServerConfig,
-                        )
-                    }
-                    item(contentType = "addSubscription") {
-                        AddSubscriptionActionButton(
-                            modifier = Modifier.fillMaxWidth(),
-                            onPasteFromClipboard = pasteFromClipboard,
-                            onScanQrCode = openQrScanner,
-                            onAddManually = { showAddDialog = true },
                         )
                     }
                 }
@@ -1093,50 +1103,67 @@ private fun AddSubscriptionActionButton(
         ) {
             Text(stringResource(R.string.home_add_server_or_subscription))
         }
-        DropdownMenu(
+        AddSubscriptionMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },
-        ) {
-            DropdownMenuItem(
-                text = { Text(stringResource(R.string.home_paste_from_clipboard)) },
-                leadingIcon = {
-                    Icon(
-                        painter = painterResource(R.drawable.ic_content_paste_24),
-                        contentDescription = null,
-                    )
-                },
-                onClick = {
-                    expanded = false
-                    onPasteFromClipboard()
-                },
-            )
-            DropdownMenuItem(
-                text = { Text(stringResource(R.string.home_scan_qr_code)) },
-                leadingIcon = {
-                    Icon(
-                        painter = painterResource(R.drawable.ic_qr_code_scanner_24),
-                        contentDescription = null,
-                    )
-                },
-                onClick = {
-                    expanded = false
-                    onScanQrCode()
-                },
-            )
-            DropdownMenuItem(
-                text = { Text(stringResource(R.string.home_add_manually)) },
-                leadingIcon = {
-                    Icon(
-                        painter = painterResource(R.drawable.ic_add_24),
-                        contentDescription = null,
-                    )
-                },
-                onClick = {
-                    expanded = false
-                    onAddManually()
-                },
-            )
-        }
+            onPasteFromClipboard = onPasteFromClipboard,
+            onScanQrCode = onScanQrCode,
+            onAddManually = onAddManually,
+        )
+    }
+}
+
+@Composable
+private fun AddSubscriptionMenu(
+    expanded: Boolean,
+    onDismissRequest: () -> Unit,
+    onPasteFromClipboard: () -> Unit,
+    onScanQrCode: () -> Unit,
+    onAddManually: () -> Unit,
+) {
+    DropdownMenu(
+        expanded = expanded,
+        onDismissRequest = onDismissRequest,
+    ) {
+        DropdownMenuItem(
+            text = { Text(stringResource(R.string.home_paste_from_clipboard)) },
+            leadingIcon = {
+                Icon(
+                    painter = painterResource(R.drawable.ic_content_paste_24),
+                    contentDescription = null,
+                )
+            },
+            onClick = {
+                onDismissRequest()
+                onPasteFromClipboard()
+            },
+        )
+        DropdownMenuItem(
+            text = { Text(stringResource(R.string.home_scan_qr_code)) },
+            leadingIcon = {
+                Icon(
+                    painter = painterResource(R.drawable.ic_qr_code_scanner_24),
+                    contentDescription = null,
+                )
+            },
+            onClick = {
+                onDismissRequest()
+                onScanQrCode()
+            },
+        )
+        DropdownMenuItem(
+            text = { Text(stringResource(R.string.home_add_manually)) },
+            leadingIcon = {
+                Icon(
+                    painter = painterResource(R.drawable.ic_add_24),
+                    contentDescription = null,
+                )
+            },
+            onClick = {
+                onDismissRequest()
+                onAddManually()
+            },
+        )
     }
 }
 
