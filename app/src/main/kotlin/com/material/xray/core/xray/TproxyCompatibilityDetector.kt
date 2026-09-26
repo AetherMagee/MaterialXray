@@ -514,6 +514,8 @@ internal data class FwmarkRule(
     val priority: Int,
     val value: UInt,
     val mask: UInt,
+    /** The lookup table the rule points at, or null when the output names it instead of numbering it. */
+    val table: Int? = null,
 )
 
 internal fun overlappingFwmarkRules(output: String, value: Int, mask: Int): List<FwmarkRule> {
@@ -526,11 +528,17 @@ internal fun overlappingFwmarkRules(output: String, value: Int, mask: Int): List
             ?: return@mapNotNull null
         val ruleValue = encoded.groupValues[1].parseUInt() ?: return@mapNotNull null
         val ruleMask = encoded.groupValues[2].takeIf(String::isNotEmpty)?.parseUInt() ?: UInt.MAX_VALUE
-        FwmarkRule(priority, ruleValue, ruleMask).takeIf {
+        FwmarkRule(priority, ruleValue, ruleMask, table = lookupTable(line)).takeIf {
             ((targetValue xor ruleValue) and targetMask and ruleMask) == 0u
         }
     }.toList()
 }
+
+private fun lookupTable(line: String): Int? = Regex("\\b(?:lookup|table)\\s+(\\d+)\\b")
+    .find(line)
+    ?.groupValues
+    ?.get(1)
+    ?.toIntOrNull()
 
 private fun String.parseUInt(): UInt? = if (startsWith("0x", ignoreCase = true)) {
     drop(2).toUIntOrNull(16)

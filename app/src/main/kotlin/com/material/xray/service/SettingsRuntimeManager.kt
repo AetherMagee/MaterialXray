@@ -5,10 +5,16 @@ import com.material.xray.core.launcher.LauncherIconManager
 import com.material.xray.core.root.RootShell
 import com.material.xray.core.xray.GeoDataAsset
 import com.material.xray.core.xray.GeoDataManager
+import com.material.xray.core.xray.RUNTIME_STATE_MARKER
+import com.material.xray.core.xray.StateFile
 import com.material.xray.core.xray.TproxyCompatibility
 import com.material.xray.core.xray.TproxyCompatibilityDetector
 import com.material.xray.core.xray.XrayBinary
+import com.material.xray.core.xray.XrayStateReadResult
+import com.material.xray.core.xray.guardStaleTproxyCleanup
 import com.material.xray.core.xray.isConclusive
+import com.material.xray.core.xray.staleTproxyCleanupCommands
+import com.material.xray.core.xray.staleTproxyRules
 import com.material.xray.data.repository.SettingsRepository
 import com.material.xray.model.ConnectionState
 import com.material.xray.model.LauncherIcon
@@ -41,6 +47,7 @@ class SettingsRuntimeManager @Inject constructor(
     private val _xrayCoreVersion = MutableStateFlow<String?>(null)
     private val diagnosticsMutex = Mutex()
     private var diagnosticsLoaded = false
+    private val stateFile = StateFile(context)
 
     val rootAvailable: StateFlow<Boolean?> = _rootAvailable.asStateFlow()
     val xrayCoreVersion: StateFlow<String?> = _xrayCoreVersion.asStateFlow()
@@ -94,6 +101,7 @@ class SettingsRuntimeManager @Inject constructor(
     val tproxyCompatibility: StateFlow<TproxyCompatibility> get() = tproxyCompatibilityDetector.state
 
     suspend fun detectTproxyCompatibility(forceRefresh: Boolean = false): TproxyCompatibility {
+        removeStaleTproxyRules()
         log.append(LogSource.APP, "Checking TPROXY IPv4 and IPv6 compatibility...")
         val detection = if (forceRefresh) {
             tproxyCompatibilityDetector.refresh()
@@ -102,10 +110,13 @@ class SettingsRuntimeManager @Inject constructor(
         }
         return detection.also { result ->
             when (result) {
-                is TproxyCompatibility.Supported -> log.append(
-                    LogSource.APP,
-                    "TPROXY compatibility: supported (ipv6=${result.ipv6})",
-                )
+                is TproxyCompatibility.Supported -> {
+                    log.append(
+                        LogSource.APP,
+                        "TPROXY compatibility: supported (ipv6=${result.ipv6})",
+                    )
+                    hintTproxyBackendAvailable()
+                }
                 is TproxyCompatibility.Unsupported -> {
                     val details = result.details
                         ?.replace(Regex("\\s+"), " ")
@@ -135,6 +146,74 @@ class SettingsRuntimeManager @Inject constructor(
         if (!shouldDemoteTproxyBackend(result, settingsRepository.rootConnectionBackend.first())) return
         settingsRepository.setRootConnectionBackend(RootConnectionBackend.Tun)
         log.append(LogSource.APP, "TPROXY is unsupported on this device; the root backend was switched to TUN")
+    }
+
+    private suspend fun removeStaleTproxyRules() {
+        if (!shouldRemoveStaleTproxyRules(stateCoordinator.state.value, runtimeStateFileExists())) return
+        val ipv4 = rootShell.execute("ip rule show", RootShell.NetworkNamespace.INIT)
+        val ipv6 = rootShell.execute("ip -6 rule show", RootShell.NetworkNamespace.INIT)
+        if (!ipv4.isSuccess && !ipv6.isSuccess) {
+            val details = commandDetails(ipv4.error.ifBlank { ipv6.error })
+            log.append(
+                LogSource.APP,
+                "Stale TPROXY rules: cannot read policy rules, skipping cleanup" +
+                    (details.takeIf(String::isNotEmpty)?.let { ", details=$it" } ?: ""),
+            )
+            return
+        }
+        val ipv4Rules = if (ipv4.isSuccess) staleTproxyRules(ipv4.output) else emptyList()
+        val ipv6Rules = if (ipv6.isSuccess) staleTproxyRules(ipv6.output) else emptyList()
+        if (ipv4Rules.isEmpty() && ipv6Rules.isEmpty()) return
+
+        val summary = "Stale TPROXY policy rules (ipv4=${ipv4Rules.size}, ipv6=${ipv6Rules.size})"
+        val result = rootShell.execute(
+            guardStaleTproxyCleanup(
+                staleTproxyCleanupCommands(ipv4Rules, ipv6Rules),
+                runtimeStatePath = stateFile.absolutePath,
+            ),
+            RootShell.NetworkNamespace.INIT,
+        )
+        log.append(
+            LogSource.APP,
+            when {
+                RUNTIME_STATE_MARKER in result.output ->
+                    "$summary left in place: a connection went live during the cleanup"
+                !result.isSuccess ->
+                    "$summary; cleanup failed: ${commandDetails(result.error.ifBlank { result.output })}"
+                else -> when (val remaining = remainingStaleRuleCount()) {
+                    0 -> "$summary removed"
+                    null -> "$summary removed (could not be verified)"
+                    else -> "$summary; cleanup incomplete, $remaining more left"
+                }
+            },
+        )
+    }
+
+    /**
+     * An unreadable state file counts as present: it may still describe a live runtime, so it is no
+     * proof that nothing is running.
+     */
+    private suspend fun runtimeStateFileExists(): Boolean = withContext(Dispatchers.IO) {
+        stateFile.readResult() != XrayStateReadResult.Absent
+    }
+
+    private suspend fun remainingStaleRuleCount(): Int? {
+        val rules = rootShell.execute("ip rule show; ip -6 rule show", RootShell.NetworkNamespace.INIT)
+        return if (rules.isSuccess) staleTproxyRules(rules.output).size else null
+    }
+
+    private fun commandDetails(output: String): String = output
+        .replace(Regex("\\s+"), " ")
+        .trim()
+        .take(500)
+
+    private suspend fun hintTproxyBackendAvailable() {
+        if (settingsRepository.rootConnectionBackend.first() == RootConnectionBackend.Tun) {
+            log.append(
+                LogSource.APP,
+                "TPROXY is supported on this device; the root backend is set to TUN and can be switched back in the settings",
+            )
+        }
     }
 
     suspend fun updateGeoDataAsset(asset: GeoDataAsset, url: String) {
@@ -179,3 +258,8 @@ internal fun shouldDemoteTproxyBackend(
 ): Boolean = result is TproxyCompatibility.Unsupported &&
     result.isConclusive() &&
     currentBackend == RootConnectionBackend.Tproxy
+
+internal fun shouldRemoveStaleTproxyRules(
+    connectionState: ConnectionState,
+    runtimeStateFileExists: Boolean,
+): Boolean = connectionState == ConnectionState.Disconnected && !runtimeStateFileExists

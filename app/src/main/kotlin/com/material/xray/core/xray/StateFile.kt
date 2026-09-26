@@ -89,6 +89,11 @@ class StateFile(context: Context) {
         prettyPrint = true
     }
 
+    /**
+     * Where the state lives on disk, for root commands that must not race its writes.
+     */
+    val absolutePath: String get() = file.baseFile.absolutePath
+
     fun readResult(): XrayStateReadResult {
         if (!file.baseFile.exists()) return XrayStateReadResult.Absent
         return runCatching {
