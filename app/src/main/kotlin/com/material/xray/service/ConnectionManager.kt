@@ -98,6 +98,8 @@ internal class ConnectionManager(
 
     private var rootRoutingKnownCleanForConnect = false
 
+    private var lastTproxyAuditAt = 0L
+
     // Root is the only runtime that installs routing outside the process; the rootless runtime
     // gets it from Android's VpnService.
     val isUsingRootRuntime: Boolean
@@ -942,6 +944,7 @@ internal class ConnectionManager(
                     fail(environment.localizedString(R.string.connection_error_tproxy_health_check))
                     return@coroutineScope false
                 }
+                lastTproxyAuditAt = environment.elapsedRealtime()
                 if (!ensureProcessAliveAfterSetup(pid)) return@coroutineScope false
                 log.append(LogSource.APP, "TPROXY routing applied")
                 finishTransitionGuard()
@@ -1459,7 +1462,15 @@ internal class ConnectionManager(
         val state = stateStore.read() ?: return false
         val tproxyState = state.tproxy
         return if (state.rootConnectionBackend == RootConnectionBackend.Tproxy && tproxyState != null) {
-            tproxyGateway.verify(tproxyState).success
+            val now = environment.elapsedRealtime()
+            val auditDue = now - lastTproxyAuditAt >= TPROXY_FULL_AUDIT_INTERVAL_MS
+            if (!auditDue && tproxyGateway.checkHealth(tproxyState)) {
+                true
+            } else {
+                tproxyGateway.verify(tproxyState).success.also { healthy ->
+                    if (healthy) lastTproxyAuditAt = now
+                }
+            }
         } else {
             tunAvailable
         }
@@ -1720,7 +1731,9 @@ internal class ConnectionManager(
             action = {
                 val tproxyState = state.tproxy
                 if (state.rootConnectionBackend == RootConnectionBackend.Tproxy && tproxyState != null) {
-                    tproxyGateway.verify(tproxyState).success
+                    tproxyGateway.verify(tproxyState).success.also { healthy ->
+                        if (healthy) lastTproxyAuditAt = environment.elapsedRealtime()
+                    }
                 } else {
                     tunAvailable
                 }
@@ -1899,6 +1912,7 @@ private fun effectiveRootBackend(
 private fun XrayRuntimeSettings.usesProxyAsRoutingDefault(): Boolean = (routingFallbackOutbound ?: defaultOutbound) == XrayOutbound.Proxy
 
 private const val LEGACY_DEFAULT_TUN_NAME = "xray0"
+private const val TPROXY_FULL_AUDIT_INTERVAL_MS = 10 * 60_000L
 internal const val TPROXY_INTERFACE_LABEL = "TPROXY"
 private const val CONNECTION_STEP_MAX_RETRIES = 2
 private const val CONNECTION_STEP_RETRY_DELAY_MS = 1_500L

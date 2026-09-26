@@ -245,6 +245,7 @@ internal interface TproxyRoutingGateway {
     suspend fun updateTetherAddresses(plan: TproxyTrafficPlan): TunManager.RoutingResult
     suspend fun updateTetherUpstream(plan: TproxyTrafficPlan, previousUpstream: String): TunManager.RoutingResult
     suspend fun verify(state: TproxyRuntimeState): TunManager.RoutingResult
+    suspend fun checkHealth(state: TproxyRuntimeState): Boolean
     suspend fun removeGuard(): Boolean
 }
 
@@ -312,6 +313,7 @@ internal class TproxyManagerRoutingGateway(
     override suspend fun updateTetherAddresses(plan: TproxyTrafficPlan): TunManager.RoutingResult = manager.updateTetherAddresses(plan)
     override suspend fun updateTetherUpstream(plan: TproxyTrafficPlan, previousUpstream: String): TunManager.RoutingResult = manager.updateTetherUpstream(plan, previousUpstream)
     override suspend fun verify(state: TproxyRuntimeState): TunManager.RoutingResult = manager.verify(state)
+    override suspend fun checkHealth(state: TproxyRuntimeState): Boolean = manager.checkHealth(state)
     override suspend fun removeGuard(): Boolean = manager.removeGuard()
 
     private companion object {
@@ -442,7 +444,9 @@ class ConnectionManagerFactory @Inject constructor(
             serverResolver = ServerAddressConnectionResolver(serverAddressResolver),
             tunGateway = tunGateway,
             tproxyGateway = tproxyGateway,
-            cleanup = CleanupManagerConnectionAdapter(CleanupManager(context, shell)),
+            cleanup = CleanupManagerConnectionAdapter(
+                CleanupManager(context, shell) { message -> log.append(LogSource.APP, message) },
+            ),
             stateStore = stateStore,
             rootProcess = rootProcess,
             userProcess = userProcess,

@@ -372,6 +372,29 @@ class ConnectionManagerTest {
     }
 
     @Test
+    fun `periodic TPROXY check uses lightweight probe and audits after a failure`() = runTest {
+        val harness = Harness()
+        harness.manager.connect(
+            server(),
+            runtimeSettings().copy(rootConnectionBackend = RootConnectionBackend.Tproxy),
+            preparation = ConnectionPreparation.ReusePreparedRuntime,
+        )
+        assertEquals(1, harness.tproxyGateway.verificationCalls)
+
+        assertTrue(harness.manager.isRootTrafficAvailable(tunAvailable = false))
+        assertEquals(1, harness.tproxyGateway.healthCalls)
+        assertEquals(1, harness.tproxyGateway.verificationCalls)
+
+        harness.environment.advanceTime(10 * 60_000L)
+        assertTrue(harness.manager.isRootTrafficAvailable(tunAvailable = false))
+        assertEquals(2, harness.tproxyGateway.verificationCalls)
+
+        harness.tproxyGateway.healthResult = false
+        assertTrue(harness.manager.isRootTrafficAvailable(tunAvailable = false))
+        assertEquals(3, harness.tproxyGateway.verificationCalls)
+    }
+
+    @Test
     fun `TPROXY non-proxy default keeps a separate default-selected route`() = runTest {
         val routingPlanBuilder = RecordingRoutingPlanBuilder()
         val harness = Harness(routingPlanBuilder)
@@ -1027,6 +1050,9 @@ class ConnectionManagerTest {
         private var clock = 0L
 
         override fun elapsedRealtime(): Long = clock.also { clock += 250L }
+        fun advanceTime(durationMs: Long) {
+            clock += durationMs
+        }
 
         override fun localizedString(resourceId: Int, vararg arguments: Any): String = message(resourceId)
 
@@ -1168,6 +1194,9 @@ class ConnectionManagerTest {
         var tetherAddressUpdateCalls = 0
         var tetherUpstreamUpdateCalls = 0
         var verificationResult = TunManager.RoutingResult(success = true)
+        var verificationCalls = 0
+        var healthCalls = 0
+        var healthResult = true
 
         override suspend fun createPlan(
             appRoutingPlan: AppRoutingPlan,
@@ -1211,7 +1240,14 @@ class ConnectionManagerTest {
             tetherUpstreamUpdateCalls++
             return TunManager.RoutingResult(success = true)
         }
-        override suspend fun verify(state: TproxyRuntimeState): TunManager.RoutingResult = verificationResult
+        override suspend fun verify(state: TproxyRuntimeState): TunManager.RoutingResult {
+            verificationCalls++
+            return verificationResult
+        }
+        override suspend fun checkHealth(state: TproxyRuntimeState): Boolean {
+            healthCalls++
+            return healthResult
+        }
         override suspend fun removeGuard(): Boolean {
             removeGuardCalls += 1
             return true
