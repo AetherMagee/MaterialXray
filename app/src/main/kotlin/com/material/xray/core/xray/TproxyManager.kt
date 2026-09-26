@@ -292,8 +292,11 @@ class TproxyManager internal constructor(
 
     suspend fun remove(state: TproxyRuntimeState?, preserveGuard: Boolean = false): Boolean = executeCommand(cleanupCommand(state, appUid, preserveGuard)).isSuccess
 
-    suspend fun removeGuard(): Boolean = executeCommand(guardCleanupCommand(appUid, guardCoversTethering)).isSuccess.also {
-        if (it) guardCoversTethering = false
+    suspend fun removeGuard(): Boolean {
+        val removed = (bulkRestoreSupported && executeCommand(guardRemovalRestoreCommand(guardCoversTethering)).isSuccess) ||
+            executeCommand(guardCleanupCommand(appUid, guardCoversTethering)).isSuccess
+        if (removed) guardCoversTethering = false
+        return removed
     }
 
     private suspend fun execute(command: String, label: String): TunManager.RoutingResult {
@@ -308,6 +311,49 @@ class TproxyManager internal constructor(
             success = false,
             error = if (details.isEmpty()) "$label failed (exit=$exitCode)" else "$label failed: $details",
         )
+    }
+
+    private fun activationInspectionCommand(state: TproxyRuntimeState): String = buildList {
+        add("ip rule show")
+        if (state.ipv6Enabled) add("ip -6 rule show")
+        add("printf '\\n$ACTIVATION_INSPECTION_SEPARATOR\\n'")
+        add("ip route show table ${state.routeTable}")
+        if (state.ipv6Enabled) add("ip -6 route show table ${state.routeTable}")
+    }.joinToString(" && ")
+
+    internal fun guardRemovalRestoreCommand(includeFilterTables: Boolean): String {
+        val guard = chainNames(appUid).guard
+        return FirewallCommands.tools.flatMap { tool ->
+            buildList {
+                if (includeFilterTables) {
+                    add(
+                        FirewallRestoreBatch(
+                            tool,
+                            "filter",
+                            listOf(
+                                "$tool -t filter -D INPUT -j ${guard}I",
+                                "$tool -t filter -D FORWARD -j $guard",
+                                "$tool -t filter -F ${guard}I",
+                                "$tool -t filter -X ${guard}I",
+                                "$tool -t filter -F $guard",
+                                "$tool -t filter -X $guard",
+                            ),
+                        ).command(),
+                    )
+                }
+                add(
+                    FirewallRestoreBatch(
+                        tool,
+                        "mangle",
+                        listOf(
+                            "$tool -t mangle -D OUTPUT -j $guard",
+                            "$tool -t mangle -F $guard",
+                            "$tool -t mangle -X $guard",
+                        ),
+                    ).command(),
+                )
+            }
+        }.shellAnd()
     }
 
     internal companion object {
@@ -382,10 +428,6 @@ class TproxyManager internal constructor(
             }
         }
 
-        private fun activationInspectionCommand(state: TproxyRuntimeState): String = "ip rule show && ip -6 rule show && " +
-            "printf '\\n$ACTIVATION_INSPECTION_SEPARATOR\\n' && " +
-            "ip route show table ${state.routeTable} && ip -6 route show table ${state.routeTable}"
-
         fun guardInstallCommand(plan: TproxyTrafficPlan, appUid: Int): String {
             validatePlan(plan, appUid)
             val names = chainNames(appUid)
@@ -413,10 +455,10 @@ class TproxyManager internal constructor(
                     val setup = FirewallRestoreBatch(tool, "mangle", guardSetupCommands(tool, guard, plan, appUid))
                     val refresh = FirewallRestoreBatch(tool, "mangle", guardRefreshCommands(tool, guard, plan, appUid))
                     add(
-                        "if $tool -t mangle -C OUTPUT -j $guard 2>/dev/null; then ${refresh.command()}; else " +
-                            "if $tool -t mangle -S $guard >/dev/null 2>&1; then " +
-                            "${guardMangleCleanupCommands(tool, guard).joinToString("; ")}; fi; " +
-                            "${setup.command()}; fi",
+                        "if $tool -t mangle -S $guard >/dev/null 2>&1; then " +
+                            "if $tool -t mangle -C OUTPUT -j $guard 2>/dev/null; then ${refresh.command()}; else " +
+                            "${guardMangleCleanupCommands(tool, guard).joinToString("; ")}; ${setup.command()}; fi; " +
+                            "else ${setup.command()}; fi",
                     )
                     if (plan.runtimeState.tetherUpstreamInterface != null) {
                         val filterSetup = FirewallRestoreBatch(tool, "filter", tetherGuardSetupCommands(tool, guard, plan))

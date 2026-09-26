@@ -273,6 +273,19 @@ class TproxyManagerTest {
     }
 
     @Test
+    fun `IPv4 only activation does not inspect unused IPv6 routing`() = runTest {
+        val commands = mutableListOf<String>()
+        val manager = TproxyManager(APP_UID) { command ->
+            commands += command
+            RootShell.Result(0, "\n__MXRAY_TPROXY_ROUTES__\n", "")
+        }
+
+        assertTrue(manager.activate(plan(allowIpv6 = false)).success)
+        assertFalse(commands.first().contains("ip -6 rule show"))
+        assertFalse(commands.first().contains("ip -6 route show"))
+    }
+
+    @Test
     fun `activation fallback stops if rollback leaves a conflicting route`() = runTest {
         var calls = 0
         val manager = TproxyManager(APP_UID) {
@@ -546,6 +559,48 @@ class TproxyManagerTest {
     }
 
     @Test
+    fun `guard removal batches both families when restore is available`() = runTest {
+        val commands = mutableListOf<String>()
+        val manager = TproxyManager(APP_UID) { command ->
+            commands += command
+            RootShell.Result(0, "", "")
+        }
+
+        assertTrue(manager.installGuard(plan()).success)
+        assertTrue(manager.removeGuard())
+        assertEquals(2, commands.size)
+        assertTrue(commands.last().contains("iptables-restore --noflush -w 2"))
+        assertTrue(commands.last().contains("ip6tables-restore --noflush -w 2"))
+        assertFalse(commands.last().contains("-t filter -S"))
+        assertEquals(0, ProcessBuilder("sh", "-n", "-c", commands.last()).start().waitFor())
+    }
+
+    @Test
+    fun `tether guard removal batches filter hooks before mangle guard`() {
+        val manager = TproxyManager(APP_UID) { RootShell.Result(0, "", "") }
+        val command = manager.guardRemovalRestoreCommand(includeFilterTables = true)
+
+        assertTrue(command.indexOf("*filter") < command.indexOf("*mangle"))
+        assertTrue(command.contains("-D INPUT -j MXG278bI"))
+        assertTrue(command.contains("-D FORWARD -j MXG278b"))
+        assertEquals(0, ProcessBuilder("sh", "-n", "-c", command).start().waitFor())
+    }
+
+    @Test
+    fun `failed bulk guard removal falls back to audited cleanup`() = runTest {
+        val commands = mutableListOf<String>()
+        val manager = TproxyManager(APP_UID) { command ->
+            commands += command
+            RootShell.Result(if (commands.size == 2) 1 else 0, "", "")
+        }
+
+        assertTrue(manager.installGuard(plan()).success)
+        assertTrue(manager.removeGuard())
+        assertEquals(3, commands.size)
+        assertTrue(commands.last().contains("rules=\$(iptables -w 2 -t mangle -S) || exit 1"))
+    }
+
+    @Test
     fun `startup guard exempts xray without blocking the shared resolver`() {
         val command = TproxyManager.guardInstallCommand(plan(), APP_UID)
         val clearXrayMark = command.indexOf(
@@ -578,9 +633,10 @@ class TproxyManagerTest {
             assertTrue(
                 command.contains(
                     "if $tool -t mangle -S MXG278b >/dev/null 2>&1; then " +
-                        "$tool -t mangle -D OUTPUT -j MXG278b",
+                        "if $tool -t mangle -C OUTPUT -j MXG278b 2>/dev/null; then",
                 ),
             )
+            assertTrue(command.contains("else $tool -t mangle -D OUTPUT -j MXG278b"))
             assertTrue(
                 command.contains(
                     "if $tool -t filter -S MXG278b >/dev/null 2>&1 || " +

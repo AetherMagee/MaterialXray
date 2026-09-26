@@ -23,8 +23,20 @@ class XrayApiFirewallTest {
         assertTrue(command.contains("--dport 48123 -m owner --uid-owner 10518 -j ACCEPT"))
         assertTrue(command.contains("--dport 48123 -j REJECT"))
         assertTrue(command.contains("iptables -w 2 -I OUTPUT 1 -j \"\$replacement\""))
-        assertFalse(command.contains("iptables-restore"))
+        assertTrue(command.contains("iptables-restore --noflush -w 2"))
+        assertFalse(command.contains("| grep"))
         assertTrue(ProcessBuilder("sh", "-n", "-c", command).start().waitFor() == 0)
+    }
+
+    @Test
+    fun `fresh API firewall uses one restore instead of individual mutations`() = runTest {
+        val command = XrayApiFirewall { successfulCommand() }.buildApplyCommand("mxray_api_10518_a", "mxray_api_10518_b", 48_123, 10_518)
+        val tools = """
+            iptables() { [ "${'$'}*" = '-w 2 -S' ] && { printf '%s\n' '-P OUTPUT ACCEPT'; return 0; }; return 1; }
+            iptables-restore() { cat >/dev/null; return 0; }
+        """.trimIndent()
+
+        assertTrue(ProcessBuilder("bash", "-c", "$tools\n$command").start().waitFor() == 0)
     }
 
     @Test
