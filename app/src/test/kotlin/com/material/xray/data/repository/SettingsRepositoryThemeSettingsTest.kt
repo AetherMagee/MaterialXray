@@ -17,11 +17,11 @@ class SettingsRepositoryThemeSettingsTest {
     @Test
     fun `theme settings survive an export and import round trip`() = runTest {
         withTestRepository { repository ->
-            repository.setThemePreset(ThemePreset.Nord)
+            repository.setThemePreset(ThemePreset.Indigo)
             repository.setOledDark(true)
 
             val exported = repository.getAllAsMap()
-            assertEquals(ThemePreset.Nord.value, exported[SettingsRepository.THEME_PRESET.name])
+            assertEquals(ThemePreset.Indigo.value, exported[SettingsRepository.THEME_PRESET.name])
             assertEquals("true", exported[SettingsRepository.OLED_DARK.name])
 
             repository.restoreFromMap(emptyMap())
@@ -29,7 +29,7 @@ class SettingsRepositoryThemeSettingsTest {
             assertFalse(repository.oledDark.first())
 
             repository.restoreFromMap(exported)
-            assertEquals(ThemePreset.Nord, repository.themePreset.first())
+            assertEquals(ThemePreset.Indigo, repository.themePreset.first())
             assertTrue(repository.oledDark.first())
         }
     }

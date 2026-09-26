@@ -35,14 +35,7 @@ fun MaterialXrayTheme(
                 DefaultBlueLightColorScheme
             }
         }
-        ThemePreset.TokyoNight -> remember(preset, darkTheme) { presetColorScheme(preset, darkTheme) }
-        ThemePreset.Gruvbox -> remember(preset, darkTheme) { presetColorScheme(preset, darkTheme) }
-        ThemePreset.Nord -> remember(preset, darkTheme) { presetColorScheme(preset, darkTheme) }
-        ThemePreset.Catppuccin -> remember(preset, darkTheme) { presetColorScheme(preset, darkTheme) }
-        ThemePreset.Dracula -> remember(preset, darkTheme) { presetColorScheme(preset, darkTheme) }
-        ThemePreset.Solarized -> remember(preset, darkTheme) { presetColorScheme(preset, darkTheme) }
-        ThemePreset.RosePine -> remember(preset, darkTheme) { presetColorScheme(preset, darkTheme) }
-        ThemePreset.Everforest -> remember(preset, darkTheme) { presetColorScheme(preset, darkTheme) }
+        else -> remember(preset, darkTheme) { presetColorScheme(preset, darkTheme) }
     }
     val detectDynamicPureBlack =
         preset == ThemePreset.Dynamic && darkTheme && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
