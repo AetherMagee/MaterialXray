@@ -15,6 +15,13 @@ data class LogEntry(
 
 enum class LogSource { APP, XRAY }
 
+private val xrayTimestampPrefix = Regex(
+    "^\\d{4}/\\d{2}/\\d{2} \\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?\\s+",
+)
+
+val LogEntry.displayMessage: String
+    get() = if (source == LogSource.XRAY) message.replaceFirst(xrayTimestampPrefix, "") else message
+
 @Singleton
 class LogBuffer @Inject constructor() {
     private val _entries = MutableStateFlow<List<LogEntry>>(emptyList())
@@ -80,7 +87,7 @@ class LogBuffer @Inject constructor() {
     fun formatAll(): String = _entries.value.joinToString("\n") { entry ->
         val time = java.text.SimpleDateFormat("HH:mm:ss.SSS", java.util.Locale.US)
             .format(java.util.Date(entry.timestamp))
-        "$time [${entry.source.name}] ${entry.message}"
+        "$time [${entry.source.name}] ${entry.displayMessage}"
     }
 
     internal companion object {

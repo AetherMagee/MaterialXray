@@ -18,7 +18,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -45,6 +46,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -56,6 +58,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.material.xray.R
 import com.material.xray.service.LogEntry
 import com.material.xray.service.LogSource
+import com.material.xray.service.displayMessage
 import com.material.xray.ui.components.AppBarTitle
 import com.material.xray.ui.components.ScrollFadeEdges
 import com.material.xray.ui.components.SegmentedTabRow
@@ -256,12 +259,16 @@ private fun LogEntriesList(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(vertical = 4.dp),
     ) {
-        items(
+        itemsIndexed(
             items = entries,
-            key = { it.id },
-            contentType = { it.source },
-        ) { entry ->
-            LogEntryRow(entry = entry, onCopy = { onCopy(entry) })
+            key = { _, entry -> entry.id },
+            contentType = { _, entry -> entry.source },
+        ) { index, entry ->
+            LogEntryRow(
+                entry = entry,
+                showDivider = index < entries.lastIndex,
+                onCopy = { onCopy(entry) },
+            )
         }
     }
 }
@@ -274,21 +281,34 @@ private fun List<LogEntry>.filterBy(filter: LogFilter): List<LogEntry> = when (f
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun LogEntryRow(entry: LogEntry, onCopy: () -> Unit) {
+private fun LogEntryRow(entry: LogEntry, showDivider: Boolean, onCopy: () -> Unit) {
     val timeFormat = remember { SimpleDateFormat("HH:mm:ss.SSS", Locale.US) }
     val time = remember(entry.timestamp) { timeFormat.format(Date(entry.timestamp)) }
     val isError = entry.message.contains("error", ignoreCase = true) ||
         entry.message.contains("fail", ignoreCase = true)
     val messageColor = if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
 
-    Text(
-        text = "$time [${entry.source.name}] ${entry.message}",
-        fontFamily = FontFamily.Monospace,
-        fontSize = 11.sp,
-        color = messageColor,
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .combinedClickable(onClick = {}, onLongClick = onCopy)
-            .padding(horizontal = 8.dp, vertical = 2.dp),
-    )
+            .combinedClickable(onClick = {}, onLongClick = onCopy),
+    ) {
+        Text(
+            text = "$time [${entry.source.name}] ${entry.displayMessage}",
+            fontFamily = FontFamily.Monospace,
+            fontSize = 11.sp,
+            lineHeight = 13.sp,
+            color = messageColor,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 8.dp, top = 3.dp, end = 8.dp, bottom = 4.dp),
+        )
+        if (showDivider) {
+            HorizontalDivider(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(horizontal = 8.dp),
+            )
+        }
+    }
 }
