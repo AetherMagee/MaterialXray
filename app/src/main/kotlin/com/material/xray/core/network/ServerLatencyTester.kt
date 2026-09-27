@@ -100,7 +100,7 @@ private suspend fun executeTimedHttpProbe(
 
 @Singleton
 class ServerLatencyTester @Inject constructor(
-    @param:ApplicationContext context: Context,
+    @ApplicationContext context: Context,
     private val ephemeralCore: EphemeralXrayCore,
 ) {
     private val json = Json { prettyPrint = true }

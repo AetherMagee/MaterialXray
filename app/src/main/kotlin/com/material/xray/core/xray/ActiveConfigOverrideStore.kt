@@ -17,7 +17,7 @@ import kotlinx.coroutines.withContext
  */
 @Singleton
 class ActiveConfigOverrideStore @Inject constructor(
-    @param:ApplicationContext context: Context,
+    @ApplicationContext context: Context,
 ) {
     private val file = context.filesDir.resolve(ACTIVE_CONFIG_OVERRIDE_FILE)
 
@@ -38,7 +38,10 @@ class ActiveConfigOverrideStore @Inject constructor(
     }
 
     suspend fun clear(): Unit = withContext(Dispatchers.IO) {
-        runCatching { file.delete() }
-        Unit
+        try {
+            file.delete()
+        } catch (_: Exception) {
+            // A failed cleanup must not interrupt the caller.
+        }
     }
 }

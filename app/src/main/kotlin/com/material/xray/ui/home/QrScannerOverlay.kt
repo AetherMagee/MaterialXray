@@ -13,8 +13,11 @@ import android.hardware.camera2.CameraDevice
 import android.hardware.camera2.CameraManager
 import android.hardware.camera2.CaptureRequest
 import android.hardware.camera2.params.MeteringRectangle
+import android.hardware.camera2.params.OutputConfiguration
+import android.hardware.camera2.params.SessionConfiguration
 import android.media.Image
 import android.media.ImageReader
+import android.os.Build
 import android.os.Handler
 import android.os.HandlerThread
 import android.util.Log
@@ -258,25 +261,42 @@ private class Camera2QrScanner(
     private fun createCaptureSession(device: CameraDevice) {
         val surface = previewSurface ?: return
         val readerSurface = imageReader?.surface ?: return
+        val handler = backgroundHandler ?: return
         previewRequestBuilder = device.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW).apply {
             addTarget(surface)
             addTarget(readerSurface)
             set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE)
             set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON)
         }
-        device.createCaptureSession(
-            listOf(surface, readerSurface),
-            object : CameraCaptureSession.StateCallback() {
-                override fun onConfigured(session: CameraCaptureSession) {
-                    captureSession = session
-                    val request = previewRequestBuilder?.build() ?: return
-                    session.setRepeatingRequest(request, null, backgroundHandler)
-                }
+        val callback = object : CameraCaptureSession.StateCallback() {
+            override fun onConfigured(session: CameraCaptureSession) {
+                captureSession = session
+                val request = previewRequestBuilder?.build() ?: return
+                session.setRepeatingRequest(request, null, backgroundHandler)
+            }
 
-                override fun onConfigureFailed(session: CameraCaptureSession) = Unit
-            },
-            backgroundHandler,
-        )
+            override fun onConfigureFailed(session: CameraCaptureSession) = Unit
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            val configuration = SessionConfiguration(
+                SessionConfiguration.SESSION_REGULAR,
+                listOf(OutputConfiguration(surface), OutputConfiguration(readerSurface)),
+                { command -> handler.post(command) },
+                callback,
+            )
+            device.createCaptureSession(configuration)
+        } else {
+            createLegacyCaptureSession(device, listOf(surface, readerSurface), callback)
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun createLegacyCaptureSession(
+        device: CameraDevice,
+        surfaces: List<Surface>,
+        callback: CameraCaptureSession.StateCallback,
+    ) {
+        device.createCaptureSession(surfaces, callback, backgroundHandler)
     }
 
     private fun focusAt(viewX: Float, viewY: Float) {
