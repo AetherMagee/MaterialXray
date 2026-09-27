@@ -270,6 +270,8 @@ android {
 sentry {
     org.set("materialxray")
     projectName.set("materialxray")
+    // Debug builds do not upload mappings, and Sentry's AGP 9.4 optimization probe logs a stack trace.
+    ignoredBuildTypes.add("debug")
     authToken.set(sentryAuthToken)
     autoInstallation {
         enabled.set(false)
