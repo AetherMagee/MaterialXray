@@ -73,6 +73,10 @@ class MaterialXrayApp : Application() {
             )
         }
         appScope.launch {
+            runCatching { geoDataUpdateScheduler.enqueueInitialRefresh() }
+                .onFailure { error -> Log.e(LOG_TAG, "Unable to schedule initial geodata refresh", error) }
+        }
+        appScope.launch {
             if (settingsRepository.autoConnect.first()) {
                 delay(STARTUP_BACKGROUND_WORK_DELAY_SECONDS * 1_000)
                 oemAutostartManager.restoreRootGrant()

@@ -6,6 +6,7 @@ import com.material.xray.data.repository.SettingsRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
 import java.io.IOException
+import java.io.InputStream
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
@@ -28,6 +29,29 @@ internal const val GEOIP_FILE_NAME = "geoip.dat"
 internal const val GEOSITE_FILE_NAME = "geosite.dat"
 
 internal fun normalizeGeoDataUrl(url: String): String = url.trim()
+
+internal fun seedBundledGeoData(
+    configuredUrl: String,
+    defaultUrl: String,
+    targetFile: File,
+    sourceFile: File,
+    openAsset: () -> InputStream,
+) {
+    if (configuredUrl != defaultUrl || targetFile.exists()) return
+
+    val temporary = File(targetFile.parentFile, "${targetFile.name}.bundled")
+    try {
+        openAsset().use { input ->
+            temporary.outputStream().use { output -> input.copyTo(output) }
+        }
+        if (!temporary.renameTo(targetFile)) {
+            throw IOException("Unable to install bundled ${targetFile.name}")
+        }
+        sourceFile.writeText(defaultUrl)
+    } finally {
+        temporary.delete()
+    }
+}
 
 data class GeoDataDownloadProgress(
     val bytesDownloaded: Long,
@@ -75,12 +99,13 @@ class GeoDataManager @Inject constructor(
     private val geoipUpdatedAtFile get() = File(binaryDir, "geoip-updated-at")
     private val geositeUpdatedAtFile get() = File(binaryDir, "geosite-updated-at")
     private val downloadMutex = Mutex()
+    private var cacheGeneration = 0L
     private val _downloadProgress = MutableStateFlow<Map<GeoDataAsset, GeoDataDownloadProgress>>(emptyMap())
 
     val downloadProgress: StateFlow<Map<GeoDataAsset, GeoDataDownloadProgress>> = _downloadProgress.asStateFlow()
 
     suspend fun needsRefresh(): Boolean = withContext(Dispatchers.IO) {
-        resolveState().needsDownload
+        downloadMutex.withLock { resolveState().needsDownload }
     }
 
     suspend fun ensureReady(): GeoDataStatus = withContext(Dispatchers.IO) {
@@ -156,61 +181,80 @@ class GeoDataManager @Inject constructor(
                     throw IOException("Unable to delete ${file.name}")
                 }
             }
+            cacheGeneration++
             _downloadProgress.value = emptyMap()
         }
     }
 
-    /** Refreshes initialized files without preempting connection-driven initial downloads. */
+    /** Downloads outside the connection lock, then installs each completed file under the lock. */
     suspend fun refreshForScheduledUpdate() = withContext(Dispatchers.IO) {
-        downloadMutex.withLock {
-            val state = resolveState()
-            if (state.needsDownload) return@withLock
-            trackDownloads(GeoDataAsset.entries.toSet()) {
-                httpClient.use { client ->
-                    coroutineScope {
-                        val geoip = async {
-                            runCatching {
-                                refreshAsset(
-                                    GeoDataAsset.GEOIP,
-                                    client,
-                                    state.geoipUrl,
-                                    state.geoipFile,
-                                    geoipSourceFile,
-                                    geoipUpdatedAtFile,
-                                )
-                            }
+        val (state, generation) = downloadMutex.withLock { resolveState() to cacheGeneration }
+        if (state.needsDownload) return@withContext
+        trackDownloads(GeoDataAsset.entries.toSet()) {
+            httpClient.use { client ->
+                coroutineScope {
+                    val geoip = async {
+                        runCatching {
+                            refreshAsset(
+                                GeoDataAsset.GEOIP,
+                                client,
+                                state.geoipUrl,
+                                state.geoipFile,
+                                geoipSourceFile,
+                                geoipUpdatedAtFile,
+                                generation,
+                            )
                         }
-                        val geosite = async {
-                            runCatching {
-                                refreshAsset(
-                                    GeoDataAsset.GEOSITE,
-                                    client,
-                                    state.geositeUrl,
-                                    state.geositeFile,
-                                    geositeSourceFile,
-                                    geositeUpdatedAtFile,
-                                )
-                            }
-                        }
-                        val failures = listOfNotNull(geoip.await().exceptionOrNull(), geosite.await().exceptionOrNull())
-                        if (failures.isNotEmpty()) throw failures.first()
                     }
+                    val geosite = async {
+                        runCatching {
+                            refreshAsset(
+                                GeoDataAsset.GEOSITE,
+                                client,
+                                state.geositeUrl,
+                                state.geositeFile,
+                                geositeSourceFile,
+                                geositeUpdatedAtFile,
+                                generation,
+                            )
+                        }
+                    }
+                    val failures = listOfNotNull(geoip.await().exceptionOrNull(), geosite.await().exceptionOrNull())
+                    if (failures.isNotEmpty()) throw failures.first()
                 }
             }
         }
     }
 
-    private fun refreshAsset(
+    private suspend fun refreshAsset(
         asset: GeoDataAsset,
         client: OkHttpClient,
         url: String,
         targetFile: File,
         sourceMarkerFile: File,
         updatedAtFile: File,
+        generation: Long,
     ) {
-        download(asset, client, url, targetFile)
-        sourceMarkerFile.writeText(url)
-        markUpdated(updatedAtFile)
+        val stagedFile = File.createTempFile("${targetFile.name}-refresh-", ".dat", binaryDir)
+        try {
+            download(asset, client, url, stagedFile)
+            downloadMutex.withLock {
+                if (generation != cacheGeneration) return@withLock
+                val current = resolveState()
+                val currentUrl = when (asset) {
+                    GeoDataAsset.GEOIP -> current.geoipUrl
+                    GeoDataAsset.GEOSITE -> current.geositeUrl
+                }
+                if (current.needsDownload || currentUrl != url) return@withLock
+                if (!stagedFile.renameTo(targetFile)) {
+                    throw IOException("Unable to install refreshed ${targetFile.name}")
+                }
+                sourceMarkerFile.writeText(url)
+                markUpdated(updatedAtFile)
+            }
+        } finally {
+            stagedFile.delete()
+        }
     }
 
     private fun markUpdated(updatedAtFile: File) {
@@ -287,6 +331,18 @@ class GeoDataManager @Inject constructor(
         val geositeUrl = configuredGeositeUrl.ifEmpty { SettingsRepository.DEFAULT_GEOSITE_URL }
         val geoipFile = File(binaryDir, GEOIP_FILE_NAME)
         val geositeFile = File(binaryDir, GEOSITE_FILE_NAME)
+        seedBundledGeoData(
+            geoipUrl,
+            SettingsRepository.DEFAULT_GEOIP_URL,
+            geoipFile,
+            geoipSourceFile,
+        ) { context.assets.open(GEOIP_FILE_NAME) }
+        seedBundledGeoData(
+            geositeUrl,
+            SettingsRepository.DEFAULT_GEOSITE_URL,
+            geositeFile,
+            geositeSourceFile,
+        ) { context.assets.open(GEOSITE_FILE_NAME) }
         val needsDownload = geoipSourceFile.readTextOrNull() != geoipUrl ||
             geositeSourceFile.readTextOrNull() != geositeUrl ||
             !geoipFile.exists() ||
