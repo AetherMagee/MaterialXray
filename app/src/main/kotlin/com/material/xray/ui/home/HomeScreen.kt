@@ -32,6 +32,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.indication
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -50,7 +51,9 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -108,6 +111,7 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateList
@@ -120,12 +124,14 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LookaheadScope
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
@@ -235,6 +241,24 @@ fun HomeScreen(
     val context = LocalContext.current
     val collapsedSubscriptionIds = remember(context) {
         context.collapsedSubscriptionIds().toMutableStateList()
+    }
+    val subscriptionOrder = remember(uiState.subscriptions?.map { it.id }) {
+        uiState.subscriptions.orEmpty().map { it.id }.toMutableStateList()
+    }
+    val listState = rememberLazyListState()
+    val hapticFeedback = LocalHapticFeedback.current
+    var draggingSubscriptionId by remember { mutableStateOf<Long?>(null) }
+    var dragOffsetY by remember { mutableFloatStateOf(0f) }
+    val subscriptionSpacingPx = with(LocalDensity.current) { 10.dp.toPx() }
+    val finishSubscriptionDrag = {
+        persistSubscriptionOrderIfChanged(
+            draggingSubscriptionId,
+            subscriptionOrder,
+            uiState.subscriptions.orEmpty(),
+            viewModel::reorderSubscriptions,
+        )
+        draggingSubscriptionId = null
+        dragOffsetY = 0f
     }
     LaunchedEffect(uiState.subscriptions) {
         val currentIds = uiState.subscriptions?.mapTo(mutableSetOf()) { it.id } ?: return@LaunchedEffect
@@ -356,6 +380,7 @@ fun HomeScreen(
         },
     ) { padding ->
         LazyColumn(
+            state = listState,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding),
@@ -403,7 +428,8 @@ fun HomeScreen(
                 }
             }
 
-            val subscriptions = uiState.subscriptions
+            val subscriptions = uiState.subscriptions?.associateBy { it.id }
+                ?.let { byId -> subscriptionOrder.mapNotNull(byId::get) }
             when {
                 // Not loaded yet. The splash screen normally covers this state on cold start; if
                 // loading is unusually slow, a blank list beats a misleading empty-state card.
@@ -427,6 +453,11 @@ fun HomeScreen(
                             selectedProvider = uiState.providerRoutingAvailability,
                         )
                         SubscriptionCard(
+                            modifier = Modifier.subscriptionDragVisual(
+                                subscription.id,
+                                draggingSubscriptionId,
+                                dragOffsetY,
+                            ),
                             subscription = subscription,
                             isRefreshing = subscription.id in uiState.refreshingSubscriptionIds,
                             servers = servers,
@@ -436,6 +467,22 @@ fun HomeScreen(
                             canCollapse = subscriptions.size > 1,
                             expanded = subscription.id !in collapsedSubscriptionIds,
                             canReorder = subscriptions.size > 1,
+                            onDragStart = {
+                                hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                                draggingSubscriptionId = subscription.id
+                                dragOffsetY = 0f
+                            },
+                            onDrag = { delta ->
+                                dragOffsetY = reorderSubscriptionDuringDrag(
+                                    subscriptionOrder,
+                                    listState,
+                                    subscription.id,
+                                    delta,
+                                    dragOffsetY,
+                                    subscriptionSpacingPx,
+                                )
+                            },
+                            onDragFinished = finishSubscriptionDrag,
                             onExpandedChange = { expanded ->
                                 context.setSubscriptionExpanded(
                                     collapsedSubscriptionIds,
@@ -1722,6 +1769,7 @@ private fun AddSubscriptionActionButton(
 
 @Composable
 private fun SubscriptionCard(
+    modifier: Modifier = Modifier,
     subscription: SubscriptionEntity,
     isRefreshing: Boolean,
     servers: List<ServerListItem>,
@@ -1731,6 +1779,9 @@ private fun SubscriptionCard(
     canCollapse: Boolean,
     expanded: Boolean,
     canReorder: Boolean,
+    onDragStart: () -> Unit,
+    onDrag: (Float) -> Unit,
+    onDragFinished: () -> Unit,
     onExpandedChange: (Boolean) -> Unit,
     onDelete: () -> Unit,
     onEdit: () -> Unit,
@@ -1744,6 +1795,9 @@ private fun SubscriptionCard(
     onTestLatency: (ServerEntity) -> Unit,
     onOpenServerConfig: (Long, String) -> Unit,
 ) {
+    val currentOnDragStart by rememberUpdatedState(onDragStart)
+    val currentOnDrag by rememberUpdatedState(onDrag)
+    val currentOnDragFinished by rememberUpdatedState(onDragFinished)
     val resources = LocalResources.current
     val locale = resources.configuration.locales[0]
     val metadata = remember(
@@ -1759,7 +1813,25 @@ private fun SubscriptionCard(
     }
 
     ElevatedCard(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .then(
+                if (canReorder && !expanded) {
+                    Modifier.pointerInput(subscription.id) {
+                        detectDragGesturesAfterLongPress(
+                            onDragStart = { currentOnDragStart() },
+                            onDragEnd = { currentOnDragFinished() },
+                            onDragCancel = { currentOnDragFinished() },
+                            onDrag = { change, amount ->
+                                change.consume()
+                                currentOnDrag(amount.y)
+                            },
+                        )
+                    }
+                } else {
+                    Modifier
+                },
+            ),
         colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
@@ -2600,6 +2672,42 @@ private const val CORE_UPTIME_REFRESH_INTERVAL_MS = 1_000L
 private const val CAMERA_PERMISSION_PREFS = "camera_permission"
 private const val CAMERA_PERMISSION_REQUESTED = "requested"
 private const val HOME_UI_PREFS = "home_ui"
+private fun Modifier.subscriptionDragVisual(id: Long, draggingId: Long?, offset: Float): Modifier = zIndex(if (id == draggingId) 1f else 0f).graphicsLayer {
+    translationY = if (id == draggingId) offset else 0f
+}
+
+private fun persistSubscriptionOrderIfChanged(
+    draggingId: Long?,
+    order: List<Long>,
+    subscriptions: List<SubscriptionEntity>,
+    persist: (List<Long>) -> Unit,
+) {
+    if (draggingId != null && order != subscriptions.map { it.id }) persist(order.toList())
+}
+
+private fun reorderSubscriptionDuringDrag(
+    order: SnapshotStateList<Long>,
+    listState: LazyListState,
+    subscriptionId: Long,
+    delta: Float,
+    currentOffset: Float,
+    spacingPx: Float,
+): Float {
+    val offset = currentOffset + delta
+    val current = order.indexOf(subscriptionId)
+    if (current < 0) return offset
+    val next = current + if (delta > 0f) 1 else -1
+    if (next !in order.indices) return offset
+
+    val neighbor = listState.layoutInfo.visibleItemsInfo.firstOrNull { it.key == order[next] } ?: return offset
+    val movingDown = delta > 0f
+    val crossedMidpoint = if (movingDown) offset > neighbor.size / 2f else -offset > neighbor.size / 2f
+    if (!crossedMidpoint) return offset
+
+    order.add(next, order.removeAt(current))
+    return offset + if (movingDown) -(neighbor.size + spacingPx) else neighbor.size + spacingPx
+}
+
 private const val COLLAPSED_SUBSCRIPTION_IDS = "collapsed_subscription_ids"
 
 private fun Context.clipboardText(): String? {
