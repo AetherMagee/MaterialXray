@@ -1422,10 +1422,15 @@ internal fun resolveNotificationAccess(
 }
 
 private fun android.content.Context.openNotificationSettings() {
-    startActivity(
-        Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
-            .putExtra(Settings.EXTRA_APP_PACKAGE, packageName),
-    )
+    val appDetails = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName"))
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+        startActivity(appDetails)
+        return
+    }
+    val notificationSettings = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+        .putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+    runCatching { startActivity(notificationSettings) }
+        .onFailure { startActivity(appDetails) }
 }
 
 private fun android.content.Context.recordNotificationPermissionRequest() {
