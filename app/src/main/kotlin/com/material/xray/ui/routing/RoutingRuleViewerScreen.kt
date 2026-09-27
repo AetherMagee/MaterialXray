@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -22,12 +21,13 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.SpanStyle
@@ -38,6 +38,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.material.xray.R
+import com.material.xray.ui.components.ScrolledTopAppBar
 import com.material.xray.ui.configviewer.JsonTokenKind
 import com.material.xray.ui.configviewer.tokenizeJsonLines
 import kotlinx.serialization.Serializable
@@ -67,10 +68,14 @@ enum class RoutingRuleViewerTargetKind {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun RoutingRuleViewerScreen(request: RoutingRuleViewerRequest, onBack: () -> Unit) {
+    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
     Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
-            TopAppBar(
-                title = { Text(request.name) },
+            ScrolledTopAppBar(
+                title = request.name,
+                scrollBehavior = scrollBehavior,
+                showLogo = false,
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
@@ -79,7 +84,6 @@ internal fun RoutingRuleViewerScreen(request: RoutingRuleViewerRequest, onBack: 
                         )
                     }
                 },
-                windowInsets = TopAppBarDefaults.windowInsets,
             )
         },
     ) { padding ->
@@ -87,8 +91,8 @@ internal fun RoutingRuleViewerScreen(request: RoutingRuleViewerRequest, onBack: 
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             item(contentType = "ruleSummary") {
                 RuleSummary(request)
@@ -183,7 +187,7 @@ internal fun HighlightedJson(rawJson: String) {
     }
     Surface(
         color = MaterialTheme.colorScheme.surfaceContainerLow,
-        shape = RoundedCornerShape(12.dp),
+        shape = MaterialTheme.shapes.medium,
         modifier = Modifier.fillMaxWidth(),
     ) {
         SelectionContainer {

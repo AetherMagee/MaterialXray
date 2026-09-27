@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -28,7 +27,8 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -38,6 +38,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
@@ -51,6 +52,7 @@ import com.material.xray.model.RoutingRuleOperator
 import com.material.xray.model.XrayOutbound
 import com.material.xray.ui.components.DropdownOption
 import com.material.xray.ui.components.ReadOnlyDropdownField
+import com.material.xray.ui.components.ScrolledTopAppBar
 import com.material.xray.ui.text.catchAllEffectResource
 import com.material.xray.ui.text.descriptionResource
 import java.util.Locale
@@ -165,11 +167,16 @@ internal fun RoutingRuleEditorScreen(
         operator = selectedOperator,
     )
 
+    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
     Scaffold(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier
+            .fillMaxSize()
+            .nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.routing_edit_rule_title)) },
+            ScrolledTopAppBar(
+                title = stringResource(R.string.routing_edit_rule_title),
+                scrollBehavior = scrollBehavior,
+                showLogo = false,
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
@@ -195,7 +202,7 @@ internal fun RoutingRuleEditorScreen(
                         saveRule(edited)
                     }
                 },
-                shape = CircleShape,
+                shape = MaterialTheme.shapes.small,
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
             ) {
                 Text(stringResource(R.string.routing_save))
@@ -207,8 +214,8 @@ internal fun RoutingRuleEditorScreen(
                 .fillMaxSize()
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp, vertical = 14.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+                .padding(horizontal = 16.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             OutlinedTextField(
                 value = name,
@@ -290,7 +297,7 @@ internal fun RoutingRuleEditorScreen(
                                     }
                                 },
                             )
-                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {

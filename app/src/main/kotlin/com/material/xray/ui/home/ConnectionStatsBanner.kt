@@ -11,9 +11,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ArrowDownward
 import androidx.compose.material.icons.outlined.ArrowUpward
 import androidx.compose.material.icons.outlined.Bolt
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -64,17 +65,20 @@ internal fun ConnectionStatsBanner(
     }
     val traffic by sessionTraffic.collectAsStateWithLifecycle()
 
-    Surface(
+    Card(
         modifier = modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.surfaceContainer,
+        shape = MaterialTheme.shapes.extraLarge,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainer,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+        ),
     ) {
         Column(
             modifier = Modifier.animateContentSize().padding(horizontal = 16.dp, vertical = 12.dp),
         ) {
             activeBalancer?.let { BalancerHeader(state = it) }
 
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     StatCell(
                         icon = Icons.Outlined.Bolt,
@@ -82,6 +86,7 @@ internal fun ConnectionStatsBanner(
                             if ((activeBalancer?.servers?.size ?: 0) > 1) R.string.home_stats_average_ping else R.string.home_stats_ping,
                         ),
                         value = ping?.let { stringResource(R.string.home_stats_ping_value, it) },
+                        asStateBadge = true,
                         modifier = Modifier.weight(1f),
                     )
                     StatCell(
@@ -110,6 +115,7 @@ private fun StatCell(
     label: String,
     value: String?,
     modifier: Modifier = Modifier,
+    asStateBadge: Boolean = false,
 ) {
     val reading = value ?: stringResource(R.string.home_stats_unavailable)
 
@@ -118,7 +124,7 @@ private fun StatCell(
         // single "Ping, 42 ms" node instead of three fragments.
         modifier = modifier.semantics(mergeDescendants = true) {},
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(2.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Row(
             horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -138,14 +144,18 @@ private fun StatCell(
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        Text(
-            text = reading,
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.onSurface,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            textAlign = TextAlign.Center,
-        )
+        if (asStateBadge) {
+            HomeStateBadge(text = reading)
+        } else {
+            Text(
+                text = reading,
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center,
+            )
+        }
     }
 }
 

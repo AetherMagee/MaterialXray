@@ -96,7 +96,7 @@ internal fun BalancerHeader(state: ActiveBalancerState) {
         }
         HorizontalDivider(
             modifier = Modifier.padding(top = 8.dp),
-            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+            color = MaterialTheme.colorScheme.outlineVariant,
         )
     }
 }
@@ -122,11 +122,14 @@ private fun BalancerServerDetails(servers: List<ActiveBalancerServer>) {
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurface,
                     )
-                    Text(
+                    HomeStateBadge(
                         text = server.latencyMs?.let { stringResource(R.string.home_stats_ping_value, it) }
                             ?: stringResource(R.string.home_stats_unavailable),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        tone = if (server.latencyMs?.let { it < 0 } == true) {
+                            HomeStateBadgeTone.Error
+                        } else {
+                            HomeStateBadgeTone.Neutral
+                        },
                     )
                 }
             }

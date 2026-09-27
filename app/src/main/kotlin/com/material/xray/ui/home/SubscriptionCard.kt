@@ -2,13 +2,12 @@ package com.material.xray.ui.home
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.indication
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -20,21 +19,19 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ExpandLess
-import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.outlined.SwapVert
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -47,8 +44,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
@@ -112,9 +108,13 @@ internal fun SubscriptionCard(
         buildSubscriptionMetadataUiState(subscription, resources)
     }
 
-    ElevatedCard(
+    Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+        shape = MaterialTheme.shapes.extraLarge,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainer,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+        ),
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
             SubscriptionHeader(
@@ -150,7 +150,7 @@ internal fun SubscriptionCard(
                     if (servers.isEmpty()) {
                         Text(
                             stringResource(R.string.home_no_servers_in_subscription),
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             style = MaterialTheme.typography.bodyMedium,
                         )
@@ -222,7 +222,7 @@ private fun SubscriptionTrafficUsage(
     val expiredStatusText = stringResource(R.string.home_subscription_expired_inline)
     Column(
         modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(5.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Text(
             text = state.summary,
@@ -230,7 +230,9 @@ private fun SubscriptionTrafficUsage(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurface,
             fontWeight = FontWeight.Medium,
-            textAlign = TextAlign.Center,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Start,
         )
         LinearProgressIndicator(
             progress = { state.progress },
@@ -241,7 +243,7 @@ private fun SubscriptionTrafficUsage(
                 text = remember(expiry.standaloneText, expiredStatusText) {
                     expiry.standaloneText.withMetadataEmphasis(expiredStatusText)
                 },
-                modifier = Modifier.align(Alignment.End),
+                modifier = Modifier.align(Alignment.Start),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -284,40 +286,27 @@ private fun SubscriptionHeader(
     } else {
         null
     }
-    val arrowInteractionSource = remember { MutableInteractionSource() }
+    val chevronRotation by animateFloatAsState(
+        targetValue = if (expanded) 180f else 0f,
+        animationSpec = tween(durationMillis = 150),
+        label = "subscription-chevron-rotation",
+    )
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = if (canCollapse) 0.dp else 16.dp, top = 6.dp, end = 8.dp, bottom = 6.dp),
+            .padding(start = if (canCollapse) 0.dp else 16.dp, top = 8.dp, end = 8.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(0.dp),
     ) {
         if (canCollapse) {
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .clickable(
-                        interactionSource = arrowInteractionSource,
-                        indication = null,
-                        role = Role.Button,
-                        onClickLabel = expansionActionDescription,
-                    ) { onExpandedChange(!expanded) },
-                contentAlignment = Alignment.Center,
-            ) {
-                Box(
+            IconButton(onClick = { onExpandedChange(!expanded) }) {
+                Icon(
+                    imageVector = Icons.Default.KeyboardArrowDown,
+                    contentDescription = expansionActionDescription,
                     modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .indication(arrowInteractionSource, LocalIndication.current),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                        contentDescription = expansionActionDescription,
-                        modifier = Modifier.size(24.dp),
-                    )
-                }
+                        .size(24.dp)
+                        .graphicsLayer { rotationZ = chevronRotation },
+                )
             }
         }
         val titleInteractionSource = remember { MutableInteractionSource() }
@@ -383,7 +372,6 @@ private fun SubscriptionHeader(
         Box(
             modifier = Modifier
                 .size(48.dp)
-                .clip(CircleShape)
                 .combinedClickable(
                     role = Role.Button,
                     onClick = onTestAll,
@@ -408,6 +396,16 @@ private fun SubscriptionHeader(
                 )
             }
             DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.home_choose_ping_method_title)) },
+                    leadingIcon = {
+                        Icon(Icons.Default.Speed, contentDescription = null)
+                    },
+                    onClick = {
+                        showMenu = false
+                        onPingMethodRequested()
+                    },
+                )
                 DropdownMenuItem(
                     text = { Text(stringResource(R.string.home_action_edit)) },
                     leadingIcon = {
@@ -593,5 +591,5 @@ private val subscriptionUrlRegex = Regex(
     pattern = """(?i)(?<![@\w])(?:https?://[^\s<>"']+|(?:www\.|(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,})(?:/[^\s<>"']*)?)""",
 )
 private val trailingUrlPunctuation = setOf('.', ',', ';', ':', '!', '?', ')', ']', '}')
-private val SubscriptionBlockGap = 6.dp
-private val SubscriptionMetadataGap = 10.dp
+private val SubscriptionBlockGap = 8.dp
+private val SubscriptionMetadataGap = 8.dp

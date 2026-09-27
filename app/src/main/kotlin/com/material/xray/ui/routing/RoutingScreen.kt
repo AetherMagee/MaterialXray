@@ -23,11 +23,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
@@ -40,6 +38,7 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -49,8 +48,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.TopAppBarScrollBehavior
+import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -64,6 +64,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -80,8 +81,9 @@ import com.material.xray.model.RoutingRule
 import com.material.xray.model.RoutingRuleCatalog
 import com.material.xray.ui.apps.AppBypassContent
 import com.material.xray.ui.apps.AppRoutingMenuActions
-import com.material.xray.ui.components.AppBarTitle
+import com.material.xray.ui.components.FlatStateCard
 import com.material.xray.ui.components.ScrollFadeEdges
+import com.material.xray.ui.components.ScrolledTopAppBar
 import com.material.xray.ui.components.SegmentedTabRow
 import kotlinx.coroutines.launch
 
@@ -120,6 +122,7 @@ fun RoutingScreen(
     val automaticRoutingProviderName by viewModel.automaticRoutingProviderName.collectAsStateWithLifecycle()
     val profileRouting by viewModel.profileRouting.collectAsStateWithLifecycle()
     val pagerState = rememberPagerState(pageCount = { RoutingTab.entries.size })
+    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
     val coroutineScope = rememberCoroutineScope()
     var previousTab by remember { mutableIntStateOf(pagerState.currentPage) }
     var selectedRuleIds by remember { mutableStateOf(emptySet<String>()) }
@@ -187,9 +190,11 @@ fun RoutingScreen(
     }
 
     Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         contentWindowInsets = WindowInsets(0.dp),
         topBar = {
             RoutingTopBar(
+                scrollBehavior = scrollBehavior,
                 selectedTab = RoutingTab.entries[pagerState.currentPage],
                 showTitleBarLogo = showTitleBarLogo,
                 selectionMode = selectionMode,
@@ -297,6 +302,7 @@ fun RoutingScreen(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun RoutingTopBar(
+    scrollBehavior: TopAppBarScrollBehavior,
     selectedTab: RoutingTab,
     showTitleBarLogo: Boolean,
     selectionMode: Boolean,
@@ -306,23 +312,19 @@ private fun RoutingTopBar(
     onRuleAction: (RoutingRuleAction) -> Unit,
 ) {
     var rulesMenuExpanded by remember { mutableStateOf(false) }
-    TopAppBar(
-        title = {
-            AppBarTitle(
-                if (selectedTab == RoutingTab.Rules && selectionMode) {
-                    pluralStringResource(
-                        R.plurals.routing_rules_selected,
-                        selectedRuleIds.size,
-                        selectedRuleIds.size,
-                    )
-                } else {
-                    stringResource(R.string.routing_title)
-                },
-                showTitleBarLogo,
-            )
-        },
-        expandedHeight = 52.dp,
-        windowInsets = TopAppBarDefaults.windowInsets,
+    val title = if (selectedTab == RoutingTab.Rules && selectionMode) {
+        pluralStringResource(
+            R.plurals.routing_rules_selected,
+            selectedRuleIds.size,
+            selectedRuleIds.size,
+        )
+    } else {
+        stringResource(R.string.routing_title)
+    }
+    ScrolledTopAppBar(
+        title = title,
+        scrollBehavior = scrollBehavior,
+        showLogo = showTitleBarLogo,
         actions = {
             when {
                 selectedTab == RoutingTab.Apps -> AppRoutingMenuActions()
@@ -411,7 +413,7 @@ private fun RoutingRulesTab(
     Box(modifier = Modifier.fillMaxSize()) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(start = 12.dp, top = 8.dp, end = 12.dp, bottom = 16.dp),
+            contentPadding = PaddingValues(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             if (providerManaged) {
@@ -425,8 +427,8 @@ private fun RoutingRulesTab(
                             .padding(horizontal = 4.dp),
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Icon(
@@ -455,16 +457,50 @@ private fun RoutingRulesTab(
                     }
                 }
             }
+            if (customRules.isEmpty() && subscriptionRules.isEmpty() && profileRules.isEmpty()) {
+                item(contentType = "emptyRoutingRules") {
+                    FlatStateCard {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalAlignment = Alignment.Top,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Info,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                            )
+                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text(
+                                    text = stringResource(R.string.routing_empty_title),
+                                    style = MaterialTheme.typography.titleMedium,
+                                )
+                                Text(
+                                    text = stringResource(R.string.routing_empty_message),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
             if (customRules.isNotEmpty()) {
                 item(contentType = "routingScopeHeader") {
                     RoutingScopeHeader(R.string.routing_scope_custom)
                 }
             }
-            items(items = customRules, key = { it.id }, contentType = { "routingRule" }) { rule ->
+            itemsIndexed(
+                items = customRules,
+                key = { _, rule -> rule.id },
+                contentType = { _, _ -> "routingRule" },
+            ) { index, rule ->
+                if (index > 0) {
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                }
                 val selected = rule.id in selectedRuleIds
                 val containerColor by animateColorAsState(
                     targetValue = if (selected) {
-                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
+                        MaterialTheme.colorScheme.primaryContainer
                     } else {
                         MaterialTheme.colorScheme.surfaceContainer
                     },
@@ -495,7 +531,7 @@ private fun RoutingRulesTab(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 14.dp, vertical = 12.dp),
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         AnimatedVisibility(
@@ -521,7 +557,7 @@ private fun RoutingRulesTab(
                             modifier = Modifier
                                 .weight(1f)
                                 .padding(end = 12.dp),
-                            verticalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
                             Text(
                                 text = routingRuleDisplayName(rule),
@@ -553,8 +589,11 @@ private fun RoutingRulesTab(
                     items = subscriptionRules,
                     key = { index, rule -> "subscription-$index-${rule.id}" },
                     contentType = { _, _ -> "subscriptionRoutingRule" },
-                ) { _, rule ->
-                    SubscriptionRoutingRuleCard(rule = rule, onClick = { onSubscriptionRuleClick(rule) })
+                ) { index, rule ->
+                    if (index > 0) {
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    }
+                    SubscriptionRoutingRuleRow(rule = rule, onClick = { onSubscriptionRuleClick(rule) })
                 }
             }
             if (profileRules.isNotEmpty()) {
@@ -565,8 +604,11 @@ private fun RoutingRulesTab(
                     items = profileRules,
                     key = { index, rule -> "profile-$index-${rule.id}" },
                     contentType = { _, _ -> "profileRoutingRule" },
-                ) { _, rule ->
-                    ProfileRoutingRuleCard(
+                ) { index, rule ->
+                    if (index > 0) {
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    }
+                    ProfileRoutingRuleRow(
                         rule = rule,
                         onClick = { onProfileRuleClick(rule) },
                         onToggled = { enabled -> onProfileRuleToggled(rule, enabled) },
@@ -580,7 +622,7 @@ private fun RoutingRulesTab(
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun SubscriptionRoutingRuleCard(rule: RoutingRule, onClick: () -> Unit) {
+private fun SubscriptionRoutingRuleRow(rule: RoutingRule, onClick: () -> Unit) {
     Surface(
         color = MaterialTheme.colorScheme.surfaceContainer,
         shape = MaterialTheme.shapes.medium,
@@ -591,8 +633,8 @@ private fun SubscriptionRoutingRuleCard(rule: RoutingRule, onClick: () -> Unit) 
             .combinedClickable(onClick = onClick),
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text(
                 text = routingRuleDisplayName(rule),
@@ -622,7 +664,7 @@ private fun RoutingScopeHeader(@StringRes titleResource: Int) {
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun ProfileRoutingRuleCard(
+private fun ProfileRoutingRuleRow(
     rule: ProfileRoutingRule,
     onClick: () -> Unit,
     onToggled: (Boolean) -> Unit,
@@ -638,14 +680,14 @@ private fun ProfileRoutingRuleCard(
             .combinedClickable(onClick = onClick),
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(
                 modifier = Modifier
                     .weight(1f)
                     .padding(end = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Text(
                     text = rule.name,
@@ -712,14 +754,14 @@ internal fun AutomaticRuleRoutingDialog(
             ) {
                 Button(
                     onClick = onSwitchToManual,
-                    shape = CircleShape,
+                    shape = MaterialTheme.shapes.small,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Text(stringResource(R.string.routing_switch_to_manual_mode))
                 }
                 OutlinedButton(
                     onClick = onDismiss,
-                    shape = CircleShape,
+                    shape = MaterialTheme.shapes.small,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Text(stringResource(R.string.routing_leave_as_is))

@@ -8,13 +8,15 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
@@ -22,11 +24,11 @@ import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FloatingActionButtonDefaults
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -36,7 +38,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
@@ -131,52 +132,67 @@ internal fun ConnectionPanel(
     onViewConfig: () -> Unit,
 ) {
     val buttonEnabled = (canStart || isConnected || isRestartRequired || isInterfaceBusy) && !isTransitioning
-    val containerColor = if (buttonEnabled) {
-        buttonColor.copy(alpha = 0.15f)
-    } else {
-        buttonColor.copy(alpha = 0.10f)
+    val buttonContentColor = when {
+        isRestartRequired || isInterfaceBusy || isConnected && !isAlwaysOnVpn -> MaterialTheme.colorScheme.onError
+        isTransitioning -> MaterialTheme.colorScheme.onTertiary
+        else -> MaterialTheme.colorScheme.onPrimary
     }
-    val contentColor = if (buttonEnabled) {
-        buttonColor
-    } else {
-        buttonColor.copy(alpha = 0.75f)
-    }
+    val actionLabel = stringResource(
+        connectionActionLabel(
+            isConnected = isConnected,
+            isAlwaysOnVpn = isAlwaysOnVpn,
+            isRestartRequired = isRestartRequired,
+            isInterfaceBusy = isInterfaceBusy,
+        ),
+    )
 
     Column(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text(
-            text = connectionHeading(connectionState, geoDataDownloadFraction),
-            modifier = Modifier.fillMaxWidth(),
-            style = MaterialTheme.typography.titleLarge,
-            textAlign = TextAlign.Center,
-            color = when {
-                isConnected -> MaterialTheme.colorScheme.primary
-                isRestartRequired || isInterfaceBusy -> MaterialTheme.colorScheme.error
-                connectionState is ConnectionState.Error -> MaterialTheme.colorScheme.error
-                else -> MaterialTheme.colorScheme.onSurface
-            },
-        )
+        if (compact) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                HomeStateBadge(
+                    text = connectionHeading(connectionState, geoDataDownloadFraction),
+                    tone = connectionState.badgeTone(),
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = when {
+                        isInterfaceBusy -> stringResource(R.string.home_connection_interface_busy_detail)
+                        isRestartRequired -> stringResource(R.string.home_connection_restart_required_detail)
+                        else -> selectedServerName
+                    },
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.bodyLarge,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        } else {
+            HomeStateBadge(
+                text = connectionHeading(connectionState, geoDataDownloadFraction),
+                tone = connectionState.badgeTone(),
+            )
 
-        Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
-        Text(
-            text = when {
-                isInterfaceBusy -> stringResource(R.string.home_connection_interface_busy_detail)
-                isRestartRequired -> stringResource(R.string.home_connection_restart_required_detail)
-                else -> selectedServerName
-            },
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-            maxLines = if (isRestartRequired || isInterfaceBusy) 4 else 1,
-            overflow = TextOverflow.Ellipsis,
-            textAlign = TextAlign.Center,
-        )
-        // The row is normally held open even when empty so the panel does not jump as progress
-        // text and uptime come and go. Idle-and-disconnected has nothing coming, so the compact
-        // layout drops it rather than leave a gap.
-        if (!compact || connectionState !is ConnectionState.Disconnected) {
+            Text(
+                text = when {
+                    isInterfaceBusy -> stringResource(R.string.home_connection_interface_busy_detail)
+                    isRestartRequired -> stringResource(R.string.home_connection_restart_required_detail)
+                    else -> selectedServerName
+                },
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = if (isRestartRequired || isInterfaceBusy) 4 else 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center,
+            )
+
             Box(
                 modifier = Modifier.height(
                     with(LocalDensity.current) { MaterialTheme.typography.bodySmall.lineHeight.toDp() },
@@ -195,20 +211,18 @@ internal fun ConnectionPanel(
                     connectionState is ConnectionState.Connected -> CoreUptime(startTime = connectionState.startTime)
                 }
             }
-        }
 
-        if (!compact) {
             Spacer(modifier = Modifier.height(24.dp))
 
-            Surface(
-                color = containerColor,
-                contentColor = contentColor,
-                shape = CircleShape,
+            Button(
+                onClick = onClick,
+                enabled = buttonEnabled,
                 modifier = Modifier
-                    .size(124.dp)
-                    .clip(CircleShape)
+                    .height(64.dp)
                     .combinedClickable(
                         enabled = buttonEnabled,
+                        role = Role.Button,
+                        onClickLabel = actionLabel,
                         onClick = onClick,
                         onLongClick = {
                             if (isConnected) {
@@ -216,32 +230,40 @@ internal fun ConnectionPanel(
                             }
                         },
                     ),
+                shape = MaterialTheme.shapes.extraLarge,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = buttonColor,
+                    contentColor = buttonContentColor,
+                ),
+                contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp),
             ) {
-                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                    if (isTransitioning) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(54.dp),
-                            strokeWidth = 4.dp,
-                            color = buttonColor,
-                        )
-                    } else {
-                        Text(
-                            text = stringResource(
-                                connectionActionLabel(
-                                    isConnected = isConnected,
-                                    isAlwaysOnVpn = isAlwaysOnVpn,
-                                    isRestartRequired = isRestartRequired,
-                                    isInterfaceBusy = isInterfaceBusy,
-                                ),
+                if (isTransitioning) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp),
+                        strokeWidth = 2.dp,
+                        color = buttonContentColor,
+                    )
+                } else {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = connectionActionIcon(
+                                isConnected = isConnected,
+                                isAlwaysOnVpn = isAlwaysOnVpn,
+                                isRestartRequired = isRestartRequired,
+                                isInterfaceBusy = isInterfaceBusy,
                             ),
-                            modifier = Modifier.padding(horizontal = 8.dp),
-                            style = MaterialTheme.typography.titleLarge,
-                            textAlign = TextAlign.Center,
-                            color = contentColor,
+                            contentDescription = null,
+                            modifier = Modifier.size(24.dp),
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = actionLabel,
+                            style = MaterialTheme.typography.titleMedium,
                             maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                             autoSize = TextAutoSize.StepBased(
                                 minFontSize = 10.sp,
-                                maxFontSize = MaterialTheme.typography.titleLarge.fontSize,
+                                maxFontSize = MaterialTheme.typography.titleMedium.fontSize,
                                 stepSize = 1.sp,
                             ),
                         )
@@ -258,9 +280,19 @@ internal fun ConnectionPanel(
                 modifier = Modifier.padding(top = 16.dp),
             )
         }
-
-        Spacer(modifier = Modifier.height(10.dp))
     }
+}
+
+private fun ConnectionState.badgeTone(): HomeStateBadgeTone = when {
+    this is ConnectionState.Connected -> HomeStateBadgeTone.Primary
+    this is ConnectionState.Connecting ||
+        this == ConnectionState.ApplyingRoutingChanges ||
+        this == ConnectionState.UpdatingRoutingData ||
+        this is ConnectionState.Disconnecting -> HomeStateBadgeTone.Tertiary
+    this is ConnectionState.Error ||
+        this is ConnectionState.RestartRequired ||
+        this is ConnectionState.InterfaceBusy -> HomeStateBadgeTone.Error
+    else -> HomeStateBadgeTone.Neutral
 }
 
 @Composable
@@ -285,9 +317,8 @@ internal fun ConnectionState.showsConnectionStats(): Boolean = this is Connectio
     this == ConnectionState.ApplyingRoutingChanges
 
 /**
- * Compact alternative to the large power button, anchored in the corner of the home screen.
- * Kept as a [Surface] rather than a [androidx.compose.material3.FloatingActionButton] so it can
- * express a disabled state and keep the long-press shortcut to the running config.
+ * Compact alternative to the large connection button, anchored in the corner of the home screen.
+ * The standard FAB keeps the same action semantics and long-press shortcut as the full button.
  */
 @Composable
 internal fun ConnectionFab(
@@ -308,20 +339,10 @@ internal fun ConnectionFab(
             isInterfaceBusy = state.isInterfaceBusy,
         ),
     )
-    val shape = FloatingActionButtonDefaults.shape
 
-    Surface(
-        color = if (enabled) state.buttonColor else MaterialTheme.colorScheme.surfaceContainerHighest,
-        contentColor = if (enabled) {
-            state.fabContentColor
-        } else {
-            MaterialTheme.colorScheme.onSurface.copy(alpha = DISABLED_FAB_CONTENT_ALPHA)
-        },
-        shape = shape,
-        shadowElevation = 6.dp,
+    FloatingActionButton(
+        onClick = {},
         modifier = Modifier
-            .size(64.dp)
-            .clip(shape)
             .combinedClickable(
                 enabled = enabled,
                 role = Role.Button,
@@ -333,12 +354,23 @@ internal fun ConnectionFab(
                     }
                 },
             ),
+        shape = MaterialTheme.shapes.large,
+        containerColor = if (enabled) {
+            state.buttonColor
+        } else {
+            MaterialTheme.colorScheme.surfaceContainerHighest
+        },
+        contentColor = if (enabled) {
+            state.fabContentColor
+        } else {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        },
     ) {
         Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
             if (state.isTransitioning) {
                 CircularProgressIndicator(
-                    modifier = Modifier.size(26.dp),
-                    strokeWidth = 3.dp,
+                    modifier = Modifier.size(24.dp),
+                    strokeWidth = 2.dp,
                     color = state.fabContentColor,
                 )
             } else {
@@ -350,7 +382,7 @@ internal fun ConnectionFab(
                         isInterfaceBusy = state.isInterfaceBusy,
                     ),
                     contentDescription = actionLabel,
-                    modifier = Modifier.size(30.dp),
+                    modifier = Modifier.size(24.dp),
                 )
             }
         }
@@ -452,7 +484,5 @@ private fun connectionActionIcon(
     isRestartRequired || isInterfaceBusy -> Icons.Default.RestartAlt
     else -> Icons.Default.PlayArrow
 }
-
-private const val DISABLED_FAB_CONTENT_ALPHA = 0.38f
 
 private const val CORE_UPTIME_REFRESH_INTERVAL_MS = 1_000L

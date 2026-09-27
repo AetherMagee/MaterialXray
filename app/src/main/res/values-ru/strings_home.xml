@@ -46,6 +46,7 @@
     <string name="home_app_update_progress_installing_root">Установка обновления с root-доступом&#8230;</string>
 
     <string name="home_no_server_selected">Сервер не выбран</string>
+    <string name="home_loading_subscriptions">Загрузка подписок&#8230;</string>
     <string name="home_select_server_below">Выберите сервер ниже</string>
     <string name="home_selected_server">Выбранный сервер</string>
     <string name="home_balancer_loading">Проверка серверов&#8230;</string>

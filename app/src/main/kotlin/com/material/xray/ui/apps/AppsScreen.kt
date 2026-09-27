@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -15,7 +16,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Info
@@ -65,6 +66,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.material.xray.R
 import com.material.xray.model.RoutingPolicyControl
+import com.material.xray.ui.components.FlatStateCard
 import com.material.xray.ui.components.ScrollFadeEdges
 import com.material.xray.ui.components.SelectableOptionRow
 
@@ -150,73 +152,109 @@ fun AppBypassContent(active: Boolean, viewModel: AppsViewModel = hiltViewModel()
                 singleLine = true,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(start = 16.dp, top = 0.dp, end = 16.dp, bottom = 8.dp),
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
             )
 
             Box(modifier = Modifier.fillMaxSize()) {
-                LazyColumn(modifier = Modifier.fillMaxSize()) {
-                    items(
-                        items = apps,
-                        key = { it.appKey },
-                        contentType = { "app" },
-                    ) { app ->
-                        ListItem(
-                            headlineContent = { Text(app.name) },
-                            supportingContent = {
-                                Text(
-                                    text = if (app.workProfile) {
-                                        stringResource(
-                                            R.string.apps_package_with_profile,
-                                            app.packageName,
-                                            stringResource(R.string.apps_work_profile_label),
-                                        )
-                                    } else {
-                                        app.packageName
-                                    },
-                                    style = MaterialTheme.typography.bodySmall,
-                                )
-                            },
-                            leadingContent = {
-                                val iconBitmap = remember(app.appKey, app.icon, iconPixelSize) {
-                                    app.icon?.toBitmap(iconPixelSize, iconPixelSize)?.asImageBitmap()
-                                }
-                                iconBitmap?.let { bitmap ->
-                                    Image(
-                                        bitmap = bitmap,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(iconSize),
-                                    )
-                                }
-                            },
-                            trailingContent = {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
+                ) {
+                    if (apps.isEmpty()) {
+                        item(contentType = "empty") {
+                            FlatStateCard {
                                 Row(
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
-                                    modifier = Modifier.width(176.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                    verticalAlignment = androidx.compose.ui.Alignment.Top,
                                 ) {
-                                    Text(
-                                        text = app.routeTitle.resolve(context),
-                                        style = MaterialTheme.typography.labelLarge,
-                                        maxLines = 2,
-                                        overflow = TextOverflow.Ellipsis,
-                                        textAlign = TextAlign.End,
-                                        modifier = Modifier.weight(1f),
-                                    )
                                     Icon(
-                                        imageVector = Icons.Default.ArrowDropDown,
+                                        imageVector = Icons.Default.Info,
                                         contentDescription = null,
-                                        modifier = Modifier.size(24.dp),
+                                        tint = MaterialTheme.colorScheme.primary,
                                     )
+                                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        Text(
+                                            text = stringResource(R.string.apps_empty_title),
+                                            style = MaterialTheme.typography.titleMedium,
+                                        )
+                                        Text(
+                                            text = stringResource(R.string.apps_empty_message),
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
                                 }
-                            },
-                            modifier = Modifier.clickable {
-                                if (routingPolicyControl == RoutingPolicyControl.SubscriptionProvider) {
-                                    pendingManualEdit = app
-                                } else {
-                                    editingApp = app
-                                }
-                            },
-                        )
+                            }
+                        }
+                    } else {
+                        itemsIndexed(
+                            items = apps,
+                            key = { _, app -> app.appKey },
+                            contentType = { _, _ -> "app" },
+                        ) { index, app ->
+                            if (index > 0) {
+                                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                            }
+                            ListItem(
+                                headlineContent = { Text(app.name) },
+                                supportingContent = {
+                                    Text(
+                                        text = if (app.workProfile) {
+                                            stringResource(
+                                                R.string.apps_package_with_profile,
+                                                app.packageName,
+                                                stringResource(R.string.apps_work_profile_label),
+                                            )
+                                        } else {
+                                            app.packageName
+                                        },
+                                        style = MaterialTheme.typography.bodySmall,
+                                    )
+                                },
+                                leadingContent = {
+                                    val iconBitmap = remember(app.appKey, app.icon, iconPixelSize) {
+                                        app.icon?.toBitmap(iconPixelSize, iconPixelSize)?.asImageBitmap()
+                                    }
+                                    iconBitmap?.let { bitmap ->
+                                        Image(
+                                            bitmap = bitmap,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(iconSize),
+                                        )
+                                    }
+                                },
+                                trailingContent = {
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                                        modifier = Modifier.width(176.dp),
+                                    ) {
+                                        Text(
+                                            text = app.routeTitle.resolve(context),
+                                            style = MaterialTheme.typography.labelLarge,
+                                            maxLines = 2,
+                                            overflow = TextOverflow.Ellipsis,
+                                            textAlign = TextAlign.End,
+                                            modifier = Modifier.weight(1f),
+                                        )
+                                        Icon(
+                                            imageVector = Icons.Default.ArrowDropDown,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(24.dp),
+                                        )
+                                    }
+                                },
+                                modifier = Modifier
+                                    .clickable {
+                                        if (routingPolicyControl == RoutingPolicyControl.SubscriptionProvider) {
+                                            pendingManualEdit = app
+                                        } else {
+                                            editingApp = app
+                                        }
+                                    }
+                                    .padding(vertical = 4.dp),
+                            )
+                        }
                     }
                 }
                 ScrollFadeEdges()
@@ -274,8 +312,8 @@ private fun SubscriptionRoutingBanner(providerName: String?) {
             .padding(horizontal = 16.dp, vertical = 8.dp),
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
@@ -446,14 +484,14 @@ private fun AutomaticRoutingDialog(
             ) {
                 Button(
                     onClick = onSwitchToManual,
-                    shape = CircleShape,
+                    shape = MaterialTheme.shapes.small,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Text(stringResource(R.string.apps_switch_to_manual_mode))
                 }
                 OutlinedButton(
                     onClick = onDismiss,
-                    shape = CircleShape,
+                    shape = MaterialTheme.shapes.small,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Text(stringResource(R.string.apps_leave_as_is))
@@ -558,7 +596,7 @@ private fun AppRoutePickerDialog(
         },
         title = { Text(stringResource(R.string.apps_route_title, app.name)) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 if (routeOptions.size > 8) {
                     OutlinedTextField(
                         value = query,
@@ -587,7 +625,7 @@ private fun AppRoutePickerDialog(
                     }
                     if (presetOptions.isNotEmpty() && serverOptions.isNotEmpty()) {
                         item(contentType = "routeOptionDivider") {
-                            HorizontalDivider(modifier = Modifier.padding(vertical = 6.dp))
+                            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
                         }
                     }
                     items(

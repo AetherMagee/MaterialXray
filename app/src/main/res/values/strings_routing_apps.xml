@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="routing_title">Routing</string>
+    <string name="routing_empty_title">No routing rules</string>
+    <string name="routing_empty_message">Add a rule or choose a subscription to route your traffic.</string>
     <string name="routing_tab_rules">Rules</string>
     <string name="routing_tab_apps">Apps</string>
     <plurals name="routing_rules_selected">
@@ -91,6 +93,8 @@
     </plurals>
 
     <string name="apps_search">Search apps</string>
+    <string name="apps_empty_title">No apps found</string>
+    <string name="apps_empty_message">Try changing the search or app filters.</string>
     <string name="apps_package_with_profile">%1$s &#8226; %2$s</string>
     <string name="apps_work_profile_label">Work profile</string>
     <string name="apps_personal_profile_label">Personal</string>

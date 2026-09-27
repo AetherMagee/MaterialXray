@@ -8,6 +8,8 @@
 
     <string name="logs_filter_all">Все</string>
     <string name="logs_filter_app">Приложение</string>
+    <string name="logs_empty_title">Записей журнала нет</string>
+    <string name="logs_empty_message">Новые записи появятся здесь по мере работы приложения.</string>
     <string name="logs_copy_all">Копировать всё</string>
     <string name="logs_export">Экспорт журнала</string>
     <string name="logs_save_to_file">Сохранить в файл</string>

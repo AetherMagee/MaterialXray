@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="routing_title">Маршрутизация</string>
+    <string name="routing_empty_title">Нет правил маршрутизации</string>
+    <string name="routing_empty_message">Добавьте правило или выберите подписку для маршрутизации трафика.</string>
     <string name="routing_tab_rules">Правила</string>
     <string name="routing_tab_apps">Приложения</string>
     <plurals name="routing_rules_selected">
@@ -105,6 +107,8 @@
     </plurals>
 
     <string name="apps_search">Поиск приложений</string>
+    <string name="apps_empty_title">Приложения не найдены</string>
+    <string name="apps_empty_message">Измените поиск или фильтры приложений.</string>
     <string name="apps_package_with_profile">%1$s &#8226; %2$s</string>
     <string name="apps_work_profile_label">Рабочий профиль</string>
     <string name="apps_personal_profile_label">Личный профиль</string>

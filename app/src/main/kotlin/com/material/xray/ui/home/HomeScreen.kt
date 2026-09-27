@@ -35,7 +35,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DragIndicator
@@ -45,11 +44,9 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
@@ -57,7 +54,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
@@ -78,7 +74,6 @@ import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
@@ -89,6 +84,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
@@ -119,6 +115,7 @@ import com.material.xray.service.AppUpdateInstallProgress
 import com.material.xray.service.AppUpdateInstallStage
 import com.material.xray.service.ConnectionEvent
 import com.material.xray.ui.components.DropdownOption
+import com.material.xray.ui.components.FlatStateCard
 import com.material.xray.ui.components.ReadOnlyDropdownField
 import com.material.xray.ui.components.ScrolledTopAppBar
 import com.material.xray.ui.components.SettingsSwitchRow
@@ -323,7 +320,7 @@ fun HomeScreen(
                 .fillMaxSize()
                 .padding(padding),
             contentPadding = homeListContentPadding(floatingConnectButton),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             item {
@@ -368,9 +365,31 @@ fun HomeScreen(
 
             val subscriptions = uiState.subscriptions
             when {
-                // Not loaded yet. The splash screen normally covers this state on cold start; if
-                // loading is unusually slow, a blank list beats a misleading empty-state card.
-                subscriptions == null -> Unit
+                subscriptions == null -> item {
+                    val loadingText = stringResource(R.string.home_loading_subscriptions)
+                    FlatStateCard {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .semantics(mergeDescendants = true) {
+                                    contentDescription = loadingText
+                                },
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier
+                                    .size(24.dp)
+                                    .clearAndSetSemantics {},
+                            )
+                            Text(
+                                text = loadingText,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
                 subscriptions.isEmpty() -> item {
                     EmptySubscriptionsCard(
                         onPasteFromClipboard = pasteFromClipboard,
@@ -739,9 +758,13 @@ private fun ReorderableSubscriptionList(order: SnapshotStateList<SubscriptionEnt
                         .zIndex(if (dragging) 1f else 0f)
                         .graphicsLayer { translationY = if (dragging) dragOffsetY else 0f }
                         .padding(vertical = 4.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(
-                            if (dragging) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent,
+                        .clip(MaterialTheme.shapes.medium)
+                        .then(
+                            if (dragging) {
+                                Modifier.background(MaterialTheme.colorScheme.surfaceVariant)
+                            } else {
+                                Modifier
+                            },
                         )
                         .heightIn(min = 52.dp)
                         .padding(horizontal = 8.dp, vertical = 8.dp),
@@ -907,21 +930,17 @@ private data class PendingSubscriptionLink(
 /** The floating button overlays the list, so the last item needs room to scroll clear of it. */
 private fun homeListContentPadding(floatingConnectButton: Boolean) = PaddingValues(
     start = 16.dp,
-    top = 14.dp,
+    top = 16.dp,
     end = 16.dp,
-    bottom = if (floatingConnectButton) 14.dp + FloatingConnectButtonClearance else 14.dp,
+    bottom = if (floatingConnectButton) 16.dp + FloatingConnectButtonClearance else 16.dp,
 )
 
 @Composable
 private fun ErrorCard(message: String) {
-    Card(
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
-        modifier = Modifier.fillMaxWidth(),
-    ) {
+    FlatStateCard {
         Text(
             text = message,
-            modifier = Modifier.padding(16.dp),
-            color = MaterialTheme.colorScheme.onErrorContainer,
+            color = MaterialTheme.colorScheme.error,
         )
     }
 }
@@ -932,20 +951,18 @@ private fun AppUpdateBanner(
     installProgress: AppUpdateInstallProgress?,
     onInstall: () -> Unit,
 ) {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(enabled = installProgress == null, onClick = onInstall),
-        shape = MaterialTheme.shapes.medium,
-        color = MaterialTheme.colorScheme.secondaryContainer,
-        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+    FlatStateCard(
+        modifier = Modifier.clickable(enabled = installProgress == null, onClick = onInstall),
     ) {
         Row(
-            modifier = Modifier.padding(16.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Icon(Icons.Default.SystemUpdate, contentDescription = null)
+            Icon(
+                Icons.Default.SystemUpdate,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.secondary,
+            )
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = stringResource(R.string.home_app_update_title),
@@ -961,9 +978,9 @@ private fun AppUpdateBanner(
                     Text(
                         text = appUpdateInstallProgressText(installProgress),
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
                     val fraction = installProgress.fraction
                     if (fraction == null) {
                         LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
@@ -998,11 +1015,8 @@ private fun EmptySubscriptionsCard(
     onScanQrCode: () -> Unit,
     onAddManually: () -> Unit,
 ) {
-    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier.padding(18.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
+    FlatStateCard {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(
                 stringResource(R.string.home_no_subscriptions_title),
                 style = MaterialTheme.typography.titleMedium,

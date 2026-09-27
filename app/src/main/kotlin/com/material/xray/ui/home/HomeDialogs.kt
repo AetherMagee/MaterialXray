@@ -316,7 +316,7 @@ private fun PingMethodDialog(
         },
         title = { Text(stringResource(R.string.home_choose_ping_method_title)) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 PingMethod.entries.forEach { method ->
                     SelectableOptionRow(
                         title = stringResource(method.labelResource),

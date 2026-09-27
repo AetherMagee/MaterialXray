@@ -1,16 +1,8 @@
 package com.material.xray.ui.home
 
-import androidx.annotation.StringRes
 import androidx.compose.animation.animateBounds
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -20,42 +12,34 @@ import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.outlined.Dns
+import androidx.compose.material.icons.filled.RadioButtonChecked
 import androidx.compose.material.icons.outlined.Edit
-import androidx.compose.material.icons.outlined.NetworkPing
+import androidx.compose.material.icons.outlined.RadioButtonUnchecked
 import androidx.compose.material.icons.outlined.Shield
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.LookaheadScope
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.material.xray.R
 import com.material.xray.data.db.entity.ServerEntity
 import com.material.xray.model.PingMethod
@@ -76,7 +60,7 @@ internal fun AnimatedServerRows(
                     Column(modifier = Modifier.animateBounds(this@LookaheadScope)) {
                         if (index > 0) {
                             HorizontalDivider(
-                                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f),
+                                color = MaterialTheme.colorScheme.outlineVariant,
                             )
                         }
                         ServerRow(
@@ -107,10 +91,29 @@ internal fun ServerRow(
     contentPadding: PaddingValues = ServerRowDefaults.contentPadding,
 ) {
     val latency = server.latency
-    val latencyColor = if (latency?.let(::latencyShowsError) == true) {
-        MaterialTheme.colorScheme.error
+    val latencyText = when {
+        latency == null -> null
+        latency.latencyMs == LATENCY_TESTING -> stringResource(R.string.home_latency_testing)
+        latency.tcpingLatencyMs != null && latency.httpingLatencyMs != null -> {
+            val tcping = latencyCompactText(latency.tcpingLatencyMs)
+            val httping = latencyCompactText(latency.httpingLatencyMs)
+            "$tcping · $httping"
+        }
+        else -> if (latency.latencyMs < 0) {
+            stringResource(R.string.home_latency_not_available)
+        } else {
+            stringResource(R.string.home_latency_milliseconds, latency.latencyMs)
+        }
+    }
+    val latencyDescription = if (
+        latency?.tcpingLatencyMs != null && latency.httpingLatencyMs != null
+    ) {
+        val tcping = latencyAccessibleText(latency.tcpingLatencyMs)
+        val httping = latencyAccessibleText(latency.httpingLatencyMs)
+        "${stringResource(PingMethod.Tcping.labelResource)}: $tcping; " +
+            "${stringResource(PingMethod.Httping.labelResource)}: $httping"
     } else {
-        MaterialTheme.colorScheme.onSurfaceVariant
+        null
     }
 
     Surface(
@@ -118,16 +121,17 @@ internal fun ServerRow(
             .fillMaxWidth()
             .combinedClickable(onClick = onClick, onLongClick = onTestLatency),
         color = if (isSelected) {
-            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f)
+            MaterialTheme.colorScheme.primaryContainer
         } else {
             MaterialTheme.colorScheme.surfaceContainer
         },
     ) {
         // IntrinsicSize.Min gives the row a height the chevron can fill, so its tap target and
-        // ripple cover the whole strip at the row's end instead of a small circle inside it.
+        // ripple cover the whole strip at the row's end instead of a small indicator inside it.
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .heightIn(min = 64.dp)
                 .height(IntrinsicSize.Min),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -152,10 +156,18 @@ internal fun ServerRow(
                             overflow = TextOverflow.Ellipsis,
                         )
                         if (server.entity.edited) {
-                            ServerStateBadge(Icons.Outlined.Edit, R.string.home_server_edited)
+                            HomeStateBadge(
+                                text = stringResource(R.string.home_server_edited),
+                                leadingIcon = Icons.Outlined.Edit,
+                                showText = false,
+                            )
                         }
                         if (server.entity.guarded) {
-                            ServerStateBadge(Icons.Outlined.Shield, R.string.home_server_guarded)
+                            HomeStateBadge(
+                                text = stringResource(R.string.home_server_guarded),
+                                leadingIcon = Icons.Outlined.Shield,
+                                showText = false,
+                            )
                         }
                     }
                     Text(
@@ -166,17 +178,17 @@ internal fun ServerRow(
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-                if (latency != null) {
-                    Surface(
-                        shape = MaterialTheme.shapes.small,
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                        color = MaterialTheme.colorScheme.surface,
-                    ) {
-                        LatencyBadgeContent(
-                            latency = latency,
-                            color = latencyColor,
-                        )
-                    }
+                if (latencyText != null) {
+                    HomeStateBadge(
+                        text = latencyText,
+                        tone = if (latency != null && latencyShowsError(latency)) {
+                            HomeStateBadgeTone.Error
+                        } else {
+                            HomeStateBadgeTone.Neutral
+                        },
+                        isLoading = latency?.latencyMs == LATENCY_TESTING,
+                        contentDescription = latencyDescription,
+                    )
                 }
             }
             Box(
@@ -200,120 +212,6 @@ internal fun ServerRow(
     }
 }
 
-@Composable
-private fun ServerStateBadge(icon: ImageVector, @StringRes descriptionRes: Int) {
-    Icon(
-        imageVector = icon,
-        contentDescription = stringResource(descriptionRes),
-        modifier = Modifier.size(14.dp),
-        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
-}
-
-@Composable
-private fun LatencyBadgeContent(
-    latency: ServerLatencyState,
-    color: Color,
-) {
-    val tcpingLatencyMs = latency.tcpingLatencyMs
-    val httpingLatencyMs = latency.httpingLatencyMs
-    if (latency.latencyMs == LATENCY_TESTING) {
-        ShimmeringText(
-            text = stringResource(R.string.home_latency_testing),
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-            color = color,
-            style = MaterialTheme.typography.labelMedium,
-        )
-    } else if (tcpingLatencyMs != null && httpingLatencyMs != null) {
-        Row(
-            modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
-            horizontalArrangement = Arrangement.spacedBy(1.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            LatencyValue(tcpingLatencyMs, PingMethod.Tcping, Icons.Outlined.NetworkPing, color)
-            Text(
-                text = ",",
-                color = color,
-                style = MaterialTheme.typography.labelMedium.copy(letterSpacing = (-0.25).sp),
-            )
-            LatencyValue(httpingLatencyMs, PingMethod.Httping, Icons.Outlined.Dns, color)
-        }
-    } else {
-        Text(
-            text = if (latency.latencyMs < 0) {
-                stringResource(R.string.home_latency_not_available)
-            } else {
-                stringResource(R.string.home_latency_milliseconds, latency.latencyMs)
-            },
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-            color = color,
-            style = MaterialTheme.typography.labelMedium,
-        )
-    }
-}
-
-@Composable
-private fun ShimmeringText(
-    text: String,
-    color: Color,
-    style: TextStyle,
-    modifier: Modifier = Modifier,
-) {
-    val transition = rememberInfiniteTransition(label = "latency-shimmer")
-    val progress by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = LATENCY_SHIMMER_DURATION_MS, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart,
-        ),
-        label = "latency-shimmer-progress",
-    )
-    val shimmerWidth = with(LocalDensity.current) { 32.dp.toPx() }
-    val travelDistance = with(LocalDensity.current) { 120.dp.toPx() }
-    val startX = -shimmerWidth + progress * (travelDistance + shimmerWidth)
-    val brush = Brush.linearGradient(
-        colors = listOf(color.copy(alpha = 0.45f), color, color.copy(alpha = 0.45f)),
-        start = Offset(startX, 0f),
-        end = Offset(startX + shimmerWidth, 0f),
-    )
-
-    Text(
-        text = text,
-        modifier = modifier,
-        style = style.copy(brush = brush),
-    )
-}
-
-@Composable
-private fun LatencyValue(
-    latencyMs: Int,
-    method: PingMethod?,
-    icon: ImageVector,
-    color: Color,
-) {
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(1.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = if (latencyMs < 0) {
-                stringResource(R.string.home_latency_not_available)
-            } else {
-                stringResource(R.string.home_latency_milliseconds_compact, latencyMs)
-            },
-            color = color,
-            style = MaterialTheme.typography.labelMedium.copy(letterSpacing = (-0.25).sp),
-        )
-        Icon(
-            imageVector = icon,
-            contentDescription = method?.let { stringResource(it.labelResource) },
-            modifier = Modifier.size(13.dp),
-            tint = color,
-        )
-    }
-}
-
 internal fun latencyShowsError(latency: ServerLatencyState): Boolean {
     val httpingLatencyMs = latency.httpingLatencyMs
     if (latency.latencyMs == LATENCY_TESTING) return false
@@ -324,39 +222,119 @@ internal fun latencyShowsError(latency: ServerLatencyState): Boolean {
     }
 }
 
+@Composable
+private fun latencyCompactText(latencyMs: Int): String = if (latencyMs < 0) {
+    stringResource(R.string.home_latency_not_available)
+} else {
+    stringResource(R.string.home_latency_milliseconds_compact, latencyMs)
+}
+
+@Composable
+private fun latencyAccessibleText(latencyMs: Int): String = if (latencyMs < 0) {
+    stringResource(R.string.home_latency_not_available)
+} else {
+    stringResource(R.string.home_latency_milliseconds, latencyMs)
+}
+
+internal enum class HomeStateBadgeTone {
+    Neutral,
+    Primary,
+    Tertiary,
+    Error,
+}
+
+@Composable
+internal fun HomeStateBadge(
+    text: String,
+    modifier: Modifier = Modifier,
+    tone: HomeStateBadgeTone = HomeStateBadgeTone.Neutral,
+    leadingIcon: ImageVector? = null,
+    isLoading: Boolean = false,
+    showText: Boolean = true,
+    contentDescription: String? = null,
+) {
+    val containerColor = when (tone) {
+        HomeStateBadgeTone.Neutral -> MaterialTheme.colorScheme.surfaceContainerHighest
+        HomeStateBadgeTone.Primary -> MaterialTheme.colorScheme.primaryContainer
+        HomeStateBadgeTone.Tertiary -> MaterialTheme.colorScheme.tertiaryContainer
+        HomeStateBadgeTone.Error -> MaterialTheme.colorScheme.errorContainer
+    }
+    val contentColor = when (tone) {
+        HomeStateBadgeTone.Neutral -> MaterialTheme.colorScheme.onSurfaceVariant
+        HomeStateBadgeTone.Primary -> MaterialTheme.colorScheme.onPrimaryContainer
+        HomeStateBadgeTone.Tertiary -> MaterialTheme.colorScheme.onTertiaryContainer
+        HomeStateBadgeTone.Error -> MaterialTheme.colorScheme.onErrorContainer
+    }
+
+    Surface(
+        modifier = modifier
+            .heightIn(min = 24.dp)
+            .semantics(mergeDescendants = true) {
+                if (contentDescription != null) {
+                    this.contentDescription = contentDescription
+                }
+            },
+        shape = MaterialTheme.shapes.small,
+        color = containerColor,
+        contentColor = contentColor,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+    ) {
+        Row(
+            modifier = Modifier.padding(
+                horizontal = if (showText) 8.dp else 4.dp,
+                vertical = 4.dp,
+            ),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (leadingIcon != null) {
+                Icon(
+                    imageVector = leadingIcon,
+                    contentDescription = if (showText) null else text,
+                    modifier = Modifier.size(16.dp),
+                )
+            }
+            if (isLoading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(16.dp),
+                    strokeWidth = 2.dp,
+                    color = contentColor,
+                )
+            }
+            if (showText) {
+                Text(
+                    text = text,
+                    style = MaterialTheme.typography.labelMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+    }
+}
+
 private object ServerRowDefaults {
     // No end padding: the chevron's own strip supplies the row's end inset.
-    val contentPadding = PaddingValues(start = 12.dp, top = 10.dp, end = 0.dp, bottom = 10.dp)
+    val contentPadding = PaddingValues(start = 16.dp, top = 8.dp, end = 0.dp, bottom = 8.dp)
 
-    val chevronHorizontalPadding = 7.dp
+    val chevronHorizontalPadding = 8.dp
     val chevronIconSize = 20.dp
 }
 
-private const val LATENCY_SHIMMER_DURATION_MS = 850
-
 @Composable
 private fun CompactSelectionDot(isSelected: Boolean) {
-    Surface(
-        modifier = Modifier.size(18.dp),
-        shape = CircleShape,
-        color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(
-            width = 2.dp,
-            color = if (isSelected) {
-                MaterialTheme.colorScheme.primary
-            } else {
-                MaterialTheme.colorScheme.outline
-            },
-        ),
-    ) {
-        if (isSelected) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(4.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary),
-            )
-        }
-    }
+    Icon(
+        imageVector = if (isSelected) {
+            Icons.Filled.RadioButtonChecked
+        } else {
+            Icons.Outlined.RadioButtonUnchecked
+        },
+        contentDescription = null,
+        modifier = Modifier.size(20.dp),
+        tint = if (isSelected) {
+            MaterialTheme.colorScheme.primary
+        } else {
+            MaterialTheme.colorScheme.outline
+        },
+    )
 }

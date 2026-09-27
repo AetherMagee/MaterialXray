@@ -9,6 +9,8 @@
     <string name="logs_filter_all">All</string>
     <string name="logs_filter_app">App</string>
     <string name="logs_filter_xray" translatable="false">Xray</string>
+    <string name="logs_empty_title">No log entries</string>
+    <string name="logs_empty_message">New entries will appear here as the app records activity.</string>
     <string name="logs_copy_all">Copy all</string>
     <string name="logs_export">Export logs</string>
     <string name="logs_save_to_file">Save to file</string>

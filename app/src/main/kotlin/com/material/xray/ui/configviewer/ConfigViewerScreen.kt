@@ -26,7 +26,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
@@ -41,9 +40,9 @@ import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -92,6 +91,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import com.material.xray.R
 import com.material.xray.model.Protocol
+import com.material.xray.ui.components.FlatStateCard
 import com.material.xray.ui.components.ScrolledTopAppBar
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -211,13 +211,27 @@ fun ConfigViewerScreen(
                 // Reading a local row or file is quick enough that a spinner would only ever be a
                 // flash of noise between the fade-in and the content.
                 ConfigViewerUiState.Loading -> Unit
-                is ConfigViewerUiState.Message -> Text(
-                    text = stringResource(state.textRes),
+                is ConfigViewerUiState.Message -> FlatStateCard(
                     modifier = Modifier
                         .align(Alignment.Center)
-                        .padding(32.dp),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                        .padding(16.dp),
+                ) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.Top,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Info,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.error,
+                        )
+                        Text(
+                            text = stringResource(state.textRes),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
                 is ConfigViewerUiState.JsonDocument -> JsonDocumentContent(state)
                 is ConfigViewerUiState.JsonEditor -> JsonEditorContent(
                     state = state,
@@ -270,7 +284,7 @@ private fun JsonDocumentContent(state: ConfigViewerUiState.JsonDocument) {
     SelectionContainer {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(start = 16.dp, top = 14.dp, end = 16.dp, bottom = 24.dp),
+            contentPadding = PaddingValues(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 24.dp),
         ) {
             if (state.showDisclaimer) {
                 item(contentType = "banner") {
@@ -278,7 +292,7 @@ private fun JsonDocumentContent(state: ConfigViewerUiState.JsonDocument) {
                         titleRes = R.string.config_viewer_banner_title,
                         bodyRes = R.string.config_viewer_banner_body,
                     )
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
                 }
             }
             if (state.overrideActive) {
@@ -287,17 +301,17 @@ private fun JsonDocumentContent(state: ConfigViewerUiState.JsonDocument) {
                         titleRes = R.string.config_viewer_override_banner_title,
                         bodyRes = R.string.config_viewer_override_banner_body,
                     )
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
                 }
             }
             item(contentType = "codeEdge") {
-                CodeBlockEdge(codeBackground, RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp))
+                CodeBlockEdge(codeBackground)
             }
             items(state.lines, contentType = { "line" }) { tokens ->
                 JsonLine(tokens, colors, codeBackground)
             }
             item(contentType = "codeEdge") {
-                CodeBlockEdge(codeBackground, RoundedCornerShape(bottomStart = 12.dp, bottomEnd = 12.dp))
+                CodeBlockEdge(codeBackground)
             }
         }
     }
@@ -313,8 +327,8 @@ private fun JsonEditorContent(
         modifier = Modifier
             .fillMaxSize()
             .imePadding()
-            .padding(horizontal = 16.dp, vertical = 14.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+            .padding(horizontal = 16.dp, vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         state.errorRes?.let { EditErrorText(it) }
         OutlinedTextField(
@@ -333,11 +347,23 @@ private fun JsonEditorContent(
 
 @Composable
 private fun EditErrorText(@StringRes textRes: Int) {
-    Text(
-        text = stringResource(textRes),
-        style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.error,
-    )
+    FlatStateCard {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.Top,
+        ) {
+            Icon(
+                imageVector = Icons.Default.Info,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.error,
+            )
+            Text(
+                text = stringResource(textRes),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
+    }
 }
 
 @Composable
@@ -367,12 +393,12 @@ private fun JsonLine(tokens: List<JsonToken>, colors: JsonSyntaxColors, backgrou
 }
 
 @Composable
-private fun CodeBlockEdge(color: Color, shape: RoundedCornerShape) {
+private fun CodeBlockEdge(color: Color) {
     Spacer(
         modifier = Modifier
             .fillMaxWidth()
             .height(10.dp)
-            .background(color, shape),
+            .background(color),
     )
 }
 
@@ -412,8 +438,8 @@ private fun NoticeBanner(
 private fun ParamsList(state: ConfigViewerUiState.Params) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 16.dp, top = 14.dp, end = 16.dp, bottom = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+        contentPadding = PaddingValues(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         items(state.sections, contentType = { "section" }) { section ->
             ParamSectionCard(section)
@@ -436,8 +462,8 @@ private fun ParamsEditorList(
         modifier = Modifier
             .fillMaxSize()
             .imePadding(),
-        contentPadding = PaddingValues(start = 16.dp, top = 14.dp, end = 16.dp, bottom = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+        contentPadding = PaddingValues(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         state.errorRes?.let { errorRes ->
             item(contentType = "error") { EditErrorText(errorRes) }
@@ -458,15 +484,16 @@ private fun List<EditSection>.withField(key: EditKey, value: String): List<EditS
 
 @Composable
 private fun EditSectionCard(section: EditSection, onFieldChange: (EditKey, String) -> Unit) {
-    ElevatedCard(
+    Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+        shape = MaterialTheme.shapes.medium,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(
                 text = stringResource(section.titleRes),
@@ -607,7 +634,7 @@ private fun SaveModeOption(
         modifier = Modifier
             .fillMaxWidth()
             .selectable(selected = selected, role = Role.RadioButton, onClick = onSelect)
-            .padding(vertical = 6.dp),
+            .padding(vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         RadioButton(selected = selected, onClick = null)
@@ -624,15 +651,16 @@ private fun SaveModeOption(
 
 @Composable
 private fun ParamSectionCard(section: ParamSection) {
-    ElevatedCard(
+    Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+        shape = MaterialTheme.shapes.medium,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(
                 text = stringResource(section.titleRes),
@@ -689,15 +717,16 @@ private fun ParamLabel.resolve(): String = when (this) {
 
 @Composable
 private fun RawLinkCard(rawLink: String, stale: Boolean) {
-    ElevatedCard(
+    Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+        shape = MaterialTheme.shapes.medium,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(
                 text = stringResource(R.string.config_viewer_section_raw_link),

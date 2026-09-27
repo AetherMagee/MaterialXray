@@ -11,32 +11,37 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -46,6 +51,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
@@ -56,8 +62,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.material.xray.R
 import com.material.xray.service.LogEntry
 import com.material.xray.service.LogSource
-import com.material.xray.ui.components.AppBarTitle
+import com.material.xray.ui.components.FlatStateCard
 import com.material.xray.ui.components.ScrollFadeEdges
+import com.material.xray.ui.components.ScrolledTopAppBar
 import com.material.xray.ui.components.SegmentedTabRow
 import java.io.IOException
 import java.text.SimpleDateFormat
@@ -76,6 +83,7 @@ private enum class LogFilter(@param:StringRes val labelRes: Int) {
 fun LogsScreen(showTitleBarLogo: Boolean, viewModel: LogsViewModel = hiltViewModel()) {
     val allEntries by viewModel.entries.collectAsStateWithLifecycle()
     val pagerState = rememberPagerState(pageCount = { LogFilter.entries.size })
+    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
     val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
     var isExporting by remember { mutableStateOf(false) }
@@ -104,12 +112,13 @@ fun LogsScreen(showTitleBarLogo: Boolean, viewModel: LogsViewModel = hiltViewMod
     }
 
     Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         contentWindowInsets = WindowInsets(0.dp),
         topBar = {
-            TopAppBar(
-                title = { AppBarTitle(stringResource(R.string.navigation_logs), showTitleBarLogo) },
-                expandedHeight = 52.dp,
-                windowInsets = TopAppBarDefaults.windowInsets,
+            ScrolledTopAppBar(
+                title = stringResource(R.string.navigation_logs),
+                scrollBehavior = scrollBehavior,
+                showLogo = showTitleBarLogo,
                 actions = {
                     Box {
                         IconButton(
@@ -254,14 +263,45 @@ private fun LogEntriesList(
     LazyColumn(
         state = listState,
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(vertical = 4.dp),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
     ) {
-        items(
-            items = entries,
-            key = { it.id },
-            contentType = { it.source },
-        ) { entry ->
-            LogEntryRow(entry = entry, onCopy = { onCopy(entry) })
+        if (entries.isEmpty()) {
+            item(contentType = "empty") {
+                FlatStateCard {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = androidx.compose.ui.Alignment.Top,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Info,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                        )
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text(
+                                text = stringResource(R.string.logs_empty_title),
+                                style = MaterialTheme.typography.titleMedium,
+                            )
+                            Text(
+                                text = stringResource(R.string.logs_empty_message),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+            }
+        } else {
+            itemsIndexed(
+                items = entries,
+                key = { _, entry -> entry.id },
+                contentType = { _, entry -> entry.source },
+            ) { index, entry ->
+                if (index > 0) {
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                }
+                LogEntryRow(entry = entry, onCopy = { onCopy(entry) })
+            }
         }
     }
 }
@@ -289,6 +329,6 @@ private fun LogEntryRow(entry: LogEntry, onCopy: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .combinedClickable(onClick = {}, onLongClick = onCopy)
-            .padding(horizontal = 8.dp, vertical = 2.dp),
+            .padding(horizontal = 8.dp, vertical = 8.dp),
     )
 }
