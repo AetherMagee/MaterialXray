@@ -48,7 +48,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -71,7 +70,6 @@ fun QrScannerOverlay(
     onQrCodeScanned: (String) -> Unit,
     onClose: () -> Unit,
 ) {
-    val context = LocalContext.current
     var scanner by remember { mutableStateOf<Camera2QrScanner?>(null) }
     var cameraUnavailable by remember { mutableStateOf(false) }
 
@@ -85,7 +83,7 @@ fun QrScannerOverlay(
     Box(modifier = Modifier.fillMaxSize()) {
         AndroidView(
             factory = { viewContext ->
-                TextureView(viewContext).also { textureView ->
+                ScannerTextureView(viewContext).also { textureView ->
                     scanner = Camera2QrScanner(
                         context = viewContext.applicationContext,
                         textureView = textureView,
@@ -164,9 +162,31 @@ private fun ScannerMask(modifier: Modifier = Modifier) {
     }
 }
 
+private class ScannerTextureView(context: Context) : TextureView(context) {
+    private var focusPoint: Pair<Float, Float>? = null
+    var onFocusRequested: ((Float, Float) -> Unit)? = null
+
+    init {
+        isClickable = true
+        contentDescription = context.getString(R.string.home_scan_qr_code)
+    }
+
+    fun prepareFocus(x: Float, y: Float) {
+        focusPoint = x to y
+    }
+
+    override fun performClick(): Boolean {
+        super.performClick()
+        val point = focusPoint
+        focusPoint = null
+        onFocusRequested?.invoke(point?.first ?: width / 2f, point?.second ?: height / 2f)
+        return true
+    }
+}
+
 private class Camera2QrScanner(
     private val context: Context,
-    private val textureView: TextureView,
+    private val textureView: ScannerTextureView,
     private val onQrCodeScanned: (String) -> Unit,
     private val onCameraUnavailable: () -> Unit,
 ) {
@@ -203,9 +223,11 @@ private class Camera2QrScanner(
         } else {
             textureView.surfaceTextureListener = surfaceTextureListener
         }
-        textureView.setOnTouchListener { _, event ->
+        textureView.onFocusRequested = ::focusAt
+        textureView.setOnTouchListener { view, event ->
             if (event.action == MotionEvent.ACTION_UP) {
-                focusAt(event.x, event.y)
+                textureView.prepareFocus(event.x, event.y)
+                view.performClick()
             }
             true
         }
@@ -213,6 +235,7 @@ private class Camera2QrScanner(
 
     fun stop() {
         textureView.setOnTouchListener(null)
+        textureView.onFocusRequested = null
         textureView.surfaceTextureListener = null
         captureSession?.close()
         captureSession = null
