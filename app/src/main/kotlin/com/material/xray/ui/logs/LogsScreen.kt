@@ -11,6 +11,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
@@ -48,6 +49,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
@@ -72,6 +74,21 @@ private enum class LogFilter(@param:StringRes val labelRes: Int) {
     ALL(R.string.logs_filter_all),
     APP(R.string.logs_filter_app),
     XRAY(R.string.logs_filter_xray),
+}
+
+internal enum class LogSeverity { ERROR, WARNING, NORMAL }
+
+internal fun LogEntry.severity(): LogSeverity = when (source) {
+    LogSource.XRAY -> when {
+        displayMessage.startsWith("[Error]") -> LogSeverity.ERROR
+        displayMessage.startsWith("[Warning]") -> LogSeverity.WARNING
+        else -> LogSeverity.NORMAL
+    }
+    LogSource.APP -> if (message.startsWith("ERROR:", ignoreCase = true) || message.contains("fail", ignoreCase = true)) {
+        LogSeverity.ERROR
+    } else {
+        LogSeverity.NORMAL
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -284,9 +301,12 @@ private fun List<LogEntry>.filterBy(filter: LogFilter): List<LogEntry> = when (f
 private fun LogEntryRow(entry: LogEntry, showDivider: Boolean, onCopy: () -> Unit) {
     val timeFormat = remember { SimpleDateFormat("HH:mm:ss.SSS", Locale.US) }
     val time = remember(entry.timestamp) { timeFormat.format(Date(entry.timestamp)) }
-    val isError = entry.message.contains("error", ignoreCase = true) ||
-        entry.message.contains("fail", ignoreCase = true)
-    val messageColor = if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+    val warningColor = if (isSystemInDarkTheme()) Color(0xFFFFD54F) else Color(0xFF9A6700)
+    val messageColor = when (entry.severity()) {
+        LogSeverity.ERROR -> MaterialTheme.colorScheme.error
+        LogSeverity.WARNING -> warningColor
+        LogSeverity.NORMAL -> MaterialTheme.colorScheme.onSurface
+    }
 
     Box(
         modifier = Modifier
