@@ -61,6 +61,8 @@ import kotlinx.serialization.json.Json
 fun MainNavigation(
     pendingSubscriptionLink: String?,
     onSubscriptionLinkHandled: () -> Unit,
+    showDiagnosticsNotice: Boolean,
+    onDiagnosticsNoticeDismiss: () -> Unit,
 ) {
     val viewModel: MainNavigationViewModel = hiltViewModel()
     val navController = rememberNavController()
@@ -189,6 +191,8 @@ fun MainNavigation(
                         floatingConnectButton = floatingConnectButton,
                         pendingSubscriptionLink = pendingSubscriptionLink,
                         onSubscriptionLinkHandled = onSubscriptionLinkHandled,
+                        showDiagnosticsNotice = showDiagnosticsNotice,
+                        onDiagnosticsNoticeDismiss = onDiagnosticsNoticeDismiss,
                         onOpenServerConfig = { serverId, name ->
                             configViewerRequest = ConfigViewerRequest.Server(serverId, name)
                         },

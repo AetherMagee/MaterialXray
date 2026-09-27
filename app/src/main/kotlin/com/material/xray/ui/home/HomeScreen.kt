@@ -42,6 +42,8 @@ import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SystemUpdate
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -49,6 +51,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -133,6 +136,8 @@ fun HomeScreen(
     floatingConnectButton: Boolean,
     pendingSubscriptionLink: String?,
     onSubscriptionLinkHandled: () -> Unit,
+    showDiagnosticsNotice: Boolean,
+    onDiagnosticsNoticeDismiss: () -> Unit,
     onOpenServerConfig: (Long, String) -> Unit,
     onViewRunningConfig: () -> Unit,
     viewModel: HomeViewModel = hiltViewModel(),
@@ -323,6 +328,12 @@ fun HomeScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
+            if (showDiagnosticsNotice) {
+                item(key = "diagnosticsNotice", contentType = "diagnosticsNotice") {
+                    DiagnosticsNoticeBanner(onDismiss = onDiagnosticsNoticeDismiss)
+                }
+            }
+
             item {
                 ConnectionPanel(
                     connectionState = uiState.connectionState,
@@ -942,6 +953,37 @@ private fun ErrorCard(message: String) {
             text = message,
             color = MaterialTheme.colorScheme.error,
         )
+    }
+}
+
+@Composable
+private fun DiagnosticsNoticeBanner(onDismiss: () -> Unit) {
+    FlatStateCard {
+        Row(
+            modifier = Modifier.padding(start = 16.dp, top = 4.dp, bottom = 4.dp, end = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Info,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(20.dp),
+            )
+            Text(
+                text = stringResource(R.string.diagnostics_default_notice),
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            IconButton(onClick = onDismiss, modifier = Modifier.size(40.dp)) {
+                Icon(
+                    imageVector = Icons.Outlined.Close,
+                    contentDescription = stringResource(R.string.diagnostics_dismiss),
+                    modifier = Modifier.size(18.dp),
+                )
+            }
+        }
     }
 }
 

@@ -26,7 +26,6 @@ import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -369,7 +368,7 @@ internal fun ConnectionFab(
         } else {
             MaterialTheme.colorScheme.onSurfaceVariant
         },
-        shadowElevation = FloatingActionButtonDefaults.Elevation,
+        shadowElevation = 6.dp,
     ) {
         Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
             if (state.isTransitioning) {
