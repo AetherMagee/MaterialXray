@@ -76,6 +76,9 @@
     </plurals>
     <string name="home_no_active_xray_config">No active Xray config file was found.</string>
     <string name="home_connection_connected">Connected</string>
+    <string name="home_connection_uptime">Connected for %1$s</string>
+    <string name="home_connection_show_stats">Show connection stats</string>
+    <string name="home_connection_hide_stats">Hide connection stats</string>
     <string name="home_connection_connecting">Connecting&#8230;</string>
     <string name="home_connection_applying_routing">Applying routing changes&#8230;</string>
     <string name="home_connection_updating_routing">Updating routing data&#8230;</string>

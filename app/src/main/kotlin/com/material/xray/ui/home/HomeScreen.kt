@@ -158,6 +158,8 @@ fun HomeScreen(
 
     var showAddDialog by rememberSaveable { mutableStateOf(false) }
     var showAddMenu by rememberSaveable { mutableStateOf(false) }
+    // The connection card stays thin until the user opts into the live stats.
+    var connectionStatsExpanded by rememberSaveable { mutableStateOf(false) }
     var showQrScanner by remember { mutableStateOf(false) }
     var keepQrScannerDialog by remember { mutableStateOf(false) }
     var showReorderDialog by remember { mutableStateOf(false) }
@@ -330,7 +332,10 @@ fun HomeScreen(
         },
         bottomBar = {
             if (!floatingConnectButton) {
+                // Floating: margins keep the card detached from the screen edges and the app's
+                // bottom navigation, so it reads as a docked control rather than a footer.
                 ConnectionPanel(
+                    modifier = Modifier.padding(start = 16.dp, top = 8.dp, end = 16.dp, bottom = 12.dp),
                     connectionState = uiState.connectionState,
                     connectionProgress = uiState.connectionProgress,
                     geoDataDownloadFraction = uiState.geoDataDownloadFraction,
@@ -349,7 +354,8 @@ fun HomeScreen(
                     compact = false,
                     onClick = onConnectionClick,
                     onViewConfig = onViewRunningConfig,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    statsExpanded = connectionStatsExpanded,
+                    onStatsExpandedChange = { connectionStatsExpanded = it },
                 )
             }
         },

@@ -18,12 +18,10 @@ import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.SideEffect
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
@@ -40,12 +38,7 @@ fun ScrolledTopAppBar(
     navigationIcon: @Composable () -> Unit = {},
     actions: @Composable RowScope.() -> Unit = {},
 ) {
-    val surface = MaterialTheme.colorScheme.surface
-    val scrolledSurface = MaterialTheme.colorScheme.surfaceContainer
-    val overlappedFraction by remember(scrollBehavior) {
-        derivedStateOf { scrollBehavior.state.overlappedFraction.coerceIn(0f, 1f) }
-    }
-    val containerColor = lerp(surface, scrolledSurface, overlappedFraction)
+    val containerColor = MaterialTheme.colorScheme.surface
     val view = LocalView.current
     val window = remember(view) { view.context.findActivity()?.window }
 

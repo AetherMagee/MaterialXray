@@ -102,7 +102,6 @@ internal fun ConnectionStatsContent(
                         if ((activeBalancer?.servers?.size ?: 0) > 1) R.string.home_stats_average_ping else R.string.home_stats_ping,
                     ),
                     value = ping?.let { stringResource(R.string.home_stats_ping_value, it) },
-                    asStateBadge = true,
                     modifier = Modifier.weight(1f),
                 )
                 StatCell(
@@ -130,7 +129,6 @@ private fun StatCell(
     label: String,
     value: String?,
     modifier: Modifier = Modifier,
-    asStateBadge: Boolean = false,
 ) {
     val reading = value ?: stringResource(R.string.home_stats_unavailable)
 
@@ -159,18 +157,14 @@ private fun StatCell(
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        if (asStateBadge) {
-            HomeStateBadge(text = reading)
-        } else {
-            Text(
-                text = reading,
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                textAlign = TextAlign.Center,
-            )
-        }
+        Text(
+            text = reading,
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center,
+        )
     }
 }
 

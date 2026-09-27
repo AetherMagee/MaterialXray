@@ -80,7 +80,6 @@ import com.material.xray.model.RoutingRuleCatalog
 import com.material.xray.ui.apps.AppBypassContent
 import com.material.xray.ui.apps.AppRoutingMenuActions
 import com.material.xray.ui.components.FlatStateCard
-import com.material.xray.ui.components.ScrollFadeEdges
 import com.material.xray.ui.components.ScrolledTopAppBar
 import com.material.xray.ui.components.SegmentedTabRow
 import kotlinx.coroutines.launch
@@ -596,7 +595,6 @@ private fun RoutingRulesTab(
                 }
             }
         }
-        ScrollFadeEdges()
     }
 }
 

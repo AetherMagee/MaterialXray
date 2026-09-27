@@ -79,6 +79,9 @@
     </plurals>
     <string name="home_no_active_xray_config">Активный файл конфигурации Xray не найден.</string>
     <string name="home_connection_connected">Подключено</string>
+    <string name="home_connection_uptime">Подключено %1$s</string>
+    <string name="home_connection_show_stats">Показать статистику подключения</string>
+    <string name="home_connection_hide_stats">Скрыть статистику подключения</string>
     <string name="home_connection_connecting">Подключение&#8230;</string>
     <string name="home_connection_applying_routing">Применение изменений маршрутизации&#8230;</string>
     <string name="home_connection_updating_routing">Обновление данных маршрутизации&#8230;</string>

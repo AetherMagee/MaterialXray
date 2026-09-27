@@ -67,7 +67,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.material.xray.R
 import com.material.xray.model.RoutingPolicyControl
 import com.material.xray.ui.components.FlatStateCard
-import com.material.xray.ui.components.ScrollFadeEdges
 import com.material.xray.ui.components.SelectableOptionRow
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -257,7 +256,6 @@ fun AppBypassContent(active: Boolean, viewModel: AppsViewModel = hiltViewModel()
                         }
                     }
                 }
-                ScrollFadeEdges()
             }
         }
     }

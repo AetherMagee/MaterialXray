@@ -5,6 +5,12 @@ import android.content.Intent
 import android.provider.Settings
 import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -20,6 +26,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material.icons.filled.Settings
@@ -30,6 +37,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -41,6 +49,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
@@ -114,6 +123,64 @@ internal data class ConnectionUiState(
     val displayServerName: String,
 )
 
+/** The progress or uptime line under the status, in a fixed-height slot so the card does not jump. */
+@Composable
+private fun ConnectionDetailLine(
+    showProgressDetails: Boolean,
+    connectionProgress: ConnectionProgress?,
+    connectedStartTime: Long?,
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(
+                with(LocalDensity.current) { MaterialTheme.typography.bodySmall.lineHeight.toDp() },
+            ),
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        when {
+            showProgressDetails && connectionProgress != null -> Text(
+                text = connectionProgressText(connectionProgress),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Start,
+            )
+            connectedStartTime != null -> CoreUptime(startTime = connectedStartTime)
+        }
+    }
+}
+
+/** The chevron that expands the live stats block, present only while stats can be shown. */
+@Composable
+private fun ConnectionStatsDisclosure(
+    showsStats: Boolean,
+    expanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
+) {
+    if (!showsStats) return
+    val chevronRotation by animateFloatAsState(
+        targetValue = if (expanded) 180f else 0f,
+        animationSpec = tween(140),
+        label = "connectionStatsChevron",
+    )
+    IconButton(
+        onClick = { onExpandedChange(!expanded) },
+        modifier = Modifier.size(40.dp),
+    ) {
+        Icon(
+            imageVector = Icons.Default.KeyboardArrowDown,
+            contentDescription = stringResource(
+                if (expanded) R.string.home_connection_hide_stats else R.string.home_connection_show_stats,
+            ),
+            modifier = Modifier
+                .size(20.dp)
+                .rotate(chevronRotation),
+        )
+    }
+}
+
 @Composable
 internal fun ConnectionPanel(
     connectionState: ConnectionState,
@@ -134,6 +201,8 @@ internal fun ConnectionPanel(
     compact: Boolean,
     onClick: () -> Unit,
     onViewConfig: () -> Unit,
+    statsExpanded: Boolean = false,
+    onStatsExpandedChange: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val buttonEnabled = (canStart || isConnected || isRestartRequired || isInterfaceBusy) && !isTransitioning
@@ -206,33 +275,18 @@ internal fun ConnectionPanel(
                     )
 
                     if (showProgress) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(
-                                    with(LocalDensity.current) {
-                                        MaterialTheme.typography.bodySmall.lineHeight.toDp()
-                                    },
-                                ),
-                            contentAlignment = Alignment.CenterStart,
-                        ) {
-                            when {
-                                showProgressDetails && connectionProgress != null -> Text(
-                                    text = connectionProgressText(connectionProgress),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    textAlign = TextAlign.Start,
-                                )
-                                connectionState is ConnectionState.Connected -> CoreUptime(
-                                    startTime = connectionState.startTime,
-                                )
-                            }
-                        }
+                        ConnectionDetailLine(
+                            showProgressDetails = showProgressDetails,
+                            connectionProgress = connectionProgress,
+                            connectedStartTime = (connectionState as? ConnectionState.Connected)?.startTime,
+                        )
                     }
 
-                    AnimatedVisibility(visible = connectionState.showsConnectionStats()) {
+                    AnimatedVisibility(
+                        visible = connectionState.showsConnectionStats() && statsExpanded,
+                        enter = fadeIn(tween(140)) + expandVertically(tween(140)),
+                        exit = fadeOut(tween(100)) + shrinkVertically(tween(100)),
+                    ) {
                         ConnectionStatsContent(
                             activeBalancer = activeBalancer,
                             pingMs = pingMs,
@@ -242,6 +296,11 @@ internal fun ConnectionPanel(
                     }
                 }
 
+                ConnectionStatsDisclosure(
+                    showsStats = connectionState.showsConnectionStats(),
+                    expanded = statsExpanded,
+                    onExpandedChange = onStatsExpandedChange,
+                )
                 Button(
                     onClick = onClick,
                     enabled = buttonEnabled,
@@ -488,7 +547,7 @@ private fun CoreUptime(startTime: Long) {
     }
 
     Text(
-        text = formatCoreUptime(currentTime - startTime),
+        text = stringResource(R.string.home_connection_uptime, formatCoreUptime(currentTime - startTime)),
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         maxLines = 1,

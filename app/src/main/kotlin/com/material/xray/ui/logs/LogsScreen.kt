@@ -63,7 +63,6 @@ import com.material.xray.R
 import com.material.xray.service.LogEntry
 import com.material.xray.service.LogSource
 import com.material.xray.ui.components.FlatStateCard
-import com.material.xray.ui.components.ScrollFadeEdges
 import com.material.xray.ui.components.ScrolledTopAppBar
 import com.material.xray.ui.components.SegmentedTabRow
 import java.io.IOException
@@ -227,7 +226,6 @@ fun LogsScreen(showTitleBarLogo: Boolean, viewModel: LogsViewModel = hiltViewMod
                     },
                 )
             }
-            ScrollFadeEdges()
         }
     }
 }
