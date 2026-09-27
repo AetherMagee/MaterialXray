@@ -23,8 +23,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
@@ -56,7 +54,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -82,12 +80,7 @@ import com.material.xray.ui.apps.AppRoutingMenuActions
 import com.material.xray.ui.components.FlatStateCard
 import com.material.xray.ui.components.ScrolledTopAppBar
 import com.material.xray.ui.components.SegmentedTabRow
-import kotlinx.coroutines.launch
-
-private enum class RoutingTab(@StringRes val titleResource: Int) {
-    Rules(R.string.routing_tab_rules),
-    Apps(R.string.routing_tab_apps),
-}
+import com.material.xray.ui.components.TabbedContent
 
 private sealed interface RoutingRuleAction {
     data object Add : RoutingRuleAction
@@ -107,7 +100,7 @@ private val defaultRoutingRulesById = RoutingRuleCatalog.defaults().associateBy(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun RoutingScreen(
+internal fun RoutingScreen(
     showTitleBarLogo: Boolean,
     onViewRule: (RoutingRuleViewerRequest) -> Unit,
     onEditRule: (EditableRoutingRule) -> Unit,
@@ -118,15 +111,15 @@ fun RoutingScreen(
     val routingPolicyControl by viewModel.routingPolicyControl.collectAsStateWithLifecycle()
     val automaticRoutingProviderName by viewModel.automaticRoutingProviderName.collectAsStateWithLifecycle()
     val profileRouting by viewModel.profileRouting.collectAsStateWithLifecycle()
-    val pagerState = rememberPagerState(pageCount = { RoutingTab.entries.size })
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
-    val coroutineScope = rememberCoroutineScope()
-    var previousTab by remember { mutableIntStateOf(pagerState.currentPage) }
+    // The tab strip floats over the lists at the bottom of this tab, so the selection belongs here
+    // with it rather than in the shared navigation bar.
+    var selectedTab by rememberSaveable { mutableStateOf(RoutingTab.Rules) }
+    var previousTab by remember { mutableIntStateOf(selectedTab.ordinal) }
     var selectedRuleIds by remember { mutableStateOf(emptySet<String>()) }
     var pendingProfileAction by remember { mutableStateOf<ProfileRoutingRuleAction?>(null) }
     var confirmResetToDefault by remember { mutableStateOf(false) }
     val selectionMode by remember { derivedStateOf { selectedRuleIds.isNotEmpty() } }
-    val selectedTab = pagerState.currentPage
     val newRuleName = stringResource(R.string.routing_new_rule_name)
 
     fun applyRuleAction(action: RoutingRuleAction) {
@@ -177,13 +170,13 @@ fun RoutingScreen(
     }
 
     LaunchedEffect(selectedTab) {
-        if (previousTab != selectedTab) {
+        if (previousTab != selectedTab.ordinal) {
             if (previousTab == RoutingTab.Rules.ordinal) {
                 selectedRuleIds = emptySet()
             }
             viewModel.applyPendingChangesIfNeeded()
         }
-        previousTab = selectedTab
+        previousTab = selectedTab.ordinal
     }
 
     Scaffold(
@@ -192,7 +185,7 @@ fun RoutingScreen(
         topBar = {
             RoutingTopBar(
                 scrollBehavior = scrollBehavior,
-                selectedTab = RoutingTab.entries[pagerState.currentPage],
+                selectedTab = selectedTab,
                 showTitleBarLogo = showTitleBarLogo,
                 selectionMode = selectionMode,
                 selectedRuleIds = selectedRuleIds,
@@ -201,66 +194,66 @@ fun RoutingScreen(
                 onRuleAction = ::applyRuleAction,
             )
         },
-        bottomBar = {
+    ) { padding ->
+        Box(modifier = Modifier.fillMaxSize()) {
+            TabbedContent(
+                selectedTab = selectedTab.ordinal,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding),
+            ) { page ->
+                when (RoutingTab.entries[page]) {
+                    RoutingTab.Rules -> RoutingRulesTab(
+                        customRules = rules,
+                        subscriptionRules = subscriptionRules,
+                        profileRules = profileRouting?.rules.orEmpty(),
+                        providerManaged = routingPolicyControl == RoutingPolicyControl.SubscriptionProvider,
+                        providerName = automaticRoutingProviderName,
+                        selectionMode = selectionMode,
+                        selectedRuleIds = selectedRuleIds,
+                        onRuleToggled = { rule, enabled -> applyRuleAction(RoutingRuleAction.Toggle(rule, enabled)) },
+                        onRuleClick = { rule ->
+                            if (selectionMode) {
+                                selectedRuleIds = selectedRuleIds.toggle(rule.id)
+                            } else {
+                                applyRuleAction(RoutingRuleAction.Edit(rule))
+                            }
+                        },
+                        onRuleLongClick = { rule ->
+                            selectedRuleIds = selectedRuleIds.toggle(rule.id)
+                        },
+                        onSubscriptionRuleClick = { rule -> onViewRule(rule.toViewerRequest()) },
+                        onProfileRuleClick = { rule ->
+                            if (rule.orphaned || rule.editableRule == null) {
+                                onViewRule(rule.toViewerRequest())
+                            } else {
+                                onEditRule(
+                                    EditableRoutingRule(
+                                        rule = rule.editableRule,
+                                        isNew = false,
+                                        profileOriginalRuleJson = rule.originalRuleJson,
+                                        profileOriginalIndex = rule.originalIndex,
+                                        rawJson = rule.rawJson,
+                                    ),
+                                )
+                            }
+                        },
+                        onProfileRuleToggled = { rule, enabled ->
+                            requestProfileRuleAction(ProfileRoutingRuleAction.Toggle(rule, enabled))
+                        },
+                    )
+                    RoutingTab.Apps -> AppBypassContent(active = selectedTab == RoutingTab.Apps)
+                }
+            }
+
             SegmentedTabRow(
                 labels = RoutingTab.entries.map { stringResource(it.titleResource) },
-                selectedIndex = selectedTab,
-                onSelected = { index ->
-                    coroutineScope.launch {
-                        pagerState.animateScrollToPage(index)
-                    }
-                },
+                selectedIndex = selectedTab.ordinal,
+                onSelected = { index -> selectedTab = RoutingTab.entries[index] },
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
             )
-        },
-    ) { padding ->
-        HorizontalPager(
-            state = pagerState,
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding),
-        ) { page ->
-            when (RoutingTab.entries[page]) {
-                RoutingTab.Rules -> RoutingRulesTab(
-                    customRules = rules,
-                    subscriptionRules = subscriptionRules,
-                    profileRules = profileRouting?.rules.orEmpty(),
-                    providerManaged = routingPolicyControl == RoutingPolicyControl.SubscriptionProvider,
-                    providerName = automaticRoutingProviderName,
-                    selectionMode = selectionMode,
-                    selectedRuleIds = selectedRuleIds,
-                    onRuleToggled = { rule, enabled -> applyRuleAction(RoutingRuleAction.Toggle(rule, enabled)) },
-                    onRuleClick = { rule ->
-                        if (selectionMode) {
-                            selectedRuleIds = selectedRuleIds.toggle(rule.id)
-                        } else {
-                            applyRuleAction(RoutingRuleAction.Edit(rule))
-                        }
-                    },
-                    onRuleLongClick = { rule ->
-                        selectedRuleIds = selectedRuleIds.toggle(rule.id)
-                    },
-                    onSubscriptionRuleClick = { rule -> onViewRule(rule.toViewerRequest()) },
-                    onProfileRuleClick = { rule ->
-                        if (rule.orphaned || rule.editableRule == null) {
-                            onViewRule(rule.toViewerRequest())
-                        } else {
-                            onEditRule(
-                                EditableRoutingRule(
-                                    rule = rule.editableRule,
-                                    isNew = false,
-                                    profileOriginalRuleJson = rule.originalRuleJson,
-                                    profileOriginalIndex = rule.originalIndex,
-                                    rawJson = rule.rawJson,
-                                ),
-                            )
-                        }
-                    },
-                    onProfileRuleToggled = { rule, enabled ->
-                        requestProfileRuleAction(ProfileRoutingRuleAction.Toggle(rule, enabled))
-                    },
-                )
-                RoutingTab.Apps -> AppBypassContent(active = selectedTab == RoutingTab.Apps.ordinal)
-            }
         }
     }
 
@@ -410,7 +403,7 @@ private fun RoutingRulesTab(
     Box(modifier = Modifier.fillMaxSize()) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 24.dp),
+            contentPadding = PaddingValues(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 96.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             if (providerManaged) {

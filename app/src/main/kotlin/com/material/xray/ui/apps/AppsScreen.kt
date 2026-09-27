@@ -157,7 +157,7 @@ fun AppBypassContent(active: Boolean, viewModel: AppsViewModel = hiltViewModel()
             Box(modifier = Modifier.fillMaxSize()) {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
+                    contentPadding = PaddingValues(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 96.dp),
                 ) {
                     if (apps.isEmpty()) {
                         item(contentType = "empty") {

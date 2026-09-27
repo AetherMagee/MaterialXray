@@ -6,7 +6,6 @@ import android.provider.Settings
 import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -52,6 +51,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -59,6 +59,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
@@ -69,6 +70,7 @@ import com.material.xray.model.ConnectionProgress
 import com.material.xray.model.ConnectionState
 import com.material.xray.model.ServerConfig
 import com.material.xray.model.SessionTrafficMetrics
+import com.material.xray.ui.components.AppMotion
 import java.util.Locale
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
@@ -152,7 +154,11 @@ private fun ConnectionDetailLine(
     }
 }
 
-/** The chevron that expands the live stats block, present only while stats can be shown. */
+/**
+ * The chevron that expands the live stats block, present only while stats can be shown. The card
+ * floats above the bottom navigation bar and opens upward over the list, so the collapsed state
+ * points up and the expanded state points back down.
+ */
 @Composable
 private fun ConnectionStatsDisclosure(
     showsStats: Boolean,
@@ -161,8 +167,8 @@ private fun ConnectionStatsDisclosure(
 ) {
     if (!showsStats) return
     val chevronRotation by animateFloatAsState(
-        targetValue = if (expanded) 180f else 0f,
-        animationSpec = tween(140),
+        targetValue = if (expanded) 0f else 180f,
+        animationSpec = AppMotion.spec(),
         label = "connectionStatsChevron",
     )
     IconButton(
@@ -203,9 +209,11 @@ internal fun ConnectionPanel(
     onViewConfig: () -> Unit,
     statsExpanded: Boolean = false,
     onStatsExpandedChange: (Boolean) -> Unit = {},
+    onCardHeightChange: (Dp) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val buttonEnabled = (canStart || isConnected || isRestartRequired || isInterfaceBusy) && !isTransitioning
+    val density = LocalDensity.current
     val buttonContentColor = when {
         isRestartRequired || isInterfaceBusy || isConnected && !isAlwaysOnVpn -> MaterialTheme.colorScheme.onError
         isTransitioning -> MaterialTheme.colorScheme.onTertiary
@@ -234,7 +242,11 @@ internal fun ConnectionPanel(
             )
         }
 
-        AnimatedVisibility(visible = connectionState.showsConnectionStats()) {
+        AnimatedVisibility(
+            visible = connectionState.showsConnectionStats(),
+            enter = fadeIn(AppMotion.spec()) + expandVertically(AppMotion.spec()),
+            exit = fadeOut(AppMotion.spec()) + shrinkVertically(AppMotion.spec()),
+        ) {
             ConnectionStatsBanner(
                 activeBalancer = activeBalancer,
                 pingMs = pingMs,
@@ -247,7 +259,9 @@ internal fun ConnectionPanel(
             (isTransitioning && showProgressDetails && connectionProgress != null)
 
         Card(
-            modifier = modifier.fillMaxWidth(),
+            modifier = modifier
+                .fillMaxWidth()
+                .onSizeChanged { size -> onCardHeightChange(with(density) { size.height.toDp() }) },
             shape = MaterialTheme.shapes.extraLarge,
             colors = CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.surfaceContainer,
@@ -284,8 +298,8 @@ internal fun ConnectionPanel(
 
                     AnimatedVisibility(
                         visible = connectionState.showsConnectionStats() && statsExpanded,
-                        enter = fadeIn(tween(140)) + expandVertically(tween(140)),
-                        exit = fadeOut(tween(100)) + shrinkVertically(tween(100)),
+                        enter = fadeIn(AppMotion.spec()) + expandVertically(AppMotion.spec()),
+                        exit = fadeOut(AppMotion.spec()) + shrinkVertically(AppMotion.spec()),
                     ) {
                         ConnectionStatsContent(
                             activeBalancer = activeBalancer,

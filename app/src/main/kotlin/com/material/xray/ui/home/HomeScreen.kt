@@ -94,6 +94,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.core.app.ActivityCompat
@@ -160,6 +161,9 @@ fun HomeScreen(
     var showAddMenu by rememberSaveable { mutableStateOf(false) }
     // The connection card stays thin until the user opts into the live stats.
     var connectionStatsExpanded by rememberSaveable { mutableStateOf(false) }
+    // The floating connection card reports its height, so the list reserves exactly enough room
+    // to scroll the last item clear of it, expanded stats included.
+    var connectionCardHeight by remember { mutableStateOf(88.dp) }
     var showQrScanner by remember { mutableStateOf(false) }
     var keepQrScannerDialog by remember { mutableStateOf(false) }
     var showReorderDialog by remember { mutableStateOf(false) }
@@ -303,223 +307,227 @@ fun HomeScreen(
         )
     }
 
-    Scaffold(
-        modifier = Modifier.nestedScroll(topAppBarScrollBehavior.nestedScrollConnection),
-        contentWindowInsets = WindowInsets(0.dp),
-        topBar = {
-            ScrolledTopAppBar(
-                title = stringResource(R.string.app_name),
-                scrollBehavior = topAppBarScrollBehavior,
-                showLogo = showTitleBarLogo,
-                actions = {
-                    Box {
-                        IconButton(onClick = { showAddMenu = true }) {
-                            Icon(
-                                painter = painterResource(R.drawable.ic_add_24),
-                                contentDescription = stringResource(R.string.home_add_server_or_subscription),
+    Box(modifier = Modifier.fillMaxSize()) {
+        Scaffold(
+            modifier = Modifier.nestedScroll(topAppBarScrollBehavior.nestedScrollConnection),
+            contentWindowInsets = WindowInsets(0.dp),
+            topBar = {
+                ScrolledTopAppBar(
+                    title = stringResource(R.string.app_name),
+                    scrollBehavior = topAppBarScrollBehavior,
+                    showLogo = showTitleBarLogo,
+                    actions = {
+                        Box {
+                            IconButton(onClick = { showAddMenu = true }) {
+                                Icon(
+                                    painter = painterResource(R.drawable.ic_add_24),
+                                    contentDescription = stringResource(R.string.home_add_server_or_subscription),
+                                )
+                            }
+                            AddSubscriptionMenu(
+                                expanded = showAddMenu,
+                                onDismissRequest = { showAddMenu = false },
+                                onPasteFromClipboard = pasteFromClipboard,
+                                onScanQrCode = openQrScanner,
+                                onAddManually = { showAddDialog = true },
                             )
                         }
-                        AddSubscriptionMenu(
-                            expanded = showAddMenu,
-                            onDismissRequest = { showAddMenu = false },
+                    },
+                )
+            },
+            floatingActionButton = {
+                ConnectionFab(
+                    visible = floatingConnectButton,
+                    state = connectionUiState,
+                    canStart = uiState.selectedServer != null,
+                    onClick = onConnectionClick,
+                    onViewConfig = onViewRunningConfig,
+                )
+            },
+        ) { padding ->
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding),
+                contentPadding = homeListContentPadding(floatingConnectButton, connectionCardHeight),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                if (showDiagnosticsNotice) {
+                    item(key = "diagnosticsNotice", contentType = "diagnosticsNotice") {
+                        DiagnosticsNoticeBanner(onDismiss = onDiagnosticsNoticeDismiss)
+                    }
+                }
+
+                uiState.availableUpdate?.let { update ->
+                    item(key = "appUpdate", contentType = "appUpdate") {
+                        AppUpdateBanner(
+                            update = update,
+                            installProgress = uiState.appUpdateInstallProgress,
+                            onInstall = { viewModel.installAppUpdate(update) },
+                        )
+                    }
+                }
+
+                if (floatingConnectButton) {
+                    item(key = "connectionPanel", contentType = "connectionPanel") {
+                        ConnectionPanel(
+                            connectionState = uiState.connectionState,
+                            connectionProgress = uiState.connectionProgress,
+                            geoDataDownloadFraction = uiState.geoDataDownloadFraction,
+                            showProgressDetails = uiState.showAdvancedOptions,
+                            selectedServerName = connectionUiState.displayServerName,
+                            activeBalancer = uiState.activeBalancer,
+                            pingMs = viewModel.activeServerPingMs,
+                            sessionTraffic = viewModel.sessionTraffic,
+                            buttonColor = connectionUiState.buttonColor,
+                            isConnected = connectionUiState.isConnected,
+                            isRestartRequired = connectionUiState.isRestartRequired,
+                            isInterfaceBusy = connectionUiState.isInterfaceBusy,
+                            isTransitioning = connectionUiState.isTransitioning,
+                            isAlwaysOnVpn = connectionUiState.isAlwaysOnVpn,
+                            canStart = uiState.selectedServer != null,
+                            compact = true,
+                            onClick = onConnectionClick,
+                            onViewConfig = onViewRunningConfig,
+                        )
+                    }
+                }
+
+                val errorState = uiState.connectionState as? ConnectionState.Error
+                if (errorState != null) {
+                    item {
+                        ErrorCard(message = errorState.message)
+                    }
+                }
+
+                val subscriptions = uiState.subscriptions
+                when {
+                    subscriptions == null -> item {
+                        val loadingText = stringResource(R.string.home_loading_subscriptions)
+                        FlatStateCard {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .semantics(mergeDescendants = true) {
+                                        contentDescription = loadingText
+                                    },
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier
+                                        .size(24.dp)
+                                        .clearAndSetSemantics {},
+                                )
+                                Text(
+                                    text = loadingText,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    }
+                    subscriptions.isEmpty() -> item {
+                        EmptySubscriptionsCard(
                             onPasteFromClipboard = pasteFromClipboard,
                             onScanQrCode = openQrScanner,
                             onAddManually = { showAddDialog = true },
                         )
                     }
-                },
-            )
-        },
-        bottomBar = {
-            if (!floatingConnectButton) {
-                // Floating: margins keep the card detached from the screen edges and the app's
-                // bottom navigation, so it reads as a docked control rather than a footer.
-                ConnectionPanel(
-                    modifier = Modifier.padding(start = 16.dp, top = 8.dp, end = 16.dp, bottom = 12.dp),
-                    connectionState = uiState.connectionState,
-                    connectionProgress = uiState.connectionProgress,
-                    geoDataDownloadFraction = uiState.geoDataDownloadFraction,
-                    showProgressDetails = uiState.showAdvancedOptions,
-                    selectedServerName = connectionUiState.displayServerName,
-                    activeBalancer = uiState.activeBalancer,
-                    pingMs = viewModel.activeServerPingMs,
-                    sessionTraffic = viewModel.sessionTraffic,
-                    buttonColor = connectionUiState.buttonColor,
-                    isConnected = connectionUiState.isConnected,
-                    isRestartRequired = connectionUiState.isRestartRequired,
-                    isInterfaceBusy = connectionUiState.isInterfaceBusy,
-                    isTransitioning = connectionUiState.isTransitioning,
-                    isAlwaysOnVpn = connectionUiState.isAlwaysOnVpn,
-                    canStart = uiState.selectedServer != null,
-                    compact = false,
-                    onClick = onConnectionClick,
-                    onViewConfig = onViewRunningConfig,
-                    statsExpanded = connectionStatsExpanded,
-                    onStatsExpandedChange = { connectionStatsExpanded = it },
-                )
-            }
-        },
-        floatingActionButton = {
-            ConnectionFab(
-                visible = floatingConnectButton,
-                state = connectionUiState,
-                canStart = uiState.selectedServer != null,
-                onClick = onConnectionClick,
-                onViewConfig = onViewRunningConfig,
-            )
-        },
-    ) { padding ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding),
-            contentPadding = homeListContentPadding(floatingConnectButton),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            if (showDiagnosticsNotice) {
-                item(key = "diagnosticsNotice", contentType = "diagnosticsNotice") {
-                    DiagnosticsNoticeBanner(onDismiss = onDiagnosticsNoticeDismiss)
-                }
-            }
-
-            uiState.availableUpdate?.let { update ->
-                item(key = "appUpdate", contentType = "appUpdate") {
-                    AppUpdateBanner(
-                        update = update,
-                        installProgress = uiState.appUpdateInstallProgress,
-                        onInstall = { viewModel.installAppUpdate(update) },
-                    )
-                }
-            }
-
-            if (floatingConnectButton) {
-                item(key = "connectionPanel", contentType = "connectionPanel") {
-                    ConnectionPanel(
-                        connectionState = uiState.connectionState,
-                        connectionProgress = uiState.connectionProgress,
-                        geoDataDownloadFraction = uiState.geoDataDownloadFraction,
-                        showProgressDetails = uiState.showAdvancedOptions,
-                        selectedServerName = connectionUiState.displayServerName,
-                        activeBalancer = uiState.activeBalancer,
-                        pingMs = viewModel.activeServerPingMs,
-                        sessionTraffic = viewModel.sessionTraffic,
-                        buttonColor = connectionUiState.buttonColor,
-                        isConnected = connectionUiState.isConnected,
-                        isRestartRequired = connectionUiState.isRestartRequired,
-                        isInterfaceBusy = connectionUiState.isInterfaceBusy,
-                        isTransitioning = connectionUiState.isTransitioning,
-                        isAlwaysOnVpn = connectionUiState.isAlwaysOnVpn,
-                        canStart = uiState.selectedServer != null,
-                        compact = true,
-                        onClick = onConnectionClick,
-                        onViewConfig = onViewRunningConfig,
-                    )
-                }
-            }
-
-            val errorState = uiState.connectionState as? ConnectionState.Error
-            if (errorState != null) {
-                item {
-                    ErrorCard(message = errorState.message)
-                }
-            }
-
-            val subscriptions = uiState.subscriptions
-            when {
-                subscriptions == null -> item {
-                    val loadingText = stringResource(R.string.home_loading_subscriptions)
-                    FlatStateCard {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .semantics(mergeDescendants = true) {
-                                    contentDescription = loadingText
-                                },
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            CircularProgressIndicator(
-                                modifier = Modifier
-                                    .size(24.dp)
-                                    .clearAndSetSemantics {},
+                    else -> {
+                        items(
+                            items = subscriptions,
+                            key = { it.id },
+                            contentType = { "subscription" },
+                        ) { subscription ->
+                            val servers = uiState.serversBySubscription[subscription.id].orEmpty()
+                            val manualRouting = subscription.manualRoutingData(
+                                policy = uiState.routingPolicyControl,
+                                selectedProvider = uiState.providerRoutingAvailability,
                             )
-                            Text(
-                                text = loadingText,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            SubscriptionCard(
+                                subscription = subscription,
+                                isRefreshing = subscription.id in uiState.refreshingSubscriptionIds,
+                                servers = servers,
+                                selectedServerId = uiState.selectedServerId,
+                                defaultPingMethod = uiState.defaultPingMethod,
+                                canApplyRouting = manualRouting.appRouting != null || manualRouting.routing != null,
+                                canCollapse = subscriptions.size > 1,
+                                expanded = subscription.id !in collapsedSubscriptionIds,
+                                canReorder = subscriptions.size > 1,
+                                onExpandedChange = { expanded ->
+                                    context.setSubscriptionExpanded(
+                                        collapsedSubscriptionIds,
+                                        subscription.id,
+                                        expanded,
+                                    )
+                                },
+                                onDelete = {
+                                    if (servers.isEmpty()) {
+                                        viewModel.deleteSubscription(subscription)
+                                    } else {
+                                        removeSubscriptionRequest = subscription to servers.size
+                                    }
+                                },
+                                onEdit = { editingSubscriptionId = subscription.id },
+                                onReorder = { showReorderDialog = true },
+                                onRefresh = { viewModel.refreshSubscription(subscription) },
+                                onTestAll = { viewModel.testSubscriptionLatencies(subscription) },
+                                onPingMethodRequested = {
+                                    showPingMethodDialog = true
+                                    pingMethodDialogSubscriptionId = subscription.id
+                                },
+                                onDescriptionUrlClick = { url ->
+                                    pendingDescriptionLink = PendingSubscriptionLink(
+                                        subscriptionId = subscription.id,
+                                        description = subscription.announce?.trim().orEmpty(),
+                                        url = url,
+                                    )
+                                },
+                                onApplyRouting = { viewModel.requestApplySubscriptionRouting(subscription) },
+                                onDescriptionHiddenChange = { hidden ->
+                                    viewModel.setSubscriptionDescriptionHidden(subscription.id, hidden)
+                                },
+                                onServerSelected = { viewModel.selectServer(it) },
+                                onTestLatency = { viewModel.testLatency(it) },
+                                onOpenServerConfig = onOpenServerConfig,
                             )
                         }
                     }
                 }
-                subscriptions.isEmpty() -> item {
-                    EmptySubscriptionsCard(
-                        onPasteFromClipboard = pasteFromClipboard,
-                        onScanQrCode = openQrScanner,
-                        onAddManually = { showAddDialog = true },
-                    )
-                }
-                else -> {
-                    items(
-                        items = subscriptions,
-                        key = { it.id },
-                        contentType = { "subscription" },
-                    ) { subscription ->
-                        val servers = uiState.serversBySubscription[subscription.id].orEmpty()
-                        val manualRouting = subscription.manualRoutingData(
-                            policy = uiState.routingPolicyControl,
-                            selectedProvider = uiState.providerRoutingAvailability,
-                        )
-                        SubscriptionCard(
-                            subscription = subscription,
-                            isRefreshing = subscription.id in uiState.refreshingSubscriptionIds,
-                            servers = servers,
-                            selectedServerId = uiState.selectedServerId,
-                            defaultPingMethod = uiState.defaultPingMethod,
-                            canApplyRouting = manualRouting.appRouting != null || manualRouting.routing != null,
-                            canCollapse = subscriptions.size > 1,
-                            expanded = subscription.id !in collapsedSubscriptionIds,
-                            canReorder = subscriptions.size > 1,
-                            onExpandedChange = { expanded ->
-                                context.setSubscriptionExpanded(
-                                    collapsedSubscriptionIds,
-                                    subscription.id,
-                                    expanded,
-                                )
-                            },
-                            onDelete = {
-                                if (servers.isEmpty()) {
-                                    viewModel.deleteSubscription(subscription)
-                                } else {
-                                    removeSubscriptionRequest = subscription to servers.size
-                                }
-                            },
-                            onEdit = { editingSubscriptionId = subscription.id },
-                            onReorder = { showReorderDialog = true },
-                            onRefresh = { viewModel.refreshSubscription(subscription) },
-                            onTestAll = { viewModel.testSubscriptionLatencies(subscription) },
-                            onPingMethodRequested = {
-                                showPingMethodDialog = true
-                                pingMethodDialogSubscriptionId = subscription.id
-                            },
-                            onDescriptionUrlClick = { url ->
-                                pendingDescriptionLink = PendingSubscriptionLink(
-                                    subscriptionId = subscription.id,
-                                    description = subscription.announce?.trim().orEmpty(),
-                                    url = url,
-                                )
-                            },
-                            onApplyRouting = { viewModel.requestApplySubscriptionRouting(subscription) },
-                            onDescriptionHiddenChange = { hidden ->
-                                viewModel.setSubscriptionDescriptionHidden(subscription.id, hidden)
-                            },
-                            onServerSelected = { viewModel.selectServer(it) },
-                            onTestLatency = { viewModel.testLatency(it) },
-                            onOpenServerConfig = onOpenServerConfig,
-                        )
-                    }
-                }
             }
+        }
+
+        // The connection card floats over the list and stays clear of the bottom navigation
+        // bar, so opening its stats moves only this card and never the bar or the screen.
+        if (!floatingConnectButton) {
+            ConnectionPanel(
+                connectionState = uiState.connectionState,
+                connectionProgress = uiState.connectionProgress,
+                geoDataDownloadFraction = uiState.geoDataDownloadFraction,
+                showProgressDetails = uiState.showAdvancedOptions,
+                selectedServerName = connectionUiState.displayServerName,
+                activeBalancer = uiState.activeBalancer,
+                pingMs = viewModel.activeServerPingMs,
+                sessionTraffic = viewModel.sessionTraffic,
+                buttonColor = connectionUiState.buttonColor,
+                isConnected = connectionUiState.isConnected,
+                isRestartRequired = connectionUiState.isRestartRequired,
+                isInterfaceBusy = connectionUiState.isInterfaceBusy,
+                isTransitioning = connectionUiState.isTransitioning,
+                isAlwaysOnVpn = connectionUiState.isAlwaysOnVpn,
+                canStart = uiState.selectedServer != null,
+                compact = false,
+                onClick = onConnectionClick,
+                onViewConfig = onViewRunningConfig,
+                statsExpanded = connectionStatsExpanded,
+                onStatsExpandedChange = { connectionStatsExpanded = it },
+                onCardHeightChange = { connectionCardHeight = it },
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
+            )
         }
     }
 
@@ -981,12 +989,15 @@ private data class PendingSubscriptionLink(
     val url: String,
 )
 
-/** The floating button overlays the list, so the last item needs room to scroll clear of it. */
-private fun homeListContentPadding(floatingConnectButton: Boolean) = PaddingValues(
+/** Floating controls overlay the list, so the last item needs room to scroll clear of them. */
+private fun homeListContentPadding(floatingConnectButton: Boolean, connectionCardHeight: Dp) = PaddingValues(
     start = 16.dp,
     top = 16.dp,
     end = 16.dp,
-    bottom = if (floatingConnectButton) 16.dp + FloatingConnectButtonClearance else 16.dp,
+    // The compact FAB floats; the floating connection card reports its own height and the gap it
+    // keeps above the navigation bar, expanded stats included, so the last row can always scroll
+    // above it.
+    bottom = 16.dp + if (floatingConnectButton) FloatingConnectButtonClearance else connectionCardHeight,
 )
 
 @Composable

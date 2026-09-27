@@ -35,6 +35,7 @@ import com.material.xray.core.format.rateUnit
 import com.material.xray.core.format.scaleBytes
 import com.material.xray.core.format.sizeUnit
 import com.material.xray.model.SessionTrafficMetrics
+import com.material.xray.ui.components.AppMotion
 import java.util.Locale
 import kotlinx.coroutines.flow.StateFlow
 
@@ -91,7 +92,7 @@ internal fun ConnectionStatsContent(
     }
     val traffic by sessionTraffic.collectAsStateWithLifecycle()
 
-    Column(modifier = modifier.animateContentSize()) {
+    Column(modifier = modifier.animateContentSize(animationSpec = AppMotion.spec())) {
         activeBalancer?.let { BalancerHeader(state = it) }
 
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {

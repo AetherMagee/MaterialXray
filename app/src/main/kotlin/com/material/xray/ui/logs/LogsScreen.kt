@@ -8,7 +8,6 @@ import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.annotation.StringRes
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -23,8 +22,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
@@ -44,12 +41,13 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
@@ -65,23 +63,21 @@ import com.material.xray.service.LogSource
 import com.material.xray.ui.components.FlatStateCard
 import com.material.xray.ui.components.ScrolledTopAppBar
 import com.material.xray.ui.components.SegmentedTabRow
+import com.material.xray.ui.components.TabbedContent
 import java.io.IOException
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import kotlinx.coroutines.launch
 
-private enum class LogFilter(@param:StringRes val labelRes: Int) {
-    ALL(R.string.logs_filter_all),
-    APP(R.string.logs_filter_app),
-    XRAY(R.string.logs_filter_xray),
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LogsScreen(showTitleBarLogo: Boolean, viewModel: LogsViewModel = hiltViewModel()) {
+internal fun LogsScreen(
+    showTitleBarLogo: Boolean,
+    viewModel: LogsViewModel = hiltViewModel(),
+) {
     val allEntries by viewModel.entries.collectAsStateWithLifecycle()
-    val pagerState = rememberPagerState(pageCount = { LogFilter.entries.size })
+    var selectedFilter by rememberSaveable { mutableStateOf(LogFilter.ALL) }
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
     val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -105,9 +101,6 @@ fun LogsScreen(showTitleBarLogo: Boolean, viewModel: LogsViewModel = hiltViewMod
                 }
             }
         }
-    }
-    val selectedFilter by remember {
-        derivedStateOf { LogFilter.entries[pagerState.targetPage] }
     }
 
     Scaffold(
@@ -193,25 +186,14 @@ fun LogsScreen(showTitleBarLogo: Boolean, viewModel: LogsViewModel = hiltViewMod
                 },
             )
         },
-        bottomBar = {
-            SegmentedTabRow(
-                labels = LogFilter.entries.map { stringResource(it.labelRes) },
-                selectedIndex = LogFilter.entries.indexOf(selectedFilter),
-                onSelected = { index ->
-                    coroutineScope.launch {
-                        pagerState.animateScrollToPage(index)
-                    }
-                },
-            )
-        },
     ) { padding ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding),
         ) {
-            HorizontalPager(
-                state = pagerState,
+            TabbedContent(
+                selectedTab = selectedFilter.ordinal,
                 modifier = Modifier.fillMaxSize(),
             ) { page ->
                 val pageFilter = LogFilter.entries[page]
@@ -226,6 +208,15 @@ fun LogsScreen(showTitleBarLogo: Boolean, viewModel: LogsViewModel = hiltViewMod
                     },
                 )
             }
+
+            SegmentedTabRow(
+                labels = LogFilter.entries.map { stringResource(it.labelRes) },
+                selectedIndex = selectedFilter.ordinal,
+                onSelected = { index -> selectedFilter = LogFilter.entries[index] },
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
+            )
         }
     }
 }
@@ -261,7 +252,7 @@ private fun LogEntriesList(
     LazyColumn(
         state = listState,
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
+        contentPadding = PaddingValues(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 96.dp),
     ) {
         if (entries.isEmpty()) {
             item(contentType = "empty") {

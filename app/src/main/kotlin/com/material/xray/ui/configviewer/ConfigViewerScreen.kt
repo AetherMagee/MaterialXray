@@ -145,8 +145,8 @@ fun ConfigViewerScreen(
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-        // The viewer is drawn over the whole app, past the bottom navigation bar, so nothing else
-        // is left to keep the content clear of the system navigation bar.
+        // The viewer opens above the bottom navigation bar, and the band the bar fills is consumed
+        // up there, so this inset has nothing left to pad for at the bottom.
         contentWindowInsets = WindowInsets.navigationBars,
         topBar = {
             ScrolledTopAppBar(

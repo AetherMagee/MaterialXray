@@ -3,7 +3,6 @@ package com.material.xray.ui.home
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.clickable
@@ -68,6 +67,7 @@ import com.material.xray.R
 import com.material.xray.data.db.entity.ServerEntity
 import com.material.xray.data.db.entity.SubscriptionEntity
 import com.material.xray.model.PingMethod
+import com.material.xray.ui.components.AppMotion
 
 @Composable
 internal fun SubscriptionCard(
@@ -184,14 +184,14 @@ private fun SubscriptionMetadataSection(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .animateContentSize(animationSpec = tween(durationMillis = 180))
+            .animateContentSize(animationSpec = AppMotion.spec())
             .padding(start = 16.dp, top = 0.dp, end = 16.dp, bottom = SubscriptionMetadataGap),
         verticalArrangement = Arrangement.spacedBy(SubscriptionMetadataGap),
     ) {
         AnimatedVisibility(
             visible = metadata.announcement.isNotEmpty() && !subscription.descriptionHidden,
-            enter = fadeIn(animationSpec = tween(durationMillis = 120)),
-            exit = fadeOut(animationSpec = tween(durationMillis = 90)),
+            enter = fadeIn(animationSpec = AppMotion.spec()),
+            exit = fadeOut(animationSpec = AppMotion.spec()),
         ) {
             SubscriptionDescriptionText(
                 description = metadata.announcement,
@@ -288,7 +288,7 @@ private fun SubscriptionHeader(
     }
     val chevronRotation by animateFloatAsState(
         targetValue = if (expanded) 180f else 0f,
-        animationSpec = tween(durationMillis = 150),
+        animationSpec = AppMotion.spec(),
         label = "subscription-chevron-rotation",
     )
 

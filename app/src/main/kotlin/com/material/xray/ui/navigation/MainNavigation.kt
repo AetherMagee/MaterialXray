@@ -8,19 +8,25 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarDefaults
 import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.Scaffold
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.Saver
@@ -37,11 +43,6 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.navigation.NavDestination.Companion.hierarchy
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
-import androidx.navigation.compose.currentBackStackEntryAsState
-import androidx.navigation.compose.rememberNavController
 import com.material.xray.ui.configviewer.ConfigViewerRequest
 import com.material.xray.ui.configviewer.ConfigViewerScreen
 import com.material.xray.ui.home.HomeScreen
@@ -65,19 +66,39 @@ fun MainNavigation(
     onDiagnosticsNoticeDismiss: () -> Unit,
 ) {
     val viewModel: MainNavigationViewModel = hiltViewModel()
-    val navController = rememberNavController()
     val lifecycleOwner = LocalLifecycleOwner.current
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val loadedSettings = settings ?: return
     val showTitleBarLogo = loadedSettings.showTitleBarLogo
     val floatingConnectButton = loadedSettings.floatingConnectButton
     val showAdvancedOptions = loadedSettings.showAdvancedOptions
-    val navBackStackEntry by navController.currentBackStackEntryAsState()
-    val currentDestination = navBackStackEntry?.destination
-    val currentRoute = currentDestination?.route
-    var previousRoute by remember { mutableStateOf<String?>(currentRoute) }
+    val navigationScreens = remember(showAdvancedOptions) {
+        if (showAdvancedOptions) {
+            Screen.entries.toList()
+        } else {
+            Screen.entries.filterNot { it == Screen.Logs }
+        }
+    }
+    // The tab pager lives here, above the screens, so the main tabs can be swiped or tapped as one
+    // element while the persistent bottom navigation bar drives the same selection. Screens are
+    // keyed by tab, so their state follows the tab across jumps and across the tab list changing.
+    val tabPagerState = rememberTabPagerState(pageCount = navigationScreens.size)
+    var selectedScreen by rememberSaveable { mutableStateOf(Screen.Home) }
+    var previousScreen by remember { mutableStateOf(selectedScreen) }
+    // The pill and the bottom navigation bar follow the pager's own position, so they move together
+    // with a swipe or a slide; the effects above keep waiting for the settled selection instead.
+    val visibleScreen by remember(navigationScreens) {
+        derivedStateOf {
+            navigationScreens[tabPagerState.currentPage().coerceIn(navigationScreens.indices)]
+        }
+    }
     val bottomInset = with(LocalDensity.current) {
         NavigationBarDefaults.windowInsets.getBottom(this).toDp()
+    }
+
+    fun selectScreen(screen: Screen) {
+        selectedScreen = screen
+        tabPagerState.select(navigationScreens.indexOf(screen))
     }
 
     DisposableEffect(lifecycleOwner) {
@@ -92,35 +113,38 @@ fun MainNavigation(
         }
     }
 
-    LaunchedEffect(currentRoute) {
-        if (previousRoute == Screen.Routing.route && currentRoute != Screen.Routing.route) {
+    LaunchedEffect(selectedScreen) {
+        if (previousScreen == Screen.Routing && selectedScreen != Screen.Routing) {
             viewModel.onLeavingRoutingTab()
         }
-        previousRoute = currentRoute
+        previousScreen = selectedScreen
     }
 
-    LaunchedEffect(showAdvancedOptions, currentRoute) {
-        if (!showAdvancedOptions && currentRoute == Screen.Logs.route) {
-            navController.navigate(Screen.Home.route) {
-                popUpTo(navController.graph.startDestinationId) { saveState = true }
-                launchSingleTop = true
-                restoreState = true
-            }
+    LaunchedEffect(showAdvancedOptions, selectedScreen) {
+        if (!showAdvancedOptions && selectedScreen == Screen.Logs) {
+            selectScreen(Screen.Home)
         }
     }
 
     LaunchedEffect(pendingSubscriptionLink) {
-        if (pendingSubscriptionLink != null && currentRoute != Screen.Home.route) {
-            navController.navigate(Screen.Home.route) {
-                popUpTo(navController.graph.startDestinationId) { saveState = true }
-                launchSingleTop = true
-                restoreState = true
-            }
+        if (pendingSubscriptionLink != null && selectedScreen != Screen.Home) {
+            selectScreen(Screen.Home)
         }
     }
 
-    // The viewer covers the whole app, navigation bar included, so opening it does not make the
-    // bar pop out of existence while the screen is still fading in.
+    // A process death mid-jump leaves the pager parked on one of the two jump pages; line it up with
+    // the restored selection once, before anything is shown moving.
+    LaunchedEffect(Unit) {
+        val restoredPage = navigationScreens.indexOf(selectedScreen)
+        if (restoredPage >= 0 && tabPagerState.currentPage() != restoredPage) {
+            tabPagerState.snapTo(restoredPage)
+        }
+    }
+
+    BackHandler(enabled = selectedScreen != Screen.Home) {
+        selectScreen(Screen.Home)
+    }
+
     var configViewerRequest by rememberSaveable(stateSaver = ConfigViewerRequestSaver) {
         mutableStateOf<ConfigViewerRequest?>(null)
     }
@@ -130,63 +154,23 @@ fun MainNavigation(
     var routingRuleEditorRequest by rememberSaveable(stateSaver = RoutingRuleEditorRequestSaver) {
         mutableStateOf<EditableRoutingRule?>(null)
     }
-    BackHandler(enabled = configViewerRequest != null) { configViewerRequest = null }
 
-    Box {
-        Scaffold(
-            contentWindowInsets = WindowInsets(0.dp),
-            bottomBar = {
-                if (currentRoute != ROUTING_RULE_VIEWER_ROUTE) {
-                    AnimatedContent(
-                        targetState = showAdvancedOptions,
-                        transitionSpec = { fadeIn(tween(150)) togetherWith fadeOut(tween(150)) },
-                        label = "advancedNavigationItems",
-                    ) { showLogs ->
-                        val navigationScreens = remember(showLogs) {
-                            if (showLogs) {
-                                Screen.entries
-                            } else {
-                                Screen.entries.filterNot { it == Screen.Logs }
-                            }
-                        }
-                        NavigationBar(modifier = Modifier.height(CompactNavigationBarHeight + bottomInset)) {
-                            navigationScreens.forEach { screen ->
-                                val label = stringResource(screen.labelRes)
-                                NavigationBarItem(
-                                    icon = {
-                                        val icon = screen.icon
-                                        if (icon != null) {
-                                            Icon(icon, contentDescription = label)
-                                        } else {
-                                            Icon(
-                                                painter = painterResource(requireNotNull(screen.iconRes)),
-                                                contentDescription = label,
-                                            )
-                                        }
-                                    },
-                                    label = { Text(label) },
-                                    selected = currentDestination?.hierarchy?.any { it.route == screen.route } == true,
-                                    onClick = {
-                                        navController.navigate(screen.route) {
-                                            popUpTo(navController.graph.startDestinationId) { saveState = true }
-                                            launchSingleTop = true
-                                            restoreState = true
-                                        }
-                                    },
-                                )
-                            }
-                        }
-                    }
-                }
-            },
-        ) { innerPadding ->
-            NavHost(
-                navController = navController,
-                startDestination = Screen.Home.route,
-                modifier = Modifier.padding(innerPadding),
-            ) {
-                composable(Screen.Home.route) {
-                    HomeScreen(
+    Column(modifier = Modifier.fillMaxSize()) {
+        // The bar's band is consumed here, so nothing inside pads for the navigation bar twice.
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .consumeWindowInsets(PaddingValues(bottom = CompactNavigationBarHeight + bottomInset)),
+        ) {
+            TabPager(
+                pages = navigationScreens,
+                state = tabPagerState,
+                modifier = Modifier.fillMaxSize(),
+                onPageSettled = { page -> selectedScreen = navigationScreens[page] },
+            ) { screen ->
+                when (screen) {
+                    Screen.Home -> HomeScreen(
                         showTitleBarLogo = showTitleBarLogo,
                         floatingConnectButton = floatingConnectButton,
                         pendingSubscriptionLink = pendingSubscriptionLink,
@@ -198,69 +182,105 @@ fun MainNavigation(
                         },
                         onViewRunningConfig = { configViewerRequest = ConfigViewerRequest.Running },
                     )
-                }
-                composable(Screen.Logs.route) { LogsScreen(showTitleBarLogo) }
-                composable(Screen.Routing.route) {
-                    RoutingScreen(
+                    Screen.Logs -> LogsScreen(showTitleBarLogo = showTitleBarLogo)
+                    Screen.Routing -> RoutingScreen(
                         showTitleBarLogo = showTitleBarLogo,
                         onViewRule = { request ->
                             routingRuleEditorRequest = null
                             routingRuleViewerRequest = request
-                            navController.navigate(ROUTING_RULE_VIEWER_ROUTE) { launchSingleTop = true }
                         },
                         onEditRule = { request ->
                             routingRuleViewerRequest = null
                             routingRuleEditorRequest = request
                         },
                     )
+                    Screen.Settings -> SettingsScreen(showTitleBarLogo)
                 }
-                composable(Screen.Settings.route) { SettingsScreen(showTitleBarLogo) }
-                composable(ROUTING_RULE_VIEWER_ROUTE) {
-                    val request = routingRuleViewerRequest
-                    if (request == null) {
-                        LaunchedEffect(Unit) { navController.popBackStack() }
-                    } else {
-                        RoutingRuleViewerScreen(
-                            request = request,
-                            onBack = {
-                                navController.popBackStack()
-                                routingRuleViewerRequest = null
-                            },
-                        )
-                    }
+            }
+
+            BackHandler(enabled = configViewerRequest != null) { configViewerRequest = null }
+            AnimatedContent(
+                targetState = configViewerRequest,
+                transitionSpec = {
+                    fadeIn(tween(VIEWER_FADE_MS)) togetherWith fadeOut(tween(VIEWER_FADE_MS)) using null
+                },
+                label = "configViewer",
+            ) { request ->
+                if (request != null) {
+                    ConfigViewerScreen(request = request, onBack = { configViewerRequest = null })
+                }
+            }
+
+            AnimatedContent(
+                targetState = routingRuleEditorRequest,
+                transitionSpec = {
+                    (
+                        fadeIn(tween(ROUTING_EDITOR_ENTER_MS)) +
+                            slideInVertically(tween(ROUTING_EDITOR_ENTER_MS)) { height -> height / 16 }
+                        ) togetherWith
+                        fadeOut(tween(ROUTING_EDITOR_EXIT_MS)) using null
+                },
+                label = "routingRuleEditor",
+            ) { request ->
+                if (request != null) {
+                    RoutingRuleEditorScreen(
+                        editableRule = request,
+                        viewModel = hiltViewModel<RoutingViewModel>(),
+                        onBack = { routingRuleEditorRequest = null },
+                    )
+                }
+            }
+
+            BackHandler(enabled = routingRuleViewerRequest != null) { routingRuleViewerRequest = null }
+            AnimatedContent(
+                targetState = routingRuleViewerRequest,
+                transitionSpec = {
+                    fadeIn(tween(VIEWER_FADE_MS)) togetherWith fadeOut(tween(VIEWER_FADE_MS)) using null
+                },
+                label = "routingRuleViewer",
+            ) { request ->
+                if (request != null) {
+                    RoutingRuleViewerScreen(request = request, onBack = { routingRuleViewerRequest = null })
                 }
             }
         }
 
-        AnimatedContent(
-            targetState = configViewerRequest,
-            transitionSpec = {
-                fadeIn(tween(CONFIG_VIEWER_FADE_MS)) togetherWith fadeOut(tween(CONFIG_VIEWER_FADE_MS)) using null
-            },
-            label = "configViewer",
-        ) { request ->
-            if (request != null) {
-                ConfigViewerScreen(request = request, onBack = { configViewerRequest = null })
-            }
-        }
-
-        AnimatedContent(
-            targetState = routingRuleEditorRequest,
-            transitionSpec = {
-                (
-                    fadeIn(tween(ROUTING_EDITOR_ENTER_MS)) +
-                        slideInVertically(tween(ROUTING_EDITOR_ENTER_MS)) { height -> height / 16 }
-                    ) togetherWith
-                    fadeOut(tween(ROUTING_EDITOR_EXIT_MS)) using null
-            },
-            label = "routingRuleEditor",
-        ) { request ->
-            if (request != null) {
-                RoutingRuleEditorScreen(
-                    editableRule = request,
-                    viewModel = hiltViewModel<RoutingViewModel>(requireNotNull(navBackStackEntry)),
-                    onBack = { routingRuleEditorRequest = null },
-                )
+        NavigationBar(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(CompactNavigationBarHeight + bottomInset),
+        ) {
+            navigationScreens.forEach { screen ->
+                key(screen) {
+                    val label = stringResource(screen.labelRes)
+                    NavigationBarItem(
+                        icon = {
+                            val icon = screen.icon
+                            if (icon != null) {
+                                Icon(icon, contentDescription = label)
+                            } else {
+                                Icon(
+                                    painter = painterResource(requireNotNull(screen.iconRes)),
+                                    contentDescription = label,
+                                )
+                            }
+                        },
+                        label = { Text(label) },
+                        selected = screen == visibleScreen,
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                            selectedTextColor = MaterialTheme.colorScheme.onSurface,
+                            indicatorColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                        ),
+                        onClick = {
+                            configViewerRequest = null
+                            routingRuleViewerRequest = null
+                            routingRuleEditorRequest = null
+                            selectScreen(screen)
+                        },
+                    )
+                }
             }
         }
     }
@@ -295,9 +315,8 @@ private val RoutingRuleEditorRequestSaver: Saver<EditableRoutingRule?, String> =
 
 private const val RUNNING_CONFIG_TAG = "running"
 private const val SERVER_CONFIG_TAG = "server"
-private const val CONFIG_VIEWER_FADE_MS = 180
+private const val VIEWER_FADE_MS = 180
 private const val ROUTING_EDITOR_ENTER_MS = 200
 private const val ROUTING_EDITOR_EXIT_MS = 140
-private const val ROUTING_RULE_VIEWER_ROUTE = "routing/rule"
 
 private val CompactNavigationBarHeight = 68.dp
