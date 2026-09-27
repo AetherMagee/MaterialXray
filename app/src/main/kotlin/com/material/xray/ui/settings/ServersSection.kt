@@ -1,5 +1,8 @@
 package com.material.xray.ui.settings
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.material3.Text
@@ -23,45 +26,43 @@ fun LazyListScope.serversSection(
     expanded: Boolean,
     onExpandedChange: (Boolean) -> Unit,
 ) {
-    item(key = "servers_header") {
-        SettingsSectionHeader(
-            title = stringResource(R.string.settings_section_servers),
-            expanded = expanded,
-            onExpandedChange = onExpandedChange,
-            showDivider = true,
-        )
-    }
-    if (!expanded) return
-
-    item(key = "servers_sort_by_latency") {
-        SettingsSwitchRow(
-            title = stringResource(R.string.settings_sort_outbounds_by_latency_title),
-            description = stringResource(R.string.settings_sort_outbounds_by_latency_description),
-            checked = sortOutboundsByLatency,
-            onCheckedChange = onSortOutboundsByLatencyChange,
-        )
-    }
-
-    item(key = "servers_both_latency_results") {
-        SettingsSwitchRow(
-            title = stringResource(R.string.settings_show_both_latency_results_title),
-            description = stringResource(R.string.settings_show_both_latency_results_description),
-            checked = showBothLatencyResults,
-            onCheckedChange = onShowBothLatencyResultsChange,
-        )
-    }
-
-    if (showAdvancedOptions) {
-        item(key = "servers_latency_check_url") {
-            SettingsTextFieldWithSave(
-                value = editingLatencyCheckUrl,
-                onValueChange = onEditingLatencyCheckUrlChange,
-                label = stringResource(R.string.settings_latency_check_url_label),
-                supportingText = { Text(stringResource(R.string.settings_latency_check_url_supporting_text)) },
-                hasChanges = hasLatencyCheckUrlChanges,
-                onSave = onSaveLatencyCheckUrl,
-                modifier = Modifier.padding(horizontal = 16.dp),
+    item(key = "servers") {
+        Column(modifier = Modifier.padding(bottom = 16.dp)) {
+            SettingsSectionHeader(
+                title = stringResource(R.string.settings_section_servers),
+                expanded = expanded,
+                onExpandedChange = onExpandedChange,
+                showDivider = true,
             )
+            AnimatedVisibility(visible = expanded) {
+                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    SettingsSwitchRow(
+                        title = stringResource(R.string.settings_sort_outbounds_by_latency_title),
+                        description = stringResource(R.string.settings_sort_outbounds_by_latency_description),
+                        checked = sortOutboundsByLatency,
+                        onCheckedChange = onSortOutboundsByLatencyChange,
+                    )
+
+                    SettingsSwitchRow(
+                        title = stringResource(R.string.settings_show_both_latency_results_title),
+                        description = stringResource(R.string.settings_show_both_latency_results_description),
+                        checked = showBothLatencyResults,
+                        onCheckedChange = onShowBothLatencyResultsChange,
+                    )
+
+                    if (showAdvancedOptions) {
+                        SettingsTextFieldWithSave(
+                            value = editingLatencyCheckUrl,
+                            onValueChange = onEditingLatencyCheckUrlChange,
+                            label = stringResource(R.string.settings_latency_check_url_label),
+                            supportingText = { Text(stringResource(R.string.settings_latency_check_url_supporting_text)) },
+                            hasChanges = hasLatencyCheckUrlChanges,
+                            onSave = onSaveLatencyCheckUrl,
+                            modifier = Modifier.padding(horizontal = 16.dp),
+                        )
+                    }
+                }
+            }
         }
     }
 }

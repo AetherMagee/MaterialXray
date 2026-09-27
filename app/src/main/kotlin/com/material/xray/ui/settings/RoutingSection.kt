@@ -1,5 +1,6 @@
 package com.material.xray.ui.settings
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
@@ -18,10 +19,35 @@ import com.material.xray.ui.text.labelResource
 /** Whether IPv6 is allowed but no configured resolver can be reached over it. */
 internal fun hasIpv4OnlyDnsServers(dnsServers: String, domesticDnsServers: String): Boolean {
     val lists = listOf(dnsServers, domesticDnsServers)
-    // An empty list hands that lookup to the OS resolver, which a dual-stack network may well have
-    // given an IPv6 address. That is an unknown rather than an absence, so there is nothing to claim.
+    // An empty list hands that lookup to the OS resolver, which may well be IPv6-only, so there is
+    // nothing to claim either way.
     if (lists.any(String::isBlank)) return false
     return lists.none { ipv6DnsServers(it).isNotEmpty() }
+}
+
+fun LazyListScope.routingSection(
+    bypassLan: Boolean,
+    allowIpv6: Boolean,
+    dnsServers: String,
+    domesticDnsServers: String,
+    routingPolicyControl: RoutingPolicyControl,
+    ipv6SelectionEnabled: Boolean,
+    onBypassLanChange: (Boolean) -> Unit,
+    onAllowIpv6Change: (Boolean) -> Unit,
+    onRoutingPolicyControlChange: (RoutingPolicyControl) -> Unit,
+) {
+    routingSection(
+        bypassLan = bypassLan,
+        allowIpv6 = allowIpv6,
+        dnsServers = dnsServers,
+        domesticDnsServers = domesticDnsServers,
+        routingPolicyControl = routingPolicyControl,
+        ipv6SelectionEnabled = ipv6SelectionEnabled,
+        onBypassLanChange = onBypassLanChange,
+        onAllowIpv6Change = onAllowIpv6Change,
+        onRoutingPolicyControlChange = onRoutingPolicyControlChange,
+        expanded = true,
+    )
 }
 
 @Suppress("LongParameterList")
@@ -35,38 +61,46 @@ fun LazyListScope.routingSection(
     onBypassLanChange: (Boolean) -> Unit,
     onAllowIpv6Change: (Boolean) -> Unit,
     onRoutingPolicyControlChange: (RoutingPolicyControl) -> Unit,
+    expanded: Boolean,
 ) {
-    item(key = "connection_connectivity") {
-        SettingsNestedSection(title = stringResource(R.string.settings_connectivity_title)) {
-            SettingsSwitchRow(
-                title = stringResource(R.string.settings_bypass_lan_title),
-                description = stringResource(R.string.settings_bypass_lan_description),
-                checked = bypassLan,
-                onCheckedChange = onBypassLanChange,
-            )
-            SettingsSwitchRow(
-                title = stringResource(R.string.settings_allow_ipv6_connections),
-                checked = allowIpv6,
-                onCheckedChange = onAllowIpv6Change,
-                enabled = ipv6SelectionEnabled,
-            )
-            if (allowIpv6 && hasIpv4OnlyDnsServers(dnsServers, domesticDnsServers)) {
-                SettingsNotice(text = stringResource(R.string.settings_allow_ipv6_dns_ipv4_only))
-            }
-        }
-    }
+    item(key = "routing") {
+        Column {
+            AnimatedVisibility(visible = expanded) {
+                Column(
+                    modifier = Modifier.padding(bottom = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    SettingsNestedSection(title = stringResource(R.string.settings_connectivity_title)) {
+                        SettingsSwitchRow(
+                            title = stringResource(R.string.settings_bypass_lan_title),
+                            description = stringResource(R.string.settings_bypass_lan_description),
+                            checked = bypassLan,
+                            onCheckedChange = onBypassLanChange,
+                        )
+                        SettingsSwitchRow(
+                            title = stringResource(R.string.settings_allow_ipv6_connections),
+                            checked = allowIpv6,
+                            onCheckedChange = onAllowIpv6Change,
+                            enabled = ipv6SelectionEnabled,
+                        )
+                        if (allowIpv6 && hasIpv4OnlyDnsServers(dnsServers, domesticDnsServers)) {
+                            SettingsNotice(text = stringResource(R.string.settings_allow_ipv6_dns_ipv4_only))
+                        }
+                    }
 
-    item(key = "connection_routing_policy") {
-        SettingsNestedSection(title = stringResource(R.string.settings_routing_policy_title)) {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                RoutingPolicyControl.entries.forEach { policy ->
-                    SelectableOptionRow(
-                        title = stringResource(policy.labelResource),
-                        description = stringResource(policy.descriptionResource),
-                        selected = policy == routingPolicyControl,
-                        onSelected = { onRoutingPolicyControlChange(policy) },
-                        modifier = Modifier.padding(horizontal = 16.dp),
-                    )
+                    SettingsNestedSection(title = stringResource(R.string.settings_routing_policy_title)) {
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            RoutingPolicyControl.entries.forEach { policy ->
+                                SelectableOptionRow(
+                                    title = stringResource(policy.labelResource),
+                                    description = stringResource(policy.descriptionResource),
+                                    selected = policy == routingPolicyControl,
+                                    onSelected = { onRoutingPolicyControlChange(policy) },
+                                    modifier = Modifier.padding(horizontal = 16.dp),
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }

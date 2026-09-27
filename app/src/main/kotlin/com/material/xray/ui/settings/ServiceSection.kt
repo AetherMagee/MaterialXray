@@ -1,5 +1,8 @@
 package com.material.xray.ui.settings
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.material3.MaterialTheme
@@ -80,105 +83,116 @@ fun LazyListScope.serviceSection(
     expanded: Boolean,
     onExpandedChange: (Boolean) -> Unit,
 ) {
-    item(key = "connection_header") {
-        SettingsSectionHeader(
-            title = stringResource(R.string.settings_section_connection),
-            expanded = expanded,
-            onExpandedChange = onExpandedChange,
-            showDivider = false,
-        )
-    }
-    if (!expanded) return
-
-    item(key = "connection_root_service") {
-        SettingsSwitchRow(
-            title = stringResource(R.string.settings_use_root_service),
-            description = stringResource(R.string.settings_unavailable).takeIf { rootAvailable == false },
-            checked = useRootService && rootAvailable != false,
-            onCheckedChange = onUseRootServiceChange,
-            enabled = rootServiceAvailable,
-            titleColor = if (rootAvailable == false) {
-                MaterialTheme.colorScheme.onSurfaceVariant
-            } else {
-                MaterialTheme.colorScheme.onSurface
-            },
-        )
-    }
-
-    if (rootServiceActive) {
-        item(key = "connection_backend") {
-            val tproxySelectable = tproxyCompatibility !is TproxyCompatibility.Unsupported
-            val supportingText = tproxyCompatibilitySupportingText(tproxyCompatibility)
-            SettingsNestedSection(title = stringResource(R.string.settings_root_connection_backend)) {
-                RootConnectionBackend.entries.forEach { backend ->
-                    val enabled = backend == RootConnectionBackend.Tun || tproxySelectable
-                    SelectableOptionRow(
-                        title = stringResource(backend.labelResource),
-                        description = stringResource(backend.descriptionResource),
-                        selected = backend == rootConnectionBackend,
-                        onSelected = { onRootConnectionBackendChange(backend) },
-                        modifier = Modifier.padding(horizontal = 16.dp),
-                        enabled = enabled,
+    item(key = "service") {
+        Column(modifier = Modifier.padding(bottom = 16.dp)) {
+            SettingsSectionHeader(
+                title = stringResource(R.string.settings_section_connection),
+                expanded = expanded,
+                onExpandedChange = onExpandedChange,
+                showDivider = false,
+            )
+            AnimatedVisibility(visible = expanded) {
+                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    SettingsSwitchRow(
+                        title = stringResource(R.string.settings_use_root_service),
+                        description = stringResource(R.string.settings_unavailable).takeIf { rootAvailable == false },
+                        checked = useRootService && rootAvailable != false,
+                        onCheckedChange = onUseRootServiceChange,
+                        enabled = rootServiceAvailable,
+                        titleColor = if (rootAvailable == false) {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        } else {
+                            MaterialTheme.colorScheme.onSurface
+                        },
                     )
-                }
-                supportingText?.let { text ->
-                    Text(
-                        text = text,
-                        modifier = Modifier.padding(horizontal = 16.dp),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+
+                    if (rootServiceActive) {
+                        val tproxySelectable = tproxyCompatibility !is TproxyCompatibility.Unsupported
+                        val supportingText = tproxyCompatibilitySupportingText(tproxyCompatibility)
+                        SettingsNestedSection(title = stringResource(R.string.settings_root_connection_backend)) {
+                            RootConnectionBackend.entries.forEach { backend ->
+                                val enabled = backend == RootConnectionBackend.Tun || tproxySelectable
+                                SelectableOptionRow(
+                                    title = stringResource(backend.labelResource),
+                                    description = stringResource(backend.descriptionResource),
+                                    selected = backend == rootConnectionBackend,
+                                    onSelected = { onRootConnectionBackendChange(backend) },
+                                    modifier = Modifier.padding(horizontal = 16.dp),
+                                    enabled = enabled,
+                                )
+                            }
+                            supportingText?.let { text ->
+                                Text(
+                                    text = text,
+                                    modifier = Modifier.padding(horizontal = 16.dp),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+
+                        if (tproxyCompatibility is TproxyCompatibility.Unsupported) {
+                            TextButton(
+                                onClick = onRetryTproxyCompatibility,
+                                modifier = Modifier.padding(horizontal = 16.dp),
+                            ) {
+                                Text(stringResource(R.string.settings_retry_compatibility_check))
+                            }
+                        }
+
+                        SettingsSwitchRow(
+                            title = stringResource(R.string.settings_tunnel_tethered_clients_title),
+                            description = stringResource(R.string.settings_tunnel_tethered_clients_description),
+                            checked = tunnelTetheredClients,
+                            onCheckedChange = onTunnelTetheredClientsChange,
+                        )
+                    }
+
+                    SettingsSwitchRow(
+                        title = stringResource(R.string.settings_auto_connect_on_boot),
+                        checked = autoConnect,
+                        onCheckedChange = onAutoConnectChange,
+                        enabled = !useRootService || rootServiceActive,
                     )
+
+                    if (autoConnect && oemAutostartGuidance.required && !oemAutostartGuidance.granted) {
+                        OemAutostartBanner(
+                            directSettingsAvailable = oemAutostartGuidance.directSettingsAvailable,
+                            onOpenSettings = onOpenOemAutostartSettings,
+                        )
+                    }
                 }
             }
-        }
-
-        if (tproxyCompatibility is TproxyCompatibility.Unsupported) {
-            item(key = "connection_tproxy_retry") {
-                TextButton(
-                    onClick = onRetryTproxyCompatibility,
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                ) {
-                    Text(stringResource(R.string.settings_retry_compatibility_check))
-                }
-            }
-        }
-
-        item(key = "connection_tethering") {
-            SettingsSwitchRow(
-                title = stringResource(R.string.settings_tunnel_tethered_clients_title),
-                description = stringResource(R.string.settings_tunnel_tethered_clients_description),
-                checked = tunnelTetheredClients,
-                onCheckedChange = onTunnelTetheredClientsChange,
-            )
-        }
-    }
-
-    item(key = "connection_auto_connect") {
-        SettingsSwitchRow(
-            title = stringResource(R.string.settings_auto_connect_on_boot),
-            checked = autoConnect,
-            onCheckedChange = onAutoConnectChange,
-            enabled = !useRootService || rootServiceActive,
-        )
-    }
-
-    if (autoConnect && oemAutostartGuidance.required && !oemAutostartGuidance.granted) {
-        item(key = "connection_oem_banner") {
-            OemAutostartBanner(
-                directSettingsAvailable = oemAutostartGuidance.directSettingsAvailable,
-                onOpenSettings = onOpenOemAutostartSettings,
-            )
         }
     }
 }
 
 fun LazyListScope.connectionDnsSection(onOpenDnsSettings: () -> Unit) {
+    connectionDnsSection(
+        onOpenDnsSettings = onOpenDnsSettings,
+        expanded = true,
+    )
+}
+
+fun LazyListScope.connectionDnsSection(
+    onOpenDnsSettings: () -> Unit,
+    expanded: Boolean,
+) {
     item(key = "connection_dns") {
-        SettingsActionRow(
-            title = stringResource(R.string.settings_dns_title),
-            subtitle = stringResource(R.string.settings_dns_row_subtitle),
-            onClick = onOpenDnsSettings,
-        )
+        Column {
+            AnimatedVisibility(visible = expanded) {
+                Column(
+                    modifier = Modifier.padding(bottom = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    SettingsActionRow(
+                        title = stringResource(R.string.settings_dns_title),
+                        subtitle = stringResource(R.string.settings_dns_row_subtitle),
+                        onClick = onOpenDnsSettings,
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -187,19 +201,42 @@ fun LazyListScope.connectionHardwareIdSection(
     hwidLockedBySubscription: Boolean,
     onSubscriptionSendHardwareIdChange: (Boolean) -> Unit,
 ) {
+    connectionHardwareIdSection(
+        subscriptionSendHardwareId = subscriptionSendHardwareId,
+        hwidLockedBySubscription = hwidLockedBySubscription,
+        onSubscriptionSendHardwareIdChange = onSubscriptionSendHardwareIdChange,
+        expanded = true,
+    )
+}
+
+fun LazyListScope.connectionHardwareIdSection(
+    subscriptionSendHardwareId: Boolean,
+    hwidLockedBySubscription: Boolean,
+    onSubscriptionSendHardwareIdChange: (Boolean) -> Unit,
+    expanded: Boolean,
+) {
     item(key = "connection_hardware_id") {
-        SettingsSwitchRow(
-            title = stringResource(R.string.settings_send_hardware_id_title),
-            description = stringResource(
-                if (hwidLockedBySubscription) {
-                    R.string.settings_send_hardware_id_locked
-                } else {
-                    R.string.settings_send_hardware_id_description
-                },
-            ),
-            checked = subscriptionSendHardwareId,
-            onCheckedChange = onSubscriptionSendHardwareIdChange,
-            enabled = !hwidLockedBySubscription,
-        )
+        Column {
+            AnimatedVisibility(visible = expanded) {
+                Column(
+                    modifier = Modifier.padding(bottom = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    SettingsSwitchRow(
+                        title = stringResource(R.string.settings_send_hardware_id_title),
+                        description = stringResource(
+                            if (hwidLockedBySubscription) {
+                                R.string.settings_send_hardware_id_locked
+                            } else {
+                                R.string.settings_send_hardware_id_description
+                            },
+                        ),
+                        checked = subscriptionSendHardwareId,
+                        onCheckedChange = onSubscriptionSendHardwareIdChange,
+                        enabled = !hwidLockedBySubscription,
+                    )
+                }
+            }
+        }
     }
 }

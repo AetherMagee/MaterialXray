@@ -400,7 +400,7 @@ private fun SettingsScreenContent(
                 .fillMaxSize()
                 .padding(padding),
             contentPadding = PaddingValues(vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            verticalArrangement = Arrangement.Top,
         ) {
             serviceSection(
                 rootAvailable = rootAvailable,
@@ -421,29 +421,32 @@ private fun SettingsScreenContent(
                 expanded = serviceExpanded,
                 onExpandedChange = { serviceExpanded = it },
             )
-            if (serviceExpanded) {
-                routingSection(
-                    bypassLan = bypassLan,
-                    allowIpv6 = allowIpv6,
-                    dnsServers = dnsServers,
-                    domesticDnsServers = domesticDnsServers,
-                    routingPolicyControl = routingPolicyControl,
-                    ipv6SelectionEnabled = isIpv6SelectionEnabled(
-                        rootServiceActive = rootServiceActive,
-                        backend = rootConnectionBackend,
-                        compatibility = tproxyCompatibility,
-                    ),
-                    onBypassLanChange = viewModel::setBypassLan,
-                    onAllowIpv6Change = viewModel::setAllowIpv6,
-                    onRoutingPolicyControlChange = viewModel::setRoutingPolicyControl,
-                )
-                connectionDnsSection(onOpenDnsSettings = onOpenDnsSettings)
-                connectionHardwareIdSection(
-                    subscriptionSendHardwareId = subscriptionSendHardwareId,
-                    hwidLockedBySubscription = selectedSubscriptionRequiresHwid && subscriptionSendHardwareId,
-                    onSubscriptionSendHardwareIdChange = viewModel::setSubscriptionSendHardwareId,
-                )
-            }
+            routingSection(
+                bypassLan = bypassLan,
+                allowIpv6 = allowIpv6,
+                dnsServers = dnsServers,
+                domesticDnsServers = domesticDnsServers,
+                routingPolicyControl = routingPolicyControl,
+                ipv6SelectionEnabled = isIpv6SelectionEnabled(
+                    rootServiceActive = rootServiceActive,
+                    backend = rootConnectionBackend,
+                    compatibility = tproxyCompatibility,
+                ),
+                onBypassLanChange = viewModel::setBypassLan,
+                onAllowIpv6Change = viewModel::setAllowIpv6,
+                onRoutingPolicyControlChange = viewModel::setRoutingPolicyControl,
+                expanded = serviceExpanded,
+            )
+            connectionDnsSection(
+                onOpenDnsSettings = onOpenDnsSettings,
+                expanded = serviceExpanded,
+            )
+            connectionHardwareIdSection(
+                subscriptionSendHardwareId = subscriptionSendHardwareId,
+                hwidLockedBySubscription = selectedSubscriptionRequiresHwid && subscriptionSendHardwareId,
+                onSubscriptionSendHardwareIdChange = viewModel::setSubscriptionSendHardwareId,
+                expanded = serviceExpanded,
+            )
 
             serversSection(
                 sortOutboundsByLatency = sortOutboundsByLatency,

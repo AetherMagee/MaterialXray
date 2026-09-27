@@ -7,13 +7,19 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.provider.Settings
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
@@ -32,52 +38,48 @@ internal fun LazyListScope.notificationSection(
     expanded: Boolean,
     onExpandedChange: (Boolean) -> Unit,
 ) {
-    item(key = "notification_header") {
-        SettingsSectionHeader(
-            title = stringResource(R.string.settings_notification_title),
-            expanded = expanded,
-            onExpandedChange = onExpandedChange,
-            showDivider = true,
-        )
-    }
-    if (!expanded) return
-
-    if (access != NotificationAccess.Available) {
-        item(key = "notification_permission") {
-            SettingsActionRow(
-                title = stringResource(R.string.settings_notification_permission_unavailable),
-                subtitle = stringResource(R.string.settings_notification_permission_unavailable_description),
-                onClick = onRequestAccess,
+    item(key = "notifications") {
+        Column(modifier = Modifier.padding(bottom = 16.dp)) {
+            SettingsSectionHeader(
+                title = stringResource(R.string.settings_notification_title),
+                expanded = expanded,
+                onExpandedChange = onExpandedChange,
+                showDivider = true,
             )
+            AnimatedVisibility(visible = expanded) {
+                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    if (access != NotificationAccess.Available) {
+                        SettingsActionRow(
+                            title = stringResource(R.string.settings_notification_permission_unavailable),
+                            subtitle = stringResource(R.string.settings_notification_permission_unavailable_description),
+                            onClick = onRequestAccess,
+                        )
+                    }
+
+                    SettingsActionRow(
+                        title = stringResource(R.string.settings_configure_notification_fields),
+                        subtitle = notificationFieldSummary(settings),
+                        onClick = onConfigureFields,
+                    )
+
+                    SettingsActionRow(
+                        title = stringResource(R.string.settings_notification_field_style),
+                        subtitle = stringResource(settings.style.labelResource),
+                        onClick = onConfigureStyle,
+                    )
+
+                    SettingsActionRow(
+                        title = stringResource(R.string.settings_notification_update_frequency),
+                        subtitle = pluralStringResource(
+                            R.plurals.settings_notification_update_frequency_summary,
+                            settings.updateIntervalMs,
+                            settings.updateIntervalMs,
+                        ),
+                        onClick = onConfigureFrequency,
+                    )
+                }
+            }
         }
-    }
-
-    item(key = "notification_fields") {
-        SettingsActionRow(
-            title = stringResource(R.string.settings_configure_notification_fields),
-            subtitle = notificationFieldSummary(settings),
-            onClick = onConfigureFields,
-        )
-    }
-
-    item(key = "notification_field_style") {
-        SettingsActionRow(
-            title = stringResource(R.string.settings_notification_field_style),
-            subtitle = stringResource(settings.style.labelResource),
-            onClick = onConfigureStyle,
-        )
-    }
-
-    item(key = "notification_update_frequency") {
-        SettingsActionRow(
-            title = stringResource(R.string.settings_notification_update_frequency),
-            subtitle = pluralStringResource(
-                R.plurals.settings_notification_update_frequency_summary,
-                settings.updateIntervalMs,
-                settings.updateIntervalMs,
-            ),
-            onClick = onConfigureFrequency,
-        )
     }
 }
 

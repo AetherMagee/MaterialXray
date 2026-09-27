@@ -226,6 +226,7 @@ internal fun SettingsActionRow(
     onClick: () -> Unit,
     enabled: Boolean = true,
     inProgress: Boolean = false,
+    modifier: Modifier = Modifier,
 ) {
     val contentEnabled = enabled || inProgress
     val titleColor = if (contentEnabled) {
@@ -239,7 +240,7 @@ internal fun SettingsActionRow(
         MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
     }
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .clickable(enabled = enabled, onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 12.dp),

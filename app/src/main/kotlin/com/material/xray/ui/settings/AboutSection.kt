@@ -1,5 +1,8 @@
 package com.material.xray.ui.settings
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.material3.MaterialTheme
@@ -63,57 +66,51 @@ fun LazyListScope.aboutSection(
     expanded: Boolean,
     onExpandedChange: (Boolean) -> Unit,
 ) {
-    item(key = "about_header") {
-        SettingsSectionHeader(
-            title = stringResource(R.string.settings_section_about),
-            expanded = expanded,
-            onExpandedChange = onExpandedChange,
-            showDivider = true,
-        )
-    }
-    if (!expanded) return
+    item(key = "about") {
+        Column(modifier = Modifier.padding(bottom = 16.dp)) {
+            SettingsSectionHeader(
+                title = stringResource(R.string.settings_section_about),
+                expanded = expanded,
+                onExpandedChange = onExpandedChange,
+                showDivider = true,
+            )
+            AnimatedVisibility(visible = expanded) {
+                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    SettingsSwitchRow(
+                        title = stringResource(R.string.settings_app_update_checks_title),
+                        description = stringResource(R.string.settings_app_update_checks_description),
+                        checked = appUpdateChecksEnabled,
+                        onCheckedChange = onAppUpdateChecksEnabledChange,
+                    )
 
-    item(key = "about_update_checks") {
-        SettingsSwitchRow(
-            title = stringResource(R.string.settings_app_update_checks_title),
-            description = stringResource(R.string.settings_app_update_checks_description),
-            checked = appUpdateChecksEnabled,
-            onCheckedChange = onAppUpdateChecksEnabledChange,
-        )
-    }
+                    SettingsActionRow(
+                        title = stringResource(R.string.settings_check_for_updates),
+                        subtitle = appUpdateCheckDescription,
+                        enabled = appUpdateCheckStatus?.isInProgress != true,
+                        inProgress = appUpdateCheckStatus?.isInProgress == true,
+                        onClick = onCheckForUpdates,
+                    )
 
-    item(key = "about_check_updates") {
-        SettingsActionRow(
-            title = stringResource(R.string.settings_check_for_updates),
-            subtitle = appUpdateCheckDescription,
-            enabled = appUpdateCheckStatus?.isInProgress != true,
-            inProgress = appUpdateCheckStatus?.isInProgress == true,
-            onClick = onCheckForUpdates,
-        )
-    }
+                    SettingsActionRow(
+                        title = stringResource(R.string.settings_open_source_licenses),
+                        subtitle = stringResource(R.string.settings_open_source_licenses_description),
+                        onClick = onOpenLicenses,
+                    )
 
-    item(key = "about_licenses") {
-        SettingsActionRow(
-            title = stringResource(R.string.settings_open_source_licenses),
-            subtitle = stringResource(R.string.settings_open_source_licenses_description),
-            onClick = onOpenLicenses,
-        )
-    }
+                    Text(
+                        text = appVersionText,
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
 
-    item(key = "about_app_version") {
-        Text(
-            text = appVersionText,
-            modifier = Modifier.padding(horizontal = 16.dp),
-            style = MaterialTheme.typography.bodyMedium,
-        )
-    }
-
-    item(key = "about_xray_version") {
-        Text(
-            text = xrayCoreVersionText,
-            modifier = Modifier.padding(horizontal = 16.dp),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+                    Text(
+                        text = xrayCoreVersionText,
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
     }
 }

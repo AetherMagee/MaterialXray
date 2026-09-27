@@ -1,5 +1,6 @@
 package com.material.xray.ui.settings
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -62,90 +63,84 @@ fun LazyListScope.appearanceSection(
     expanded: Boolean,
     onExpandedChange: (Boolean) -> Unit,
 ) {
-    item(key = "appearance_header") {
-        SettingsSectionHeader(
-            title = stringResource(R.string.settings_section_appearance),
-            expanded = expanded,
-            onExpandedChange = onExpandedChange,
-            showDivider = true,
-        )
-    }
-    if (!expanded) return
-
-    item(key = "appearance_theme") {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(
-                text = stringResource(R.string.settings_theme_title),
-                style = MaterialTheme.typography.titleSmall,
-                modifier = Modifier.padding(horizontal = 16.dp),
+    item(key = "appearance") {
+        Column(modifier = Modifier.padding(bottom = 16.dp)) {
+            SettingsSectionHeader(
+                title = stringResource(R.string.settings_section_appearance),
+                expanded = expanded,
+                onExpandedChange = onExpandedChange,
+                showDivider = true,
             )
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(themeScrollState)
-                    .padding(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                ThemePreset.entries.forEach { preset ->
-                    ThemePresetSwatch(
-                        preset = preset,
-                        darkTheme = darkTheme,
-                        dynamicColorScheme = dynamicColorScheme,
-                        selected = preset == themePreset,
-                        onClick = { onThemePresetChange(preset) },
+            AnimatedVisibility(visible = expanded) {
+                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            text = stringResource(R.string.settings_theme_title),
+                            style = MaterialTheme.typography.titleSmall,
+                            modifier = Modifier.padding(horizontal = 16.dp),
+                        )
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(themeScrollState)
+                                .padding(horizontal = 16.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            ThemePreset.entries.forEach { preset ->
+                                ThemePresetSwatch(
+                                    preset = preset,
+                                    darkTheme = darkTheme,
+                                    dynamicColorScheme = dynamicColorScheme,
+                                    selected = preset == themePreset,
+                                    onClick = { onThemePresetChange(preset) },
+                                )
+                            }
+                        }
+                        if (darkTheme) {
+                            SettingsSwitchRow(
+                                title = stringResource(R.string.settings_oled_dark_title),
+                                description = stringResource(R.string.settings_oled_dark_description),
+                                checked = oledDark,
+                                onCheckedChange = onOledDarkChange,
+                            )
+                        }
+                    }
+
+                    SettingsActionRow(
+                        title = stringResource(R.string.settings_app_language_title),
+                        subtitle = appLanguageName,
+                        onClick = onAppLanguageClick,
+                    )
+
+                    SettingsNestedSection(title = stringResource(R.string.settings_app_icon_title)) {
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            LauncherIcon.entries.forEach { icon ->
+                                SelectableOptionRow(
+                                    title = stringResource(icon.labelResource),
+                                    description = null,
+                                    selected = icon == launcherIcon,
+                                    onSelected = { onLauncherIconChange(icon) },
+                                    modifier = Modifier.padding(horizontal = 16.dp),
+                                )
+                            }
+                        }
+                    }
+
+                    SettingsSwitchRow(
+                        title = stringResource(R.string.settings_show_title_bar_logo),
+                        checked = showTitleBarLogo,
+                        onCheckedChange = onShowTitleBarLogoChange,
+                    )
+
+                    SettingsSwitchRow(
+                        title = stringResource(R.string.settings_floating_connect_button_title),
+                        description = stringResource(R.string.settings_floating_connect_button_description),
+                        checked = floatingConnectButton,
+                        onCheckedChange = onFloatingConnectButtonChange,
                     )
                 }
             }
-            if (darkTheme) {
-                SettingsSwitchRow(
-                    title = stringResource(R.string.settings_oled_dark_title),
-                    description = stringResource(R.string.settings_oled_dark_description),
-                    checked = oledDark,
-                    onCheckedChange = onOledDarkChange,
-                )
-            }
         }
-    }
-
-    item(key = "appearance_language") {
-        SettingsActionRow(
-            title = stringResource(R.string.settings_app_language_title),
-            subtitle = appLanguageName,
-            onClick = onAppLanguageClick,
-        )
-    }
-
-    item(key = "appearance_icon") {
-        SettingsNestedSection(title = stringResource(R.string.settings_app_icon_title)) {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                LauncherIcon.entries.forEach { icon ->
-                    SelectableOptionRow(
-                        title = stringResource(icon.labelResource),
-                        description = null,
-                        selected = icon == launcherIcon,
-                        onSelected = { onLauncherIconChange(icon) },
-                        modifier = Modifier.padding(horizontal = 16.dp),
-                    )
-                }
-            }
-        }
-    }
-
-    item(key = "appearance_title_bar_logo") {
-        SettingsSwitchRow(
-            title = stringResource(R.string.settings_show_title_bar_logo),
-            checked = showTitleBarLogo,
-            onCheckedChange = onShowTitleBarLogoChange,
-        )
-    }
-
-    item(key = "appearance_floating_connect_button") {
-        SettingsSwitchRow(
-            title = stringResource(R.string.settings_floating_connect_button_title),
-            description = stringResource(R.string.settings_floating_connect_button_description),
-            checked = floatingConnectButton,
-            onCheckedChange = onFloatingConnectButtonChange,
-        )
     }
 }
 

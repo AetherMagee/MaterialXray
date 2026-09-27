@@ -1,5 +1,8 @@
 package com.material.xray.ui.settings
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.text.KeyboardOptions
@@ -116,134 +119,121 @@ fun LazyListScope.coreSection(
     expanded: Boolean,
     onExpandedChange: (Boolean) -> Unit,
 ) {
-    item(key = "core_header") {
-        SettingsSectionHeader(
-            title = stringResource(R.string.settings_section_core),
-            expanded = expanded,
-            onExpandedChange = onExpandedChange,
-            showDivider = true,
-        )
-    }
-    if (!expanded) return
-
-    if (rootServiceActive && rootConnectionBackend == RootConnectionBackend.Tun) {
-        item(key = "core_tun_name") {
-            RootTunNameSetting(
-                visible = true,
-                editingTunName = editingTunName,
-                hasTunNameChanges = hasTunNameChanges,
-                onEditingTunNameChange = onEditingTunNameChange,
-                onSave = onSaveTunName,
-                modifier = Modifier.padding(horizontal = 16.dp),
+    item(key = "core") {
+        Column(modifier = Modifier.padding(bottom = 16.dp)) {
+            SettingsSectionHeader(
+                title = stringResource(R.string.settings_section_core),
+                expanded = expanded,
+                onExpandedChange = onExpandedChange,
+                showDivider = true,
             )
-        }
-    }
+            AnimatedVisibility(visible = expanded) {
+                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    if (rootServiceActive && rootConnectionBackend == RootConnectionBackend.Tun) {
+                        RootTunNameSetting(
+                            visible = true,
+                            editingTunName = editingTunName,
+                            hasTunNameChanges = hasTunNameChanges,
+                            onEditingTunNameChange = onEditingTunNameChange,
+                            onSave = onSaveTunName,
+                            modifier = Modifier.padding(horizontal = 16.dp),
+                        )
+                    }
 
-    // This control is deliberately outside every advanced-only block: it is the way back in.
-    item(key = "core_advanced_options") {
-        SettingsSwitchRow(
-            title = stringResource(R.string.settings_show_advanced_options),
-            checked = showAdvancedOptions,
-            onCheckedChange = onShowAdvancedOptionsChange,
-        )
-    }
+                    SettingsSwitchRow(
+                        title = stringResource(R.string.settings_show_advanced_options),
+                        checked = showAdvancedOptions,
+                        onCheckedChange = onShowAdvancedOptionsChange,
+                    )
 
-    if (showAdvancedOptions) {
-        item(key = "core_xray_buffer") {
-            AdvancedIntegerSetting(
-                value = editingXrayBufferSizeKiB,
-                onValueChange = onEditingXrayBufferSizeKiBChange,
-                label = stringResource(R.string.settings_xray_buffer_size_label),
-                supportingText = stringResource(
-                    R.string.settings_xray_buffer_size_supporting_text,
-                    XrayRuntimeSettings.MIN_XRAY_BUFFER_SIZE_KIB,
-                    XrayRuntimeSettings.MAX_XRAY_BUFFER_SIZE_KIB,
-                    XrayRuntimeSettings.DEFAULT_XRAY_BUFFER_SIZE_KIB,
-                ),
-                suffix = stringResource(R.string.settings_kib_abbreviation),
-                isValid = isXrayBufferSizeKiBValid,
-                hasChanges = hasXrayBufferSizeKiBChanges,
-                onSave = onSaveXrayBufferSizeKiB,
-                modifier = Modifier.padding(horizontal = 16.dp),
-            )
-        }
+                    if (showAdvancedOptions) {
+                        AdvancedIntegerSetting(
+                            value = editingXrayBufferSizeKiB,
+                            onValueChange = onEditingXrayBufferSizeKiBChange,
+                            label = stringResource(R.string.settings_xray_buffer_size_label),
+                            supportingText = stringResource(
+                                R.string.settings_xray_buffer_size_supporting_text,
+                                XrayRuntimeSettings.MIN_XRAY_BUFFER_SIZE_KIB,
+                                XrayRuntimeSettings.MAX_XRAY_BUFFER_SIZE_KIB,
+                                XrayRuntimeSettings.DEFAULT_XRAY_BUFFER_SIZE_KIB,
+                            ),
+                            suffix = stringResource(R.string.settings_kib_abbreviation),
+                            isValid = isXrayBufferSizeKiBValid,
+                            hasChanges = hasXrayBufferSizeKiBChanges,
+                            onSave = onSaveXrayBufferSizeKiB,
+                            modifier = Modifier.padding(horizontal = 16.dp),
+                        )
 
-        if (shouldShowTunMtu(rootServiceActive, rootConnectionBackend)) {
-            item(key = "core_tun_mtu") {
-                TunMtuSetting(
-                    visible = true,
-                    value = editingTunMtu,
-                    onValueChange = onEditingTunMtuChange,
-                    isValid = isTunMtuValid,
-                    hasChanges = hasTunMtuChanges,
-                    onSave = onSaveTunMtu,
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                )
+                        if (shouldShowTunMtu(rootServiceActive, rootConnectionBackend)) {
+                            TunMtuSetting(
+                                visible = true,
+                                value = editingTunMtu,
+                                onValueChange = onEditingTunMtuChange,
+                                isValid = isTunMtuValid,
+                                hasChanges = hasTunMtuChanges,
+                                onSave = onSaveTunMtu,
+                                modifier = Modifier.padding(horizontal = 16.dp),
+                            )
+                        }
+
+                        AdvancedIntegerSetting(
+                            value = editingXrayMemoryRestartThresholdMiB,
+                            onValueChange = onEditingXrayMemoryRestartThresholdMiBChange,
+                            label = stringResource(R.string.settings_xray_memory_restart_threshold_label),
+                            supportingText = stringResource(
+                                R.string.settings_xray_memory_restart_threshold_supporting_text,
+                                XrayRuntimeSettings.MIN_XRAY_MEMORY_RESTART_THRESHOLD_MIB,
+                                XrayRuntimeSettings.MAX_XRAY_MEMORY_RESTART_THRESHOLD_MIB,
+                                XrayRuntimeSettings.DEFAULT_XRAY_MEMORY_RESTART_THRESHOLD_MIB,
+                            ),
+                            suffix = stringResource(R.string.settings_mib_abbreviation),
+                            isValid = isXrayMemoryRestartThresholdMiBValid,
+                            hasChanges = hasXrayMemoryRestartThresholdMiBChanges,
+                            onSave = onSaveXrayMemoryRestartThresholdMiB,
+                            modifier = Modifier.padding(horizontal = 16.dp),
+                        )
+
+                        SettingsSwitchRow(
+                            title = stringResource(R.string.settings_passive_health_monitoring_title),
+                            description = stringResource(R.string.settings_passive_health_monitoring_description),
+                            checked = passiveHealthMonitoringEnabled,
+                            onCheckedChange = onPassiveHealthMonitoringEnabledChange,
+                        )
+
+                        ReadOnlyDropdownField(
+                            label = stringResource(R.string.settings_default_outbound_label),
+                            selectedText = stringResource(defaultOutbound.labelResource),
+                            supportingText = stringResource(defaultOutbound.descriptionResource),
+                            options = XrayOutbound.entries.map { outbound ->
+                                DropdownOption(
+                                    value = outbound,
+                                    label = stringResource(outbound.labelResource),
+                                    description = stringResource(outbound.descriptionResource),
+                                )
+                            },
+                            onSelected = onDefaultOutboundChange,
+                            modifier = Modifier.padding(horizontal = 16.dp),
+                        )
+
+                        ReadOnlyDropdownField(
+                            label = stringResource(R.string.settings_xray_log_level_label),
+                            selectedText = stringResource(xrayLogLevel.labelResource),
+                            supportingText = stringResource(
+                                R.string.settings_default_value,
+                                stringResource(XrayLogLevel.default.labelResource),
+                            ),
+                            options = XrayLogLevel.entries.map { level ->
+                                DropdownOption(
+                                    value = level,
+                                    label = stringResource(level.labelResource),
+                                )
+                            },
+                            onSelected = onXrayLogLevelChange,
+                            modifier = Modifier.padding(horizontal = 16.dp),
+                        )
+                    }
+                }
             }
-        }
-
-        item(key = "core_memory_restart_threshold") {
-            AdvancedIntegerSetting(
-                value = editingXrayMemoryRestartThresholdMiB,
-                onValueChange = onEditingXrayMemoryRestartThresholdMiBChange,
-                label = stringResource(R.string.settings_xray_memory_restart_threshold_label),
-                supportingText = stringResource(
-                    R.string.settings_xray_memory_restart_threshold_supporting_text,
-                    XrayRuntimeSettings.MIN_XRAY_MEMORY_RESTART_THRESHOLD_MIB,
-                    XrayRuntimeSettings.MAX_XRAY_MEMORY_RESTART_THRESHOLD_MIB,
-                    XrayRuntimeSettings.DEFAULT_XRAY_MEMORY_RESTART_THRESHOLD_MIB,
-                ),
-                suffix = stringResource(R.string.settings_mib_abbreviation),
-                isValid = isXrayMemoryRestartThresholdMiBValid,
-                hasChanges = hasXrayMemoryRestartThresholdMiBChanges,
-                onSave = onSaveXrayMemoryRestartThresholdMiB,
-                modifier = Modifier.padding(horizontal = 16.dp),
-            )
-        }
-
-        item(key = "core_passive_health_monitoring") {
-            SettingsSwitchRow(
-                title = stringResource(R.string.settings_passive_health_monitoring_title),
-                description = stringResource(R.string.settings_passive_health_monitoring_description),
-                checked = passiveHealthMonitoringEnabled,
-                onCheckedChange = onPassiveHealthMonitoringEnabledChange,
-            )
-        }
-
-        item(key = "core_default_outbound") {
-            ReadOnlyDropdownField(
-                label = stringResource(R.string.settings_default_outbound_label),
-                selectedText = stringResource(defaultOutbound.labelResource),
-                supportingText = stringResource(defaultOutbound.descriptionResource),
-                options = XrayOutbound.entries.map { outbound ->
-                    DropdownOption(
-                        value = outbound,
-                        label = stringResource(outbound.labelResource),
-                        description = stringResource(outbound.descriptionResource),
-                    )
-                },
-                onSelected = onDefaultOutboundChange,
-                modifier = Modifier.padding(horizontal = 16.dp),
-            )
-        }
-
-        item(key = "core_log_level") {
-            ReadOnlyDropdownField(
-                label = stringResource(R.string.settings_xray_log_level_label),
-                selectedText = stringResource(xrayLogLevel.labelResource),
-                supportingText = stringResource(
-                    R.string.settings_default_value,
-                    stringResource(XrayLogLevel.default.labelResource),
-                ),
-                options = XrayLogLevel.entries.map { level ->
-                    DropdownOption(
-                        value = level,
-                        label = stringResource(level.labelResource),
-                    )
-                },
-                onSelected = onXrayLogLevelChange,
-                modifier = Modifier.padding(horizontal = 16.dp),
-            )
         }
     }
 }
