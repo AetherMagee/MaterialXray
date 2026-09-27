@@ -11,7 +11,10 @@
     <string name="home_subscription_fetch_failed_tls">Subscription fetch failed: a secure connection could not be established.</string>
     <string name="home_subscription_fetch_failed_connection">Subscription fetch failed: could not connect to the server.</string>
     <string name="home_subscription_fetch_failed_network">Subscription fetch failed because of a network error.</string>
-    <string name="home_subscription_refresh_batch_failed">%1$d subscriptions failed to refresh. First error: %2$s</string>
+    <plurals name="home_subscription_refresh_batch_failed">
+        <item quantity="one">%1$d subscription failed to refresh. First error: %2$s</item>
+        <item quantity="other">%1$d subscriptions failed to refresh. First error: %2$s</item>
+    </plurals>
 
     <string name="home_root_fallback_message">Unable to access root on this device. Material Xray will fall back to rootless mode.</string>
     <string name="home_action_continue">Continue</string>
@@ -46,7 +49,6 @@
     <string name="home_app_update_progress_installing_root">Installing update with root&#8230;</string>
 
     <string name="home_no_server_selected">No server selected</string>
-    <string name="home_select_server_below">Select a server below</string>
     <string name="home_selected_server">Selected server</string>
     <string name="home_balancer_loading">Checking servers&#8230;</string>
     <string name="home_balancer_unavailable">Server details unavailable</string>
@@ -141,7 +143,6 @@
     <string name="home_latency_not_available">N/A</string>
     <string name="home_latency_milliseconds">%1$d ms</string>
     <string name="home_latency_milliseconds_compact">%1$dms</string>
-    <string name="home_zero_gigabytes">0 GB</string>
 
     <string name="home_edit_subscription_title">Edit subscription</string>
     <string name="home_field_name">Name</string>

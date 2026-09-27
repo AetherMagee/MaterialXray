@@ -1486,9 +1486,21 @@ private fun SettingsDialogs(
                 Text(
                     stringResource(
                         R.string.settings_backup_import_confirmation,
-                        backupImportSummary.subscriptionCount,
-                        backupImportSummary.serverCount,
-                        backupImportSummary.appRouteCount,
+                        pluralStringResource(
+                            R.plurals.settings_backup_subscription_count,
+                            backupImportSummary.subscriptionCount,
+                            backupImportSummary.subscriptionCount,
+                        ),
+                        pluralStringResource(
+                            R.plurals.settings_backup_server_count,
+                            backupImportSummary.serverCount,
+                            backupImportSummary.serverCount,
+                        ),
+                        pluralStringResource(
+                            R.plurals.settings_backup_app_route_count,
+                            backupImportSummary.appRouteCount,
+                            backupImportSummary.appRouteCount,
+                        ),
                     ),
                 )
             },

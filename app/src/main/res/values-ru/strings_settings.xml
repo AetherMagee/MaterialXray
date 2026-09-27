@@ -49,7 +49,6 @@
     <string name="settings_latency_check_url_label">URL-адрес для проверки задержки</string>
     <string name="settings_latency_check_url_supporting_text">HTTP-адрес для проверки задержки узлов</string>
     <string name="settings_save">Сохранить</string>
-    <string name="settings_update">Обновить</string>
     <string name="settings_updating">Обновление&#8230;</string>
     <string name="settings_section_appearance">Оформление</string>
     <string name="settings_app_language_title">Язык приложения</string>
@@ -100,7 +99,25 @@
     <string name="settings_backup_import_failed">Не удалось импортировать резервную копию</string>
     <string name="settings_backup_import_failed_with_detail">Не удалось импортировать резервную копию: %1$s</string>
     <string name="settings_backup_import_title">Заменить локальную конфигурацию?</string>
-    <string name="settings_backup_import_confirmation">Резервная копия содержит подписки: %1$d, серверы: %2$d, маршруты приложений: %3$d. Импорт заменит текущую локальную конфигурацию.</string>
+    <string name="settings_backup_import_confirmation">Резервная копия содержит %1$s, %2$s и %3$s. Импорт заменит текущую локальную конфигурацию.</string>
+    <plurals name="settings_backup_subscription_count">
+        <item quantity="one">%1$d подписку</item>
+        <item quantity="few">%1$d подписки</item>
+        <item quantity="many">%1$d подписок</item>
+        <item quantity="other">%1$d подписки</item>
+    </plurals>
+    <plurals name="settings_backup_server_count">
+        <item quantity="one">%1$d сервер</item>
+        <item quantity="few">%1$d сервера</item>
+        <item quantity="many">%1$d серверов</item>
+        <item quantity="other">%1$d сервера</item>
+    </plurals>
+    <plurals name="settings_backup_app_route_count">
+        <item quantity="one">%1$d маршрут приложения</item>
+        <item quantity="few">%1$d маршрута приложений</item>
+        <item quantity="many">%1$d маршрутов приложений</item>
+        <item quantity="other">%1$d маршрута приложений</item>
+    </plurals>
     <string name="settings_backup_importing">Импорт&#8230;</string>
     <string name="settings_reset_internal_database">Сбросить внутреннюю базу данных</string>
     <string name="settings_reset_internal_database_description">Удалить подписки, серверы и маршрутизацию приложений, сохранив настройки приложения</string>

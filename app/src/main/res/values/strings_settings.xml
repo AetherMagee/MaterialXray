@@ -49,7 +49,6 @@
     <string name="settings_latency_check_url_label">Latency Check URL</string>
     <string name="settings_latency_check_url_supporting_text">HTTP endpoint used for node latency checks</string>
     <string name="settings_save">Save</string>
-    <string name="settings_update">Update</string>
     <string name="settings_updating">Updating&#8230;</string>
     <string name="settings_section_appearance">Appearance</string>
     <string name="settings_app_language_title">App language</string>
@@ -98,7 +97,19 @@
     <string name="settings_backup_import_failed">Unable to import backup</string>
     <string name="settings_backup_import_failed_with_detail">Unable to import backup: %1$s</string>
     <string name="settings_backup_import_title">Replace local configuration?</string>
-    <string name="settings_backup_import_confirmation">The backup contains %1$d subscriptions, %2$d servers, and %3$d app routes. Importing it will replace the current local configuration.</string>
+    <string name="settings_backup_import_confirmation">The backup contains %1$s, %2$s, and %3$s. Importing it will replace the current local configuration.</string>
+    <plurals name="settings_backup_subscription_count">
+        <item quantity="one">%1$d subscription</item>
+        <item quantity="other">%1$d subscriptions</item>
+    </plurals>
+    <plurals name="settings_backup_server_count">
+        <item quantity="one">%1$d server</item>
+        <item quantity="other">%1$d servers</item>
+    </plurals>
+    <plurals name="settings_backup_app_route_count">
+        <item quantity="one">%1$d app route</item>
+        <item quantity="other">%1$d app routes</item>
+    </plurals>
     <string name="settings_backup_importing">Importing&#8230;</string>
     <string name="settings_reset_internal_database">Reset internal database</string>
     <string name="settings_reset_internal_database_description">Delete subscriptions, servers, and app routing data while keeping app settings</string>

@@ -11,7 +11,12 @@
     <string name="home_subscription_fetch_failed_tls">Не удалось загрузить подписку: не удалось установить защищённое соединение.</string>
     <string name="home_subscription_fetch_failed_connection">Не удалось загрузить подписку: не удалось подключиться к серверу.</string>
     <string name="home_subscription_fetch_failed_network">Не удалось загрузить подписку из-за сетевой ошибки.</string>
-    <string name="home_subscription_refresh_batch_failed">Не удалось обновить подписки: %1$d. Первая ошибка: %2$s</string>
+    <plurals name="home_subscription_refresh_batch_failed">
+        <item quantity="one">Не удалось обновить %1$d подписку. Первая ошибка: %2$s</item>
+        <item quantity="few">Не удалось обновить %1$d подписки. Первая ошибка: %2$s</item>
+        <item quantity="many">Не удалось обновить %1$d подписок. Первая ошибка: %2$s</item>
+        <item quantity="other">Не удалось обновить %1$d подписки. Первая ошибка: %2$s</item>
+    </plurals>
 
     <string name="home_root_fallback_message">Не удалось получить root-доступ на этом устройстве. Material Xray продолжит работу в режиме без root-доступа.</string>
     <string name="home_action_continue">Продолжить</string>
@@ -46,7 +51,6 @@
     <string name="home_app_update_progress_installing_root">Установка обновления с root-доступом&#8230;</string>
 
     <string name="home_no_server_selected">Сервер не выбран</string>
-    <string name="home_select_server_below">Выберите сервер ниже</string>
     <string name="home_selected_server">Выбранный сервер</string>
     <string name="home_balancer_loading">Проверка серверов&#8230;</string>
     <string name="home_balancer_unavailable">Сведения о серверах недоступны</string>
@@ -144,7 +148,6 @@
     <string name="home_latency_not_available">Н/Д</string>
     <string name="home_latency_milliseconds">%1$d мс</string>
     <string name="home_latency_milliseconds_compact">%1$dмс</string>
-    <string name="home_zero_gigabytes">0 ГБ</string>
 
     <string name="home_edit_subscription_title">Изменить подписку</string>
     <string name="home_field_name">Название</string>

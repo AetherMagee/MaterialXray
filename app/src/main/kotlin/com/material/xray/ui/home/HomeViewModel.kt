@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.material.xray.R
+import com.material.xray.core.locale.forAppLanguage
 import com.material.xray.core.locale.localizedString
 import com.material.xray.core.network.ServerLatencyTester
 import com.material.xray.core.xray.ActiveConfigOverrideStore
@@ -819,8 +820,9 @@ class HomeViewModel @Inject constructor(
         val message = if (failures.size == 1) {
             firstFailure
         } else {
-            context.localizedString(
-                R.string.home_subscription_refresh_batch_failed,
+            context.forAppLanguage().resources.getQuantityString(
+                R.plurals.home_subscription_refresh_batch_failed,
+                failures.size,
                 failures.size,
                 firstFailure,
             )
