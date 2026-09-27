@@ -108,7 +108,7 @@
     <string name="apps_switch_to_manual_mode">Switch to manual mode</string>
     <string name="apps_leave_as_is">Leave as is</string>
     <string name="apps_specific_server_routing_title">Specific server routing</string>
-    <string name="apps_specific_server_routing_description">Custom routing rules are not applied when an app is routed to a specific server. Use Default outbound or Default selected server to keep Routing rules active.</string>
+    <string name="apps_specific_server_routing_description">Routing rules remain active for a specific server. Select Always proxied to send all of this app’s traffic through that server.</string>
     <string name="apps_ok">OK</string>
     <string name="apps_cancel">Cancel</string>
     <string name="apps_reset_to_defaults_title">Reset to defaults?</string>
@@ -122,6 +122,9 @@
     <string name="apps_route_default_outbound_description">Use the default outbound selected on Settings page.</string>
     <string name="apps_route_default_server_title">Default selected server</string>
     <string name="apps_route_default_server_description">Use the server selected on Home page.</string>
+    <string name="apps_route_always_proxied_title">Always proxied</string>
+    <string name="apps_route_always_proxied_description">Use the selected server for all traffic, ignoring routing rules.</string>
+    <string name="apps_route_specific_server_heading">Use specific server</string>
     <string name="apps_route_not_proxied_title">Not proxied</string>
     <string name="apps_route_not_proxied_description">Use the device network.</string>
     <string name="apps_route_bypass_tun_title">Bypass TUN</string>

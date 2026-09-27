@@ -1245,6 +1245,15 @@ class TproxyManager internal constructor(
             uidRanges(plan.bypassUids - appUid).forEach { range ->
                 add("$tool -t mangle -A $chain -m owner --uid-owner ${range.asArgument()} -j RETURN")
             }
+            plan.groups.filter { !it.isBase && it.state.routeKey < 0 && it.state.routeKey != Long.MIN_VALUE }.forEach { group ->
+                uidRanges(group.uids).forEach { range ->
+                    for (protocol in listOf("tcp", "udp")) {
+                        val match = "-m owner --uid-owner ${range.asArgument()} -p $protocol --dport 53"
+                        add("$tool -t mangle -A $chain $match -j MARK --set-xmark ${hex(group.state.mark)}/$groupMask")
+                        add("$tool -t mangle -A $chain $match -j RETURN")
+                    }
+                }
+            }
             // Android sends application DNS through a system resolver UID outside the managed app ranges.
             for (protocol in listOf("tcp", "udp")) {
                 add("$tool -t mangle -A $chain -p $protocol --dport 53 -j MARK --set-xmark $baseMark/$groupMask")

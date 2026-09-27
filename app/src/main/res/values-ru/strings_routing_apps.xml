@@ -122,7 +122,7 @@
     <string name="apps_switch_to_manual_mode">Перейти в ручной режим</string>
     <string name="apps_leave_as_is">Оставить как есть</string>
     <string name="apps_specific_server_routing_title">Маршрутизация через определённый сервер</string>
-    <string name="apps_specific_server_routing_description">Пользовательские правила маршрутизации не применяются, когда приложение направляется через определённый сервер. Чтобы правила маршрутизации продолжали действовать, выберите «Исходящее соединение по умолчанию» или «Выбранный сервер по умолчанию».</string>
+    <string name="apps_specific_server_routing_description">Правила маршрутизации действуют и для определённого сервера. Включите «Всегда через прокси», чтобы направлять через него весь трафик приложения.</string>
     <string name="apps_ok">ОК</string>
     <string name="apps_cancel">Отмена</string>
     <string name="apps_reset_to_defaults_title">Восстановить настройки по умолчанию?</string>
@@ -136,6 +136,9 @@
     <string name="apps_route_default_outbound_description">Использовать исходящее соединение, выбранное по умолчанию в настройках.</string>
     <string name="apps_route_default_server_title">Выбранный сервер по умолчанию</string>
     <string name="apps_route_default_server_description">Использовать сервер, выбранный на главном экране.</string>
+    <string name="apps_route_always_proxied_title">Всегда через прокси</string>
+    <string name="apps_route_always_proxied_description">Направлять весь трафик через выбранный сервер, игнорируя правила маршрутизации.</string>
+    <string name="apps_route_specific_server_heading">Использовать определённый сервер</string>
     <string name="apps_route_not_proxied_title">Без прокси</string>
     <string name="apps_route_not_proxied_description">Использовать сеть устройства.</string>
     <string name="apps_route_bypass_tun_title">В обход TUN</string>

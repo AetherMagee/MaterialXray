@@ -1868,8 +1868,8 @@ class XrayService : VpnService() {
             .map { it.packageName }
             .distinct()
         val rootOnlyRouteCount = appRouteAssignments.count { entity ->
-            val routeMode = entity.routeAssignment().mode
-            routeMode == AppRouteMode.Server || routeMode == AppRouteMode.DefaultOutbound
+            val route = entity.routeAssignment()
+            route.mode == AppRouteMode.Server || route.mode == AppRouteMode.DefaultOutbound || route.alwaysProxied
         }
 
         bypassPackages.forEach { packageName ->

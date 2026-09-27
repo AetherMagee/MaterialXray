@@ -42,6 +42,7 @@ class BackupImportPlanTest {
                     profileId = 10,
                     mode = AppRouteMode.Server.name,
                     serverKey = "server-9",
+                    alwaysProxied = true,
                 ),
             ),
             selectedServerKey = "server-9",
@@ -52,6 +53,7 @@ class BackupImportPlanTest {
         assertEquals("subscription-4", plan.servers.single().subscriptionKey)
         assertEquals(AppRouteMode.Server, plan.appRoutes.single().mode)
         assertEquals("server-9", plan.appRoutes.single().serverKey)
+        assertEquals(true, plan.appRoutes.single().alwaysProxied)
         assertEquals("server-9", plan.selectedServerKey)
     }
 

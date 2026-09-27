@@ -12,6 +12,14 @@ class AppRouteAssignmentTest {
         assertEquals(AppRouteAssignment(AppRouteMode.Bypass), entity(excluded = true).routeAssignment())
         assertEquals(AppRouteAssignment(AppRouteMode.Direct), entity(routeMode = "direct").routeAssignment())
         assertEquals(
+            AppRouteAssignment(AppRouteMode.DefaultSelected, alwaysProxied = true),
+            entity(routeMode = "always_proxied").routeAssignment(),
+        )
+        assertEquals(
+            AppRouteAssignment(AppRouteMode.Server, 42, alwaysProxied = true),
+            entity(serverId = 42, alwaysProxied = true).routeAssignment(),
+        )
+        assertEquals(
             AppRouteAssignment(AppRouteMode.DefaultOutbound),
             entity(routeMode = "default_outbound").routeAssignment(),
         )
@@ -31,6 +39,11 @@ class AppRouteAssignmentTest {
         assertFalse(server.excluded)
         assertEquals(42L, server.serverId)
         assertEquals("server", server.routeMode)
+        assertFalse(server.alwaysProxied)
+
+        val forcedServer = AppRouteAssignment(AppRouteMode.Server, 42, alwaysProxied = true)
+            .toAppBypassEntity(packageName = "pkg", profileId = 10, uid = 123, manual = true)
+        assertTrue(forcedServer.alwaysProxied)
 
         val bypass = AppRouteAssignment(AppRouteMode.Bypass)
             .toAppBypassEntity(packageName = "pkg", profileId = 0, uid = 123, manual = false)
@@ -45,6 +58,7 @@ class AppRouteAssignmentTest {
     fun isManualRouteOverrideIgnoresDefaultSelectedAssignments() {
         assertTrue(entity(routeMode = "direct", manual = true).isManualRouteOverride())
         assertTrue(entity(serverId = 42, routeMode = "server", manual = true).isManualRouteOverride())
+        assertTrue(entity(routeMode = "default_selected", alwaysProxied = true, manual = true).isManualRouteOverride())
 
         assertFalse(entity(routeMode = "direct", manual = false).isManualRouteOverride())
         assertFalse(entity(routeMode = "default_selected", manual = true).isManualRouteOverride())
@@ -56,6 +70,7 @@ class AppRouteAssignmentTest {
         serverId: Long? = null,
         routeMode: String? = null,
         manual: Boolean = true,
+        alwaysProxied: Boolean = false,
     ): AppBypassEntity = AppBypassEntity(
         packageName = "pkg",
         uid = 123,
@@ -63,5 +78,6 @@ class AppRouteAssignmentTest {
         serverId = serverId,
         routeMode = routeMode,
         manual = manual,
+        alwaysProxied = alwaysProxied,
     )
 }

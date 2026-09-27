@@ -211,12 +211,12 @@ class XrayConfigRoutingTest {
 
         val rules = routing.getValue("rules").jsonArray.map { it.jsonObject }
         assertEquals("IPOnDemand", routing.getValue("domainStrategy").jsonPrimitive.content)
-        assertEquals(listOf("tun-in", "app-in-direct", "app-in-rules"), rules[0].array("inboundTag"))
+        assertEquals(listOf("tun-in", "app-in-rules"), rules[0].array("inboundTag"))
         assertEquals("dns-out", rules[0].getValue("outboundTag").jsonPrimitive.content)
         assertEquals(listOf("tun-in", "app-in-direct", "app-in-rules"), rules[1].array("inboundTag"))
         assertEquals(listOf("10.10.14.2"), rules[1].array("ip"))
         assertEquals("block", rules[1].getValue("outboundTag").jsonPrimitive.content)
-        assertEquals(listOf("tun-in", "app-in-direct", "app-in-rules"), rules[2].array("inboundTag"))
+        assertEquals(listOf("tun-in", "app-in-rules"), rules[2].array("inboundTag"))
         assertEquals("853", rules[2].getValue("port").jsonPrimitive.content)
         assertEquals("tcp", rules[2].getValue("network").jsonPrimitive.content)
         assertEquals("direct", rules[2].getValue("outboundTag").jsonPrimitive.content)
@@ -231,6 +231,46 @@ class XrayConfigRoutingTest {
         assertEquals("443", rules[10].getValue("port").jsonPrimitive.content)
         assertEquals(listOf("tcp", "udp"), rules[11].array("protocol"))
         assertEquals("app-in-rules", rules.last().array("inboundTag").single())
+    }
+
+    @Test
+    fun `specific server keeps proxy-targeting rules on its selected outbound`() {
+        val routing = buildRouting(
+            routingRules = listOf(RoutingRule(id = "proxy-site", name = "Proxy site", outboundTag = "proxy", domains = listOf("domain:example.com"))),
+            appProxyRoutes = listOf(
+                appProxyRoute(inboundTag = "app-in-7", outboundTag = "app-proxy-7", applyRoutingRules = true),
+            ),
+        )
+        val rules = routing.getValue("rules").jsonArray.map { it.jsonObject }
+        val scopedIndex = rules.indexOfFirst {
+            it["inboundTag"]?.jsonArray?.singleOrNull()?.jsonPrimitive?.content == "app-in-7" &&
+                it["domain"]?.jsonArray?.singleOrNull()?.jsonPrimitive?.content == "domain:example.com"
+        }
+        val globalIndex = rules.indexOfFirst {
+            it["inboundTag"] == null &&
+                it["domain"]?.jsonArray?.singleOrNull()?.jsonPrimitive?.content == "domain:example.com"
+        }
+        assertTrue(scopedIndex in 0 until globalIndex)
+        assertEquals("app-proxy-7", rules[scopedIndex].getValue("outboundTag").jsonPrimitive.content)
+        assertEquals("proxy", rules[globalIndex].getValue("outboundTag").jsonPrimitive.content)
+    }
+
+    @Test
+    fun `forced app inbound does not use direct DNS over TLS rule`() {
+        val routing = buildRouting(
+            routingRules = emptyList(),
+            appProxyRoutes = listOf(
+                appProxyRoute(inboundTag = "app-in-forced-7", outboundTag = "app-proxy-forced-7", applyRoutingRules = false),
+            ),
+        )
+        val rules = routing.getValue("rules").jsonArray.map { it.jsonObject }
+        val dotRule = rules.first { it["port"]?.jsonPrimitive?.content == "853" }
+        assertEquals(listOf("tun-in"), dotRule.array("inboundTag"))
+        val forcedIndex = rules.indexOfFirst {
+            it["inboundTag"]?.jsonArray?.singleOrNull()?.jsonPrimitive?.content == "app-in-forced-7"
+        }
+        val dotIndex = rules.indexOf(dotRule)
+        assertTrue(dotIndex < forcedIndex)
     }
 
     @Test

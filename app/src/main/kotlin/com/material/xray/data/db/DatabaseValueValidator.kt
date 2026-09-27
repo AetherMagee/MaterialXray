@@ -4,7 +4,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import com.material.xray.data.db.entity.DatabaseMetadataEntity
 
 internal object DatabaseValueValidator {
-    internal const val CURRENT_REVISION = 1
+    internal const val CURRENT_REVISION = 2
 
     fun validateIfNeeded(db: SupportSQLiteDatabase): Boolean {
         if (!shouldValidate(readRevision(db))) return false
@@ -176,11 +176,18 @@ internal object DatabaseValueValidator {
                 WHEN manual = 0 THEN 0
                 ELSE 1
             END,
+            alwaysProxied = CASE
+                WHEN excluded != 0 OR LOWER(TRIM(routeMode)) IN ('bypass', 'direct', 'default_outbound') THEN 0
+                WHEN LOWER(TRIM(routeMode)) = 'always_proxied' THEN 1
+                WHEN alwaysProxied = 1 AND (routeMode IS NULL OR LOWER(TRIM(routeMode)) IN ('default_selected', 'server')) THEN 1
+                ELSE 0
+            END,
             routeMode = CASE
                 WHEN TRIM(packageName) = '' OR profileId < 0 THEN NULL
                 WHEN excluded != 0 OR LOWER(TRIM(routeMode)) = 'bypass' THEN 'bypass'
                 WHEN LOWER(TRIM(routeMode)) = 'direct' THEN 'direct'
                 WHEN LOWER(TRIM(routeMode)) = 'default_outbound' THEN 'default_outbound'
+                WHEN LOWER(TRIM(routeMode)) = 'always_proxied' THEN 'default_selected'
                 WHEN LOWER(TRIM(routeMode)) = 'default_selected' THEN 'default_selected'
                 WHEN serverId IN (SELECT id FROM servers) THEN 'server'
                 ELSE NULL
@@ -190,11 +197,13 @@ internal object DatabaseValueValidator {
             OR uid < 0
             OR excluded NOT IN (0, 1)
             OR manual NOT IN (0, 1)
+            OR alwaysProxied NOT IN (0, 1)
+            OR (alwaysProxied != 0 AND (excluded != 0 OR LOWER(TRIM(routeMode)) IN ('bypass', 'direct', 'default_outbound')))
             OR (LOWER(TRIM(routeMode)) = 'bypass' AND excluded = 0)
             OR (routeMode IS NOT NULL AND routeMode != LOWER(TRIM(routeMode)))
-            OR (routeMode IS NOT NULL AND LOWER(TRIM(routeMode)) NOT IN ('bypass', 'direct', 'default_outbound', 'default_selected', 'server'))
+            OR (routeMode IS NOT NULL AND LOWER(TRIM(routeMode)) NOT IN ('bypass', 'direct', 'default_outbound', 'default_selected', 'always_proxied', 'server'))
             OR (serverId IS NOT NULL AND serverId NOT IN (SELECT id FROM servers))
-            OR (serverId IS NOT NULL AND (excluded != 0 OR LOWER(TRIM(routeMode)) IN ('bypass', 'direct', 'default_outbound', 'default_selected')))
+            OR (serverId IS NOT NULL AND (excluded != 0 OR LOWER(TRIM(routeMode)) IN ('bypass', 'direct', 'default_outbound', 'default_selected', 'always_proxied')))
         """.trimIndent(),
     )
 }

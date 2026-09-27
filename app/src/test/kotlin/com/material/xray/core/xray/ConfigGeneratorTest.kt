@@ -629,4 +629,68 @@ class ConfigGeneratorTest {
 
         assertTrue("User routing rules should be emitted before default selected proxy fallback", ruRuleIndex in 0 until fallbackIndex)
     }
+
+    @Test
+    fun `always proxied app route precedes regular routing rules`() {
+        val config = generator.generate(
+            vlessReality,
+            routingRules = RoutingRuleCatalog.defaults(),
+            appProxyRoutes = listOf(
+                AppProxyRoute(
+                    inboundTag = "app-in-always-proxied",
+                    tunName = "xray0a1",
+                    outboundTag = "proxy",
+                    server = vlessReality,
+                ),
+            ),
+        )
+        val rules = Json.parseToJsonElement(config).jsonObject["routing"]!!.jsonObject["rules"]!!.jsonArray.map { it.jsonObject }
+        val forcedIndex = rules.indexOfFirst {
+            it["inboundTag"]?.jsonArray?.singleOrNull()?.jsonPrimitive?.content == "app-in-always-proxied" &&
+                it["outboundTag"]?.jsonPrimitive?.content == "proxy"
+        }
+        val regularIndex = rules.indexOfFirst {
+            it["domain"]?.jsonArray?.any { domain -> domain.jsonPrimitive.content == "domain:ru" } == true
+        }
+        assertTrue("Forced proxy route should precede regular routing rules", forcedIndex in 0 until regularIndex)
+        assertEquals(
+            1,
+            Json.parseToJsonElement(config).jsonObject["outbounds"]!!.jsonArray.count {
+                it.jsonObject["tag"]?.jsonPrimitive?.content == "proxy"
+            },
+        )
+    }
+
+    @Test
+    fun `specific server without forced proxy applies rules before its own server fallback`() {
+        val appServer = vlessReality.copy(name = "Specific", address = "5.6.7.8")
+        val config = generator.generate(
+            vlessReality,
+            routingRules = RoutingRuleCatalog.defaults(),
+            appProxyRoutes = listOf(
+                AppProxyRoute(
+                    inboundTag = "app-in-42",
+                    tunName = "xray0a1",
+                    outboundTag = "app-proxy-42",
+                    server = appServer,
+                    applyRoutingRules = true,
+                ),
+            ),
+        )
+        val json = Json.parseToJsonElement(config).jsonObject
+        val rules = json["routing"]!!.jsonObject["rules"]!!.jsonArray.map { it.jsonObject }
+        val regularIndex = rules.indexOfFirst {
+            it["domain"]?.jsonArray?.any { domain -> domain.jsonPrimitive.content == "domain:ru" } == true
+        }
+        val fallbackIndex = rules.indexOfFirst {
+            it["inboundTag"]?.jsonArray?.singleOrNull()?.jsonPrimitive?.content == "app-in-42" &&
+                it["outboundTag"]?.jsonPrimitive?.content == "app-proxy-42"
+        }
+        assertTrue(regularIndex in 0 until fallbackIndex)
+        assertTrue(
+            json["outbounds"]!!.jsonArray.any {
+                it.jsonObject["tag"]?.jsonPrimitive?.content == "app-proxy-42"
+            },
+        )
+    }
 }

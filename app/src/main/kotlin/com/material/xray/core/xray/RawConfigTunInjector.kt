@@ -60,7 +60,7 @@ internal class RawConfigTunInjector(
         val defaultRouteTarget = rawRouting.defaultTcpRouteTarget()
             ?: XrayRouteTarget.Outbound(proxyOutboundTag)
 
-        val appProxyOutbounds = appProxyRoutes.filterNot { it.applyRoutingRules }.map { route ->
+        val appProxyOutbounds = appProxyRoutes.filter { it.outboundTag != "proxy" }.map { route ->
             buildProxyOutbound(route.server, fwmark, physicalInterface, route.outboundTag, allowIpv6)
         }
         val managedOutboundTags = managedOutboundTags(appProxyRoutes)
@@ -102,7 +102,13 @@ internal class RawConfigTunInjector(
         original["routing"] = mergeRouting(
             generated = buildRouting(
                 routingRules = routingRules,
-                appProxyRoutes = appProxyRoutes,
+                appProxyRoutes = appProxyRoutes.map { route ->
+                    if (!route.applyRoutingRules && route.outboundTag == "proxy") {
+                        route.copy(outboundTag = proxyOutboundTag)
+                    } else {
+                        route
+                    }
+                },
                 bypassLan = bypassLan,
                 dnsServers = dnsServers,
                 domesticDnsServers = domesticDnsServers,
@@ -116,12 +122,22 @@ internal class RawConfigTunInjector(
             ),
             raw = rawRouting,
             profileDnsInboundTags = effectiveInbounds.map { it.tag }.takeIf { profileDns != null },
+            appProxyRoutes = appProxyRoutes,
+            proxyOutboundTag = proxyOutboundTag,
+            defaultRouteTarget = defaultRouteTarget,
         )
 
         return json.encodeToString(JsonObject.serializer(), JsonObject(original))
     }
 
-    private fun mergeRouting(generated: JsonObject, raw: JsonObject?, profileDnsInboundTags: List<String>?): JsonObject {
+    private fun mergeRouting(
+        generated: JsonObject,
+        raw: JsonObject?,
+        profileDnsInboundTags: List<String>?,
+        appProxyRoutes: List<AppProxyRoute>,
+        proxyOutboundTag: String,
+        defaultRouteTarget: XrayRouteTarget,
+    ): JsonObject {
         // Keep MX app rules from capturing the profile resolver's own requests. DNS interception
         // still feeds Xray's DNS outbound, including the synthetic resolver used by Android VPN.
         val generatedRules = (generated["rules"] as? JsonArray).orEmpty().map { rule ->
@@ -131,11 +147,40 @@ internal class RawConfigTunInjector(
                 JsonObject(rule.jsonObject + ("inboundTag" to JsonArray(profileDnsInboundTags.map(::JsonPrimitive))))
             }
         }
-        val rawRules = (raw?.get("rules") as? JsonArray).orEmpty()
+        val fallbackCount = appProxyRoutes.count { it.applyRoutingRules }
+        val rawRules = (raw?.get("rules") as? JsonArray).orEmpty().flatMap { rawRule ->
+            val original = rawRule as? JsonObject ?: return@flatMap listOf(rawRule)
+            val target = original.routeTarget()
+            val targetsDefaultProxy = target == XrayRouteTarget.Outbound(proxyOutboundTag) ||
+                (defaultRouteTarget is XrayRouteTarget.Balancer && target == defaultRouteTarget)
+            val scoped = if (targetsDefaultProxy) {
+                appProxyRoutes.filter { it.applyRoutingRules && it.outboundTag != "proxy" }.mapNotNull { route ->
+                    val matchesInbound = when (val inboundTags = original["inboundTag"]) {
+                        null -> true
+                        is JsonArray -> inboundTags.any { (it as? JsonPrimitive)?.contentOrNull == route.inboundTag }
+                        is JsonPrimitive -> inboundTags.contentOrNull == route.inboundTag
+                        else -> false
+                    }
+                    if (!matchesInbound) {
+                        return@mapNotNull null
+                    }
+                    JsonObject(
+                        original.toMutableMap().apply {
+                            remove("balancerTag")
+                            put("inboundTag", JsonArray(listOf(JsonPrimitive(route.inboundTag))))
+                            put("outboundTag", JsonPrimitive(route.outboundTag))
+                        },
+                    )
+                }
+            } else {
+                emptyList()
+            }
+            scoped + original
+        }
         return JsonObject(
             generated.toMutableMap().apply {
                 if (raw != null) putAll(raw)
-                put("rules", JsonArray(generatedRules + rawRules))
+                put("rules", JsonArray(generatedRules.dropLast(fallbackCount) + rawRules + generatedRules.takeLast(fallbackCount)))
             },
         )
     }
@@ -179,7 +224,7 @@ internal class RawConfigTunInjector(
         add("direct")
         add("dns-out")
         add("block")
-        appProxyRoutes.filterNot { it.applyRoutingRules }.forEach { add(it.outboundTag) }
+        appProxyRoutes.filter { it.outboundTag != "proxy" }.forEach { add(it.outboundTag) }
     }
 
     private fun JsonObject?.defaultTcpRouteTarget(): XrayRouteTarget? = (this?.get("rules") as? JsonArray)

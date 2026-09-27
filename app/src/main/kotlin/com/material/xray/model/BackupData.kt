@@ -45,6 +45,7 @@ data class BackupData(
         val mode: String,
         val serverKey: String? = null,
         val manual: Boolean = true,
+        val alwaysProxied: Boolean = false,
     )
 
     companion object {

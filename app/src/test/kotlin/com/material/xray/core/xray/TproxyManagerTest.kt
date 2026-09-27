@@ -529,6 +529,23 @@ class TproxyManagerTest {
     }
 
     @Test
+    fun `forced app DNS is marked before the base resolver rule`() {
+        val original = plan()
+        val forcedState = original.runtimeState.groups[1].copy(routeKey = -7L)
+        val forcedPlan = original.copy(
+            runtimeState = original.runtimeState.copy(groups = listOf(original.runtimeState.groups[0], forcedState)),
+            groups = listOf(original.groups[0], original.groups[1].copy(state = forcedState)),
+        )
+        val command = TproxyManager.activationCommand(forcedPlan, APP_UID)
+        val forcedMark = command.indexOf("--uid-owner 10030 -p udp --dport 53 -j MARK --set-xmark 0x10400000/0x1fe00000")
+        val forcedReturn = command.indexOf("--uid-owner 10030 -p udp --dport 53 -j RETURN")
+        val baseMark = command.indexOf("-p udp --dport 53 -j MARK --set-xmark 0x10200000/0x1fe00000")
+
+        assertTrue(forcedMark in 0..<forcedReturn)
+        assertTrue(forcedReturn < baseMark)
+    }
+
+    @Test
     fun `disabled IPv6 rejects managed apps instead of blackholing them`() {
         val command = TproxyManager.activationCommand(plan(), APP_UID)
 

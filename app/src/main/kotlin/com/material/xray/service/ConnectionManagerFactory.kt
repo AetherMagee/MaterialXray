@@ -265,7 +265,12 @@ internal class TproxyManagerRoutingGateway(
         val inboundTags = if (appRoutingPlan.proxyRoutes.isEmpty()) {
             appRoutingPlan.proxyServerIds.mapIndexed { index, routeKey ->
                 existingState?.groups?.getOrNull(index + 1)?.inboundTag
-                    ?: if (routeKey == Long.MIN_VALUE) "app-in-default-selected" else "app-in-$routeKey"
+                    ?: when (routeKey) {
+                        Long.MIN_VALUE -> "app-in-default-selected"
+                        Long.MIN_VALUE + 1 -> "app-in-always-proxied"
+                        in Long.MIN_VALUE + 2..-1L -> "app-in-forced-${-routeKey}"
+                        else -> "app-in-$routeKey"
+                    }
             }
         } else {
             appRoutingPlan.proxyRoutes.map { it.inboundTag }

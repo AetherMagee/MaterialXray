@@ -83,6 +83,7 @@ class AppRoutingPlannerTest {
         assertEquals(TunManager.appTunName(BASE_TUN, 2), serverRoute.tunName)
         assertEquals("app-proxy-$SERVER_ID", serverRoute.outboundTag)
         assertEquals(serverSpecificConfig, serverRoute.server)
+        assertTrue(serverRoute.applyRoutingRules)
     }
 
     @Test
@@ -122,6 +123,61 @@ class AppRoutingPlannerTest {
             plan.tunRoutes,
         )
         assertEquals(listOf("app-in-$SERVER_ID"), plan.proxyRoutes.map { it.inboundTag })
+    }
+
+    @Test
+    fun `always proxied apps keep a dedicated proxy route when default apps use the base route`() = runTest {
+        val defaultServer = server("Default", "198.51.100.1")
+        val planner = AppRoutingPlanner(
+            appBypassDao = FakeAppBypassDao(
+                listOf(assignment("always.app", uid = 1001, excluded = false, routeMode = "default_selected", alwaysProxied = true)),
+            ),
+            serverRepository = ServerRepository(FakeServerDao()),
+            appInventory = FakeAppInventory(apps = listOf(app("always.app", uid = 2001), app("regular.app", uid = 2002))),
+            serverAddressResolver = ServerAddressResolver(),
+            log = LogBuffer(),
+        )
+
+        val plan = planner.build(
+            baseTunName = BASE_TUN,
+            baseRouteTable = BASE_TABLE,
+            includeProxyRoutes = true,
+            includeDefaultSelectedRoute = false,
+            defaultProxyServer = defaultServer,
+        )
+
+        assertEquals(listOf(Long.MIN_VALUE + 1), plan.proxyServerIds)
+        assertEquals(setOf(2001), plan.tunRoutes.single().uids)
+        assertEquals("app-in-always-proxied", plan.proxyRoutes.single().inboundTag)
+        assertEquals("proxy", plan.proxyRoutes.single().outboundTag)
+        assertEquals(defaultServer, plan.proxyRoutes.single().server)
+        assertTrue(!plan.proxyRoutes.single().applyRoutingRules)
+    }
+
+    @Test
+    fun `specific server keeps separate rule-following and forced proxy groups`() = runTest {
+        val serverConfig = server("Specific", "203.0.113.7")
+        val planner = AppRoutingPlanner(
+            appBypassDao = FakeAppBypassDao(
+                listOf(
+                    assignment("regular.app", uid = 1001, excluded = false, serverId = SERVER_ID),
+                    assignment("forced.app", uid = 1002, excluded = false, serverId = SERVER_ID, alwaysProxied = true),
+                ),
+            ),
+            serverRepository = ServerRepository(FakeServerDao(serverEntity(SERVER_ID, serverConfig))),
+            appInventory = FakeAppInventory(apps = listOf(app("regular.app", 2001), app("forced.app", 2002))),
+            serverAddressResolver = ServerAddressResolver(),
+            log = LogBuffer(),
+        )
+
+        val plan = planner.build(BASE_TUN, BASE_TABLE, includeProxyRoutes = true, defaultProxyServer = serverConfig)
+
+        assertEquals(listOf(SERVER_ID, -SERVER_ID), plan.proxyServerIds)
+        assertEquals(setOf(2001), plan.tunRoutes[0].uids)
+        assertEquals(setOf(2002), plan.tunRoutes[1].uids)
+        assertTrue(plan.proxyRoutes[0].applyRoutingRules)
+        assertTrue(!plan.proxyRoutes[1].applyRoutingRules)
+        assertEquals("app-in-forced-$SERVER_ID", plan.proxyRoutes[1].inboundTag)
     }
 
     @Test
@@ -282,12 +338,14 @@ class AppRoutingPlannerTest {
             excluded: Boolean,
             serverId: Long? = null,
             routeMode: String? = null,
+            alwaysProxied: Boolean = false,
         ) = AppBypassEntity(
             packageName = packageName,
             uid = uid,
             excluded = excluded,
             serverId = serverId,
             routeMode = routeMode,
+            alwaysProxied = alwaysProxied,
         )
 
         fun app(packageName: String, uid: Int) = InstalledApp(

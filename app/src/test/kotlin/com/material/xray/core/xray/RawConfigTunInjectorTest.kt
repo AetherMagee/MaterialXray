@@ -306,6 +306,12 @@ class RawConfigTunInjectorTest {
                     server = server("Default selected"),
                     applyRoutingRules = true,
                 ),
+                AppProxyRoute(
+                    inboundTag = "app-in-always-proxied",
+                    tunName = "xray0a2",
+                    outboundTag = "proxy",
+                    server = server("Default selected"),
+                ),
             ),
             physicalInterface = null,
         )
@@ -320,6 +326,10 @@ class RawConfigTunInjectorTest {
             it["inboundTag"]?.jsonArray?.singleOrNull()?.jsonPrimitive?.content == "app-in-default-selected"
         }
         assertEquals(providerTag, appFallback.getValue("outboundTag").jsonPrimitive.content)
+        val forcedRule = rules.first {
+            it["inboundTag"]?.jsonArray?.singleOrNull()?.jsonPrimitive?.content == "app-in-always-proxied"
+        }
+        assertEquals(providerTag, forcedRule.getValue("outboundTag").jsonPrimitive.content)
         assertTrue(rules.any { it["network"]?.jsonPrimitive?.content == "tcp,udp" && it["outboundTag"]?.jsonPrimitive?.content == providerTag })
     }
 
@@ -553,6 +563,54 @@ class RawConfigTunInjectorTest {
 
         assertTrue(failure.isFailure)
         assertEquals("Raw JSON config has no proxy outbound", failure.exceptionOrNull()?.message)
+    }
+
+    @Test
+    fun `specific server fallback follows raw profile rules and keeps proxy matches on that server`() {
+        val result = injector.inject(
+            rawJson = """
+                {
+                  "outbounds": [{"tag":"proxy","protocol":"vless","settings":{}}],
+                  "routing": {"rules": [
+                    {"domain":["domain:direct.example"],"outboundTag":"direct"},
+                    {"domain":["domain:proxy.example"],"outboundTag":"proxy"}
+                  ]}
+                }
+            """.trimIndent(),
+            tunName = "xray0",
+            fwmark = 1,
+            dnsServers = "",
+            domesticDnsServers = "",
+            logLevel = XrayLogLevel.Error,
+            defaultOutbound = XrayOutbound.Proxy,
+            bypassLan = false,
+            routingRules = emptyList(),
+            appProxyRoutes = listOf(
+                AppProxyRoute(
+                    inboundTag = "app-in-7",
+                    tunName = "xray0a1",
+                    outboundTag = "app-proxy-7",
+                    server = server("Specific"),
+                    applyRoutingRules = true,
+                ),
+            ),
+            physicalInterface = null,
+        )
+        val rules = json.parseToJsonElement(result).jsonObject.getValue("routing").jsonObject
+            .getValue("rules").jsonArray.map { it.jsonObject }
+        val directIndex = rules.indexOfFirst {
+            it["domain"]?.jsonArray?.singleOrNull()?.jsonPrimitive?.content == "domain:direct.example"
+        }
+        val scopedProxyIndex = rules.indexOfFirst {
+            it["domain"]?.jsonArray?.singleOrNull()?.jsonPrimitive?.content == "domain:proxy.example" &&
+                it["inboundTag"]?.jsonArray?.singleOrNull()?.jsonPrimitive?.content == "app-in-7"
+        }
+        val fallbackIndex = rules.indexOfLast {
+            it["inboundTag"]?.jsonArray?.singleOrNull()?.jsonPrimitive?.content == "app-in-7" && it["domain"] == null
+        }
+        assertTrue(directIndex in 0 until scopedProxyIndex)
+        assertTrue(scopedProxyIndex in 0 until fallbackIndex)
+        assertEquals("app-proxy-7", rules[scopedProxyIndex].getValue("outboundTag").jsonPrimitive.content)
     }
 
     private fun server(name: String) = ServerConfig(
