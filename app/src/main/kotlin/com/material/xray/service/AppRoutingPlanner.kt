@@ -70,14 +70,18 @@ internal class AppRoutingPlanner(
         }
 
         val defaultProxyUids = assignmentsWithUid
-            .filter { it.route.mode == AppRouteMode.DefaultSelected }
+            .filter { it.route.mode == AppRouteMode.DefaultSelected && !it.route.alwaysProxied }
             .map { it.uid }
             .filter { it > 0 }
             .toSet() + defaultSelectedUidsForUnassignedApps(appSnapshot.apps.map { it.uid }, assignmentUids)
+        val alwaysProxiedUids = assignmentsWithUid
+            .filter { it.route.mode == AppRouteMode.DefaultSelected && it.route.alwaysProxied }
+            .map { it.uid }
+            .toSet()
 
         val proxyAssignments = assignmentsWithUid.proxyAssignments()
 
-        if (defaultProxyUids.isEmpty() && proxyAssignments.isEmpty()) {
+        if (defaultProxyUids.isEmpty() && alwaysProxiedUids.isEmpty() && proxyAssignments.isEmpty()) {
             return emptyPlan(directUids, routeProfileIds)
         }
 
@@ -90,6 +94,7 @@ internal class AppRoutingPlanner(
             includeDefaultSelectedRoute = includeDefaultSelectedRoute,
             defaultProxyServer = defaultProxyServer,
             defaultProxyUids = defaultProxyUids,
+            alwaysProxiedUids = alwaysProxiedUids,
             proxyAssignments = proxyAssignments,
             allowIpv6 = allowIpv6,
         )
@@ -104,7 +109,8 @@ internal class AppRoutingPlanner(
         includeDefaultSelectedRoute: Boolean,
         defaultProxyServer: ServerConfig?,
         defaultProxyUids: Set<Int>,
-        proxyAssignments: Map<Long, List<RoutedAppAssignment>>,
+        alwaysProxiedUids: Set<Int>,
+        proxyAssignments: Map<Pair<Long, Boolean>, List<RoutedAppAssignment>>,
         allowIpv6: Boolean,
     ): AppRoutingPlan {
         val routeBuilder = AppProxyRouteBuilder(baseTunName, baseRouteTable)
@@ -112,14 +118,17 @@ internal class AppRoutingPlanner(
         if (includeDefaultSelectedRoute && defaultProxyUids.isNotEmpty()) {
             addDefaultProxyRoute(routeBuilder, defaultProxyUids, includeProxyRoutes, defaultProxyServer)
         }
+        if (alwaysProxiedUids.isNotEmpty()) {
+            addAlwaysProxiedRoute(routeBuilder, alwaysProxiedUids, includeProxyRoutes, defaultProxyServer)
+        }
 
         var routeCapReached = false
-        for ((serverId, assignments) in proxyAssignments) {
+        for ((serverRoute, assignments) in proxyAssignments) {
             if (routeBuilder.tunRouteCount >= MAX_APP_PROXY_ROUTES) {
                 routeCapReached = true
                 break
             }
-            addServerProxyRoute(routeBuilder, serverId, assignments, includeProxyRoutes, allowIpv6)
+            addServerProxyRoute(routeBuilder, serverRoute.first, serverRoute.second, assignments, includeProxyRoutes, allowIpv6)
         }
         if (routeCapReached) {
             log.append(
@@ -162,16 +171,39 @@ internal class AppRoutingPlanner(
         )
     }
 
+    private fun addAlwaysProxiedRoute(
+        routeBuilder: AppProxyRouteBuilder,
+        uids: Set<Int>,
+        includeProxyRoutes: Boolean,
+        defaultProxyServer: ServerConfig?,
+    ) {
+        val routeTunName = routeBuilder.addTunRoute(ALWAYS_PROXIED_ROUTE_ID, uids)
+        if (!includeProxyRoutes) return
+        val activeServer = defaultProxyServer
+        if (activeServer == null) {
+            log.append(LogSource.APP, "Skipping always proxied app route: active server is not ready")
+            routeBuilder.removeLastTunRoute()
+            return
+        }
+        routeBuilder.proxyRoutes += AppProxyRoute(
+            inboundTag = ALWAYS_PROXIED_INBOUND_TAG,
+            tunName = routeTunName,
+            outboundTag = DEFAULT_SELECTED_CONFIG_OUTBOUND_TAG,
+            server = activeServer,
+        )
+    }
+
     private suspend fun addServerProxyRoute(
         routeBuilder: AppProxyRouteBuilder,
         serverId: Long,
+        alwaysProxied: Boolean,
         assignments: List<RoutedAppAssignment>,
         includeProxyRoutes: Boolean,
         allowIpv6: Boolean,
     ) {
         val uids = assignments.map { it.uid }.filter { it > 0 }.toSet()
         if (uids.isEmpty()) return
-        val routeTunName = routeBuilder.addTunRoute(serverId, uids)
+        val routeTunName = routeBuilder.addTunRoute(if (alwaysProxied) -serverId else serverId, uids)
 
         if (!includeProxyRoutes) return
 
@@ -194,6 +226,7 @@ internal class AppRoutingPlanner(
 
         routeBuilder.proxyRoutes += buildServerProxyRoute(
             serverId = serverId,
+            alwaysProxied = alwaysProxied,
             routeTunName = routeTunName,
             parsedServer = parsedServerResult.getOrThrow(),
             allowIpv6 = allowIpv6,
@@ -202,6 +235,7 @@ internal class AppRoutingPlanner(
 
     private suspend fun buildServerProxyRoute(
         serverId: Long,
+        alwaysProxied: Boolean,
         routeTunName: String,
         parsedServer: ServerConfig,
         allowIpv6: Boolean,
@@ -214,10 +248,11 @@ internal class AppRoutingPlanner(
         val routedServer = resolvedServer.server
 
         return AppProxyRoute(
-            inboundTag = "app-in-$serverId",
+            inboundTag = if (alwaysProxied) "app-in-forced-$serverId" else "app-in-$serverId",
             tunName = routeTunName,
-            outboundTag = "app-proxy-$serverId",
+            outboundTag = if (alwaysProxied) "app-proxy-forced-$serverId" else "app-proxy-$serverId",
             server = routedServer,
+            applyRoutingRules = !alwaysProxied,
         )
     }
 
@@ -236,11 +271,11 @@ internal class AppRoutingPlanner(
         .filter { it > 0 }
         .toSet()
 
-    private fun List<RoutedAppAssignment>.proxyAssignments(): Map<Long, List<RoutedAppAssignment>> = filter {
+    private fun List<RoutedAppAssignment>.proxyAssignments(): Map<Pair<Long, Boolean>, List<RoutedAppAssignment>> = filter {
         it.uid > 0 && it.route.mode == AppRouteMode.Server && it.route.serverId != null
     }
-        .groupBy { requireNotNull(it.route.serverId) }
-        .toSortedMap()
+        .groupBy { requireNotNull(it.route.serverId) to it.route.alwaysProxied }
+        .toSortedMap(compareBy<Pair<Long, Boolean>> { it.first }.thenBy { it.second })
 
     private class AppProxyRouteBuilder(
         private val baseTunName: String,
@@ -290,7 +325,9 @@ internal class AppRoutingPlanner(
     companion object {
         private const val MAX_APP_PROXY_ROUTES = 64
         private const val DEFAULT_SELECTED_CONFIG_ROUTE_ID = Long.MIN_VALUE
+        private const val ALWAYS_PROXIED_ROUTE_ID = Long.MIN_VALUE + 1
         private const val DEFAULT_SELECTED_CONFIG_INBOUND_TAG = "app-in-default-selected"
+        private const val ALWAYS_PROXIED_INBOUND_TAG = "app-in-always-proxied"
         private const val DEFAULT_SELECTED_CONFIG_OUTBOUND_TAG = "proxy"
     }
 }

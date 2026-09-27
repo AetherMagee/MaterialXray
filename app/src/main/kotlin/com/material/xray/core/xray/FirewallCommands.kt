@@ -11,13 +11,12 @@ internal object FirewallCommands {
         return "${tool.substringBefore(' ')}-restore --noflush -w 2"
     }
 
-    fun restoreAvailable(): String = tools.flatMap { tool ->
+    fun restoreAvailable(): String = tools.map { tool ->
         val executable = tool.substringBefore(' ') + "-restore"
-        listOf(
-            "command -v $executable >/dev/null 2>&1",
-            "$executable --help 2>&1 | grep -q -- '--noflush'",
-            "$executable --help 2>&1 | grep -q -- '--wait'",
-        )
+        "command -v $executable >/dev/null 2>&1 && help=\$($executable --help 2>&1) && " +
+            "case \"\$help\" in " +
+            "*--noflush*) :;; *) false;; esac && case \"\$help\" in " +
+            "*--wait*) :;; *) false;; esac"
     }.shellAnd()
 
     /** A failed inspection is an error, never evidence that cleanup succeeded. */

@@ -44,6 +44,7 @@ private class AndroidLocalSocket(
     private var closed = false
     private var inputShutdown = false
     private var outputShutdown = false
+    private var soTimeout = 0
 
     override fun bind(bindpoint: SocketAddress?) = Unit
 
@@ -60,15 +61,18 @@ private class AndroidLocalSocket(
 
     override fun connect(endpoint: SocketAddress?) {
         localSocket.connect(socketAddress)
+        localSocket.soTimeout = soTimeout
     }
 
     override fun connect(endpoint: SocketAddress?, timeout: Int) {
-        localSocket.connect(socketAddress, timeout)
+        // Android LocalSocket does not implement the timeout overload.
+        localSocket.connect(socketAddress)
+        localSocket.soTimeout = soTimeout
     }
 
     override fun getChannel(): SocketChannel = unsupported("getChannel")
 
-    override fun getInetAddress(): InetAddress = unsupported("getInetAddress")
+    override fun getInetAddress(): InetAddress = InetAddress.getLoopbackAddress()
 
     override fun getInputStream(): InputStream = object : FilterInputStream(localSocket.inputStream) {
         override fun close() = this@AndroidLocalSocket.close()
@@ -76,11 +80,11 @@ private class AndroidLocalSocket(
 
     override fun getKeepAlive(): Boolean = unsupported("getKeepAlive")
 
-    override fun getLocalAddress(): InetAddress = unsupported("getLocalAddress")
+    override fun getLocalAddress(): InetAddress = InetAddress.getLoopbackAddress()
 
-    override fun getLocalPort(): Int = unsupported("getLocalPort")
+    override fun getLocalPort(): Int = 0
 
-    override fun getLocalSocketAddress(): SocketAddress = object : SocketAddress() {}
+    override fun getLocalSocketAddress(): SocketAddress = InetSocketAddress(InetAddress.getLoopbackAddress(), 0)
 
     override fun getOOBInline(): Boolean = unsupported("getOOBInline")
 
@@ -88,7 +92,7 @@ private class AndroidLocalSocket(
         override fun close() = this@AndroidLocalSocket.close()
     }
 
-    override fun getPort(): Int = unsupported("getPort")
+    override fun getPort(): Int = 1
 
     override fun getReceiveBufferSize(): Int = try {
         localSocket.receiveBufferSize
@@ -96,7 +100,7 @@ private class AndroidLocalSocket(
         throw e.toSocketException()
     }
 
-    override fun getRemoteSocketAddress(): SocketAddress = object : SocketAddress() {}
+    override fun getRemoteSocketAddress(): SocketAddress = InetSocketAddress(InetAddress.getLoopbackAddress(), 1)
 
     override fun getReuseAddress(): Boolean = unsupported("getReuseAddress")
 
@@ -108,11 +112,7 @@ private class AndroidLocalSocket(
 
     override fun getSoLinger(): Int = -1
 
-    override fun getSoTimeout(): Int = try {
-        localSocket.soTimeout
-    } catch (e: IOException) {
-        throw e.toSocketException()
-    }
+    override fun getSoTimeout(): Int = soTimeout
 
     override fun getTcpNoDelay(): Boolean = true
 
@@ -160,10 +160,14 @@ private class AndroidLocalSocket(
     override fun setSoLinger(on: Boolean, linger: Int) = unsupported<Unit>("setSoLinger")
 
     override fun setSoTimeout(timeout: Int) {
-        try {
-            localSocket.soTimeout = timeout
-        } catch (e: IOException) {
-            throw e.toSocketException()
+        require(timeout >= 0) { "Timeout must not be negative" }
+        soTimeout = timeout
+        if (localSocket.isConnected) {
+            try {
+                localSocket.soTimeout = timeout
+            } catch (e: IOException) {
+                throw e.toSocketException()
+            }
         }
     }
 

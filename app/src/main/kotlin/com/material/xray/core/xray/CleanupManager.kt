@@ -1,6 +1,8 @@
 package com.material.xray.core.xray
 
 import android.content.Context
+import android.os.SystemClock
+import android.util.Log
 import com.material.xray.core.nftables.NftablesManager
 import com.material.xray.core.root.RootShell
 import com.material.xray.model.RootConnectionBackend
@@ -9,6 +11,7 @@ import java.io.File
 class CleanupManager(
     context: Context,
     private val shell: RootShell,
+    private val onStageResult: (String) -> Unit = {},
 ) {
     private val stateFile = StateFile(context)
     private val nftables = NftablesManager(shell)
@@ -28,7 +31,7 @@ class CleanupManager(
 
     suspend fun ensureCleanState(fallbackTunName: String = "xray0", preserveTproxyGuard: Boolean = false): Boolean {
         val state = stateFile.read()
-        val processesStopped = stopOwnedProcesses(state?.xrayPid)
+        val processesStopped = cleanupStage("processes") { stopOwnedProcesses(state?.xrayPid) }
         val runtimeRemoved = removeRuntimeState(state, fallbackTunName, preserveTproxyGuard)
         if (processesStopped && runtimeRemoved && !preserveTproxyGuard) stateFile.delete()
         return processesStopped && runtimeRemoved
@@ -36,7 +39,7 @@ class CleanupManager(
 
     suspend fun ensureKnownStateStopped(fallbackTunName: String = "xray0", preserveTproxyGuard: Boolean = false): Boolean {
         val state = stateFile.read() ?: return false
-        val processesStopped = stopOwnedProcesses(state.xrayPid)
+        val processesStopped = cleanupStage("processes") { stopOwnedProcesses(state.xrayPid) }
         val runtimeRemoved = removeRuntimeState(state, fallbackTunName, preserveTproxyGuard)
         if (processesStopped && runtimeRemoved && !preserveTproxyGuard) stateFile.delete()
         return processesStopped && runtimeRemoved
@@ -47,8 +50,8 @@ class CleanupManager(
         fallbackTunName: String,
         preserveTproxyGuard: Boolean,
     ): Boolean {
-        val firewallRemoved = apiFirewall.remove(appUid)
-        val nftablesRemoved = nftables.remove()
+        val firewallRemoved = cleanupStage("API firewall") { apiFirewall.remove(appUid) }
+        val nftablesRemoved = cleanupStage("legacy nftables") { nftables.remove() }
 
         val routingRemoved = if (!shouldRemoveTunRouting(state?.rootConnectionBackend)) {
             true
@@ -58,10 +61,28 @@ class CleanupManager(
             val routeMark = state?.routeMark ?: 100
             val routeTable = state?.routeTable ?: 100
             val appRouteCount = state?.appProxyServerIds?.size?.takeIf { it > 0 } ?: 0
-            tunManager.removeRouting(fwmark, routeMark, routeTable, tunName, appRouteCount)
+            cleanupStage("TUN routing") {
+                tunManager.removeRouting(fwmark, routeMark, routeTable, tunName, appRouteCount)
+            }
         }
-        val tproxyRemoved = tproxyManager.remove(state?.tproxy ?: state?.transitionGuard, preserveTproxyGuard)
+        val tproxyRemoved = cleanupStage("TPROXY routing") {
+            tproxyManager.remove(state?.tproxy ?: state?.transitionGuard, preserveTproxyGuard)
+        }
         return firewallRemoved && nftablesRemoved && routingRemoved && tproxyRemoved
+    }
+
+    private suspend fun cleanupStage(name: String, action: suspend () -> Boolean): Boolean {
+        val startedAt = SystemClock.elapsedRealtime()
+        var succeeded = false
+        try {
+            succeeded = action()
+            return succeeded
+        } finally {
+            val durationMs = SystemClock.elapsedRealtime() - startedAt
+            val message = "Cleanup $name ${if (succeeded) "succeeded" else "failed"} after $durationMs ms"
+            if (succeeded) Log.i(LOG_TAG, message) else Log.w(LOG_TAG, message)
+            onStageResult(message)
+        }
     }
 
     private suspend fun stopOwnedProcesses(persistedPid: Int?): Boolean = shell.execute(
@@ -70,6 +91,7 @@ class CleanupManager(
 
     private companion object {
         const val CLEAN_MARKER_FILE_NAME = "root-runtime-clean"
+        const val LOG_TAG = "MXray.cleanup"
     }
 }
 

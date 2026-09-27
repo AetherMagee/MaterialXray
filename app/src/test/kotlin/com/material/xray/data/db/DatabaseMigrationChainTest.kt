@@ -76,6 +76,26 @@ class DatabaseMigrationChainTest {
         }
     }
 
+    @Test
+    fun alwaysProxiedMigrationPreservesExistingSelections() {
+        DriverManager.getConnection("jdbc:sqlite::memory:").use { connection ->
+            connection.runSql("CREATE TABLE app_bypass (packageName TEXT PRIMARY KEY, routeMode TEXT)")
+            connection.runSql("INSERT INTO app_bypass VALUES ('forced', 'always_proxied'), ('regular', 'default_selected')")
+            DatabaseMigrations.sqlByStartVersion.getValue(22).forEach { connection.runSql(it) }
+
+            connection.createStatement().use { statement ->
+                statement.executeQuery("SELECT packageName, routeMode, alwaysProxied FROM app_bypass ORDER BY packageName").use { rows ->
+                    assertTrue(rows.next())
+                    assertEquals("forced", rows.getString("packageName"))
+                    assertEquals("default_selected", rows.getString("routeMode"))
+                    assertEquals(1, rows.getInt("alwaysProxied"))
+                    assertTrue(rows.next())
+                    assertEquals(0, rows.getInt("alwaysProxied"))
+                }
+            }
+        }
+    }
+
     /**
      * Room accepts any database default when the entity declares none, so the chain is only
      * required to match a default that the exported schema actually specifies.

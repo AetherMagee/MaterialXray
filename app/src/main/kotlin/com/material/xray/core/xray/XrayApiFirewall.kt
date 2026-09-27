@@ -31,6 +31,8 @@ internal class XrayApiFirewall(
     internal fun buildApplyCommand(chainA: String, chainB: String, port: Int, appUid: Int): String = buildString {
         append(shellHelpers())
         append("; refresh_ruleset || exit 1")
+        append("; if ! has_jump $chainA && ! has_jump $chainB && ! chain_exists $chainA && ! chain_exists $chainB")
+        append("; then if ${freshInstallCommand(chainA, port, appUid)}; then exit 0; fi; fi")
         append("; if has_jump $chainA; then active=$chainA; replacement=$chainB")
         append("; elif has_jump $chainB; then active=$chainB; replacement=$chainA")
         append("; else active=''; replacement=$chainA; fi")
@@ -45,9 +47,22 @@ internal class XrayApiFirewall(
         append("; [ -z \"\$active\" ] || remove_chain \"\$active\"")
     }
 
+    private fun freshInstallCommand(chain: String, port: Int, appUid: Int): String = FirewallRestoreBatch(
+        tool = IPTABLES,
+        table = "filter",
+        commands = listOf(
+            "$IPTABLES -t filter -N $chain",
+            "$IPTABLES -t filter -A $chain -p tcp -d $XRAY_API_LOOPBACK_ADDRESS --dport $port " +
+                "-m owner --uid-owner $appUid -j ACCEPT",
+            "$IPTABLES -t filter -A $chain -p tcp -d $XRAY_API_LOOPBACK_ADDRESS --dport $port -j REJECT",
+            "$IPTABLES -t filter -I OUTPUT 1 -j $chain",
+        ),
+    ).command()
+
     private fun shellHelpers(): String = "refresh_ruleset() { ruleset=\$($IPTABLES -S) || return 1; }" +
-        "; has_jump() { printf '%s\\n' \"\$ruleset\" | grep -Fqx -- \"-A OUTPUT -j \$1\"; }" +
-        "; chain_exists() { printf '%s\\n' \"\$ruleset\" | grep -Fqx -- \"-N \$1\"; }" +
+        "; newline='\n'" +
+        "; has_jump() { case \"\$newline\$ruleset\$newline\" in *\"\$newline-A OUTPUT -j \$1\$newline\"*) true;; *) false;; esac; }" +
+        "; chain_exists() { case \"\$newline\$ruleset\$newline\" in *\"\$newline-N \$1\$newline\"*) true;; *) false;; esac; }" +
         "; remove_chain() { " +
         "refresh_ruleset || return 1" +
         "; while has_jump \"\$1\"; do $IPTABLES -D OUTPUT -j \"\$1\" || return 1" +

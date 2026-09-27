@@ -8,6 +8,7 @@ import com.material.xray.R
 import com.material.xray.core.locale.localizedString
 import com.material.xray.service.LogBuffer
 import com.material.xray.service.LogEntry
+import com.material.xray.service.displayMessage
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
@@ -45,7 +46,7 @@ class LogsViewModel @Inject constructor(
         clipboard.setPrimaryClip(
             android.content.ClipData.newPlainText(
                 context.localizedString(R.string.clipboard_label_log_entry),
-                "$time [${entry.source.name}] ${entry.message}",
+                "$time [${entry.source.name}] ${entry.displayMessage}",
             ),
         )
     }

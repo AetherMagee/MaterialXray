@@ -75,8 +75,10 @@ fun AppBypassContent(active: Boolean, viewModel: AppsViewModel = hiltViewModel()
     val lifecycleOwner = LocalLifecycleOwner.current
     val apps by viewModel.apps.collectAsStateWithLifecycle()
     val routeOptions by viewModel.routeOptions.collectAsStateWithLifecycle()
+    val alwaysProxiedAvailable by viewModel.alwaysProxiedAvailable.collectAsStateWithLifecycle()
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
     val isLoadingApps by viewModel.isLoadingApps.collectAsStateWithLifecycle()
+    val appLoadProgress by viewModel.appLoadProgress.collectAsStateWithLifecycle()
     val appSpecificServerNoteShown by viewModel.appSpecificServerNoteShown.collectAsStateWithLifecycle()
     val routingPolicyControl by viewModel.routingPolicyControl.collectAsStateWithLifecycle()
     val automaticRoutingProviderName by viewModel.automaticRoutingProviderName.collectAsStateWithLifecycle()
@@ -98,6 +100,12 @@ fun AppBypassContent(active: Boolean, viewModel: AppsViewModel = hiltViewModel()
     var pendingSpecificServerRoute by remember { mutableStateOf<AppRouteSelection?>(null) }
     val pullToRefreshState = rememberPullToRefreshState()
     val showInitialLoading = isLoadingApps && apps.isEmpty()
+
+    fun applyRouteSelection(app: AppItem, option: AppRouteOption) {
+        val currentApp = editingApp?.takeIf { it.appKey == app.appKey } ?: app
+        viewModel.setAppRoute(currentApp, option)
+        editingApp = currentApp.withSelectedRoute(option)
+    }
 
     DisposableEffect(lifecycleOwner, viewModel, active) {
         val observer = LifecycleEventObserver { _, event ->
@@ -131,12 +139,7 @@ fun AppBypassContent(active: Boolean, viewModel: AppsViewModel = hiltViewModel()
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
             if (showInitialLoading) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    CircularProgressIndicator()
-                }
+                AppLoadProgressIndicator(progress = appLoadProgress)
                 return@Column
             }
 
@@ -275,13 +278,18 @@ fun AppBypassContent(active: Boolean, viewModel: AppsViewModel = hiltViewModel()
             app = app,
             routeOptions = visibleRouteOptions,
             singleServerRouteHidden = visibleRouteOptions.size != routeOptions.size,
+            showAlwaysProxied = alwaysProxiedAvailable,
             onDismiss = { editingApp = null },
+            onAlwaysProxiedChanged = { enabled ->
+                val currentApp = editingApp?.takeIf { it.appKey == app.appKey } ?: app
+                viewModel.setAlwaysProxied(currentApp, enabled)
+                editingApp = currentApp.copy(alwaysProxied = enabled)
+            },
             onSelected = { option ->
-                editingApp = null
                 if (option.kind == AppRouteKind.SERVER && !appSpecificServerNoteShown) {
                     pendingSpecificServerRoute = AppRouteSelection(app, option)
                 } else {
-                    viewModel.setAppRoute(app, option)
+                    applyRouteSelection(app, option)
                 }
             },
         )
@@ -292,7 +300,7 @@ fun AppBypassContent(active: Boolean, viewModel: AppsViewModel = hiltViewModel()
             onDismiss = { pendingSpecificServerRoute = null },
             onConfirm = {
                 viewModel.setAppSpecificServerNoteShown()
-                viewModel.setAppRoute(selection.app, selection.option)
+                applyRouteSelection(selection.app, selection.option)
                 pendingSpecificServerRoute = null
             },
         )
@@ -448,10 +456,43 @@ private enum class BulkAppRouteAction {
     BypassAllApps,
 }
 
+@Composable
+private fun AppLoadProgressIndicator(progress: AppLoadProgress?) {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            CircularProgressIndicator()
+            Text(
+                text = progress?.let { state ->
+                    stringResource(R.string.apps_loading_progress, state.processed, state.total)
+                } ?: stringResource(R.string.apps_finding_apps),
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        }
+    }
+}
+
 private data class AppRouteSelection(
     val app: AppItem,
     val option: AppRouteOption,
 )
+
+private fun AppItem.withSelectedRoute(option: AppRouteOption): AppItem {
+    val forceProxy = alwaysProxied && (option.kind == AppRouteKind.DEFAULT || option.kind == AppRouteKind.SERVER)
+    return copy(
+        routeKey = option.key,
+        routeKind = option.kind,
+        alwaysProxied = forceProxy,
+        customRouted = option.kind != AppRouteKind.DEFAULT || forceProxy,
+        routeTitle = option.title,
+        routeDescription = option.description,
+    )
+}
 
 @Composable
 private fun AutomaticRoutingDialog(
@@ -560,7 +601,9 @@ private fun AppRoutePickerDialog(
     app: AppItem,
     routeOptions: List<AppRouteOption>,
     singleServerRouteHidden: Boolean,
+    showAlwaysProxied: Boolean,
     onDismiss: () -> Unit,
+    onAlwaysProxiedChanged: (Boolean) -> Unit,
     onSelected: (AppRouteOption) -> Unit,
 ) {
     val context = LocalContext.current
@@ -621,9 +664,37 @@ private fun AppRoutePickerDialog(
                             onSelected = { onSelected(option) },
                         )
                     }
-                    if (presetOptions.isNotEmpty() && serverOptions.isNotEmpty()) {
+                    if (showAlwaysProxied) {
+                        item(key = "alwaysProxied", contentType = "alwaysProxied") {
+                            val enabled = app.routeKind == AppRouteKind.DEFAULT || app.routeKind == AppRouteKind.SERVER
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable(enabled = enabled) { onAlwaysProxiedChanged(!app.alwaysProxied) }
+                                    .padding(vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Checkbox(checked = app.alwaysProxied, onCheckedChange = null, enabled = enabled)
+                                Column(modifier = Modifier.padding(start = 8.dp)) {
+                                    Text(stringResource(R.string.apps_route_always_proxied_title))
+                                    Text(
+                                        stringResource(R.string.apps_route_always_proxied_description),
+                                        style = MaterialTheme.typography.bodySmall,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    if (serverOptions.isNotEmpty()) {
                         item(contentType = "routeOptionDivider") {
                             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                        }
+                        item(key = "serverHeading", contentType = "serverHeading") {
+                            Text(
+                                stringResource(R.string.apps_route_specific_server_heading),
+                                style = MaterialTheme.typography.titleSmall,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                            )
                         }
                     }
                     items(

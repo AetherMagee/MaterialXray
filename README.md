@@ -120,7 +120,7 @@ Releases before `v0.5.0` do not have attestations.
 
 Only `arm64-v8a` is currently packaged. Root mode uses `app/src/main/assets/xray_arm64`. Rootless mode uses `app/src/main/jniLibs/arm64-v8a/libxray.so`, launched through the JNI shim in `app/src/main/cpp/xray_launcher.c`.
 
-The service downloads `geoip.dat` and `geosite.dat` when needed, generates an Xray configuration, and starts the appropriate binary. Routing data defaults to `v2fly/geoip` and `v2fly/domain-list-community` releases; the download URLs are configurable in Settings.
+Each APK build downloads the latest `geoip.dat` and `geosite.dat` from `v2fly/geoip` and `v2fly/domain-list-community` and bundles them as assets. On first use, the app copies the bundled files into Xray's data directory, so a new installation can connect without downloading geodata. The app also queues a one-time background sync on first launch; its download does not delay tunnel startup. Later updates and custom download URLs remain available in Settings. APK builds require access to those release assets.
 
 In rootful TUN mode, the service manages the tunnel interface and routing. Rootful mode binds outbound connections to the physical network interface to avoid routing loops, watches Wi-Fi and cellular changes, and retargets the connection when needed. Rootless mode passes Android's VPN TUN file descriptor to Xray and excludes Material Xray itself from the VPN to prevent routing loops, relying on Android's network routing rather than the rootful retargeting logic.
 

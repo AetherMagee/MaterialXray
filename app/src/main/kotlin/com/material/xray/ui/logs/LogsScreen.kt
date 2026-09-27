@@ -60,6 +60,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.material.xray.R
 import com.material.xray.service.LogEntry
 import com.material.xray.service.LogSource
+import com.material.xray.service.displayMessage
 import com.material.xray.ui.components.FlatStateCard
 import com.material.xray.ui.components.ScrolledTopAppBar
 import com.material.xray.ui.components.SegmentedTabRow
@@ -311,9 +312,10 @@ private fun LogEntryRow(entry: LogEntry, onCopy: () -> Unit) {
     val messageColor = if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
 
     Text(
-        text = "$time [${entry.source.name}] ${entry.message}",
+        text = "$time [${entry.source.name}] ${entry.displayMessage}",
         fontFamily = FontFamily.Monospace,
         fontSize = 11.sp,
+        lineHeight = 13.sp,
         color = messageColor,
         modifier = Modifier
             .fillMaxWidth()

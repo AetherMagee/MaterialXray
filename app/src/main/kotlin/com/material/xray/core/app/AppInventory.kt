@@ -44,9 +44,14 @@ class AppInventory @Inject constructor(
 
     override suspend fun loadSnapshot(): AppInventorySnapshot = loadSnapshot(includeUiMetadata = true)
 
+    suspend fun loadSnapshotWithProgress(onProgress: (processed: Int, total: Int) -> Unit): AppInventorySnapshot = loadSnapshot(includeUiMetadata = true, onProgress = onProgress)
+
     override suspend fun loadRoutingSnapshot(): AppInventorySnapshot = loadSnapshot(includeUiMetadata = false)
 
-    private suspend fun loadSnapshot(includeUiMetadata: Boolean): AppInventorySnapshot = withContext(Dispatchers.IO) {
+    private suspend fun loadSnapshot(
+        includeUiMetadata: Boolean,
+        onProgress: ((processed: Int, total: Int) -> Unit)? = null,
+    ): AppInventorySnapshot = withContext(Dispatchers.IO) {
         val pm = context.packageManager
         val currentProfileId = profileIdForUid(context.applicationInfo.uid)
         val profiles = userProfiles()
@@ -54,9 +59,28 @@ class AppInventory @Inject constructor(
         val appsByKey = linkedMapOf<String, InstalledApp>()
         val snapshotContext = currentCoroutineContext()
 
-        pm.getInstalledApplications(0).forEach { info ->
+        val personalApps = pm.getInstalledApplications(0).filterNot { it.packageName == context.packageName }
+        val launcherApps = context.getSystemService(LauncherApps::class.java)
+        val profileActivities = if (launcherApps == null) {
+            emptyList()
+        } else {
+            profiles
+                .filter { it.identifierOrNull() != currentProfileId }
+                .flatMap { profile ->
+                    snapshotContext.ensureActive()
+                    runCatching { launcherApps.getActivityList(null, profile) }
+                        .getOrDefault(emptyList())
+                        .filterNot { it.applicationInfo.packageName == context.packageName }
+                        .map { profile to it }
+                }
+                .distinctBy { (profile, activity) -> profile to activity.applicationInfo.packageName }
+        }
+        val total = personalApps.size + profileActivities.size
+        var processed = 0
+        onProgress?.invoke(processed, total)
+
+        personalApps.forEach { info ->
             snapshotContext.ensureActive()
-            if (info.packageName == context.packageName) return@forEach
             val app = info.toInstalledApp(
                 rawLabel = if (includeUiMetadata) info.loadLabel(pm) else info.packageName,
                 icon = if (includeUiMetadata) runCatching { info.loadIcon(pm) }.getOrNull() else null,
@@ -64,30 +88,21 @@ class AppInventory @Inject constructor(
                 includeUiMetadata = includeUiMetadata,
             )
             appsByKey[app.appKey] = app
+            onProgress?.invoke(++processed, total)
         }
 
-        val launcherApps = context.getSystemService(LauncherApps::class.java)
-        if (launcherApps != null) {
-            profiles
-                .filter { it.identifierOrNull() != currentProfileId }
-                .forEach { profile ->
-                    snapshotContext.ensureActive()
-                    runCatching { launcherApps.getActivityList(null, profile) }
-                        .getOrDefault(emptyList())
-                        .forEach { activity ->
-                            snapshotContext.ensureActive()
-                            val info = activity.applicationInfo
-                            if (info.packageName == context.packageName) return@forEach
-                            val app = info.toInstalledApp(
-                                rawLabel = if (includeUiMetadata) activity.label else info.packageName,
-                                icon = if (includeUiMetadata) runCatching { activity.getIcon(0) }.getOrNull() else null,
-                                userHandle = profile,
-                                currentProfileId = currentProfileId,
-                                includeUiMetadata = includeUiMetadata,
-                            )
-                            appsByKey.putIfAbsent(app.appKey, app)
-                        }
-                }
+        profileActivities.forEach { (profile, activity) ->
+            snapshotContext.ensureActive()
+            val info = activity.applicationInfo
+            val app = info.toInstalledApp(
+                rawLabel = if (includeUiMetadata) activity.label else info.packageName,
+                icon = if (includeUiMetadata) runCatching { activity.getIcon(0) }.getOrNull() else null,
+                userHandle = profile,
+                currentProfileId = currentProfileId,
+                includeUiMetadata = includeUiMetadata,
+            )
+            appsByKey.putIfAbsent(app.appKey, app)
+            onProgress?.invoke(++processed, total)
         }
 
         AppInventorySnapshot(

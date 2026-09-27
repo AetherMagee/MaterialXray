@@ -27,11 +27,7 @@ object DatabaseModule {
     )
         .addMigrations(*DatabaseMigrations.all)
         .addCallback(AppDatabase.VALUE_VALIDATION_CALLBACK)
-        // A downgrade cannot be migrated, so recreating the tables is the only way forward. An
-        // upgrade that Room cannot satisfy is a bug in the migration chain, and destroying the
-        // user's subscriptions and routing to paper over it is worse than failing loudly, so no
-        // destructive fallback is registered for that direction.
-        .fallbackToDestructiveMigrationOnDowngrade(dropAllTables = true)
+        // An incompatible schema must fail without deleting subscriptions or routing data.
         .build()
 
     @Provides

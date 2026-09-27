@@ -9,6 +9,7 @@ local.properties
 *.iml
 .idea/
 .project
+.opencode/
 .settings/
 app/.classpath
 app/.project

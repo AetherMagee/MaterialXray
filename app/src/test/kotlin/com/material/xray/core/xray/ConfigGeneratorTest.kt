@@ -131,34 +131,24 @@ class ConfigGeneratorTest {
     }
 
     @Test
-    fun `generates loopback-only authenticated HTTP inbound`() {
+    fun `generates private HTTP socket without a network port`() {
         val config = generator.generate(
             vlessReality,
-            inbounds = listOf(XrayInbound.Http(port = 41_234, tag = "http-in", username = "u1", password = "p1")),
+            inbounds = listOf(
+                XrayInbound.Tun("tun0", "tun-in"),
+                XrayInbound.PrivateHttp("/data/user/0/com.material.xray/files/bin/mxray-http.sock"),
+            ),
         )
         val json = Json.parseToJsonElement(config).jsonObject
-        val inbound = json.getValue("inbounds").jsonArray.single().jsonObject
+        val inbound = json.getValue("inbounds").jsonArray.last().jsonObject
 
         assertEquals("http", inbound.getValue("protocol").jsonPrimitive.content)
-        assertEquals("127.0.0.1", inbound.getValue("listen").jsonPrimitive.content)
-        assertEquals(41_234, inbound.getValue("port").jsonPrimitive.int)
-        assertEquals("http-in", inbound.getValue("tag").jsonPrimitive.content)
-        val account = inbound.getValue("settings").jsonObject.getValue("accounts").jsonArray.single().jsonObject
-        assertEquals("u1", account.getValue("user").jsonPrimitive.content)
-        assertEquals("p1", account.getValue("pass").jsonPrimitive.content)
-        val firstRule = json.getValue("routing").jsonObject.getValue("rules").jsonArray.first().jsonObject
-        assertEquals(listOf("http-in"), firstRule.getValue("inboundTag").jsonArray.map { it.jsonPrimitive.content })
-    }
-
-    @Test
-    fun `HTTP inbound rejects blank credentials`() {
-        val result = runCatching {
-            generator.generate(
-                vlessReality,
-                inbounds = listOf(XrayInbound.Http(port = 41_234, tag = "http-in", username = "", password = "p1")),
-            )
-        }
-        assertTrue(result.exceptionOrNull() is IllegalArgumentException)
+        assertEquals(
+            "/data/user/0/com.material.xray/files/bin/mxray-http.sock,0666",
+            inbound.getValue("listen").jsonPrimitive.content,
+        )
+        assertTrue("port" !in inbound)
+        assertEquals(XRAY_APP_HTTP_INBOUND_TAG, inbound.getValue("tag").jsonPrimitive.content)
     }
 
     @Test
@@ -638,5 +628,69 @@ class ConfigGeneratorTest {
         }
 
         assertTrue("User routing rules should be emitted before default selected proxy fallback", ruRuleIndex in 0 until fallbackIndex)
+    }
+
+    @Test
+    fun `always proxied app route precedes regular routing rules`() {
+        val config = generator.generate(
+            vlessReality,
+            routingRules = RoutingRuleCatalog.defaults(),
+            appProxyRoutes = listOf(
+                AppProxyRoute(
+                    inboundTag = "app-in-always-proxied",
+                    tunName = "xray0a1",
+                    outboundTag = "proxy",
+                    server = vlessReality,
+                ),
+            ),
+        )
+        val rules = Json.parseToJsonElement(config).jsonObject["routing"]!!.jsonObject["rules"]!!.jsonArray.map { it.jsonObject }
+        val forcedIndex = rules.indexOfFirst {
+            it["inboundTag"]?.jsonArray?.singleOrNull()?.jsonPrimitive?.content == "app-in-always-proxied" &&
+                it["outboundTag"]?.jsonPrimitive?.content == "proxy"
+        }
+        val regularIndex = rules.indexOfFirst {
+            it["domain"]?.jsonArray?.any { domain -> domain.jsonPrimitive.content == "domain:ru" } == true
+        }
+        assertTrue("Forced proxy route should precede regular routing rules", forcedIndex in 0 until regularIndex)
+        assertEquals(
+            1,
+            Json.parseToJsonElement(config).jsonObject["outbounds"]!!.jsonArray.count {
+                it.jsonObject["tag"]?.jsonPrimitive?.content == "proxy"
+            },
+        )
+    }
+
+    @Test
+    fun `specific server without forced proxy applies rules before its own server fallback`() {
+        val appServer = vlessReality.copy(name = "Specific", address = "5.6.7.8")
+        val config = generator.generate(
+            vlessReality,
+            routingRules = RoutingRuleCatalog.defaults(),
+            appProxyRoutes = listOf(
+                AppProxyRoute(
+                    inboundTag = "app-in-42",
+                    tunName = "xray0a1",
+                    outboundTag = "app-proxy-42",
+                    server = appServer,
+                    applyRoutingRules = true,
+                ),
+            ),
+        )
+        val json = Json.parseToJsonElement(config).jsonObject
+        val rules = json["routing"]!!.jsonObject["rules"]!!.jsonArray.map { it.jsonObject }
+        val regularIndex = rules.indexOfFirst {
+            it["domain"]?.jsonArray?.any { domain -> domain.jsonPrimitive.content == "domain:ru" } == true
+        }
+        val fallbackIndex = rules.indexOfFirst {
+            it["inboundTag"]?.jsonArray?.singleOrNull()?.jsonPrimitive?.content == "app-in-42" &&
+                it["outboundTag"]?.jsonPrimitive?.content == "app-proxy-42"
+        }
+        assertTrue(regularIndex in 0 until fallbackIndex)
+        assertTrue(
+            json["outbounds"]!!.jsonArray.any {
+                it.jsonObject["tag"]?.jsonPrimitive?.content == "app-proxy-42"
+            },
+        )
     }
 }

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="database_recovery_title">Не удалось прочитать данные приложения</string>
+    <string name="database_recovery_message">Не удалось открыть базу данных. Если установлена старая версия приложения, обновите его, чтобы сохранить данные. Если восстановить их не получится, можно сбросить приложение.</string>
+    <string name="database_recovery_reset_button">Сбросить данные приложения</string>
+    <string name="database_recovery_retry">Повторить попытку</string>
+    <string name="database_recovery_confirm_title">Сбросить все данные приложения?</string>
+    <string name="database_recovery_confirm_message">Подписки, серверы, настройки и локальные файлы будут удалены без возможности восстановления. Приложение закроется. Откройте его снова для первоначальной настройки.</string>
+    <string name="database_recovery_cancel">Отмена</string>
+    <string name="database_recovery_reset_failed">Не удалось безопасно остановить подключение или сбросить приложение. Сброс не завершён.</string>
+</resources>

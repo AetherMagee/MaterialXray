@@ -3,8 +3,8 @@ package com.material.xray.di
 import android.content.Context
 import android.os.Build
 import com.material.xray.R
+import com.material.xray.core.network.ActiveCoreHttpClient
 import com.material.xray.core.network.AppHttpClient
-import com.material.xray.core.network.TunnelAwareHttpClient
 import com.material.xray.core.network.addBundledCaFallback
 import com.material.xray.core.network.shouldUseBundledCaFallback
 import com.material.xray.core.root.RootShell
@@ -48,7 +48,7 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideAppHttpClient(impl: TunnelAwareHttpClient): AppHttpClient = impl
+    fun provideAppHttpClient(impl: ActiveCoreHttpClient): AppHttpClient = impl
 
     @Provides
     @Singleton

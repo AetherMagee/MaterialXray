@@ -251,10 +251,52 @@ class TproxyManager internal constructor(
         return execute(verifyCommand(state, appUid), "TPROXY routing verification")
     }
 
+    suspend fun checkHealth(state: TproxyRuntimeState): Boolean = executeCommand(
+        healthCheckCommand(state),
+    ).isSuccess
+
+    internal fun healthCheckCommand(state: TproxyRuntimeState): String {
+        val names = chainNames(appUid)
+        val mark = "${hex(state.markPrefix)}/${hex(state.markMask)}"
+        return buildList {
+            add(
+                "newline='\n'; has_line() { case \"\$newline\$1\$newline\" in " +
+                    "*\"\$newline\$2\$newline\"*) true;; *) false;; esac; }",
+            )
+            add("v4=\$($IPV4 -t mangle -S)")
+            add("has_line \"\$v4\" '-A OUTPUT -j ${names.output}'")
+            add("has_line \"\$v4\" '-A PREROUTING -j ${names.prerouting}'")
+            add("v6=\$($IPV6 -t ${if (state.ipv6Enabled) "mangle" else "filter"} -S)")
+            add("has_line \"\$v6\" '-A OUTPUT -j ${names.output}'")
+            if (state.ipv6Enabled) add("has_line \"\$v6\" '-A PREROUTING -j ${names.prerouting}'")
+            add("rules=\$(ip rule show)")
+            add("printf '%s\\n' \"\$rules\" | grep -Eq 'fwmark $mark.*lookup ${state.routeTable}([[:space:]]|$)'")
+            add("routes=\$(ip route show table ${state.routeTable})")
+            add("printf '%s\\n' \"\$routes\" | grep -Eq '^local default dev lo([[:space:]]|$)'")
+            if (state.ipv6Enabled) {
+                add("rules6=\$(ip -6 rule show)")
+                add("printf '%s\\n' \"\$rules6\" | grep -Eq 'fwmark $mark.*lookup ${state.routeTable}([[:space:]]|$)'")
+                add("routes6=\$(ip -6 route show table ${state.routeTable})")
+                add("printf '%s\\n' \"\$routes6\" | grep -Eq '^local default dev lo([[:space:]]|$)'")
+            }
+            add("listeners=\$(ss -lntu)")
+            add("tcp_listeners=\$(printf '%s\\n' \"\$listeners\" | grep '^tcp ')")
+            add("udp_listeners=\$(printf '%s\\n' \"\$listeners\" | grep '^udp ')")
+            add("has_port() { case \"\$1\" in *\":\$2 \"*|*\".\$2 \"*) true;; *) false;; esac; }")
+            state.groups.forEach { group ->
+                add("has_port \"\$tcp_listeners\" ${group.port}")
+                add("has_port \"\$udp_listeners\" ${group.port}")
+            }
+        }.shellAnd()
+    }
+
     suspend fun remove(state: TproxyRuntimeState?, preserveGuard: Boolean = false): Boolean = executeCommand(cleanupCommand(state, appUid, preserveGuard)).isSuccess
 
-    suspend fun removeGuard(): Boolean = executeCommand(guardCleanupCommand(appUid, guardCoversTethering)).isSuccess.also {
-        if (it) guardCoversTethering = false
+    suspend fun removeGuard(): Boolean {
+        val removed = (bulkRestoreSupported && executeCommand(guardRemovalRestoreCommand(guardCoversTethering)).isSuccess) ||
+            executeCommand(guardCleanupCommand(appUid, guardCoversTethering)).isSuccess
+        if (removed) guardCoversTethering = false
+        return removed
     }
 
     private suspend fun execute(command: String, label: String): TunManager.RoutingResult {
@@ -269,6 +311,49 @@ class TproxyManager internal constructor(
             success = false,
             error = if (details.isEmpty()) "$label failed (exit=$exitCode)" else "$label failed: $details",
         )
+    }
+
+    private fun activationInspectionCommand(state: TproxyRuntimeState): String = buildList {
+        add("ip rule show")
+        if (state.ipv6Enabled) add("ip -6 rule show")
+        add("printf '\\n$ACTIVATION_INSPECTION_SEPARATOR\\n'")
+        add("ip route show table ${state.routeTable}")
+        if (state.ipv6Enabled) add("ip -6 route show table ${state.routeTable}")
+    }.joinToString(" && ")
+
+    internal fun guardRemovalRestoreCommand(includeFilterTables: Boolean): String {
+        val guard = chainNames(appUid).guard
+        return FirewallCommands.tools.flatMap { tool ->
+            buildList {
+                if (includeFilterTables) {
+                    add(
+                        FirewallRestoreBatch(
+                            tool,
+                            "filter",
+                            listOf(
+                                "$tool -t filter -D INPUT -j ${guard}I",
+                                "$tool -t filter -D FORWARD -j $guard",
+                                "$tool -t filter -F ${guard}I",
+                                "$tool -t filter -X ${guard}I",
+                                "$tool -t filter -F $guard",
+                                "$tool -t filter -X $guard",
+                            ),
+                        ).command(),
+                    )
+                }
+                add(
+                    FirewallRestoreBatch(
+                        tool,
+                        "mangle",
+                        listOf(
+                            "$tool -t mangle -D OUTPUT -j $guard",
+                            "$tool -t mangle -F $guard",
+                            "$tool -t mangle -X $guard",
+                        ),
+                    ).command(),
+                )
+            }
+        }.shellAnd()
     }
 
     internal companion object {
@@ -343,10 +428,6 @@ class TproxyManager internal constructor(
             }
         }
 
-        private fun activationInspectionCommand(state: TproxyRuntimeState): String = "ip rule show && ip -6 rule show && " +
-            "printf '\\n$ACTIVATION_INSPECTION_SEPARATOR\\n' && " +
-            "ip route show table ${state.routeTable} && ip -6 route show table ${state.routeTable}"
-
         fun guardInstallCommand(plan: TproxyTrafficPlan, appUid: Int): String {
             validatePlan(plan, appUid)
             val names = chainNames(appUid)
@@ -374,8 +455,10 @@ class TproxyManager internal constructor(
                     val setup = FirewallRestoreBatch(tool, "mangle", guardSetupCommands(tool, guard, plan, appUid))
                     val refresh = FirewallRestoreBatch(tool, "mangle", guardRefreshCommands(tool, guard, plan, appUid))
                     add(
-                        "if $tool -t mangle -C OUTPUT -j $guard 2>/dev/null; then ${refresh.command()}; else " +
-                            "${guardCleanupCommands(tool, guard).joinToString("; ")}; ${setup.command()}; fi",
+                        "if $tool -t mangle -S $guard >/dev/null 2>&1; then " +
+                            "if $tool -t mangle -C OUTPUT -j $guard 2>/dev/null; then ${refresh.command()}; else " +
+                            "${guardMangleCleanupCommands(tool, guard).joinToString("; ")}; ${setup.command()}; fi; " +
+                            "else ${setup.command()}; fi",
                     )
                     if (plan.runtimeState.tetherUpstreamInterface != null) {
                         val filterSetup = FirewallRestoreBatch(tool, "filter", tetherGuardSetupCommands(tool, guard, plan))
@@ -383,11 +466,11 @@ class TproxyManager internal constructor(
                         add(
                             "if $tool -t filter -C INPUT -j ${guard}I 2>/dev/null && " +
                                 "$tool -t filter -C FORWARD -j $guard 2>/dev/null; then ${filterRefresh.command()}; else " +
-                                "${tetherGuardCleanupCommands(tool, guard).joinToString("; ")}; " +
+                                "${conditionalTetherGuardCleanup(tool, guard)}; " +
                                 "${filterSetup.command()}; fi",
                         )
                     } else {
-                        add("{ ${tetherGuardCleanupCommands(tool, guard).joinToString("; ")}; }")
+                        add(conditionalTetherGuardCleanup(tool, guard))
                     }
                 }
             }
@@ -489,8 +572,8 @@ class TproxyManager internal constructor(
                 hasV4("PREROUTING -j ${names.prerouting}"),
                 hasV4("${names.prerouting} -j ${names.tetherSlot(state.tetherChainSlot)}"),
                 hasV4("INPUT -j ${names.prerouting}L"),
-                "ip rule show | grep -q 'fwmark $prefix/$mask.*lookup ${state.routeTable}'",
-                "ip route show table ${state.routeTable} | grep -q '^local .* dev lo'",
+                "ip rule show | grep -Eq 'fwmark $prefix/$mask.*lookup ${state.routeTable}([[:space:]]|$)'",
+                "ip route show table ${state.routeTable} | grep -Eq '^local default dev lo([[:space:]]|$)'",
                 hasV4(clearXrayMarkRule),
                 hasV4(returnXrayRule),
                 "has_v4_order ${shellQuote("-A $clearXrayMarkRule")} ${shellQuote("-A $returnXrayRule")}",
@@ -532,8 +615,8 @@ class TproxyManager internal constructor(
                 commands += hasV6("PREROUTING -j ${names.prerouting}")
                 commands += hasV6("${names.prerouting} -j ${names.tetherSlot(state.tetherChainSlot)}")
                 commands += hasV6("INPUT -j ${names.prerouting}L")
-                commands += "ip -6 rule show | grep -q 'fwmark $prefix/$mask.*lookup ${state.routeTable}'"
-                commands += "ip -6 route show table ${state.routeTable} | grep -q '^local .* dev lo'"
+                commands += "ip -6 rule show | grep -Eq 'fwmark $prefix/$mask.*lookup ${state.routeTable}([[:space:]]|$)'"
+                commands += "ip -6 route show table ${state.routeTable} | grep -Eq '^local default dev lo([[:space:]]|$)'"
                 commands += hasV6(clearXrayMarkRule)
                 commands += hasV6(returnXrayRule)
                 commands += "has_v6_order ${shellQuote("-A $clearXrayMarkRule")} ${shellQuote("-A $returnXrayRule")}"
@@ -677,7 +760,30 @@ class TproxyManager internal constructor(
                 tetherSlots +
                 listOf(names.guard, names.guard + "I").takeUnless { preserveGuard }.orEmpty()
             commands += FirewallCommands.absentChains(ownedChains)
-            return commands.joinToString("; ")
+            val routingAbsent = buildList {
+                for (ipCommand in listOf("ip", "ip -6")) {
+                    add("rules=\$($ipCommand rule show) || false")
+                    add("! printf '%s\\n' \"\$rules\" | grep -Fq 'fwmark $prefix/$mask'")
+                    table?.let { routeTable ->
+                        add("routes=\$($ipCommand route show table $routeTable) || false")
+                        add("[ -z \"\$routes\" ]")
+                    }
+                }
+            }.shellAnd()
+            commands += routingAbsent
+            val snapshots = "v4_mangle_rules=\$($IPV4 -t mangle -S) && " +
+                "v4_filter_rules=\$($IPV4 -t filter -S) && " +
+                "v6_mangle_rules=\$($IPV6 -t mangle -S) && " +
+                "v6_filter_rules=\$($IPV6 -t filter -S)"
+            val hasLine = "newline='\n'; has_line() { case \"\$newline\$1\$newline\" in " +
+                "*\"\$newline\$2\$newline\"*) true;; *) false;; esac; }"
+            val ownedChainCheck = "owned=; for chain in ${ownedChains.joinToString(" ")}; do " +
+                "for rules in \"\$v4_mangle_rules\" \"\$v4_filter_rules\" \"\$v6_mangle_rules\" \"\$v6_filter_rules\"; do " +
+                "if has_line \"\$rules\" \"-N \$chain\"; then owned=1; break 2; fi; done; done"
+            val noOwnedState = "[ -z \"\$owned\" ] && $routingAbsent"
+            val selectiveCleanup = commands.joinToString("; ") { conditionalFirewallCleanup(it) }
+            return "$hasLine; $snapshots || exit 1; $ownedChainCheck; " +
+                "if $noOwnedState; then true; else $selectiveCleanup; fi"
         }
 
         fun guardCleanupCommand(appUid: Int, includeFilterTables: Boolean = true): String {
@@ -739,19 +845,6 @@ class TproxyManager internal constructor(
             }.shellAnd()
         }
 
-        private fun discoveredRouteTableCleanupCommand(
-            ipCommand: String,
-            prefix: String,
-            mask: String,
-            priority: Int,
-        ): String = "tables=\$($ipCommand rule show 2>/dev/null | while IFS= read -r line; do " +
-            "case \"\$line\" in \"$priority:\"*\"fwmark $prefix/$mask\"*) " +
-            "previous=''; for field in \$line; do " +
-            "[ \"\$previous\" = lookup ] && printf '%s\\n' \"\$field\"; previous=\$field; done;; esac; done); " +
-            "for table in \$tables; do case \"\$table\" in ''|*[!0-9]*) continue;; esac; " +
-            "$ipCommand route del local ${if (ipCommand == "ip -6") "::/0" else "0.0.0.0/0"} " +
-            "dev lo table \"\$table\" 2>/dev/null || true; done"
-
         private fun buildGuardCommands(
             tool: String,
             chain: String,
@@ -780,6 +873,10 @@ class TproxyManager internal constructor(
             "$tool -t filter -F $chain 2>/dev/null || true",
             "$tool -t filter -X $chain 2>/dev/null || true",
         )
+
+        private fun conditionalTetherGuardCleanup(tool: String, chain: String): String = "if $tool -t filter -S $chain >/dev/null 2>&1 || " +
+            "$tool -t filter -S ${chain}I >/dev/null 2>&1; then " +
+            "${tetherGuardCleanupCommands(tool, chain).joinToString("; ")}; fi"
 
         private fun tetherGuardSetupCommands(tool: String, chain: String, plan: TproxyTrafficPlan): List<String> = buildList {
             add("$tool -t filter -N $chain")
@@ -914,17 +1011,10 @@ class TproxyManager internal constructor(
             return "actual=\$($tool -t $table -S $chain) && [ \"\$actual\" = ${shellQuote(expected)} ]"
         }
 
-        private fun guardCleanupCommands(tool: String, chain: String): List<String> = listOf(
+        private fun guardMangleCleanupCommands(tool: String, chain: String): List<String> = listOf(
             "$tool -t mangle -D OUTPUT -j $chain 2>/dev/null || true",
             "$tool -t mangle -F $chain 2>/dev/null || true",
             "$tool -t mangle -X $chain 2>/dev/null || true",
-            "$tool -t filter -D INPUT -j $chain 2>/dev/null || true",
-            "$tool -t filter -D INPUT -j ${chain}I 2>/dev/null || true",
-            "$tool -t filter -F ${chain}I 2>/dev/null || true",
-            "$tool -t filter -X ${chain}I 2>/dev/null || true",
-            "$tool -t filter -D FORWARD -j $chain 2>/dev/null || true",
-            "$tool -t filter -F $chain 2>/dev/null || true",
-            "$tool -t filter -X $chain 2>/dev/null || true",
         )
 
         private fun buildPreroutingCommands(
@@ -1155,6 +1245,15 @@ class TproxyManager internal constructor(
             uidRanges(plan.bypassUids - appUid).forEach { range ->
                 add("$tool -t mangle -A $chain -m owner --uid-owner ${range.asArgument()} -j RETURN")
             }
+            plan.groups.filter { !it.isBase && it.state.routeKey < 0 && it.state.routeKey != Long.MIN_VALUE }.forEach { group ->
+                uidRanges(group.uids).forEach { range ->
+                    for (protocol in listOf("tcp", "udp")) {
+                        val match = "-m owner --uid-owner ${range.asArgument()} -p $protocol --dport 53"
+                        add("$tool -t mangle -A $chain $match -j MARK --set-xmark ${hex(group.state.mark)}/$groupMask")
+                        add("$tool -t mangle -A $chain $match -j RETURN")
+                    }
+                }
+            }
             // Android sends application DNS through a system resolver UID outside the managed app ranges.
             for (protocol in listOf("tcp", "udp")) {
                 add("$tool -t mangle -A $chain -p $protocol --dport 53 -j MARK --set-xmark $baseMark/$groupMask")
@@ -1287,3 +1386,32 @@ class TproxyManager internal constructor(
         }
     }
 }
+
+private val FIREWALL_CLEANUP_COMMAND = Regex(
+    """^(iptables|ip6tables) -w 2 -t (mangle|filter) -([DFX]) ([A-Za-z0-9_]+)(?: -j ([A-Za-z0-9_]+))? 2>/dev/null \|\| true$""",
+)
+
+private fun conditionalFirewallCleanup(command: String): String {
+    val match = FIREWALL_CLEANUP_COMMAND.matchEntire(command) ?: return command
+    val tool = match.groupValues[1]
+    val table = match.groupValues[2]
+    val action = match.groupValues[3]
+    val chain = match.groupValues[4]
+    val target = match.groupValues[5]
+    val snapshot = "${if (tool == "iptables") "v4" else "v6"}_${table}_rules"
+    val rule = if (action == "D") "-A $chain -j $target" else "-N $chain"
+    return "if has_line \"\$$snapshot\" ${shellQuote(rule)}; then $command; fi"
+}
+
+private fun discoveredRouteTableCleanupCommand(
+    ipCommand: String,
+    prefix: String,
+    mask: String,
+    priority: Int,
+): String = "tables=\$($ipCommand rule show 2>/dev/null | while IFS= read -r line; do " +
+    "case \"\$line\" in \"$priority:\"*\"fwmark $prefix/$mask\"*) " +
+    "previous=''; for field in \$line; do " +
+    "[ \"\$previous\" = lookup ] && printf '%s\\n' \"\$field\"; previous=\$field; done;; esac; done); " +
+    "for table in \$tables; do case \"\$table\" in ''|*[!0-9]*) continue;; esac; " +
+    "$ipCommand route del local ${if (ipCommand == "ip -6") "::/0" else "0.0.0.0/0"} " +
+    "dev lo table \"\$table\" 2>/dev/null || true; done"

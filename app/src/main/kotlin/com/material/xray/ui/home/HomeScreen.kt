@@ -33,7 +33,9 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -78,10 +80,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
@@ -204,6 +209,25 @@ fun HomeScreen(
     val uriHandler = LocalUriHandler.current
     val collapsedSubscriptionIds = remember(context) {
         context.collapsedSubscriptionIds().toMutableStateList()
+    }
+
+    val subscriptionOrder = remember(uiState.subscriptions?.map { it.id }) {
+        uiState.subscriptions.orEmpty().map { it.id }.toMutableStateList()
+    }
+    val listState = rememberLazyListState()
+    val hapticFeedback = LocalHapticFeedback.current
+    var draggingSubscriptionId by remember { mutableStateOf<Long?>(null) }
+    var dragOffsetY by remember { mutableFloatStateOf(0f) }
+    val subscriptionSpacingPx = with(LocalDensity.current) { 10.dp.toPx() }
+    val finishSubscriptionDrag = {
+        persistSubscriptionOrderIfChanged(
+            draggingSubscriptionId,
+            subscriptionOrder,
+            uiState.subscriptions.orEmpty(),
+            viewModel::reorderSubscriptions,
+        )
+        draggingSubscriptionId = null
+        dragOffsetY = 0f
     }
     LaunchedEffect(uiState.subscriptions) {
         val currentIds = uiState.subscriptions?.mapTo(mutableSetOf()) { it.id } ?: return@LaunchedEffect
@@ -343,6 +367,7 @@ fun HomeScreen(
             },
         ) { padding ->
             LazyColumn(
+                state = listState,
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding),
@@ -398,7 +423,8 @@ fun HomeScreen(
                     }
                 }
 
-                val subscriptions = uiState.subscriptions
+                val subscriptions = uiState.subscriptions?.associateBy { it.id }
+                    ?.let { byId -> subscriptionOrder.mapNotNull(byId::get) }
                 when {
                     subscriptions == null -> item {
                         val loadingText = stringResource(R.string.home_loading_subscriptions)
@@ -444,6 +470,11 @@ fun HomeScreen(
                                 selectedProvider = uiState.providerRoutingAvailability,
                             )
                             SubscriptionCard(
+                                modifier = Modifier.subscriptionDragVisual(
+                                    subscription.id,
+                                    draggingSubscriptionId,
+                                    dragOffsetY,
+                                ),
                                 subscription = subscription,
                                 isRefreshing = subscription.id in uiState.refreshingSubscriptionIds,
                                 servers = servers,
@@ -453,6 +484,22 @@ fun HomeScreen(
                                 canCollapse = subscriptions.size > 1,
                                 expanded = subscription.id !in collapsedSubscriptionIds,
                                 canReorder = subscriptions.size > 1,
+                                onDragStart = {
+                                    hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    draggingSubscriptionId = subscription.id
+                                    dragOffsetY = 0f
+                                },
+                                onDrag = { delta ->
+                                    dragOffsetY = reorderSubscriptionDuringDrag(
+                                        subscriptionOrder,
+                                        listState,
+                                        subscription.id,
+                                        delta,
+                                        dragOffsetY,
+                                        subscriptionSpacingPx,
+                                    )
+                                },
+                                onDragFinished = finishSubscriptionDrag,
                                 onExpandedChange = { expanded ->
                                     context.setSubscriptionExpanded(
                                         collapsedSubscriptionIds,
@@ -1209,6 +1256,42 @@ internal const val QR_SCANNER_TRANSITION_MS = 180
 private const val CAMERA_PERMISSION_PREFS = "camera_permission"
 private const val CAMERA_PERMISSION_REQUESTED = "requested"
 private const val HOME_UI_PREFS = "home_ui"
+private fun Modifier.subscriptionDragVisual(id: Long, draggingId: Long?, offset: Float): Modifier = zIndex(if (id == draggingId) 1f else 0f).graphicsLayer {
+    translationY = if (id == draggingId) offset else 0f
+}
+
+private fun persistSubscriptionOrderIfChanged(
+    draggingId: Long?,
+    order: List<Long>,
+    subscriptions: List<SubscriptionEntity>,
+    persist: (List<Long>) -> Unit,
+) {
+    if (draggingId != null && order != subscriptions.map { it.id }) persist(order.toList())
+}
+
+private fun reorderSubscriptionDuringDrag(
+    order: SnapshotStateList<Long>,
+    listState: LazyListState,
+    subscriptionId: Long,
+    delta: Float,
+    currentOffset: Float,
+    spacingPx: Float,
+): Float {
+    val offset = currentOffset + delta
+    val current = order.indexOf(subscriptionId)
+    if (current < 0) return offset
+    val next = current + if (delta > 0f) 1 else -1
+    if (next !in order.indices) return offset
+
+    val neighbor = listState.layoutInfo.visibleItemsInfo.firstOrNull { it.key == order[next] } ?: return offset
+    val movingDown = delta > 0f
+    val crossedMidpoint = if (movingDown) offset > neighbor.size / 2f else -offset > neighbor.size / 2f
+    if (!crossedMidpoint) return offset
+
+    order.add(next, order.removeAt(current))
+    return offset + if (movingDown) -(neighbor.size + spacingPx) else neighbor.size + spacingPx
+}
+
 private const val COLLAPSED_SUBSCRIPTION_IDS = "collapsed_subscription_ids"
 
 private fun Context.clipboardText(): String? {

@@ -1,4 +1,6 @@
 import java.io.File
+import java.net.URI
+import java.security.MessageDigest
 import java.util.Properties
 import javax.inject.Inject
 import org.gradle.api.DefaultTask
@@ -94,6 +96,51 @@ abstract class ValidateReleaseTelemetry : DefaultTask() {
     }
 }
 
+abstract class DownloadGeoData : DefaultTask() {
+    @get:Input
+    abstract val geoipUrl: Property<String>
+
+    @get:Input
+    abstract val geositeUrl: Property<String>
+
+    @get:OutputDirectory
+    abstract val outputDirectory: DirectoryProperty
+
+    @TaskAction
+    fun download() {
+        val output = outputDirectory.get().asFile.apply { mkdirs() }
+        fetch(geoipUrl.get(), File(output, "geoip.dat"))
+        fetch(geositeUrl.get(), File(output, "geosite.dat"))
+    }
+
+    private fun fetch(url: String, target: File) {
+        val temporary = File(target.parentFile, "${target.name}.download")
+        try {
+            URI(url).toURL().openConnection().apply {
+                connectTimeout = 30_000
+                readTimeout = 60_000
+            }.getInputStream().use { input ->
+                temporary.outputStream().use { outputStream -> input.copyTo(outputStream) }
+            }
+            val digest = MessageDigest.getInstance("SHA-256")
+            temporary.inputStream().use { input ->
+                val buffer = ByteArray(64 * 1024)
+                while (true) {
+                    val count = input.read(buffer)
+                    if (count < 0) break
+                    digest.update(buffer, 0, count)
+                }
+            }
+            check(temporary.length() > 1024L) { "Downloaded ${target.name} is unexpectedly small" }
+            val actualSha256 = digest.digest().joinToString("") { "%02x".format(it) }
+            logger.lifecycle("Bundled ${target.name}: SHA-256 $actualSha256")
+            check(temporary.renameTo(target)) { "Unable to install ${target.name}" }
+        } finally {
+            temporary.delete()
+        }
+    }
+}
+
 val localProperties = Properties().apply {
     val file = rootProject.file("local.properties")
     if (file.isFile) {
@@ -136,6 +183,12 @@ val generateLegalAssets = tasks.register<GenerateLegalAssets>("generateLegalAsse
     xrayMetadata.set(rootProject.layout.projectDirectory.dir("third_party/xray"))
     outputDirectory.set(layout.buildDirectory.dir("generated/legalAssets"))
 }
+val downloadGeoData = tasks.register<DownloadGeoData>("downloadGeoData") {
+    geoipUrl.set("https://github.com/v2fly/geoip/releases/latest/download/geoip.dat")
+    geositeUrl.set("https://github.com/v2fly/domain-list-community/releases/latest/download/dlc.dat")
+    outputDirectory.set(layout.buildDirectory.dir("generated/geodataAssets"))
+    outputs.upToDateWhen { false }
+}
 val validateReleaseTelemetry = tasks.register<ValidateReleaseTelemetry>("validateReleaseTelemetry") {
     configured.set(sentryAuthToken.map { true }.orElse(false))
 }
@@ -144,6 +197,7 @@ android {
     namespace = "com.material.xray"
     compileSdk = 37
     compileSdkMinor = 0
+    buildToolsVersion = "37.0.0"
 
     defaultConfig {
         applicationId = "com.material.xray"
@@ -157,6 +211,8 @@ android {
             abiFilters += "arm64-v8a"
         }
     }
+
+    ndkVersion = "30.0.16248370"
 
     externalNativeBuild {
         cmake {
@@ -272,6 +328,10 @@ androidComponents {
         variant.sources.assets?.addGeneratedSourceDirectory(
             generateLegalAssets,
             GenerateLegalAssets::outputDirectory,
+        )
+        variant.sources.assets?.addGeneratedSourceDirectory(
+            downloadGeoData,
+            DownloadGeoData::outputDirectory,
         )
     }
 }

@@ -197,6 +197,24 @@ class ConnectionManagerTest {
     }
 
     @Test
+    fun `MXray HTTP inbound is omitted when routing toggle is off`() = runTest {
+        val harness = Harness()
+
+        harness.manager.connect(
+            server(),
+            runtimeSettings().copy(routeMxrayTrafficThroughXray = false),
+            preparation = ConnectionPreparation.ReusePreparedRuntime,
+        )
+
+        val config = Json.parseToJsonElement(requireNotNull(harness.binary.configJson)).jsonObject
+        assertTrue(
+            config.getValue("inbounds").jsonArray.none { inbound ->
+                inbound.jsonObject["tag"]?.jsonPrimitive?.content == "mxray-http-in"
+            },
+        )
+    }
+
+    @Test
     fun `routing-only change replaces live rules and persists generated config`() = runTest {
         val harness = Harness()
         val settings = runtimeSettings()
@@ -320,7 +338,9 @@ class ConnectionManagerTest {
         assertEquals("wlan0", harness.stateStore.state?.tproxy?.tetherUpstreamInterface)
         val config = Json.parseToJsonElement(requireNotNull(harness.binary.configJson)).jsonObject
         assertTrue(config.getValue("inbounds").jsonArray.none { it.jsonObject["protocol"]?.jsonPrimitive?.content == "tun" })
-        assertEquals("0.0.0.0", config.getValue("inbounds").jsonArray.single().jsonObject["listen"]?.jsonPrimitive?.content)
+        val inbounds = config.getValue("inbounds").jsonArray.map { it.jsonObject }
+        assertEquals("0.0.0.0", inbounds.single { it["protocol"]?.jsonPrimitive?.content == "tunnel" }["listen"]?.jsonPrimitive?.content)
+        assertTrue(inbounds.any { it["tag"]?.jsonPrimitive?.content == "mxray-http-in" })
         assertTrue(
             config.getValue("outbounds").jsonArray.none { outbound ->
                 outbound.jsonObject["streamSettings"]?.jsonObject
@@ -349,6 +369,29 @@ class ConnectionManagerTest {
 
         assertTrue(harness.manager.applyAppRoutingChanges(connectedState, settings))
         assertEquals(listOf(false, false), routingPlanBuilder.includeDefaultSelectedRouteCalls)
+    }
+
+    @Test
+    fun `periodic TPROXY check uses lightweight probe and audits after a failure`() = runTest {
+        val harness = Harness()
+        harness.manager.connect(
+            server(),
+            runtimeSettings().copy(rootConnectionBackend = RootConnectionBackend.Tproxy),
+            preparation = ConnectionPreparation.ReusePreparedRuntime,
+        )
+        assertEquals(1, harness.tproxyGateway.verificationCalls)
+
+        assertTrue(harness.manager.isRootTrafficAvailable(tunAvailable = false))
+        assertEquals(1, harness.tproxyGateway.healthCalls)
+        assertEquals(1, harness.tproxyGateway.verificationCalls)
+
+        harness.environment.advanceTime(10 * 60_000L)
+        assertTrue(harness.manager.isRootTrafficAvailable(tunAvailable = false))
+        assertEquals(2, harness.tproxyGateway.verificationCalls)
+
+        harness.tproxyGateway.healthResult = false
+        assertTrue(harness.manager.isRootTrafficAvailable(tunAvailable = false))
+        assertEquals(3, harness.tproxyGateway.verificationCalls)
     }
 
     @Test
@@ -912,17 +955,24 @@ class ConnectionManagerTest {
     }
 
     @Test
-    fun `a rootless connection without a tunnel is rejected without reclaiming root state`() = runTest {
+    fun `rootless VPN starts after routing data and config are ready`() = runTest {
         val harness = Harness()
         harness.stateStore.state = XrayState(xrayPid = 42, physicalInterface = VPN_SERVICE_INTERFACE_LABEL)
+        var establishmentAttempted = false
 
         harness.manager.connect(
             server(),
             runtimeSettings().copy(useRootService = false, tunName = "tun0"),
-            vpnInterface = null,
+            establishVpnInterface = {
+                establishmentAttempted = true
+                assertEquals(1, harness.routingData.readyCalls)
+                assertTrue(harness.binary.configJson != null)
+                null
+            },
         )
 
-        assertEquals(1, harness.userProcess.stopCalls)
+        assertTrue(establishmentAttempted)
+        assertEquals(2, harness.userProcess.stopCalls)
         assertEquals(0, harness.cleanup.cleanCalls)
         assertEquals(0, harness.cleanup.knownStateStopCalls)
         assertNull(harness.stateStore.state)
@@ -941,6 +991,7 @@ class ConnectionManagerTest {
         val environment = FakeConnectionEnvironment()
         val rootRuntime = FakeRootRuntime()
         val binary = FakeXrayBinary()
+        val routingData = FakeRoutingData()
         val tunGateway = FakeTunGateway()
         val tproxyGateway = FakeTproxyGateway(environment.appUid)
         val cleanup = FakeCleanup()
@@ -963,7 +1014,7 @@ class ConnectionManagerTest {
                 environment = environment,
                 rootRuntime = rootRuntime,
                 xrayBinary = binary,
-                routingData = FakeRoutingData(),
+                routingData = routingData,
                 serverResolver = serverResolver,
                 tunGateway = tunGateway,
                 tproxyGateway = tproxyGateway,
@@ -1007,6 +1058,9 @@ class ConnectionManagerTest {
         private var clock = 0L
 
         override fun elapsedRealtime(): Long = clock.also { clock += 250L }
+        fun advanceTime(durationMs: Long) {
+            clock += durationMs
+        }
 
         override fun localizedString(resourceId: Int, vararg arguments: Any): String = message(resourceId)
 
@@ -1049,13 +1103,18 @@ class ConnectionManagerTest {
     }
 
     private class FakeRoutingData : ConnectionRoutingData {
+        var readyCalls = 0
+
         override suspend fun needsRefresh(): Boolean = false
 
-        override suspend fun ensureReady() = GeoDataStatus(
-            geoipUrl = "https://example.com/geoip.dat",
-            geositeUrl = "https://example.com/geosite.dat",
-            downloaded = false,
-        )
+        override suspend fun ensureReady(): GeoDataStatus {
+            readyCalls += 1
+            return GeoDataStatus(
+                geoipUrl = "https://example.com/geoip.dat",
+                geositeUrl = "https://example.com/geosite.dat",
+                downloaded = false,
+            )
+        }
     }
 
     private class FakeServerResolver : ConnectionServerResolver {
@@ -1148,6 +1207,9 @@ class ConnectionManagerTest {
         var tetherAddressUpdateCalls = 0
         var tetherUpstreamUpdateCalls = 0
         var verificationResult = TunManager.RoutingResult(success = true)
+        var verificationCalls = 0
+        var healthCalls = 0
+        var healthResult = true
 
         override suspend fun createPlan(
             appRoutingPlan: AppRoutingPlan,
@@ -1191,7 +1253,14 @@ class ConnectionManagerTest {
             tetherUpstreamUpdateCalls++
             return TunManager.RoutingResult(success = true)
         }
-        override suspend fun verify(state: TproxyRuntimeState): TunManager.RoutingResult = verificationResult
+        override suspend fun verify(state: TproxyRuntimeState): TunManager.RoutingResult {
+            verificationCalls++
+            return verificationResult
+        }
+        override suspend fun checkHealth(state: TproxyRuntimeState): Boolean {
+            healthCalls++
+            return healthResult
+        }
         override suspend fun removeGuard(): Boolean {
             removeGuardCalls += 1
             return true

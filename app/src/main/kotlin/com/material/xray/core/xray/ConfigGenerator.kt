@@ -94,7 +94,7 @@ class ConfigGenerator {
                         directOutbound = buildDirectOutbound(fwmark, physicalInterface, allowIpv6),
                         dnsOutbound = buildDnsOutbound(fwmark, physicalInterface, allowIpv6),
                         blockOutbound = buildBlockOutbound(),
-                        appProxyOutbounds = appProxyRoutes.filterNot { it.applyRoutingRules }.map { route ->
+                        appProxyOutbounds = appProxyRoutes.filter { it.outboundTag != "proxy" }.map { route ->
                             buildProxyOutbound(route.server, fwmark, physicalInterface, tag = route.outboundTag, allowIpv6 = allowIpv6)
                         },
                     ).forEach { add(it) }

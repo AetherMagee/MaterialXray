@@ -98,6 +98,8 @@ internal class ConnectionManager(
 
     private var rootRoutingKnownCleanForConnect = false
 
+    private var lastTproxyAuditAt = 0L
+
     // Root is the only runtime that installs routing outside the process; the rootless runtime
     // gets it from Android's VpnService.
     val isUsingRootRuntime: Boolean
@@ -107,7 +109,7 @@ internal class ConnectionManager(
     suspend fun connect(
         server: ServerConfig,
         runtimeSettings: XrayRuntimeSettings,
-        vpnInterface: ParcelFileDescriptor? = null,
+        establishVpnInterface: suspend () -> ParcelFileDescriptor? = { null },
         syntheticDnsAddress: String? = null,
         transitionState: ConnectionState = ConnectionState.Connecting,
         preparation: ConnectionPreparation = ConnectionPreparation.Full,
@@ -130,7 +132,6 @@ internal class ConnectionManager(
         try {
             val tunName = prepareRuntime(
                 strategy = strategy,
-                vpnInterface = vpnInterface,
                 preparation = preparation,
                 configuredTunName = runtimeSettings.tunName,
                 rootBackend = rootBackend,
@@ -209,6 +210,26 @@ internal class ConnectionManager(
                 tproxyPlan,
                 syntheticDnsAddress,
             )
+            val vpnInterface = if (managesSystemRouting) {
+                null
+            } else {
+                executeStep(
+                    ConnectionStep(
+                        "Establish Android VPN interface",
+                        ConnectionProgress.ConfiguringTunnel,
+                        telemetryStep = ConnectionTelemetryStep.VpnInterface,
+                        isSuccessful = { it != null },
+                        action = establishVpnInterface,
+                    ),
+                ) ?: run {
+                    val error = stateCoordinator.state.value as? ConnectionState.Error
+                    fail(
+                        error?.message ?: environment.localizedString(R.string.connection_error_vpn_permission_required),
+                        retryable = error?.retryable ?: false,
+                    )
+                    return
+                }
+            }
             val pid = startXrayProcess(
                 strategy = strategy,
                 vpnInterface = vpnInterface,
@@ -302,7 +323,6 @@ internal class ConnectionManager(
 
     private suspend fun prepareRuntime(
         strategy: XrayRuntimeStrategy,
-        vpnInterface: ParcelFileDescriptor?,
         preparation: ConnectionPreparation,
         configuredTunName: String,
         rootBackend: RootConnectionBackend,
@@ -341,7 +361,7 @@ internal class ConnectionManager(
         val ready = if (strategy.managesSystemRouting) {
             prepareRootRuntime(preparation)
         } else {
-            prepareVpnServiceRuntime(vpnInterface)
+            prepareVpnServiceRuntime()
         }
         if (!ready) return null
 
@@ -472,14 +492,7 @@ internal class ConnectionManager(
         return true
     }
 
-    private suspend fun prepareVpnServiceRuntime(vpnInterface: ParcelFileDescriptor?): Boolean {
-        if (vpnInterface == null) {
-            fail(
-                environment.localizedString(R.string.connection_error_vpn_permission_required),
-                retryable = false,
-            )
-            return false
-        }
+    private suspend fun prepareVpnServiceRuntime(): Boolean {
         log.append(LogSource.APP, "Using Android VpnService")
         cleanOrphanedVpnServiceRuntime()
         userProcessSupervisor.stop()
@@ -646,13 +659,26 @@ internal class ConnectionManager(
         tproxyPlan: TproxyTrafficPlan?,
         syntheticDnsAddress: String?,
     ): GeneratedXrayConfig? {
-        val effectiveInbounds = tproxyPlan?.runtimeState?.groups?.map { group ->
+        val tproxyInbounds = tproxyPlan?.runtimeState?.groups?.map { group ->
             XrayInbound.Tproxy(
                 port = group.port,
                 tag = group.inboundTag,
                 allowIpv6 = runtimeSettings.allowIpv6,
                 acceptNonLoopback = tproxyPlan.runtimeState.tetherUpstreamInterface != null,
             )
+        }
+        val effectiveInbounds = if (runtimeSettings.routeMxrayTrafficThroughXray) {
+            val trafficInbounds: List<XrayInbound> = tproxyInbounds ?: buildList {
+                add(XrayInbound.Tun(runtimeSettings.tunName, "tun-in", runtimeSettings.tunMtu))
+                appRoutingPlan.proxyRoutes.forEach { route ->
+                    add(XrayInbound.Tun(route.tunName, route.inboundTag, runtimeSettings.tunMtu))
+                }
+            }
+            trafficInbounds + XrayInbound.PrivateHttp(
+                path = "${environment.binDir}/mxray-http-${java.util.UUID.randomUUID().toString().take(12)}.sock",
+            )
+        } else {
+            tproxyInbounds
         }
         // Xray's GID-exempt sockets follow Android's current default route in both local and
         // tethered TPROXY. The tether firewall still tracks the upstream separately.
@@ -929,6 +955,7 @@ internal class ConnectionManager(
                     fail(environment.localizedString(R.string.connection_error_tproxy_health_check))
                     return@coroutineScope false
                 }
+                lastTproxyAuditAt = environment.elapsedRealtime()
                 if (!ensureProcessAliveAfterSetup(pid)) return@coroutineScope false
                 log.append(LogSource.APP, "TPROXY routing applied")
                 finishTransitionGuard()
@@ -1446,7 +1473,15 @@ internal class ConnectionManager(
         val state = stateStore.read() ?: return false
         val tproxyState = state.tproxy
         return if (state.rootConnectionBackend == RootConnectionBackend.Tproxy && tproxyState != null) {
-            tproxyGateway.verify(tproxyState).success
+            val now = environment.elapsedRealtime()
+            val auditDue = now - lastTproxyAuditAt >= TPROXY_FULL_AUDIT_INTERVAL_MS
+            if (!auditDue && tproxyGateway.checkHealth(tproxyState)) {
+                true
+            } else {
+                tproxyGateway.verify(tproxyState).success.also { healthy ->
+                    if (healthy) lastTproxyAuditAt = now
+                }
+            }
         } else {
             tunAvailable
         }
@@ -1707,7 +1742,9 @@ internal class ConnectionManager(
             action = {
                 val tproxyState = state.tproxy
                 if (state.rootConnectionBackend == RootConnectionBackend.Tproxy && tproxyState != null) {
-                    tproxyGateway.verify(tproxyState).success
+                    tproxyGateway.verify(tproxyState).success.also { healthy ->
+                        if (healthy) lastTproxyAuditAt = environment.elapsedRealtime()
+                    }
                 } else {
                     tunAvailable
                 }
@@ -1886,6 +1923,7 @@ private fun effectiveRootBackend(
 private fun XrayRuntimeSettings.usesProxyAsRoutingDefault(): Boolean = (routingFallbackOutbound ?: defaultOutbound) == XrayOutbound.Proxy
 
 private const val LEGACY_DEFAULT_TUN_NAME = "xray0"
+private const val TPROXY_FULL_AUDIT_INTERVAL_MS = 10 * 60_000L
 internal const val TPROXY_INTERFACE_LABEL = "TPROXY"
 private const val CONNECTION_STEP_MAX_RETRIES = 2
 private const val CONNECTION_STEP_RETRY_DELAY_MS = 1_500L

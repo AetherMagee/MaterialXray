@@ -48,6 +48,7 @@ internal data class PlannedBackupAppRoute(
     val mode: AppRouteMode,
     val serverKey: String?,
     val manual: Boolean,
+    val alwaysProxied: Boolean,
 )
 
 internal object BackupImportPlanner {
@@ -119,6 +120,7 @@ internal object BackupImportPlanner {
                     mode = mode,
                     serverKey = route.serverKey,
                     manual = route.manual,
+                    alwaysProxied = route.alwaysProxied || mode == AppRouteMode.AlwaysProxied,
                 )
             }
         } else {
@@ -132,6 +134,7 @@ internal object BackupImportPlanner {
                     mode = AppRouteMode.Bypass,
                     serverKey = null,
                     manual = true,
+                    alwaysProxied = false,
                 )
             }
         }

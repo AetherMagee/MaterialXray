@@ -158,6 +158,7 @@ class BackupManager @Inject constructor(
                     mode = assignment.mode.name,
                     serverKey = assignment.serverId?.let(serverKeyById::get),
                     manual = route.manual,
+                    alwaysProxied = assignment.alwaysProxied,
                 )
             },
             selectedServerKey = selectedServerKey,
@@ -206,6 +207,7 @@ class BackupManager @Inject constructor(
                 AppRouteAssignment(
                     mode = planned.mode,
                     serverId = planned.serverKey?.let(serverIdByKey::getValue),
+                    alwaysProxied = planned.alwaysProxied,
                 ).toAppBypassEntity(
                     packageName = planned.packageName,
                     profileId = planned.profileId,

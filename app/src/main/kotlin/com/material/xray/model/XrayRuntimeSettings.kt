@@ -20,6 +20,7 @@ data class XrayRuntimeSettings(
     val routingDomainStrategy: String = SubscriptionRouting.DEFAULT_DOMAIN_STRATEGY,
     val routingDomainMatcher: String? = null,
     val routingFallbackOutbound: XrayOutbound? = null,
+    val routeMxrayTrafficThroughXray: Boolean = true,
 ) {
     companion object {
         const val DEFAULT_XRAY_BUFFER_SIZE_KIB = 64

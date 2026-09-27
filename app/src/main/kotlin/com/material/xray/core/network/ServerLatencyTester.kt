@@ -156,7 +156,7 @@ class ServerLatencyTester @Inject constructor(
 
     private fun buildLatencyConfig(
         server: ServerConfig,
-        inbound: XrayInbound.Http,
+        inbound: XrayInbound.PrivateHttp,
         dnsServers: String,
         allowIpv6: Boolean,
     ): String {

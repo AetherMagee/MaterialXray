@@ -5,6 +5,22 @@ import org.junit.Test
 
 class LogBufferTest {
     @Test
+    fun `Xray timestamp is omitted from formatted messages`() {
+        val buffer = LogBuffer()
+        buffer.append(LogSource.XRAY, "2026/09/26 12:34:56.123456 [Info] accepted tcp")
+        buffer.append(LogSource.XRAY, "2026/09/26 12:34:57 [Warning] retrying")
+        buffer.append(LogSource.APP, "2026/09/26 12:34:58 app message")
+
+        val entries = buffer.entries.value
+        assertEquals("[Info] accepted tcp", entries[0].displayMessage)
+        assertEquals("[Warning] retrying", entries[1].displayMessage)
+        assertEquals("2026/09/26 12:34:58 app message", entries[2].displayMessage)
+        val formattedLines = buffer.formatAll().lines()
+        assertEquals("2026/09/26 12:34:58 app message", formattedLines.last().substringAfter("[APP] "))
+        assertEquals("[Info] accepted tcp", formattedLines.first().substringAfter("[XRAY] "))
+    }
+
+    @Test
     fun `batch append publishes ordered entries and retains the configured tail`() {
         val buffer = LogBuffer()
 

@@ -90,6 +90,7 @@ fun LazyListScope.coreSection(
     rootServiceActive: Boolean,
     rootConnectionBackend: RootConnectionBackend,
     showAdvancedOptions: Boolean,
+    routeMxrayTrafficThroughXray: Boolean,
     editingTunName: String,
     hasTunNameChanges: Boolean,
     editingXrayBufferSizeKiB: String,
@@ -107,6 +108,7 @@ fun LazyListScope.coreSection(
     onEditingTunNameChange: (String) -> Unit,
     onSaveTunName: () -> Unit,
     onShowAdvancedOptionsChange: (Boolean) -> Unit,
+    onRouteMxrayTrafficThroughXrayChange: (Boolean) -> Unit,
     onEditingXrayBufferSizeKiBChange: (String) -> Unit,
     onSaveXrayBufferSizeKiB: () -> Unit,
     onEditingTunMtuChange: (String) -> Unit,
@@ -147,6 +149,13 @@ fun LazyListScope.coreSection(
                     )
 
                     if (showAdvancedOptions) {
+                        SettingsSwitchRow(
+                            title = stringResource(R.string.settings_route_mxray_traffic_title),
+                            description = stringResource(R.string.settings_route_mxray_traffic_description),
+                            checked = routeMxrayTrafficThroughXray,
+                            onCheckedChange = onRouteMxrayTrafficThroughXrayChange,
+                        )
+
                         AdvancedIntegerSetting(
                             value = editingXrayBufferSizeKiB,
                             onValueChange = onEditingXrayBufferSizeKiBChange,

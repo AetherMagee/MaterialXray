@@ -273,6 +273,19 @@ class TproxyManagerTest {
     }
 
     @Test
+    fun `IPv4 only activation does not inspect unused IPv6 routing`() = runTest {
+        val commands = mutableListOf<String>()
+        val manager = TproxyManager(APP_UID) { command ->
+            commands += command
+            RootShell.Result(0, "\n__MXRAY_TPROXY_ROUTES__\n", "")
+        }
+
+        assertTrue(manager.activate(plan(allowIpv6 = false)).success)
+        assertFalse(commands.first().contains("ip -6 rule show"))
+        assertFalse(commands.first().contains("ip -6 route show"))
+    }
+
+    @Test
     fun `activation fallback stops if rollback leaves a conflicting route`() = runTest {
         var calls = 0
         val manager = TproxyManager(APP_UID) {
@@ -516,6 +529,23 @@ class TproxyManagerTest {
     }
 
     @Test
+    fun `forced app DNS is marked before the base resolver rule`() {
+        val original = plan()
+        val forcedState = original.runtimeState.groups[1].copy(routeKey = -7L)
+        val forcedPlan = original.copy(
+            runtimeState = original.runtimeState.copy(groups = listOf(original.runtimeState.groups[0], forcedState)),
+            groups = listOf(original.groups[0], original.groups[1].copy(state = forcedState)),
+        )
+        val command = TproxyManager.activationCommand(forcedPlan, APP_UID)
+        val forcedMark = command.indexOf("--uid-owner 10030 -p udp --dport 53 -j MARK --set-xmark 0x10400000/0x1fe00000")
+        val forcedReturn = command.indexOf("--uid-owner 10030 -p udp --dport 53 -j RETURN")
+        val baseMark = command.indexOf("-p udp --dport 53 -j MARK --set-xmark 0x10200000/0x1fe00000")
+
+        assertTrue(forcedMark in 0..<forcedReturn)
+        assertTrue(forcedReturn < baseMark)
+    }
+
+    @Test
     fun `disabled IPv6 rejects managed apps instead of blackholing them`() {
         val command = TproxyManager.activationCommand(plan(), APP_UID)
 
@@ -546,6 +576,48 @@ class TproxyManagerTest {
     }
 
     @Test
+    fun `guard removal batches both families when restore is available`() = runTest {
+        val commands = mutableListOf<String>()
+        val manager = TproxyManager(APP_UID) { command ->
+            commands += command
+            RootShell.Result(0, "", "")
+        }
+
+        assertTrue(manager.installGuard(plan()).success)
+        assertTrue(manager.removeGuard())
+        assertEquals(2, commands.size)
+        assertTrue(commands.last().contains("iptables-restore --noflush -w 2"))
+        assertTrue(commands.last().contains("ip6tables-restore --noflush -w 2"))
+        assertFalse(commands.last().contains("-t filter -S"))
+        assertEquals(0, ProcessBuilder("sh", "-n", "-c", commands.last()).start().waitFor())
+    }
+
+    @Test
+    fun `tether guard removal batches filter hooks before mangle guard`() {
+        val manager = TproxyManager(APP_UID) { RootShell.Result(0, "", "") }
+        val command = manager.guardRemovalRestoreCommand(includeFilterTables = true)
+
+        assertTrue(command.indexOf("*filter") < command.indexOf("*mangle"))
+        assertTrue(command.contains("-D INPUT -j MXG278bI"))
+        assertTrue(command.contains("-D FORWARD -j MXG278b"))
+        assertEquals(0, ProcessBuilder("sh", "-n", "-c", command).start().waitFor())
+    }
+
+    @Test
+    fun `failed bulk guard removal falls back to audited cleanup`() = runTest {
+        val commands = mutableListOf<String>()
+        val manager = TproxyManager(APP_UID) { command ->
+            commands += command
+            RootShell.Result(if (commands.size == 2) 1 else 0, "", "")
+        }
+
+        assertTrue(manager.installGuard(plan()).success)
+        assertTrue(manager.removeGuard())
+        assertEquals(3, commands.size)
+        assertTrue(commands.last().contains("rules=\$(iptables -w 2 -t mangle -S) || exit 1"))
+    }
+
+    @Test
     fun `startup guard exempts xray without blocking the shared resolver`() {
         val command = TproxyManager.guardInstallCommand(plan(), APP_UID)
         val clearXrayMark = command.indexOf(
@@ -568,6 +640,28 @@ class TproxyManagerTest {
         assertTrue(command.contains("\n-I OUTPUT 1 -j MXG278b\nCOMMIT"))
         assertTrue(command.contains("actual="))
         assertTrue(command.contains("-S MXG278b"))
+    }
+
+    @Test
+    fun `cold guard setup skips deletion when owned chains are absent`() {
+        val command = TproxyManager.guardRestoreCommand(plan(), APP_UID)
+
+        for (tool in FirewallCommands.tools) {
+            assertTrue(
+                command.contains(
+                    "if $tool -t mangle -S MXG278b >/dev/null 2>&1; then " +
+                        "if $tool -t mangle -C OUTPUT -j MXG278b 2>/dev/null; then",
+                ),
+            )
+            assertTrue(command.contains("else $tool -t mangle -D OUTPUT -j MXG278b"))
+            assertTrue(
+                command.contains(
+                    "if $tool -t filter -S MXG278b >/dev/null 2>&1 || " +
+                        "$tool -t filter -S MXG278bI >/dev/null 2>&1; then " +
+                        "$tool -t filter -D INPUT -j MXG278b",
+                ),
+            )
+        }
     }
 
     @Test
@@ -688,6 +782,51 @@ class TproxyManagerTest {
     }
 
     @Test
+    fun `cleanup skips firewall mutations when reboot cleared owned state`() {
+        val command = TproxyManager.cleanupCommand(plan().runtimeState, APP_UID)
+        val stubs = """
+            iptables() { case "${'$'}*" in *' -S') return 0;; *) echo mutated;; esac; }
+            ip6tables() { iptables "${'$'}@"; }
+            ip() { case "${'$'}*" in *' del '*) return 1;; *) return 0;; esac; }
+        """.trimIndent()
+        val process = ProcessBuilder("sh", "-c", "$stubs\n$command").start()
+
+        assertEquals(0, process.waitFor())
+        assertEquals("", process.inputStream.bufferedReader().readText().trim())
+    }
+
+    @Test
+    fun `cleanup runs full teardown when an owned chain remains`() {
+        val command = TproxyManager.cleanupCommand(plan().runtimeState, APP_UID)
+        val stubs = """
+            iptables() { case "${'$'}*" in *' -S') echo '-N MXO278b';; *) echo mutated;; esac; }
+            ip6tables() { iptables "${'$'}@"; }
+            ip() { case "${'$'}*" in *' del '*) return 1;; *) return 0;; esac; }
+        """.trimIndent()
+        val process = ProcessBuilder("sh", "-c", "$stubs\n$command").start()
+
+        assertEquals(1, process.waitFor())
+        assertEquals(6, process.inputStream.bufferedReader().readLines().count { it == "mutated" })
+    }
+
+    @Test
+    fun `cleanup fails when a policy rule remains after teardown`() {
+        val command = TproxyManager.cleanupCommand(plan().runtimeState, APP_UID)
+        val stubs = """
+            iptables() { return 0; }
+            ip6tables() { return 0; }
+            ip() {
+                case "${'$'}*" in
+                    'rule show') echo '9990: from all fwmark 0x10000000/0x10000000 lookup 300';;
+                    *' del '*) return 1;;
+                esac
+            }
+        """.trimIndent()
+
+        assertEquals(1, ProcessBuilder("sh", "-c", "$stubs\n$command").start().waitFor())
+    }
+
+    @Test
     fun `enabled IPv6 uses transparent proxying rather than rejection`() {
         val command = TproxyManager.activationCommand(plan(allowIpv6 = true), APP_UID)
 
@@ -774,6 +913,44 @@ class TproxyManagerTest {
         assertTrue(command.contains("v6_slot_rules=\$(ip6tables -w 2 -t filter -S MXOA278b)"))
         assertFalse(command.contains("ip6tables -w 2 -t mangle -S"))
         assertFalse(command.contains("ip -6 rule show"))
+        assertTrue(command.contains("lookup 300([[:space:]]|$)"))
+        assertTrue(command.contains("^local default dev lo([[:space:]]|$)"))
+    }
+
+    @Test
+    fun `periodic health check detects missing hooks`() {
+        val command = TproxyManager(APP_UID) { RootShell.Result(0, "", "") }.healthCheckCommand(plan().runtimeState)
+        val stubs = """
+            iptables() { printf '%s\n' '-A OUTPUT -j MXO278b' '-A PREROUTING -j MXP278b'; }
+            ip6tables() { echo '-A OUTPUT -j MXO278b'; }
+            ip() {
+                case "${'$'}*" in
+                    'rule show') echo '9990: from all fwmark 0x10000000/0x10000000 lookup 300';;
+                    'route show table 300') echo 'local default dev lo table 300';;
+                esac
+            }
+            ss() { printf '%s\n' 'tcp LISTEN 0 5 127.0.0.1:48321 0.0.0.0:*' 'udp UNCONN 0 0 127.0.0.1:48321 0.0.0.0:*' 'tcp LISTEN 0 5 127.0.0.1:48322 0.0.0.0:*' 'udp UNCONN 0 0 127.0.0.1:48322 0.0.0.0:*'; }
+        """.trimIndent()
+
+        assertEquals(0, ProcessBuilder("sh", "-c", "$stubs\n$command").start().waitFor())
+        val missingHook = stubs.replace("'-A PREROUTING -j MXP278b'", "'-A OTHER -j MXP278b'")
+        assertEquals(1, ProcessBuilder("sh", "-c", "$missingHook\n$command").start().waitFor())
+        val missingListener = stubs.replace("'udp UNCONN 0 0 127.0.0.1:48322 0.0.0.0:*'", "")
+        assertEquals(1, ProcessBuilder("sh", "-c", "$missingListener\n$command").start().waitFor())
+        val splitRule = stubs.replace(
+            "echo '9990: from all fwmark 0x10000000/0x10000000 lookup 300'",
+            "printf '%s\\n' '9990: from all fwmark 0x10000000/0x10000000 lookup 301' '9991: from all lookup 300'",
+        )
+        assertEquals(1, ProcessBuilder("sh", "-c", "$splitRule\n$command").start().waitFor())
+        val splitRoute = stubs.replace(
+            "echo 'local default dev lo table 300'",
+            "printf '%s\\n' 'local default dev eth0 table 300' 'unicast default dev lo table 300'",
+        )
+        assertEquals(1, ProcessBuilder("sh", "-c", "$splitRoute\n$command").start().waitFor())
+        val wrongTable = stubs.replace("lookup 300'", "lookup 3000'")
+        assertEquals(1, ProcessBuilder("sh", "-c", "$wrongTable\n$command").start().waitFor())
+        val nonDefaultRoute = stubs.replace("local default dev lo", "local 127.0.0.1 dev lo")
+        assertEquals(1, ProcessBuilder("sh", "-c", "$nonDefaultRoute\n$command").start().waitFor())
     }
 
     @Test

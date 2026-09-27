@@ -193,6 +193,7 @@ private fun SettingsScreenContent(
     val showTitleBarLogo = settings.showTitleBarLogo
     val floatingConnectButton = settings.floatingConnectButton
     val showAdvancedOptions = settings.showAdvancedOptions
+    val routeMxrayTrafficThroughXray = settings.routeMxrayTrafficThroughXray
     val notificationSettings = settings.notificationSettings
     val subscriptionSendHardwareId = settings.subscriptionSendHardwareId
     val routingPolicyControl = settings.routingPolicyControl
@@ -508,6 +509,7 @@ private fun SettingsScreenContent(
                 rootServiceActive = rootServiceActive,
                 rootConnectionBackend = rootConnectionBackend,
                 showAdvancedOptions = showAdvancedOptions,
+                routeMxrayTrafficThroughXray = routeMxrayTrafficThroughXray,
                 editingTunName = editingTunName,
                 hasTunNameChanges = hasTunNameChanges,
                 editingXrayBufferSizeKiB = editingXrayBufferSizeKiB,
@@ -525,6 +527,7 @@ private fun SettingsScreenContent(
                 onEditingTunNameChange = { editingTunName = it },
                 onSaveTunName = { viewModel.setTunName(editingTunName) },
                 onShowAdvancedOptionsChange = viewModel::setShowAdvancedOptions,
+                onRouteMxrayTrafficThroughXrayChange = viewModel::setRouteMxrayTrafficThroughXray,
                 onEditingXrayBufferSizeKiBChange = { editingXrayBufferSizeKiB = it },
                 onSaveXrayBufferSizeKiB = { parsedXrayBufferSizeKiB?.let(viewModel::setXrayBufferSizeKiB) },
                 onEditingTunMtuChange = { editingTunMtu = it },

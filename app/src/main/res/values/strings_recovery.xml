@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="database_recovery_title">Could not read app data</string>
+    <string name="database_recovery_message">The database could not be opened. If you installed an older version, install the newer version to keep your data. You can reset the app if recovery is not possible.</string>
+    <string name="database_recovery_reset_button">Reset app data</string>
+    <string name="database_recovery_retry">Try again</string>
+    <string name="database_recovery_confirm_title">Reset all app data?</string>
+    <string name="database_recovery_confirm_message">This permanently deletes subscriptions, servers, settings, and local files. The app will close. Open it again to start over.</string>
+    <string name="database_recovery_cancel">Cancel</string>
+    <string name="database_recovery_reset_failed">The connection could not be stopped safely or Android could not reset the app. No reset was completed.</string>
+</resources>

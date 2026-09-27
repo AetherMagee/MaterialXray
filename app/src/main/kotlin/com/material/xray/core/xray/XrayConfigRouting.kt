@@ -6,6 +6,8 @@ import com.material.xray.model.isIpv4DnsServerLiteral
 import com.material.xray.model.isIpv6DnsServerLiteral
 import com.material.xray.model.resolveDnsServersForIpv6
 import com.material.xray.model.toXrayRules
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
@@ -88,14 +90,17 @@ internal fun buildRouting(
     manageDns: Boolean = true,
 ) = buildJsonObject {
     val hasDomesticDomains = directDomains(routingRules, bypassLan).isNotEmpty()
+    val forcedInboundTags = appProxyRoutes.filterNot { it.applyRoutingRules }.mapTo(mutableSetOf()) { it.inboundTag }
+    val interceptedDnsInboundTags = dataInboundTags.filterNot { it in forcedInboundTags }
+    val specificServerRuleRoutes = appProxyRoutes.filter { it.applyRoutingRules && it.outboundTag != "proxy" }
     put("domainStrategy", SubscriptionRouting.normalizeDomainStrategy(domainStrategy))
     SubscriptionRouting.normalizeDomainMatcher(domainMatcher)?.let { put("domainMatcher", it) }
     put(
         "rules",
         buildJsonArray {
-            add(dnsRoutingRule(dataInboundTags))
+            if (interceptedDnsInboundTags.isNotEmpty()) add(dnsRoutingRule(interceptedDnsInboundTags))
             syntheticDnsAddress?.let { add(syntheticDnsPeerBlockRule(dataInboundTags, it)) }
-            if (manageDns) add(dnsOverTlsRoutingRule(dataInboundTags))
+            if (manageDns && interceptedDnsInboundTags.isNotEmpty()) add(dnsOverTlsRoutingRule(interceptedDnsInboundTags))
             // These two rules address the tags buildDns emits, so they have to be decided from the
             // same resolved lists. A stored list that IPv6 filtering empties leaves no tag to route.
             if (manageDns && resolveDnsServersForIpv6(dnsServers, allowIpv6).isNotEmpty()) {
@@ -116,10 +121,25 @@ internal fun buildRouting(
                 add(lanDomainRoutingRule())
             }
             routingRules.filter { it.enabled }.forEach { rule ->
-                rule.toXrayRules().forEach { add(it) }
+                rule.toXrayRules().forEach { xrayRule ->
+                    if (rule.outboundTag == "proxy") {
+                        specificServerRuleRoutes.forEach { route ->
+                            add(
+                                JsonObject(
+                                    xrayRule + mapOf(
+                                        "inboundTag" to buildJsonArray { add(route.inboundTag) },
+                                        "outboundTag" to JsonPrimitive(route.outboundTag),
+                                    ),
+                                ),
+                            )
+                        }
+                    }
+                    add(xrayRule)
+                }
             }
             appProxyRoutes.filter { it.applyRoutingRules }.forEach { route ->
-                add(appProxyRoutingRule(route.inboundTag, defaultRouteTarget))
+                val target = if (route.outboundTag == "proxy") defaultRouteTarget else XrayRouteTarget.Outbound(route.outboundTag)
+                add(appProxyRoutingRule(route.inboundTag, target))
             }
         },
     )

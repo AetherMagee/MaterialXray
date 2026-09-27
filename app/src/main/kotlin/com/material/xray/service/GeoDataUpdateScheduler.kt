@@ -4,7 +4,9 @@ import android.content.Context
 import androidx.work.BackoffPolicy
 import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
+import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import com.material.xray.model.GeoDataUpdateInterval
@@ -12,11 +14,29 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 @Singleton
 class GeoDataUpdateScheduler @Inject constructor(
     @param:ApplicationContext private val context: Context,
 ) {
+    suspend fun enqueueInitialRefresh() = withContext(Dispatchers.IO) {
+        val preferences = context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
+        if (preferences.getBoolean(INITIAL_REFRESH_SCHEDULED_KEY, false)) return@withContext
+
+        val request = OneTimeWorkRequestBuilder<GeoDataUpdateWorker>()
+            .setConstraints(networkConstraints())
+            .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, BACKOFF_DELAY_MINUTES, TimeUnit.MINUTES)
+            .build()
+        WorkManager.getInstance(context).enqueueUniqueWork(
+            INITIAL_WORK_NAME,
+            ExistingWorkPolicy.KEEP,
+            request,
+        ).result.get()
+        preferences.edit().putBoolean(INITIAL_REFRESH_SCHEDULED_KEY, true).apply()
+    }
+
     fun schedulePeriodicRefresh(intervalHours: Int) {
         val normalizedIntervalHours = GeoDataUpdateInterval.normalize(intervalHours).toLong()
         val request = PeriodicWorkRequestBuilder<GeoDataUpdateWorker>(
@@ -40,6 +60,9 @@ class GeoDataUpdateScheduler @Inject constructor(
         .build()
 
     private companion object {
+        const val PREFERENCES_NAME = "geo_data_update"
+        const val INITIAL_REFRESH_SCHEDULED_KEY = "initial_refresh_scheduled"
+        const val INITIAL_WORK_NAME = "geo_data_initial_update"
         const val PERIODIC_WORK_NAME = "geo_data_auto_update"
         const val BACKOFF_DELAY_MINUTES = 15L
     }

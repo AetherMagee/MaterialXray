@@ -89,6 +89,7 @@ class DatabaseValueValidatorTest {
                     serverId INTEGER,
                     manual INTEGER NOT NULL,
                     routeMode TEXT,
+                    alwaysProxied INTEGER NOT NULL DEFAULT 0,
                     PRIMARY KEY(profileId, packageName)
                 )
                 """.trimIndent(),

@@ -23,6 +23,7 @@ import com.material.xray.data.repository.ProviderRoutingCoordinator
 import com.material.xray.data.repository.ServerRepository
 import com.material.xray.data.repository.SettingsRepository
 import com.material.xray.data.repository.selectedProviderRoutingAvailability
+import com.material.xray.model.RootConnectionBackend
 import com.material.xray.model.RoutingPolicyControl
 import com.material.xray.model.endpointSummary
 import com.material.xray.model.proxyOutboundCount
@@ -43,6 +44,8 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 data class AppItem(
     val appKey: String,
@@ -55,10 +58,13 @@ data class AppItem(
     val workProfile: Boolean,
     val routeKey: String,
     val routeKind: AppRouteKind,
+    val alwaysProxied: Boolean,
     val customRouted: Boolean,
     val routeTitle: AppRouteText,
     val routeDescription: AppRouteText,
 )
+
+data class AppLoadProgress(val processed: Int, val total: Int)
 
 sealed interface AppRouteText {
     data class Resource(
@@ -121,14 +127,19 @@ class AppsViewModel @Inject constructor(
 
     private val _isLoadingApps = MutableStateFlow(true)
     val isLoadingApps: StateFlow<Boolean> = _isLoadingApps
+    private val _appLoadProgress = MutableStateFlow<AppLoadProgress?>(null)
+    val appLoadProgress: StateFlow<AppLoadProgress?> = _appLoadProgress
     private var loadAppsJob: Job? = null
     private var loadAppsRunId = 0L
     private var routingRefreshJob: Job? = null
+    private val routeWriteMutex = Mutex()
 
     private val effectiveUseRootService = combine(
         settingsRepository.useRootService,
         alwaysOnVpnState.active,
     ) { useRootService, alwaysOnVpn -> useRootService && !alwaysOnVpn }
+    val alwaysProxiedAvailable: StateFlow<Boolean> = effectiveUseRootService
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
     val appSpecificServerNoteShown: StateFlow<Boolean> = settingsRepository.appSpecificServerNoteShown
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
@@ -168,15 +179,15 @@ class AppsViewModel @Inject constructor(
         serverRepository.observeAll(),
         settingsRepository.showAdvancedOptions,
         effectiveUseRootService,
-    ) { servers, showAdvancedOptions, useRootService ->
+        settingsRepository.rootConnectionBackend,
+    ) { servers, showAdvancedOptions, useRootService, rootConnectionBackend ->
         if (!useRootService) {
             return@combine listOf(DEFAULT_ROUTE_OPTION, DIRECT_ROUTE_OPTION)
         }
         buildList {
-            if (showAdvancedOptions) add(INHERIT_ROUTE_OPTION)
             add(DEFAULT_ROUTE_OPTION)
             add(DIRECT_ROUTE_OPTION)
-            if (showAdvancedOptions) add(BYPASS_ROUTE_OPTION)
+            if (showAdvancedOptions && rootConnectionBackend == RootConnectionBackend.Tun) add(BYPASS_ROUTE_OPTION)
             servers.forEach { server -> add(server.toRouteOption()) }
         }
     }
@@ -218,7 +229,9 @@ class AppsViewModel @Inject constructor(
                 app.copy(
                     routeKey = option.key,
                     routeKind = option.kind,
-                    customRouted = option.kind != AppRouteKind.DEFAULT,
+                    alwaysProxied = useRootService && assignment?.routeAssignment()?.alwaysProxied == true,
+                    customRouted = option.kind != AppRouteKind.DEFAULT ||
+                        (useRootService && assignment?.routeAssignment()?.alwaysProxied == true),
                     routeTitle = option.title,
                     routeDescription = option.description,
                 )
@@ -261,6 +274,7 @@ class AppsViewModel @Inject constructor(
         loadAppsJob?.cancel()
         loadAppsJob = null
         if (wasLoading) _isLoadingApps.value = false
+        _appLoadProgress.value = null
     }
 
     private fun loadApps() {
@@ -268,8 +282,13 @@ class AppsViewModel @Inject constructor(
         val runId = ++loadAppsRunId
         loadAppsJob = viewModelScope.launch {
             _isLoadingApps.value = true
+            _appLoadProgress.value = null
             try {
-                val snapshot = appInventory.loadSnapshot()
+                val snapshot = appInventory.loadSnapshotWithProgress { processed, total ->
+                    if (loadAppsRunId == runId) {
+                        _appLoadProgress.value = AppLoadProgress(processed, total)
+                    }
+                }
                 _hasWorkProfileApps.value = snapshot.profileIds.size > 1
                 val apps = snapshot.apps
                     .filterNot { it.packageName == context.packageName }
@@ -285,6 +304,7 @@ class AppsViewModel @Inject constructor(
                             workProfile = app.workProfile,
                             routeKey = DEFAULT_ROUTE_OPTION.key,
                             routeKind = DEFAULT_ROUTE_OPTION.kind,
+                            alwaysProxied = false,
                             customRouted = false,
                             routeTitle = DEFAULT_ROUTE_OPTION.title,
                             routeDescription = DEFAULT_ROUTE_OPTION.description,
@@ -300,6 +320,7 @@ class AppsViewModel @Inject constructor(
                 if (loadAppsRunId == runId) {
                     loadAppsJob = null
                     _isLoadingApps.value = false
+                    _appLoadProgress.value = null
                 }
             }
         }
@@ -322,16 +343,42 @@ class AppsViewModel @Inject constructor(
 
     fun setAppRoute(app: AppItem, option: AppRouteOption) {
         viewModelScope.launch {
-            val assignment = option.toRouteAssignment() ?: return@launch
-            appBypassDao.upsert(
-                assignment.toAppBypassEntity(
-                    packageName = app.packageName,
-                    profileId = app.profileId,
-                    uid = app.uid,
-                    manual = option.kind != AppRouteKind.DEFAULT,
-                ),
-            )
-            routingChangeManager.markPendingChanges(PendingRoutingChange.APP_ROUTING)
+            routeWriteMutex.withLock {
+                val current = appBypassDao.getAll().firstOrNull { it.profileId == app.profileId && it.packageName == app.packageName }
+                val latestAlwaysProxied = current?.routeAssignment()?.alwaysProxied ?: app.alwaysProxied
+                val assignment = option.toRouteAssignment()?.copy(
+                    alwaysProxied = latestAlwaysProxied && (option.kind == AppRouteKind.DEFAULT || option.kind == AppRouteKind.SERVER),
+                ) ?: return@withLock
+                appBypassDao.upsert(
+                    assignment.toAppBypassEntity(
+                        packageName = app.packageName,
+                        profileId = app.profileId,
+                        uid = app.uid,
+                        manual = option.kind != AppRouteKind.DEFAULT || assignment.alwaysProxied,
+                    ),
+                )
+                routingChangeManager.markPendingChanges(PendingRoutingChange.APP_ROUTING)
+            }
+        }
+    }
+
+    fun setAlwaysProxied(app: AppItem, enabled: Boolean) {
+        if (app.routeKind != AppRouteKind.DEFAULT && app.routeKind != AppRouteKind.SERVER) return
+        viewModelScope.launch {
+            routeWriteMutex.withLock {
+                val current = appBypassDao.getAll().firstOrNull { it.profileId == app.profileId && it.packageName == app.packageName }
+                val route = current?.routeAssignment() ?: AppRouteAssignment(AppRouteMode.DefaultSelected)
+                if (route.mode != AppRouteMode.DefaultSelected && route.mode != AppRouteMode.Server) return@withLock
+                appBypassDao.upsert(
+                    route.copy(alwaysProxied = enabled).toAppBypassEntity(
+                        packageName = app.packageName,
+                        profileId = app.profileId,
+                        uid = app.uid,
+                        manual = route.mode == AppRouteMode.Server || enabled,
+                    ),
+                )
+                routingChangeManager.markPendingChanges(PendingRoutingChange.APP_ROUTING)
+            }
         }
     }
 

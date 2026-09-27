@@ -11,11 +11,13 @@ data class AppBypassEntity(
     val serverId: Long? = null,
     val manual: Boolean = true,
     val routeMode: String? = null,
+    val alwaysProxied: Boolean = false,
 )
 
 enum class AppRouteMode(val persistedValue: String?) {
     DefaultSelected("default_selected"),
     DefaultOutbound("default_outbound"),
+    AlwaysProxied("always_proxied"),
     Direct("direct"),
     Bypass("bypass"),
     Server("server"),
@@ -24,6 +26,7 @@ enum class AppRouteMode(val persistedValue: String?) {
 data class AppRouteAssignment(
     val mode: AppRouteMode,
     val serverId: Long? = null,
+    val alwaysProxied: Boolean = false,
 )
 
 fun AppBypassEntity.routeAssignment(): AppRouteAssignment = when {
@@ -36,15 +39,19 @@ fun AppBypassEntity.routeAssignment(): AppRouteAssignment = when {
     routeMode == AppRouteMode.DefaultOutbound.persistedValue -> {
         AppRouteAssignment(AppRouteMode.DefaultOutbound)
     }
+    routeMode == AppRouteMode.AlwaysProxied.persistedValue -> {
+        AppRouteAssignment(AppRouteMode.DefaultSelected, alwaysProxied = true)
+    }
     serverId != null -> {
-        AppRouteAssignment(AppRouteMode.Server, serverId)
+        AppRouteAssignment(AppRouteMode.Server, serverId, alwaysProxied)
     }
     else -> {
-        AppRouteAssignment(AppRouteMode.DefaultSelected)
+        AppRouteAssignment(AppRouteMode.DefaultSelected, alwaysProxied = alwaysProxied)
     }
 }
 
-fun AppBypassEntity.isManualRouteOverride(): Boolean = manual && routeAssignment().mode != AppRouteMode.DefaultSelected
+fun AppBypassEntity.isManualRouteOverride(): Boolean = manual &&
+    (routeAssignment().mode != AppRouteMode.DefaultSelected || routeAssignment().alwaysProxied)
 
 fun AppRouteAssignment.toAppBypassEntity(
     packageName: String,
@@ -58,5 +65,7 @@ fun AppRouteAssignment.toAppBypassEntity(
     excluded = mode == AppRouteMode.Bypass,
     serverId = serverId.takeIf { mode == AppRouteMode.Server },
     manual = manual,
-    routeMode = mode.persistedValue,
+    routeMode = if (mode == AppRouteMode.AlwaysProxied) AppRouteMode.DefaultSelected.persistedValue else mode.persistedValue,
+    alwaysProxied = (alwaysProxied || mode == AppRouteMode.AlwaysProxied) &&
+        (mode == AppRouteMode.DefaultSelected || mode == AppRouteMode.Server || mode == AppRouteMode.AlwaysProxied),
 )
