@@ -8,6 +8,7 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import com.material.xray.model.ThemePreset
@@ -34,20 +35,26 @@ fun MaterialXrayTheme(
                 DefaultBlueLightColorScheme
             }
         }
-        ThemePreset.TokyoNight -> if (darkTheme) TokyoNightDarkColorScheme else TokyoNightLightColorScheme
-        ThemePreset.Gruvbox -> if (darkTheme) GruvboxDarkColorScheme else GruvboxLightColorScheme
-        ThemePreset.Nord -> if (darkTheme) NordDarkColorScheme else NordLightColorScheme
-        ThemePreset.Catppuccin -> if (darkTheme) CatppuccinDarkColorScheme else CatppuccinLightColorScheme
-        ThemePreset.Dracula -> if (darkTheme) DraculaDarkColorScheme else DraculaLightColorScheme
-        ThemePreset.Solarized -> if (darkTheme) SolarizedDarkColorScheme else SolarizedLightColorScheme
-        ThemePreset.RosePine -> if (darkTheme) RosePineDarkColorScheme else RosePineLightColorScheme
-        ThemePreset.Everforest -> if (darkTheme) EverforestDarkColorScheme else EverforestLightColorScheme
+        ThemePreset.TokyoNight -> remember(preset, darkTheme) { presetColorScheme(preset, darkTheme) }
+        ThemePreset.Gruvbox -> remember(preset, darkTheme) { presetColorScheme(preset, darkTheme) }
+        ThemePreset.Nord -> remember(preset, darkTheme) { presetColorScheme(preset, darkTheme) }
+        ThemePreset.Catppuccin -> remember(preset, darkTheme) { presetColorScheme(preset, darkTheme) }
+        ThemePreset.Dracula -> remember(preset, darkTheme) { presetColorScheme(preset, darkTheme) }
+        ThemePreset.Solarized -> remember(preset, darkTheme) { presetColorScheme(preset, darkTheme) }
+        ThemePreset.RosePine -> remember(preset, darkTheme) { presetColorScheme(preset, darkTheme) }
+        ThemePreset.Everforest -> remember(preset, darkTheme) { presetColorScheme(preset, darkTheme) }
     }
-    val colorScheme = if (darkTheme && oledDark) {
-        baseColorScheme.copy(
-            background = Color.Black,
-            surface = Color.Black,
+    val detectDynamicPureBlack =
+        preset == ThemePreset.Dynamic && darkTheme && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+    val colorScheme = if (
+        shouldApplyBlackBackgrounds(
+            colorScheme = baseColorScheme,
+            darkTheme = darkTheme,
+            oledDark = oledDark,
+            detectDynamicPureBlack = detectDynamicPureBlack,
         )
+    ) {
+        withBlackBackgrounds(baseColorScheme)
     } else {
         baseColorScheme
     }

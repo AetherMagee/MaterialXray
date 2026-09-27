@@ -22,10 +22,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -40,22 +40,7 @@ import com.material.xray.model.ThemePreset
 import com.material.xray.ui.components.SelectableOptionRow
 import com.material.xray.ui.components.SettingsSwitchRow
 import com.material.xray.ui.text.labelResource
-import com.material.xray.ui.theme.CatppuccinDarkColorScheme
-import com.material.xray.ui.theme.CatppuccinLightColorScheme
-import com.material.xray.ui.theme.DraculaDarkColorScheme
-import com.material.xray.ui.theme.DraculaLightColorScheme
-import com.material.xray.ui.theme.EverforestDarkColorScheme
-import com.material.xray.ui.theme.EverforestLightColorScheme
-import com.material.xray.ui.theme.GruvboxDarkColorScheme
-import com.material.xray.ui.theme.GruvboxLightColorScheme
-import com.material.xray.ui.theme.NordDarkColorScheme
-import com.material.xray.ui.theme.NordLightColorScheme
-import com.material.xray.ui.theme.RosePineDarkColorScheme
-import com.material.xray.ui.theme.RosePineLightColorScheme
-import com.material.xray.ui.theme.SolarizedDarkColorScheme
-import com.material.xray.ui.theme.SolarizedLightColorScheme
-import com.material.xray.ui.theme.TokyoNightDarkColorScheme
-import com.material.xray.ui.theme.TokyoNightLightColorScheme
+import com.material.xray.ui.theme.presetColorScheme
 
 @Suppress("LongParameterList")
 fun LazyListScope.appearanceSection(
@@ -97,54 +82,11 @@ fun LazyListScope.appearanceSection(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 ThemePreset.entries.forEach { preset ->
-                    val accentColor = when (preset) {
-                        ThemePreset.Dynamic -> dynamicColorScheme.primary
-                        ThemePreset.TokyoNight -> if (darkTheme) {
-                            TokyoNightDarkColorScheme.primary
-                        } else {
-                            TokyoNightLightColorScheme.primary
-                        }
-                        ThemePreset.Gruvbox -> if (darkTheme) {
-                            GruvboxDarkColorScheme.primary
-                        } else {
-                            GruvboxLightColorScheme.primary
-                        }
-                        ThemePreset.Nord -> if (darkTheme) {
-                            NordDarkColorScheme.primary
-                        } else {
-                            NordLightColorScheme.primary
-                        }
-                        ThemePreset.Catppuccin -> if (darkTheme) {
-                            CatppuccinDarkColorScheme.primary
-                        } else {
-                            CatppuccinLightColorScheme.primary
-                        }
-                        ThemePreset.Dracula -> if (darkTheme) {
-                            DraculaDarkColorScheme.primary
-                        } else {
-                            DraculaLightColorScheme.primary
-                        }
-                        ThemePreset.Solarized -> if (darkTheme) {
-                            SolarizedDarkColorScheme.primary
-                        } else {
-                            SolarizedLightColorScheme.primary
-                        }
-                        ThemePreset.RosePine -> if (darkTheme) {
-                            RosePineDarkColorScheme.primary
-                        } else {
-                            RosePineLightColorScheme.primary
-                        }
-                        ThemePreset.Everforest -> if (darkTheme) {
-                            EverforestDarkColorScheme.primary
-                        } else {
-                            EverforestLightColorScheme.primary
-                        }
-                    }
                     ThemePresetSwatch(
                         preset = preset,
+                        darkTheme = darkTheme,
+                        dynamicColorScheme = dynamicColorScheme,
                         selected = preset == themePreset,
-                        accentColor = accentColor,
-                        iconTint = if (preset == ThemePreset.Dynamic) dynamicColorScheme.onPrimary else null,
                         onClick = { onThemePresetChange(preset) },
                     )
                 }
@@ -205,11 +147,19 @@ fun LazyListScope.appearanceSection(
 @Composable
 private fun ThemePresetSwatch(
     preset: ThemePreset,
+    darkTheme: Boolean,
+    dynamicColorScheme: ColorScheme,
     selected: Boolean,
-    accentColor: Color,
-    iconTint: Color?,
     onClick: () -> Unit,
 ) {
+    val accentColor = remember(preset, darkTheme, dynamicColorScheme) {
+        if (preset == ThemePreset.Dynamic) {
+            dynamicColorScheme.primary
+        } else {
+            presetColorScheme(preset, darkTheme).primary
+        }
+    }
+    val iconTint = if (preset == ThemePreset.Dynamic) dynamicColorScheme.onPrimary else null
     val label = stringResource(preset.labelResource)
     Column(
         modifier = Modifier

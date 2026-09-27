@@ -37,6 +37,15 @@ The protocol definitions under `app/src/main/proto/` are reduced, Java-targeted 
 
 Material Xray uses this bundle only as an additive trust fallback on Android 7 after the platform trust store rejects a certificate chain.
 
+## Material Color Utilities
+
+- Component: selected Java color-scheme generation sources under `app/src/main/java/com/google/android/material/color/utilities/`
+- Project: https://github.com/material-foundation/material-color-utilities
+- Source revision: https://github.com/material-foundation/material-color-utilities/tree/f0268a6396f5e97ddef9def2651ed0dd6fefd57a/java
+- License: Apache License 2.0; Copyright Google LLC; see `third_party/licenses/material-color-utilities/LICENSE`
+
+Material Xray vendors the selected upstream Java sources without modification to generate Material 3 preset color schemes.
+
 ## Apache-2.0 Components
 
 The following component families are licensed under the Apache License 2.0. Their direct dependency declarations are recorded in `gradle/libs.versions.toml`, and Gradle resolves their transitive dependencies for each build. The complete license is in `third_party/licenses/Apache-2.0.txt`.
