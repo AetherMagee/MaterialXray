@@ -65,6 +65,25 @@ class XrayConfigOutboundsTest {
     }
 
     @Test
+    fun `buildDirectOutbound puts domain strategy only in sockopt`() {
+        val ipv4Outbound = buildDirectOutbound(fwmark = 255, physicalInterface = "wlan0")
+        assertFalse("settings" in ipv4Outbound)
+        assertEquals(
+            "UseIPv4",
+            ipv4Outbound.getValue("streamSettings").jsonObject
+                .getValue("sockopt").jsonObject.getValue("domainStrategy").jsonPrimitive.content,
+        )
+
+        val ipv6Outbound = buildDirectOutbound(fwmark = 0, physicalInterface = null, allowIpv6 = true)
+        assertFalse("settings" in ipv6Outbound)
+        assertEquals(
+            "UseIP",
+            ipv6Outbound.getValue("streamSettings").jsonObject
+                .getValue("sockopt").jsonObject.getValue("domainStrategy").jsonPrimitive.content,
+        )
+    }
+
+    @Test
     fun `buildProxyOutbound wraps normal server with stream sockopt`() {
         val outbound = buildProxyOutbound(
             server = server("Normal"),

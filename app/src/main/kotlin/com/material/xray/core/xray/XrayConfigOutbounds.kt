@@ -162,14 +162,6 @@ internal fun buildProxyOutbound(
 internal fun buildDirectOutbound(fwmark: Int, physicalInterface: String?, allowIpv6: Boolean = false) = buildJsonObject {
     put("tag", "direct")
     put("protocol", "freedom")
-    put(
-        "settings",
-        buildJsonObject {
-            if (!allowIpv6) {
-                put("domainStrategy", "UseIPv4")
-            }
-        },
-    )
     put("streamSettings", buildJsonObject { put("sockopt", buildSockopt(fwmark, physicalInterface, allowIpv6)) })
 }
 
