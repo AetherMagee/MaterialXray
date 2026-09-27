@@ -196,7 +196,7 @@ class XrayTileService : TileService() {
     companion object {
         fun requestStateRefresh(context: Context) {
             runCatching {
-                TileService.requestListeningState(
+                requestListeningState(
                     context,
                     ComponentName(context, XrayTileService::class.java),
                 )

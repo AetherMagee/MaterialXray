@@ -410,7 +410,7 @@ internal class ConnectionManager(
         appRoutingPlan: AppRoutingPlan,
         runtimeSettings: XrayRuntimeSettings,
         physicalRoute: TunManager.PhysicalRoute?,
-    ): TproxyPlanPreparation? {
+    ): TproxyPlanPreparation {
         if (rootBackend != RootConnectionBackend.Tproxy) return TproxyPlanPreparation(null)
         return TproxyPlanPreparation(
             tproxyGateway.createPlan(
@@ -1517,8 +1517,7 @@ internal class ConnectionManager(
         // A record left by the rootless runtime describes a core that died with its process, so
         // there is nothing here to reattach to.
         if (state.physicalInterface == VPN_SERVICE_INTERFACE_LABEL) return false
-        val configuredEndpoint = xrayBinary.readConfig()?.let(::parseXrayApiEndpoint)
-        val endpoint = when (configuredEndpoint) {
+        val endpoint = when (val configuredEndpoint = xrayBinary.readConfig()?.let(::parseXrayApiEndpoint)) {
             is XrayApiEndpoint.LoopbackTcp -> configuredEndpoint
             is XrayApiEndpoint.FileSystemUnixSocket,
             is XrayApiEndpoint.UnixSocket,

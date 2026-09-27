@@ -91,7 +91,7 @@ internal class AndroidXrayRuntimeEnvironment(
     override fun isIgnoringBatteryOptimizations(): Boolean? = context.getSystemService(PowerManager::class.java)?.isIgnoringBatteryOptimizations(packageName)
 
     override fun isExemptFromLowPowerStandby(): Boolean? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-        context.getSystemService(PowerManager::class.java)?.isExemptFromLowPowerStandby()
+        context.getSystemService(PowerManager::class.java)?.isExemptFromLowPowerStandby
     } else {
         null
     }

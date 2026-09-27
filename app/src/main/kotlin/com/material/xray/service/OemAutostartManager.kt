@@ -146,8 +146,8 @@ internal data class OemAutostartTarget(
 
     fun toIntent(): Intent = Intent(action)
         .setPackage(packageName)
-        .apply { className?.let { setComponent(ComponentName(packageName, it)) } }
-        .apply { dataUri?.let { setData(Uri.parse(it)) } }
+        .apply { className?.let { component = ComponentName(packageName, it) } }
+        .apply { dataUri?.let { data = Uri.parse(it) } }
         .apply { intExtras.forEach { (name, value) -> putExtra(name, value) } }
 }
 

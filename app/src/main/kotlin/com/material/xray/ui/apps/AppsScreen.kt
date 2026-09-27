@@ -210,7 +210,7 @@ fun AppBypassContent(active: Boolean, viewModel: AppsViewModel = hiltViewModel()
                             trailingContent = {
                                 Row(
                                     horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                                    verticalAlignment = Alignment.CenterVertically,
                                     modifier = Modifier.width(176.dp),
                                 ) {
                                     Text(

@@ -82,8 +82,7 @@ class ProviderRoutingCoordinator internal constructor(
     suspend fun refreshSelectedServer(
         activeUpdate: ProviderRoutingActiveUpdate = ProviderRoutingActiveUpdate.APPLY_IF_CONNECTED,
     ): ProviderRoutingRefreshResult = refreshMutex.withLock {
-        val selection = loadSelection()
-        when (selection) {
+        when (val selection = loadSelection()) {
             ProviderRoutingSelection.NotProviderControlled -> ProviderRoutingRefreshResult.NotProviderControlled
             ProviderRoutingSelection.NoSelectedServer -> ProviderRoutingRefreshResult.NoSelectedServer
             is ProviderRoutingSelection.Selected -> refreshSelectedSubscription(selection, activeUpdate)

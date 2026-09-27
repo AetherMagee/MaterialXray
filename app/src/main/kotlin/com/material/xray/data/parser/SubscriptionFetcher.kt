@@ -310,8 +310,7 @@ class SubscriptionFetcher @Inject constructor(
     }
 
     private fun parseJsonSubscription(body: String): List<ServerConfig> = runCatching {
-        val root = json.parseToJsonElement(body)
-        val items = when (root) {
+        val items = when (val root = json.parseToJsonElement(body)) {
             is JsonArray -> root
             is JsonObject -> JsonArray(listOf(root))
             else -> JsonArray(emptyList())

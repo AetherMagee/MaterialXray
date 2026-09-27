@@ -61,7 +61,7 @@ class StartupDiagnosticsLogger @Inject constructor(
             lowRamDevice = activityManager.isLowRamDevice,
             batteryOptimizationsIgnored = powerManager.isIgnoringBatteryOptimizations(context.packageName),
             lowPowerStandbyExempt = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                powerManager.isExemptFromLowPowerStandby()
+                powerManager.isExemptFromLowPowerStandby
             } else {
                 null
             },

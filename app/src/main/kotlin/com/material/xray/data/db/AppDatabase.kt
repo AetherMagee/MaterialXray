@@ -24,7 +24,7 @@ abstract class AppDatabase : RoomDatabase() {
     companion object {
         const val DATABASE_NAME = "material-xray.db"
 
-        val VALUE_VALIDATION_CALLBACK = object : RoomDatabase.Callback() {
+        val VALUE_VALIDATION_CALLBACK = object : Callback() {
             override fun onOpen(db: SupportSQLiteDatabase) {
                 DatabaseValueValidator.validateIfNeeded(db)
             }

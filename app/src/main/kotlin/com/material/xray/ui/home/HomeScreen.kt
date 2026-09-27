@@ -2601,7 +2601,7 @@ private fun String.withMetadataEmphasis(expiredStatusText: String) = buildAnnota
 }
 
 private fun String.withUrlLinks(
-    linkColor: androidx.compose.ui.graphics.Color,
+    linkColor: Color,
     onUrlClick: (String) -> Unit,
 ): AnnotatedString = buildAnnotatedString {
     var cursor = 0
