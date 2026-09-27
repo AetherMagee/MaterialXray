@@ -8,8 +8,6 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-extern char **environ;
-
 static void throw_state(JNIEnv *env, const char *prefix, int err) {
     char message[256];
     snprintf(message, sizeof(message), "%s: %s", prefix, strerror(err));
