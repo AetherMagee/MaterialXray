@@ -26,9 +26,10 @@ import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -318,7 +319,10 @@ internal fun ConnectionState.showsConnectionStats(): Boolean = this is Connectio
 
 /**
  * Compact alternative to the large connection button, anchored in the corner of the home screen.
- * The standard FAB keeps the same action semantics and long-press shortcut as the full button.
+ * Built on a plain [Surface] instead of [FloatingActionButton]: the FAB carries its own internal
+ * click handling, which sits inner in the pointer-dispatch order and swallows the tap before
+ * [combinedClickable] can fire it, leaving the button unresponsive. Shape and shadow elevation
+ * below keep the standard FAB look.
  */
 @Composable
 internal fun ConnectionFab(
@@ -340,9 +344,9 @@ internal fun ConnectionFab(
         ),
     )
 
-    FloatingActionButton(
-        onClick = {},
+    Surface(
         modifier = Modifier
+            .size(56.dp)
             .combinedClickable(
                 enabled = enabled,
                 role = Role.Button,
@@ -355,7 +359,7 @@ internal fun ConnectionFab(
                 },
             ),
         shape = MaterialTheme.shapes.large,
-        containerColor = if (enabled) {
+        color = if (enabled) {
             state.buttonColor
         } else {
             MaterialTheme.colorScheme.surfaceContainerHighest
@@ -365,6 +369,7 @@ internal fun ConnectionFab(
         } else {
             MaterialTheme.colorScheme.onSurfaceVariant
         },
+        shadowElevation = FloatingActionButtonDefaults.Elevation,
     ) {
         Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
             if (state.isTransitioning) {
