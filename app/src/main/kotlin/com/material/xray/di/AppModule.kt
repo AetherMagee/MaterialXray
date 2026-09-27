@@ -8,6 +8,7 @@ import com.material.xray.core.network.AppHttpClient
 import com.material.xray.core.network.addBundledCaFallback
 import com.material.xray.core.network.shouldUseBundledCaFallback
 import com.material.xray.core.root.RootShell
+import com.material.xray.data.parser.AndroidSubscriptionDeviceIdentity
 import com.material.xray.data.parser.SubscriptionFetcher
 import dagger.Module
 import dagger.Provides
@@ -52,5 +53,8 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideSubscriptionFetcher(client: AppHttpClient): SubscriptionFetcher = SubscriptionFetcher(client)
+    fun provideSubscriptionFetcher(
+        client: AppHttpClient,
+        @ApplicationContext context: Context,
+    ): SubscriptionFetcher = SubscriptionFetcher(client, AndroidSubscriptionDeviceIdentity(context))
 }

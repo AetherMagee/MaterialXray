@@ -1,6 +1,5 @@
 package com.material.xray.data.parser
 
-import android.content.Context
 import android.os.Build
 import com.material.xray.core.network.AppHttpClient
 import com.material.xray.model.HAPP_USER_AGENT
@@ -34,7 +33,6 @@ import com.material.xray.model.SubscriptionUserAgentMode
 import java.io.IOException
 import java.security.SecureRandom
 import java.security.cert.X509Certificate
-import java.util.UUID
 import javax.inject.Inject
 import javax.net.ssl.SSLContext
 import javax.net.ssl.X509TrustManager
@@ -87,6 +85,7 @@ class SubscriptionFetchException(
 
 class SubscriptionFetcher @Inject constructor(
     private val httpClient: AppHttpClient,
+    private val deviceIdentity: SubscriptionDeviceIdentity,
 ) {
     private val parser = ShareLinkParser()
     private val json = Json {
@@ -630,7 +629,7 @@ class SubscriptionFetcher @Inject constructor(
         userAgent: String,
     ): SubscriptionRequestHeaderValues = SubscriptionRequestHeaderValues(
         userAgent = userAgent,
-        hardwareId = if (identity.sendHardwareId) buildHardwareId() else null,
+        hardwareId = if (identity.sendHardwareId) deviceIdentity.hardwareId() else null,
         deviceOs = "Android",
         osVersion = buildOsVersion(),
         deviceModel = buildDeviceModel(),
@@ -643,67 +642,15 @@ class SubscriptionFetcher @Inject constructor(
         }
         return SubscriptionRequestHeaderValues(
             userAgent = identity.customUserAgent.trim().ifBlank { buildUserAgent() },
-            hardwareId = if (identity.sendHardwareId && !hasHardwareIdHeader) buildHardwareId() else null,
+            hardwareId = if (identity.sendHardwareId && !hasHardwareIdHeader) deviceIdentity.hardwareId() else null,
             extraHeaders = headers.map { it.name to it.value },
         )
     }
 
     private fun buildUserAgent(): String {
-        val version = resolveAppVersion()
+        val version = deviceIdentity.appVersion()
         return "Material Xray/$version (Android ${buildOsVersion()}; ${buildDeviceModel()})"
     }
-
-    private fun buildHardwareId(): String {
-        resolveAndroidId()
-            ?.takeIf { it.isNotBlank() && !it.equals("9774d56d682e549c", ignoreCase = true) }
-            ?.let { return it }
-
-        val seed = listOf(
-            Build.BRAND,
-            Build.MANUFACTURER,
-            Build.MODEL,
-            Build.DEVICE,
-            Build.BOARD,
-            Build.FINGERPRINT,
-        ).joinToString("|")
-        return UUID.nameUUIDFromBytes(seed.toByteArray(Charsets.UTF_8)).toString()
-    }
-
-    private fun resolveAppVersion(): String {
-        val appContext = resolveApplicationContext()
-        val packageVersion = appContext?.let { context ->
-            runCatching {
-                context.packageManager
-                    .getPackageInfo(context.packageName, 0)
-                    .versionName
-                    ?.takeIf { it.isNotBlank() }
-            }.getOrNull()
-        }
-        if (!packageVersion.isNullOrBlank()) return packageVersion
-
-        val buildConfigVersion = runCatching {
-            Class.forName("com.material.xray.BuildConfig")
-                .getField("VERSION_NAME")
-                .get(null) as? String
-        }.getOrNull()
-
-        return buildConfigVersion?.takeIf { it.isNotBlank() } ?: "dev"
-    }
-
-    private fun resolveAndroidId(): String? {
-        val appContext = resolveApplicationContext() ?: return null
-        return runCatching {
-            android.provider.Settings.Secure.getString(
-                appContext.contentResolver,
-                android.provider.Settings.Secure.ANDROID_ID,
-            )
-        }.getOrNull()?.trim()
-    }
-
-    private fun resolveApplicationContext(): Context? = runCatching {
-        val activityThreadClass = Class.forName("android.app.ActivityThread")
-        activityThreadClass.getMethod("currentApplication").invoke(null) as? Context
-    }.getOrNull()
 
     private fun buildOsVersion(): String = Build.VERSION.RELEASE ?: Build.VERSION.SDK_INT.toString()
 

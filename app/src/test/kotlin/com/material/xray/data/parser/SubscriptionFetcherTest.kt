@@ -36,6 +36,11 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SubscriptionFetcherTest {
+    private val testDeviceIdentity = object : SubscriptionDeviceIdentity {
+        override fun appVersion(): String = "test"
+
+        override fun hardwareId(): String = "test-hwid"
+    }
 
     @Test
     fun `parse app routing headers normalizes package list`() {
@@ -549,7 +554,7 @@ class SubscriptionFetcherTest {
             server.enqueue(MockResponse(body = "vless://uuid@example.com:443?encryption=none&type=tcp#Node"))
             server.start()
 
-            val subscription = SubscriptionFetcher(DirectHttpClient(OkHttpClient())).fetchWithMetadata(
+            val subscription = SubscriptionFetcher(DirectHttpClient(OkHttpClient()), testDeviceIdentity).fetchWithMetadata(
                 url = server.url("/sub").toString(),
                 allowInsecureUpdates = true,
             )
@@ -576,7 +581,7 @@ class SubscriptionFetcherTest {
                 .build()
 
             val error = runCatching {
-                SubscriptionFetcher(DirectHttpClient(client)).fetchWithMetadata(server.url("/sub").toString())
+                SubscriptionFetcher(DirectHttpClient(client), testDeviceIdentity).fetchWithMetadata(server.url("/sub").toString())
             }.exceptionOrNull()
 
             assertTrue(error is javax.net.ssl.SSLHandshakeException)
@@ -602,7 +607,7 @@ class SubscriptionFetcherTest {
                 .build()
 
             val error = runCatching {
-                SubscriptionFetcher(DirectHttpClient(client)).fetchWithMetadata(
+                SubscriptionFetcher(DirectHttpClient(client), testDeviceIdentity).fetchWithMetadata(
                     url = server.url("/sub").toString(),
                     allowInsecureUpdates = true,
                 )
@@ -626,7 +631,7 @@ class SubscriptionFetcherTest {
                     .build()
             }
             .build()
-        val fetcher = SubscriptionFetcher(DirectHttpClient(client))
+        val fetcher = SubscriptionFetcher(DirectHttpClient(client), testDeviceIdentity)
 
         val error = runCatching {
             fetcher.fetchWithMetadata("https://subscriptions.example/sub")
@@ -656,7 +661,7 @@ class SubscriptionFetcherTest {
                     .build()
             }
             .build()
-        return SubscriptionFetcher(DirectHttpClient(client))
+        return SubscriptionFetcher(DirectHttpClient(client), testDeviceIdentity)
     }
 
     @Test
@@ -968,7 +973,7 @@ class SubscriptionFetcherTest {
             }
             .build()
 
-        val fetched = SubscriptionFetcher(DirectHttpClient(client)).fetchWithMetadata("https://subscriptions.example/precedence")
+        val fetched = SubscriptionFetcher(DirectHttpClient(client), testDeviceIdentity).fetchWithMetadata("https://subscriptions.example/precedence")
 
         assertEquals("Header Title", fetched.metadata.profileTitle)
     }
@@ -1002,7 +1007,7 @@ class SubscriptionFetcherTest {
                     .build()
             }
             .build()
-        return SubscriptionFetcher(DirectHttpClient(client))
+        return SubscriptionFetcher(DirectHttpClient(client), testDeviceIdentity)
     }
 
     private fun capturingFetcher(
@@ -1023,6 +1028,6 @@ class SubscriptionFetcherTest {
                     .build()
             }
             .build()
-        return SubscriptionFetcher(DirectHttpClient(client))
+        return SubscriptionFetcher(DirectHttpClient(client), testDeviceIdentity)
     }
 }
