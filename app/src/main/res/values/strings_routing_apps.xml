@@ -3,6 +3,8 @@
     <string name="routing_title">Routing</string>
     <string name="routing_tab_rules">Rules</string>
     <string name="routing_tab_apps">Apps</string>
+    <string name="apps_finding_apps">Finding apps…</string>
+    <string name="apps_loading_progress">Loading apps: %1$d / %2$d</string>
     <plurals name="routing_rules_selected">
         <item quantity="one">%1$d selected</item>
         <item quantity="other">%1$d selected</item>

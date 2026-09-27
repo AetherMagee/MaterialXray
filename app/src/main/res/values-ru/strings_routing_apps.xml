@@ -3,6 +3,8 @@
     <string name="routing_title">Маршрутизация</string>
     <string name="routing_tab_rules">Правила</string>
     <string name="routing_tab_apps">Приложения</string>
+    <string name="apps_finding_apps">Поиск приложений…</string>
+    <string name="apps_loading_progress">Загрузка приложений: %1$d / %2$d</string>
     <plurals name="routing_rules_selected">
         <item quantity="one">Выбрано: %1$d</item>
         <item quantity="few">Выбрано: %1$d</item>

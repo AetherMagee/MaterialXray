@@ -64,6 +64,8 @@ data class AppItem(
     val routeDescription: AppRouteText,
 )
 
+data class AppLoadProgress(val processed: Int, val total: Int)
+
 sealed interface AppRouteText {
     data class Resource(
         @param:StringRes val resourceId: Int,
@@ -125,6 +127,8 @@ class AppsViewModel @Inject constructor(
 
     private val _isLoadingApps = MutableStateFlow(true)
     val isLoadingApps: StateFlow<Boolean> = _isLoadingApps
+    private val _appLoadProgress = MutableStateFlow<AppLoadProgress?>(null)
+    val appLoadProgress: StateFlow<AppLoadProgress?> = _appLoadProgress
     private var loadAppsJob: Job? = null
     private var loadAppsRunId = 0L
     private var routingRefreshJob: Job? = null
@@ -270,6 +274,7 @@ class AppsViewModel @Inject constructor(
         loadAppsJob?.cancel()
         loadAppsJob = null
         if (wasLoading) _isLoadingApps.value = false
+        _appLoadProgress.value = null
     }
 
     private fun loadApps() {
@@ -277,8 +282,13 @@ class AppsViewModel @Inject constructor(
         val runId = ++loadAppsRunId
         loadAppsJob = viewModelScope.launch {
             _isLoadingApps.value = true
+            _appLoadProgress.value = null
             try {
-                val snapshot = appInventory.loadSnapshot()
+                val snapshot = appInventory.loadSnapshotWithProgress { processed, total ->
+                    if (loadAppsRunId == runId) {
+                        _appLoadProgress.value = AppLoadProgress(processed, total)
+                    }
+                }
                 _hasWorkProfileApps.value = snapshot.profileIds.size > 1
                 val apps = snapshot.apps
                     .filterNot { it.packageName == context.packageName }
@@ -310,6 +320,7 @@ class AppsViewModel @Inject constructor(
                 if (loadAppsRunId == runId) {
                     loadAppsJob = null
                     _isLoadingApps.value = false
+                    _appLoadProgress.value = null
                 }
             }
         }

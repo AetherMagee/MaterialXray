@@ -77,6 +77,7 @@ fun AppBypassContent(active: Boolean, viewModel: AppsViewModel = hiltViewModel()
     val alwaysProxiedAvailable by viewModel.alwaysProxiedAvailable.collectAsStateWithLifecycle()
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
     val isLoadingApps by viewModel.isLoadingApps.collectAsStateWithLifecycle()
+    val appLoadProgress by viewModel.appLoadProgress.collectAsStateWithLifecycle()
     val appSpecificServerNoteShown by viewModel.appSpecificServerNoteShown.collectAsStateWithLifecycle()
     val routingPolicyControl by viewModel.routingPolicyControl.collectAsStateWithLifecycle()
     val automaticRoutingProviderName by viewModel.automaticRoutingProviderName.collectAsStateWithLifecycle()
@@ -141,7 +142,18 @@ fun AppBypassContent(active: Boolean, viewModel: AppsViewModel = hiltViewModel()
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center,
                 ) {
-                    CircularProgressIndicator()
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        CircularProgressIndicator()
+                        Text(
+                            text = appLoadProgress?.let { progress ->
+                                stringResource(R.string.apps_loading_progress, progress.processed, progress.total)
+                            } ?: stringResource(R.string.apps_finding_apps),
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
                 }
                 return@Column
             }
