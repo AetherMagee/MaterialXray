@@ -302,8 +302,8 @@ fun AppBypassContent(active: Boolean, viewModel: AppsViewModel = hiltViewModel()
 @Composable
 private fun SubscriptionRoutingBanner(providerName: String?) {
     Surface(
-        color = MaterialTheme.colorScheme.secondaryContainer,
-        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        color = MaterialTheme.colorScheme.primaryContainer,
+        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
         shape = MaterialTheme.shapes.small,
         modifier = Modifier
             .fillMaxWidth()

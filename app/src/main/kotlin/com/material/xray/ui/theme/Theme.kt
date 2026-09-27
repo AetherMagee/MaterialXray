@@ -39,17 +39,16 @@ fun MaterialXrayTheme(
     }
     val detectDynamicPureBlack =
         preset == ThemePreset.Dynamic && darkTheme && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
-    val colorScheme = if (
-        shouldApplyBlackBackgrounds(
-            colorScheme = baseColorScheme,
-            darkTheme = darkTheme,
-            oledDark = oledDark,
-            detectDynamicPureBlack = detectDynamicPureBlack,
-        )
-    ) {
-        withBlackBackgrounds(baseColorScheme)
-    } else {
-        baseColorScheme
+    val blackBackgrounds = shouldApplyBlackBackgrounds(
+        colorScheme = baseColorScheme,
+        darkTheme = darkTheme,
+        oledDark = oledDark,
+        detectDynamicPureBlack = detectDynamicPureBlack,
+    )
+    // The app draws the scheme's own role colours and adds only its flat surfaces and its pure black
+    // page on top, whatever produced the scheme - dynamic colour, a palette preset or the fallback.
+    val colorScheme = remember(baseColorScheme, blackBackgrounds) {
+        withAppSurfaces(colorScheme = baseColorScheme, blackPage = blackBackgrounds)
     }
     MaterialTheme(colorScheme = colorScheme, content = content)
 }

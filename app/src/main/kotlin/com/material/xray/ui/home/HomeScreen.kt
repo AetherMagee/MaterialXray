@@ -159,10 +159,7 @@ fun HomeScreen(
 
     var showAddDialog by rememberSaveable { mutableStateOf(false) }
     var showAddMenu by rememberSaveable { mutableStateOf(false) }
-    // The connection card stays thin until the user opts into the live stats.
     var connectionStatsExpanded by rememberSaveable { mutableStateOf(false) }
-    // The floating connection card reports its height, so the list reserves exactly enough room
-    // to scroll the last item clear of it, expanded stats included.
     var connectionCardHeight by remember { mutableStateOf(88.dp) }
     var showQrScanner by remember { mutableStateOf(false) }
     var keepQrScannerDialog by remember { mutableStateOf(false) }
@@ -499,8 +496,6 @@ fun HomeScreen(
             }
         }
 
-        // The connection card floats over the list and stays clear of the bottom navigation
-        // bar, so opening its stats moves only this card and never the bar or the screen.
         if (!floatingConnectButton) {
             ConnectionPanel(
                 connectionState = uiState.connectionState,
@@ -823,7 +818,7 @@ private fun ReorderableSubscriptionList(order: SnapshotStateList<SubscriptionEnt
                         .clip(MaterialTheme.shapes.medium)
                         .then(
                             if (dragging) {
-                                Modifier.background(MaterialTheme.colorScheme.surfaceVariant)
+                                Modifier.background(MaterialTheme.colorScheme.surfaceContainer)
                             } else {
                                 Modifier
                             },
@@ -994,9 +989,6 @@ private fun homeListContentPadding(floatingConnectButton: Boolean, connectionCar
     start = 16.dp,
     top = 16.dp,
     end = 16.dp,
-    // The compact FAB floats; the floating connection card reports its own height and the gap it
-    // keeps above the navigation bar, expanded stats included, so the last row can always scroll
-    // above it.
     bottom = 16.dp + if (floatingConnectButton) FloatingConnectButtonClearance else connectionCardHeight,
 )
 

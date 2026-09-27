@@ -7,7 +7,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import com.material.xray.model.ThemePreset
 import hct.Hct
-import kotlin.math.roundToInt
 import scheme.SchemeTonalSpot
 
 internal fun presetColorScheme(
@@ -139,27 +138,30 @@ internal fun shouldApplyBlackBackgrounds(
 }
 
 /**
- * Black background with containers that survive it: a system pure-black scheme can send near-black
- * container tones, which would make cards indistinguishable from the page, so any near-black
- * container is lifted onto a neutral step above the background. Colored containers keep their hue.
+ * The app's surfaces: Material's own role colours, exactly as the scheme generator assigned them,
+ * with two rules on top. Containers stay flat so the container colour alone says how deep a layer
+ * reads, and a pure black page lands its surface containers on Material's dark tones 4, 10, 12, 17
+ * and 22 so a card still separates itself from the page. Pure black is dark mode only.
  */
-internal fun withBlackBackgrounds(colorScheme: ColorScheme): ColorScheme = colorScheme.copy(
-    background = Color.Black,
-    surface = Color.Black,
-    surfaceDim = blendBlackOverlay(colorScheme.surfaceDim, PURE_BLACK_SURFACE_LUMINANCE_FLOAT),
-    surfaceContainerLowest = blendBlackOverlay(colorScheme.surfaceContainerLowest, 0.0f),
-    surfaceContainerLow = blendBlackOverlay(colorScheme.surfaceContainerLow, 0.04f),
-    surfaceContainer = blendBlackOverlay(colorScheme.surfaceContainer, 0.07f),
-    surfaceContainerHigh = blendBlackOverlay(colorScheme.surfaceContainerHigh, 0.10f),
-    surfaceContainerHighest = blendBlackOverlay(colorScheme.surfaceContainerHighest, 0.14f),
-)
+internal fun withAppSurfaces(colorScheme: ColorScheme, blackPage: Boolean): ColorScheme {
+    if (!blackPage) return colorScheme.copy(surfaceTint = Color.Transparent)
+    return colorScheme.copy(
+        surfaceTint = Color.Transparent,
+        background = Color.Black,
+        surface = Color.Black,
+        surfaceDim = Color.Black,
+        surfaceContainerLowest = atDarkTone(colorScheme.surfaceContainerLowest, 4.0),
+        surfaceContainerLow = atDarkTone(colorScheme.surfaceContainerLow, 10.0),
+        surfaceContainer = atDarkTone(colorScheme.surfaceContainer, 12.0),
+        surfaceContainerHigh = atDarkTone(colorScheme.surfaceContainerHigh, 17.0),
+        surfaceContainerHighest = atDarkTone(colorScheme.surfaceContainerHighest, 22.0),
+    )
+}
 
-/** Neutral step above black: near-black inputs become the overlay tone, lighter tones stay. */
-private fun blendBlackOverlay(color: Color, overlayLuminance: Float): Color {
-    if (Hct.fromInt(color.toArgb()).tone / 100.0 > PURE_BLACK_SURFACE_LUMINANCE) return color
-    val channel = (overlayLuminance * 255f).roundToInt()
-    return Color(channel, channel, channel)
+/** A container keeps its own hue and lands on the tone Material gives its role in dark. */
+private fun atDarkTone(container: Color, tone: Double): Color {
+    val hct = Hct.fromInt(container.toArgb())
+    return Color(Hct.from(hct.hue, hct.chroma, tone).toInt())
 }
 
 private const val PURE_BLACK_SURFACE_LUMINANCE = 0.03
-private const val PURE_BLACK_SURFACE_LUMINANCE_FLOAT = 0.03f

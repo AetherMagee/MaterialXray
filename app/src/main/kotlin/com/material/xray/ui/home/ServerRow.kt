@@ -122,11 +122,11 @@ internal fun ServerRow(
         color = if (isSelected) {
             MaterialTheme.colorScheme.primaryContainer
         } else {
-            MaterialTheme.colorScheme.surfaceContainer
+            MaterialTheme.colorScheme.surfaceContainerLow
         },
     ) {
         // IntrinsicSize.Min gives the row a height the chevron can fill, so its tap target and
-        // ripple cover the whole strip at the row's end instead of a small indicator inside it.
+        // ripple cover the whole strip at the row's end.
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -252,15 +252,17 @@ internal fun HomeStateBadge(
     showText: Boolean = true,
     contentDescription: String? = null,
 ) {
+    // Tinted chips take the secondary, tertiary and error containers; primaryContainer is reserved
+    // for selection.
     val containerColor = when (tone) {
         HomeStateBadgeTone.Neutral -> MaterialTheme.colorScheme.surfaceContainerHighest
-        HomeStateBadgeTone.Primary -> MaterialTheme.colorScheme.primaryContainer
+        HomeStateBadgeTone.Primary -> MaterialTheme.colorScheme.secondaryContainer
         HomeStateBadgeTone.Tertiary -> MaterialTheme.colorScheme.tertiaryContainer
         HomeStateBadgeTone.Error -> MaterialTheme.colorScheme.errorContainer
     }
     val contentColor = when (tone) {
         HomeStateBadgeTone.Neutral -> MaterialTheme.colorScheme.onSurfaceVariant
-        HomeStateBadgeTone.Primary -> MaterialTheme.colorScheme.onPrimaryContainer
+        HomeStateBadgeTone.Primary -> MaterialTheme.colorScheme.onSecondaryContainer
         HomeStateBadgeTone.Tertiary -> MaterialTheme.colorScheme.onTertiaryContainer
         HomeStateBadgeTone.Error -> MaterialTheme.colorScheme.onErrorContainer
     }

@@ -145,8 +145,6 @@ fun ConfigViewerScreen(
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-        // The viewer opens above the bottom navigation bar, and the band the bar fills is consumed
-        // up there, so this inset has nothing left to pad for at the bottom.
         contentWindowInsets = WindowInsets.navigationBars,
         topBar = {
             ScrolledTopAppBar(
@@ -275,7 +273,7 @@ private fun ConfigViewerUiState.isEditable(): Boolean = this is ConfigViewerUiSt
 @Composable
 private fun JsonDocumentContent(state: ConfigViewerUiState.JsonDocument) {
     val colors = rememberJsonSyntaxColors()
-    val codeBackground = MaterialTheme.colorScheme.surfaceContainerLow
+    val codeBackground = MaterialTheme.colorScheme.surfaceContainerLowest
 
     // One Text per line inside a lazy list. The generated config runs to a couple of thousand
     // lines, and laying that out as a single paragraph costs enough on the first frame to eat the
@@ -410,8 +408,8 @@ private fun NoticeBanner(
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.medium,
-        color = MaterialTheme.colorScheme.secondaryContainer,
-        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        color = MaterialTheme.colorScheme.primaryContainer,
+        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
     ) {
         Row(
             modifier = Modifier.padding(16.dp),
@@ -487,7 +485,7 @@ private fun EditSectionCard(section: EditSection, onFieldChange: (EditKey, Strin
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.medium,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
     ) {
         Column(
             modifier = Modifier
@@ -654,7 +652,7 @@ private fun ParamSectionCard(section: ParamSection) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.medium,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
     ) {
         Column(
             modifier = Modifier
@@ -720,7 +718,7 @@ private fun RawLinkCard(rawLink: String, stale: Boolean) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.medium,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
     ) {
         Column(
             modifier = Modifier
@@ -761,7 +759,11 @@ private fun rememberJsonSyntaxColors(): JsonSyntaxColors {
     return remember(dark) { if (dark) DarkJsonSyntaxColors else LightJsonSyntaxColors }
 }
 
-private data class JsonSyntaxColors(
+/**
+ * The colours of JSON syntax highlighting: code needs more hues than a surface family has, so they
+ * stay outside the surface ladder.
+ */
+internal data class JsonSyntaxColors(
     val key: Color,
     val stringValue: Color,
     val number: Color,
@@ -781,16 +783,16 @@ private data class JsonSyntaxColors(
     fun spanOf(kind: JsonTokenKind): SpanStyle? = spans[kind]
 }
 
-private val LightJsonSyntaxColors = JsonSyntaxColors(
+internal val LightJsonSyntaxColors = JsonSyntaxColors(
     key = Color(0xFF0B57D0),
-    stringValue = Color(0xFF1B7F3B),
+    stringValue = Color(0xFF1A7A38),
     number = Color(0xFFA6412A),
     literal = Color(0xFF7A3E9D),
     punctuation = Color(0xFF6B6B6B),
     plain = Color(0xFF1F1F1F),
 )
 
-private val DarkJsonSyntaxColors = JsonSyntaxColors(
+internal val DarkJsonSyntaxColors = JsonSyntaxColors(
     key = Color(0xFF8AB4F8),
     stringValue = Color(0xFF7EC699),
     number = Color(0xFFE8A87C),

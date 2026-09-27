@@ -126,7 +126,7 @@ private fun RuleSummary(request: RoutingRuleViewerRequest) {
         null -> null
     }
     Surface(
-        color = MaterialTheme.colorScheme.surfaceContainer,
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
         shape = MaterialTheme.shapes.medium,
         modifier = Modifier.fillMaxWidth(),
     ) {
@@ -195,7 +195,7 @@ internal fun HighlightedJson(rawJson: String) {
                 text = highlighted,
                 modifier = Modifier
                     .horizontalScroll(rememberScrollState())
-                    .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                    .background(MaterialTheme.colorScheme.surfaceContainerLowest)
                     .padding(12.dp),
                 color = colors.plain,
                 fontFamily = FontFamily.Monospace,
@@ -240,7 +240,7 @@ private val PrettyJson = Json { prettyPrint = true }
 
 private val LightJsonSyntaxColors = JsonSyntaxColors(
     key = Color(0xFF0B57D0),
-    stringValue = Color(0xFF1B7F3B),
+    stringValue = Color(0xFF1A7A38),
     number = Color(0xFFA6412A),
     literal = Color(0xFF7A3E9D),
     punctuation = Color(0xFF6B6B6B),

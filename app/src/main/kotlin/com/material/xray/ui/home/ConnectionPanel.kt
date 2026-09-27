@@ -103,8 +103,8 @@ internal fun buildConnectionUiState(
             isTransitioning -> MaterialTheme.colorScheme.tertiary
             else -> MaterialTheme.colorScheme.primary
         },
-        // The compact button fills with the role colour itself rather than the softer *Container
-        // pair: it is small and floats over scrolling content, so it needs the contrast.
+        // The compact button fills with the role colour, not its container: it floats over
+        // scrolling content and needs the contrast.
         fabContentColor = when {
             stopLike -> MaterialTheme.colorScheme.onError
             isTransitioning -> MaterialTheme.colorScheme.onTertiary
@@ -155,9 +155,7 @@ private fun ConnectionDetailLine(
 }
 
 /**
- * The chevron that expands the live stats block, present only while stats can be shown. The card
- * floats above the bottom navigation bar and opens upward over the list, so the collapsed state
- * points up and the expanded state points back down.
+ * The chevron that expands the live stats block, present only while stats can be shown.
  */
 @Composable
 private fun ConnectionStatsDisclosure(
@@ -451,10 +449,8 @@ internal fun ConnectionState.showsConnectionStats(): Boolean = this is Connectio
 
 /**
  * Compact alternative to the large connection button, anchored in the corner of the home screen.
- * Built on a plain [Surface] instead of [FloatingActionButton]: the FAB carries its own internal
- * click handling, which sits inner in the pointer-dispatch order and swallows the tap before
- * [combinedClickable] can fire it, leaving the button unresponsive. Shape and shadow elevation
- * below keep the standard FAB look.
+ * Built on a plain [Surface] instead of [FloatingActionButton]: the FAB's own click handling sits
+ * inner in the pointer-dispatch order and swallows the tap before [combinedClickable] can fire.
  */
 @Composable
 internal fun ConnectionFab(
@@ -494,7 +490,7 @@ internal fun ConnectionFab(
         color = if (enabled) {
             state.buttonColor
         } else {
-            MaterialTheme.colorScheme.surfaceContainerHighest
+            MaterialTheme.colorScheme.surfaceContainer
         },
         contentColor = if (enabled) {
             state.fabContentColor

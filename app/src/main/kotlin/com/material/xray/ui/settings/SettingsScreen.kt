@@ -1091,7 +1091,7 @@ private fun ReorderableFieldList(
                         .clip(MaterialTheme.shapes.small)
                         .background(
                             if (dragging) {
-                                MaterialTheme.colorScheme.surfaceVariant
+                                MaterialTheme.colorScheme.surfaceContainer
                             } else {
                                 Color.Transparent
                             },

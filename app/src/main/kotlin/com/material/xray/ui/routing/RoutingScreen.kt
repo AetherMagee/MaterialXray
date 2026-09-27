@@ -112,8 +112,7 @@ internal fun RoutingScreen(
     val automaticRoutingProviderName by viewModel.automaticRoutingProviderName.collectAsStateWithLifecycle()
     val profileRouting by viewModel.profileRouting.collectAsStateWithLifecycle()
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
-    // The tab strip floats over the lists at the bottom of this tab, so the selection belongs here
-    // with it rather than in the shared navigation bar.
+
     var selectedTab by rememberSaveable { mutableStateOf(RoutingTab.Rules) }
     var previousTab by remember { mutableIntStateOf(selectedTab.ordinal) }
     var selectedRuleIds by remember { mutableStateOf(emptySet<String>()) }
@@ -409,8 +408,8 @@ private fun RoutingRulesTab(
             if (providerManaged) {
                 item(contentType = "providerRoutingBanner") {
                     Surface(
-                        color = MaterialTheme.colorScheme.secondaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
                         shape = MaterialTheme.shapes.small,
                         modifier = Modifier
                             .fillMaxWidth()
@@ -489,7 +488,7 @@ private fun RoutingRulesTab(
                     targetValue = if (selected) {
                         MaterialTheme.colorScheme.primaryContainer
                     } else {
-                        MaterialTheme.colorScheme.surfaceContainer
+                        MaterialTheme.colorScheme.surfaceContainerLow
                     },
                     label = "routingRuleContainerColor",
                 )
@@ -595,7 +594,7 @@ private fun RoutingRulesTab(
 @Composable
 private fun SubscriptionRoutingRuleRow(rule: RoutingRule, onClick: () -> Unit) {
     Surface(
-        color = MaterialTheme.colorScheme.surfaceContainer,
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
         shape = MaterialTheme.shapes.medium,
         modifier = Modifier
             .fillMaxWidth()
@@ -640,7 +639,7 @@ private fun ProfileRoutingRuleRow(
     onToggled: (Boolean) -> Unit,
 ) {
     Surface(
-        color = MaterialTheme.colorScheme.surfaceContainer,
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
         shape = MaterialTheme.shapes.medium,
         modifier = Modifier
             .fillMaxWidth()

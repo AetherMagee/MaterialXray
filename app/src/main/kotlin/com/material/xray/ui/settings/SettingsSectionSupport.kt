@@ -130,14 +130,14 @@ internal fun SettingsNotice(
         modifier = Modifier
             .padding(horizontal = 16.dp)
             .clip(MaterialTheme.shapes.medium)
-            .background(MaterialTheme.colorScheme.tertiaryContainer)
+            .background(MaterialTheme.colorScheme.primaryContainer)
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Text(
             text = text,
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onTertiaryContainer,
+            color = MaterialTheme.colorScheme.onPrimaryContainer,
         )
         action?.invoke(this)
     }
@@ -145,10 +145,6 @@ internal fun SettingsNotice(
 
 /**
  * The shared shape for an editable settings field followed by its save action.
- *
- * All callers keep their draft value in the screen state owner. This helper only renders the field
- * and exposes the same save-button behavior, so a field can be moved between sections without
- * changing how a draft is committed.
  */
 @Composable
 internal fun SettingsTextFieldWithSave(

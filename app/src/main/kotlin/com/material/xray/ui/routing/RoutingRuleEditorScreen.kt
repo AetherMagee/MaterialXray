@@ -275,7 +275,7 @@ internal fun RoutingRuleEditorScreen(
                     modifier = Modifier.fillMaxWidth(),
                     shape = MaterialTheme.shapes.small,
                     color = if (checked) {
-                        MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f)
+                        MaterialTheme.colorScheme.primaryContainer
                     } else {
                         MaterialTheme.colorScheme.surfaceContainerLow
                     },
