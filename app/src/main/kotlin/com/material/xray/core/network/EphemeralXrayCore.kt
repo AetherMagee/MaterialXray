@@ -62,7 +62,7 @@ class EphemeralXrayCore @Inject constructor(
             try {
                 return block(client)
             } finally {
-                client.connectionPool.evictAll()
+                evictProxyConnections { client.connectionPool.evictAll() }
             }
         } finally {
             withContext(NonCancellable + Dispatchers.IO) { core.close() }
@@ -172,10 +172,9 @@ class EphemeralXrayCore @Inject constructor(
     private fun canConnectSocket(path: String): Boolean {
         val socket = LocalSocket()
         return try {
-            socket.connect(LocalSocketAddress(path, LocalSocketAddress.Namespace.FILESYSTEM))
-            true
-        } catch (_: IOException) {
-            false
+            socketConnects {
+                socket.connect(LocalSocketAddress(path, LocalSocketAddress.Namespace.FILESYSTEM))
+            }
         } finally {
             runCatching { socket.close() }
         }
@@ -203,4 +202,13 @@ class EphemeralXrayCore @Inject constructor(
         private const val WAIT_TIMEOUT_MS = 500L
         private const val STOP_POLL_INTERVAL_MS = 50L
     }
+}
+
+internal fun socketConnects(connect: () -> Unit): Boolean = try {
+    connect()
+    true
+} catch (_: IOException) {
+    false
+} catch (_: UnsupportedOperationException) {
+    false
 }

@@ -16,6 +16,7 @@ import java.net.Proxy
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -50,9 +51,13 @@ class ActiveCoreHttpClient @Inject constructor(
         return try {
             block(proxyClient)
         } finally {
-            proxyClient.connectionPool.evictAll()
+            evictProxyConnections { proxyClient.connectionPool.evictAll() }
         }
     }
+}
+
+internal suspend fun evictProxyConnections(evict: () -> Unit) {
+    withContext(NonCancellable + Dispatchers.IO) { evict() }
 }
 
 internal fun privateUnixHttpProxyClient(baseClient: OkHttpClient, socketPath: String): OkHttpClient = baseClient.newBuilder()
