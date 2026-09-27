@@ -955,17 +955,24 @@ class ConnectionManagerTest {
     }
 
     @Test
-    fun `a rootless connection without a tunnel is rejected without reclaiming root state`() = runTest {
+    fun `rootless VPN starts after routing data and config are ready`() = runTest {
         val harness = Harness()
         harness.stateStore.state = XrayState(xrayPid = 42, physicalInterface = VPN_SERVICE_INTERFACE_LABEL)
+        var establishmentAttempted = false
 
         harness.manager.connect(
             server(),
             runtimeSettings().copy(useRootService = false, tunName = "tun0"),
-            vpnInterface = null,
+            establishVpnInterface = {
+                establishmentAttempted = true
+                assertEquals(1, harness.routingData.readyCalls)
+                assertTrue(harness.binary.configJson != null)
+                null
+            },
         )
 
-        assertEquals(1, harness.userProcess.stopCalls)
+        assertTrue(establishmentAttempted)
+        assertEquals(2, harness.userProcess.stopCalls)
         assertEquals(0, harness.cleanup.cleanCalls)
         assertEquals(0, harness.cleanup.knownStateStopCalls)
         assertNull(harness.stateStore.state)
@@ -984,6 +991,7 @@ class ConnectionManagerTest {
         val environment = FakeConnectionEnvironment()
         val rootRuntime = FakeRootRuntime()
         val binary = FakeXrayBinary()
+        val routingData = FakeRoutingData()
         val tunGateway = FakeTunGateway()
         val tproxyGateway = FakeTproxyGateway(environment.appUid)
         val cleanup = FakeCleanup()
@@ -1006,7 +1014,7 @@ class ConnectionManagerTest {
                 environment = environment,
                 rootRuntime = rootRuntime,
                 xrayBinary = binary,
-                routingData = FakeRoutingData(),
+                routingData = routingData,
                 serverResolver = serverResolver,
                 tunGateway = tunGateway,
                 tproxyGateway = tproxyGateway,
@@ -1095,13 +1103,18 @@ class ConnectionManagerTest {
     }
 
     private class FakeRoutingData : ConnectionRoutingData {
+        var readyCalls = 0
+
         override suspend fun needsRefresh(): Boolean = false
 
-        override suspend fun ensureReady() = GeoDataStatus(
-            geoipUrl = "https://example.com/geoip.dat",
-            geositeUrl = "https://example.com/geosite.dat",
-            downloaded = false,
-        )
+        override suspend fun ensureReady(): GeoDataStatus {
+            readyCalls += 1
+            return GeoDataStatus(
+                geoipUrl = "https://example.com/geoip.dat",
+                geositeUrl = "https://example.com/geosite.dat",
+                downloaded = false,
+            )
+        }
     }
 
     private class FakeServerResolver : ConnectionServerResolver {

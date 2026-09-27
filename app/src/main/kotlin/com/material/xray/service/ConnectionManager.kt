@@ -109,7 +109,7 @@ internal class ConnectionManager(
     suspend fun connect(
         server: ServerConfig,
         runtimeSettings: XrayRuntimeSettings,
-        vpnInterface: ParcelFileDescriptor? = null,
+        establishVpnInterface: suspend () -> ParcelFileDescriptor? = { null },
         syntheticDnsAddress: String? = null,
         transitionState: ConnectionState = ConnectionState.Connecting,
         preparation: ConnectionPreparation = ConnectionPreparation.Full,
@@ -132,7 +132,6 @@ internal class ConnectionManager(
         try {
             val tunName = prepareRuntime(
                 strategy = strategy,
-                vpnInterface = vpnInterface,
                 preparation = preparation,
                 configuredTunName = runtimeSettings.tunName,
                 rootBackend = rootBackend,
@@ -211,6 +210,26 @@ internal class ConnectionManager(
                 tproxyPlan,
                 syntheticDnsAddress,
             )
+            val vpnInterface = if (managesSystemRouting) {
+                null
+            } else {
+                executeStep(
+                    ConnectionStep(
+                        "Establish Android VPN interface",
+                        ConnectionProgress.ConfiguringTunnel,
+                        telemetryStep = ConnectionTelemetryStep.VpnInterface,
+                        isSuccessful = { it != null },
+                        action = establishVpnInterface,
+                    ),
+                ) ?: run {
+                    val error = stateCoordinator.state.value as? ConnectionState.Error
+                    fail(
+                        error?.message ?: environment.localizedString(R.string.connection_error_vpn_permission_required),
+                        retryable = error?.retryable ?: false,
+                    )
+                    return
+                }
+            }
             val pid = startXrayProcess(
                 strategy = strategy,
                 vpnInterface = vpnInterface,
@@ -304,7 +323,6 @@ internal class ConnectionManager(
 
     private suspend fun prepareRuntime(
         strategy: XrayRuntimeStrategy,
-        vpnInterface: ParcelFileDescriptor?,
         preparation: ConnectionPreparation,
         configuredTunName: String,
         rootBackend: RootConnectionBackend,
@@ -343,7 +361,7 @@ internal class ConnectionManager(
         val ready = if (strategy.managesSystemRouting) {
             prepareRootRuntime(preparation)
         } else {
-            prepareVpnServiceRuntime(vpnInterface)
+            prepareVpnServiceRuntime()
         }
         if (!ready) return null
 
@@ -474,14 +492,7 @@ internal class ConnectionManager(
         return true
     }
 
-    private suspend fun prepareVpnServiceRuntime(vpnInterface: ParcelFileDescriptor?): Boolean {
-        if (vpnInterface == null) {
-            fail(
-                environment.localizedString(R.string.connection_error_vpn_permission_required),
-                retryable = false,
-            )
-            return false
-        }
+    private suspend fun prepareVpnServiceRuntime(): Boolean {
         log.append(LogSource.APP, "Using Android VpnService")
         cleanOrphanedVpnServiceRuntime()
         userProcessSupervisor.stop()

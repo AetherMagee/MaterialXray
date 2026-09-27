@@ -675,6 +675,7 @@ class XrayService : VpnService() {
         transitionState: ConnectionState = ConnectionState.Connecting,
         preparation: ConnectionPreparation = ConnectionPreparation.Full,
     ): Boolean {
+        closeVpnInterface()
         executeStep(
             ConnectionStep(
                 "Refresh selected server routing",
@@ -764,24 +765,12 @@ class XrayService : VpnService() {
         } else {
             planRootlessVpnNetwork(effectiveRuntimeSettings.allowIpv6)
         }
-        val activeVpnInterface = if (rootlessNetworkPlan == null) {
-            closeVpnInterface()
-            null
-        } else {
-            executeStep(
-                ConnectionStep(
-                    "Establish Android VPN interface",
-                    ConnectionProgress.ConfiguringTunnel,
-                    telemetryStep = ConnectionTelemetryStep.VpnInterface,
-                    isSuccessful = { it != null },
-                    action = { setupVpnInterface(effectiveRuntimeSettings, rootlessNetworkPlan) },
-                ),
-            ) ?: return false
-        }
         connectionManager.connect(
             server = config,
             runtimeSettings = effectiveRuntimeSettings,
-            vpnInterface = activeVpnInterface,
+            establishVpnInterface = {
+                setupVpnInterface(effectiveRuntimeSettings, requireNotNull(rootlessNetworkPlan))
+            },
             syntheticDnsAddress = rootlessNetworkPlan?.syntheticDnsAddress,
             transitionState = transitionState,
             preparation = preparation,
