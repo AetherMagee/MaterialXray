@@ -188,11 +188,7 @@ class SettingsRepository @Inject constructor(
     val allowIpv6: Flow<Boolean> = store.data.map { it[ALLOW_IPV6] ?: false }
     val lastServerId: Flow<Long> = store.data.map { it[LAST_SERVER_ID] ?: -1L }
     val xrayLogLevel: Flow<XrayLogLevel> = store.data.map { prefs ->
-        if (prefs[SHOW_ADVANCED_OPTIONS] == true) {
-            XrayLogLevel.fromValue(prefs[XRAY_LOG_LEVEL] ?: prefs[LAST_XRAY_LOG_LEVEL])
-        } else {
-            XrayLogLevel.None
-        }
+        resolveXrayLogLevel(prefs[XRAY_LOG_LEVEL], prefs[LAST_XRAY_LOG_LEVEL])
     }
     val defaultOutbound: Flow<XrayOutbound> = store.data.map { prefs ->
         XrayOutbound.fromTag(prefs[DEFAULT_OUTBOUND])
@@ -350,11 +346,7 @@ class SettingsRepository @Inject constructor(
             XrayRuntimeSettings.normalizeXrayMemoryRestartThresholdMiB(prefs[XRAY_MEMORY_RESTART_THRESHOLD_MIB]),
             passiveHealthMonitoringEnabled =
             prefs[PASSIVE_HEALTH_MONITORING_ENABLED] ?: DEFAULT_PASSIVE_HEALTH_MONITORING_ENABLED,
-            xrayLogLevel = if (showAdvancedOptions) {
-                XrayLogLevel.fromValue(prefs[XRAY_LOG_LEVEL] ?: prefs[LAST_XRAY_LOG_LEVEL])
-            } else {
-                XrayLogLevel.None
-            },
+            xrayLogLevel = resolveXrayLogLevel(prefs[XRAY_LOG_LEVEL], prefs[LAST_XRAY_LOG_LEVEL]),
             defaultOutbound = XrayOutbound.fromTag(prefs[DEFAULT_OUTBOUND]),
             launcherIcon = LauncherIcon.fromValue(prefs[LAUNCHER_ICON]),
             showTitleBarLogo = prefs[SHOW_TITLE_BAR_LOGO] ?: true,
@@ -450,7 +442,8 @@ class SettingsRepository @Inject constructor(
     }
     suspend fun setXrayLogLevel(level: XrayLogLevel) = store.edit { prefs ->
         prefs[XRAY_LOG_LEVEL] = level.value
-        prefs[LAST_XRAY_LOG_LEVEL] = level.value
+        // A choice made now supersedes any level parked by the old advanced-options toggle.
+        prefs.remove(LAST_XRAY_LOG_LEVEL)
     }
     suspend fun setDefaultOutbound(outbound: XrayOutbound) = store.edit { prefs ->
         prefs[DEFAULT_OUTBOUND] = outbound.tag
@@ -468,15 +461,6 @@ class SettingsRepository @Inject constructor(
         prefs[ROUTE_MXRAY_TRAFFIC_THROUGH_XRAY] = enabled
     }
     suspend fun setShowAdvancedOptions(enabled: Boolean) = store.edit { prefs ->
-        val wasEnabled = prefs[SHOW_ADVANCED_OPTIONS] ?: false
-        if (enabled) {
-            prefs[XRAY_LOG_LEVEL] = prefs[LAST_XRAY_LOG_LEVEL] ?: XrayLogLevel.default.value
-        } else {
-            if (wasEnabled) {
-                prefs[LAST_XRAY_LOG_LEVEL] = XrayLogLevel.fromValue(prefs[XRAY_LOG_LEVEL]).value
-            }
-            prefs[XRAY_LOG_LEVEL] = XrayLogLevel.None.value
-        }
         prefs[SHOW_ADVANCED_OPTIONS] = enabled
     }
     suspend fun setAppSpecificServerNoteShown(shown: Boolean) = store.edit { prefs ->
@@ -649,15 +633,9 @@ class SettingsRepository @Inject constructor(
             map["allow_ipv6"]?.toBooleanStrictOrNull()?.let { prefs[ALLOW_IPV6] = it }
             map["last_server_id"]?.let { prefs[LAST_SERVER_ID] = it.toLongOrNull() ?: -1L }
             val showAdvancedOptions = map["show_advanced_options"]?.toBooleanStrictOrNull()
-            val lastXrayLogLevelValue = map["last_xray_log_level"] ?: map["xray_log_level"]
-            lastXrayLogLevelValue?.let { value ->
-                val lastXrayLogLevel = XrayLogLevel.fromValue(value)
-                prefs[LAST_XRAY_LOG_LEVEL] = lastXrayLogLevel.value
-                prefs[XRAY_LOG_LEVEL] = if (showAdvancedOptions == true) {
-                    lastXrayLogLevel.value
-                } else {
-                    XrayLogLevel.None.value
-                }
+            if (map["xray_log_level"] != null || map["last_xray_log_level"] != null) {
+                prefs[XRAY_LOG_LEVEL] = resolveXrayLogLevel(map["xray_log_level"], map["last_xray_log_level"]).value
+                prefs.remove(LAST_XRAY_LOG_LEVEL)
             }
             map["default_outbound"]?.let { prefs[DEFAULT_OUTBOUND] = XrayOutbound.fromTag(it).tag }
             map["launcher_icon"]?.let { prefs[LAUNCHER_ICON] = LauncherIcon.fromValue(it).value }
@@ -817,6 +795,14 @@ class SettingsRepository @Inject constructor(
         return RoutingRuleCatalog.defaultIds().filterNotTo(mutableSetOf()) { it in presentRuleIds }
     }
 }
+
+/**
+ * The Xray log level in effect, from the stored [current] value and [legacySaved], the level an
+ * earlier version parked aside while it forced logging to `none` for as long as advanced options
+ * were off. The parked level is the one the user actually picked, so it wins until a new choice
+ * clears it; the level no longer depends on advanced options at all.
+ */
+internal fun resolveXrayLogLevel(current: String?, legacySaved: String?): XrayLogLevel = XrayLogLevel.fromValue(legacySaved ?: current)
 
 internal fun defaultRoutingRules(
     stateOverrides: Map<String, Boolean>,
