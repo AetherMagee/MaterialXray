@@ -5,6 +5,7 @@
     <string name="navigation_routing">Маршруты</string>
     <string name="navigation_logs">Журнал</string>
     <string name="navigation_settings">Настройки</string>
+    <string name="navigation_close_sheet">Закрыть</string>
 
     <string name="logs_filter_all">Все</string>
     <string name="logs_filter_app">Приложение</string>
