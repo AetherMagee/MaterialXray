@@ -62,6 +62,7 @@ import com.material.xray.service.LogEntry
 import com.material.xray.service.LogSource
 import com.material.xray.service.displayMessage
 import com.material.xray.ui.components.AppBarTitle
+import com.material.xray.ui.components.AppTopBarHeight
 import com.material.xray.ui.components.ScrollFadeEdges
 import com.material.xray.ui.components.SegmentedTabRow
 import java.io.IOException
@@ -128,7 +129,7 @@ fun LogsScreen(showTitleBarLogo: Boolean, viewModel: LogsViewModel = hiltViewMod
         topBar = {
             TopAppBar(
                 title = { AppBarTitle(stringResource(R.string.navigation_logs), showTitleBarLogo) },
-                expandedHeight = 52.dp,
+                expandedHeight = AppTopBarHeight,
                 windowInsets = TopAppBarDefaults.windowInsets,
                 actions = {
                     Box {
