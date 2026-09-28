@@ -11,8 +11,7 @@
     <string name="settings_section_core">Core</string>
     <string name="settings_default_outbound_label">Default Outbound</string>
     <string name="settings_dns_title">DNS</string>
-    <string name="settings_dns_row_subtitle">Resolvers for proxied and direct names</string>
-    <string name="settings_dns_back">Back</string>
+    <string name="settings_back">Back</string>
     <string name="settings_dns_intro">Xray answers every port 53 query itself, so names routed through the proxy are never looked up on the network you are on.</string>
     <string name="settings_prefer_profile_dns_title">Prefer profile DNS</string>
     <string name="settings_prefer_profile_dns_description">Use DNS from the JSON profile when present. Otherwise, use the DNS settings below.</string>
@@ -76,13 +75,14 @@
     <string name="settings_send_hardware_id_description">Include a stable x-hwid header so providers can recognise this device</string>
     <string name="settings_send_hardware_id_locked">Required by the subscription of the selected server and cannot be turned off</string>
     <string name="settings_show_advanced_options">Show advanced options</string>
+    <string name="settings_show_advanced_options_description">Low-level tuning, the Logs tab and database reset</string>
+    <string name="settings_backup_title">Backup</string>
     <string name="settings_route_mxray_traffic_title">Route MXray traffic through Xray</string>
     <string name="settings_route_mxray_traffic_description">Send app updates, subscriptions, and data downloads through the active connection. Server latency checks always bypass it.</string>
     <string name="settings_diagnostics_title">Diagnostics and usage statistics</string>
     <string name="settings_diagnostics_description">Send private crash and core reliability data</string>
     <string name="diagnostics_default_notice">MaterialXray sends private diagnostics and usage statistics by default. No sensitive information is shared. You can turn this off in Settings.</string>
     <string name="diagnostics_dismiss">Dismiss</string>
-    <string name="settings_section_data">Data</string>
     <string name="settings_export">Export</string>
     <string name="settings_import">Import</string>
     <string name="settings_clear_geodata">Clear geodata</string>
@@ -118,6 +118,7 @@
     <string name="settings_reset_internal_database_confirmation">This permanently deletes all subscriptions, servers, and app routing data. App settings are kept, and any active connection will be stopped.</string>
     <string name="settings_reset">Reset</string>
     <string name="settings_internal_database_reset_failed">Unable to reset internal database</string>
+    <string name="settings_section_general">General</string>
     <string name="settings_section_about">About</string>
     <string name="settings_app_update_checks_title">Automatically check for updates</string>
     <string name="settings_app_update_checks_description">Check GitHub for new releases every 8 hours</string>
