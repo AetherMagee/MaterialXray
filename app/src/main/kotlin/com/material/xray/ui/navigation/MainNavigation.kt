@@ -20,11 +20,14 @@ import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsTopHeight
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -37,6 +40,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -48,6 +52,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -66,6 +73,9 @@ import androidx.navigation.compose.rememberNavController
 import com.material.xray.R
 import com.material.xray.ui.adaptive.TwoPaneMinWidth
 import com.material.xray.ui.adaptive.useNavigationRail
+import com.material.xray.ui.components.AppTopBarHeight
+import com.material.xray.ui.components.LocalTopBarTint
+import com.material.xray.ui.components.TopBarTint
 import com.material.xray.ui.configviewer.ConfigViewerRequest
 import com.material.xray.ui.configviewer.ConfigViewerScreen
 import com.material.xray.ui.home.HomeScreen
@@ -154,6 +164,7 @@ fun MainNavigation(
     }
 
     val useRail = useNavigationRail()
+    val topBarTint = remember { TopBarTint() }
     val navigateTo: (Screen) -> Unit = { screen ->
         navController.navigate(screen.route) {
             popUpTo(navController.graph.startDestinationId) { saveState = true }
@@ -174,6 +185,7 @@ fun MainNavigation(
             if (useRail) {
                 AppNavigationRail(
                     showLogs = showAdvancedOptions,
+                    topBarScrollFraction = { topBarTint.fraction },
                     isSelected = isSelected,
                     onNavigate = navigateTo,
                 )
@@ -198,41 +210,43 @@ fun MainNavigation(
                     }
                 },
             ) { innerPadding ->
-                NavHost(
-                    navController = navController,
-                    startDestination = Screen.Home.route,
-                    // Consumed so the screens' own top bars do not add the rail layout's end inset again.
-                    modifier = Modifier
-                        .padding(innerPadding)
-                        .consumeWindowInsets(innerPadding),
-                ) {
-                    composable(Screen.Home.route) {
-                        HomeScreen(
-                            showTitleBarLogo = showTitleBarLogo,
-                            floatingConnectButton = floatingConnectButton,
-                            pendingSubscriptionLink = pendingSubscriptionLink,
-                            onSubscriptionLinkHandled = onSubscriptionLinkHandled,
-                            onOpenServerConfig = { serverId, name ->
-                                configViewerRequest = ConfigViewerRequest.Server(serverId, name)
-                            },
-                            onViewRunningConfig = { configViewerRequest = ConfigViewerRequest.Running },
-                        )
+                CompositionLocalProvider(LocalTopBarTint provides topBarTint) {
+                    NavHost(
+                        navController = navController,
+                        startDestination = Screen.Home.route,
+                        // Consumed so the screens' own top bars do not add the rail layout's end inset again.
+                        modifier = Modifier
+                            .padding(innerPadding)
+                            .consumeWindowInsets(innerPadding),
+                    ) {
+                        composable(Screen.Home.route) {
+                            HomeScreen(
+                                showTitleBarLogo = showTitleBarLogo,
+                                floatingConnectButton = floatingConnectButton,
+                                pendingSubscriptionLink = pendingSubscriptionLink,
+                                onSubscriptionLinkHandled = onSubscriptionLinkHandled,
+                                onOpenServerConfig = { serverId, name ->
+                                    configViewerRequest = ConfigViewerRequest.Server(serverId, name)
+                                },
+                                onViewRunningConfig = { configViewerRequest = ConfigViewerRequest.Running },
+                            )
+                        }
+                        composable(Screen.Logs.route) { LogsScreen(showTitleBarLogo) }
+                        composable(Screen.Routing.route) {
+                            RoutingScreen(
+                                showTitleBarLogo = showTitleBarLogo,
+                                onViewRule = { request ->
+                                    routingRuleEditorRequest = null
+                                    routingRuleViewerRequest = request
+                                },
+                                onEditRule = { request ->
+                                    routingRuleViewerRequest = null
+                                    routingRuleEditorRequest = request
+                                },
+                            )
+                        }
+                        composable(Screen.Settings.route) { SettingsScreen(showTitleBarLogo) }
                     }
-                    composable(Screen.Logs.route) { LogsScreen(showTitleBarLogo) }
-                    composable(Screen.Routing.route) {
-                        RoutingScreen(
-                            showTitleBarLogo = showTitleBarLogo,
-                            onViewRule = { request ->
-                                routingRuleEditorRequest = null
-                                routingRuleViewerRequest = request
-                            },
-                            onEditRule = { request ->
-                                routingRuleViewerRequest = null
-                                routingRuleEditorRequest = request
-                            },
-                        )
-                    }
-                    composable(Screen.Settings.route) { SettingsScreen(showTitleBarLogo) }
                 }
             }
         }
@@ -402,10 +416,38 @@ private fun AppNavigationBar(
 @Composable
 private fun AppNavigationRail(
     showLogs: Boolean,
+    topBarScrollFraction: () -> Float,
     isSelected: (Screen) -> Boolean,
     onNavigate: (Screen) -> Unit,
 ) {
-    NavigationRail {
+    val surface = MaterialTheme.colorScheme.surface
+    val scrolledSurface = MaterialTheme.colorScheme.surfaceContainer
+    Box(modifier = Modifier.background(surface)) {
+        // The top bars start beside the rail. When one tints as content scrolls under it, this
+        // band behind the rail's top edge takes the same colour, so the bar reads as running the
+        // full width instead of leaving a notch in the status bar strip.
+        // Sized from the rail rather than filling, so the band cannot widen the rail's slot.
+        Column(modifier = Modifier.matchParentSize()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .drawBehind { drawRect(lerp(surface, scrolledSurface, topBarScrollFraction())) },
+            ) {
+                Spacer(Modifier.windowInsetsTopHeight(WindowInsets.statusBars))
+                Spacer(Modifier.height(AppTopBarHeight))
+            }
+        }
+        AppNavigationRailItems(showLogs = showLogs, isSelected = isSelected, onNavigate = onNavigate)
+    }
+}
+
+@Composable
+private fun AppNavigationRailItems(
+    showLogs: Boolean,
+    isSelected: (Screen) -> Boolean,
+    onNavigate: (Screen) -> Unit,
+) {
+    NavigationRail(containerColor = Color.Transparent) {
         // Centred rather than top-aligned: on a tablet held in landscape the middle of the edge is
         // where a thumb rests, and the top corner is the hardest place to reach.
         Spacer(Modifier.weight(1f))

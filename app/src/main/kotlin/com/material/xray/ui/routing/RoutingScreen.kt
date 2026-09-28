@@ -88,6 +88,7 @@ import com.material.xray.ui.adaptive.TwoPaneMinWidth
 import com.material.xray.ui.apps.AppBypassContent
 import com.material.xray.ui.apps.AppRoutingMenuActions
 import com.material.xray.ui.components.AppBarTitle
+import com.material.xray.ui.components.AppTopBarHeight
 import com.material.xray.ui.components.ScrollFadeEdges
 import com.material.xray.ui.components.SegmentedTabRow
 import kotlinx.coroutines.launch
@@ -416,7 +417,7 @@ private fun RoutingTopBar(
                 showTitleBarLogo,
             )
         },
-        expandedHeight = 52.dp,
+        expandedHeight = AppTopBarHeight,
         windowInsets = TopAppBarDefaults.windowInsets,
         actions = actions,
     )
