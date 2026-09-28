@@ -7,14 +7,24 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarDefaults
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationRail
+import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -31,6 +41,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
@@ -42,6 +53,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.material.xray.ui.adaptive.useNavigationRail
 import com.material.xray.ui.configviewer.ConfigViewerRequest
 import com.material.xray.ui.configviewer.ConfigViewerScreen
 import com.material.xray.ui.home.HomeScreen
@@ -128,101 +140,100 @@ fun MainNavigation(
     var routingRuleEditorRequest by rememberSaveable(stateSaver = RoutingRuleEditorRequestSaver) {
         mutableStateOf<EditableRoutingRule?>(null)
     }
+
     BackHandler(enabled = configViewerRequest != null) { configViewerRequest = null }
 
+    val useRail = useNavigationRail()
+    val showNavigation = currentRoute != ROUTING_RULE_VIEWER_ROUTE
+    val navigateTo: (Screen) -> Unit = { screen ->
+        navController.navigate(screen.route) {
+            popUpTo(navController.graph.startDestinationId) { saveState = true }
+            launchSingleTop = true
+            restoreState = true
+        }
+    }
+    val isSelected: (Screen) -> Boolean = { screen ->
+        currentDestination?.hierarchy?.any { it.route == screen.route } == true
+    }
+
     Box {
-        Scaffold(
-            contentWindowInsets = WindowInsets(0.dp),
-            bottomBar = {
-                if (currentRoute != ROUTING_RULE_VIEWER_ROUTE) {
-                    AnimatedContent(
-                        targetState = showAdvancedOptions,
-                        transitionSpec = { fadeIn(tween(150)) togetherWith fadeOut(tween(150)) },
-                        label = "advancedNavigationItems",
-                    ) { showLogs ->
-                        val navigationScreens = remember(showLogs) {
-                            if (showLogs) {
-                                Screen.entries
-                            } else {
-                                Screen.entries.filterNot { it == Screen.Logs }
-                            }
-                        }
-                        NavigationBar(modifier = Modifier.height(CompactNavigationBarHeight + bottomInset)) {
-                            navigationScreens.forEach { screen ->
-                                val label = stringResource(screen.labelRes)
-                                NavigationBarItem(
-                                    icon = {
-                                        val icon = screen.icon
-                                        if (icon != null) {
-                                            Icon(icon, contentDescription = label)
-                                        } else {
-                                            Icon(
-                                                painter = painterResource(requireNotNull(screen.iconRes)),
-                                                contentDescription = label,
-                                            )
-                                        }
-                                    },
-                                    label = { Text(label) },
-                                    selected = currentDestination?.hierarchy?.any { it.route == screen.route } == true,
-                                    onClick = {
-                                        navController.navigate(screen.route) {
-                                            popUpTo(navController.graph.startDestinationId) { saveState = true }
-                                            launchSingleTop = true
-                                            restoreState = true
-                                        }
-                                    },
-                                )
-                            }
-                        }
+        Row {
+            if (useRail && showNavigation) {
+                AppNavigationRail(
+                    showLogs = showAdvancedOptions,
+                    isSelected = isSelected,
+                    onNavigate = navigateTo,
+                )
+            }
+            Scaffold(
+                modifier = Modifier.weight(1f),
+                // Without a bottom bar to absorb them, the rail layout has to keep content clear
+                // of the gesture area itself, and of a side navigation bar or cutout at the end.
+                contentWindowInsets = if (useRail && showNavigation) {
+                    WindowInsets.safeDrawing.only(WindowInsetsSides.End + WindowInsetsSides.Bottom)
+                } else {
+                    WindowInsets(0.dp)
+                },
+                bottomBar = {
+                    if (!useRail && showNavigation) {
+                        AppNavigationBar(
+                            showLogs = showAdvancedOptions,
+                            height = CompactNavigationBarHeight + bottomInset,
+                            isSelected = isSelected,
+                            onNavigate = navigateTo,
+                        )
                     }
-                }
-            },
-        ) { innerPadding ->
-            NavHost(
-                navController = navController,
-                startDestination = Screen.Home.route,
-                modifier = Modifier.padding(innerPadding),
-            ) {
-                composable(Screen.Home.route) {
-                    HomeScreen(
-                        showTitleBarLogo = showTitleBarLogo,
-                        floatingConnectButton = floatingConnectButton,
-                        pendingSubscriptionLink = pendingSubscriptionLink,
-                        onSubscriptionLinkHandled = onSubscriptionLinkHandled,
-                        onOpenServerConfig = { serverId, name ->
-                            configViewerRequest = ConfigViewerRequest.Server(serverId, name)
-                        },
-                        onViewRunningConfig = { configViewerRequest = ConfigViewerRequest.Running },
-                    )
-                }
-                composable(Screen.Logs.route) { LogsScreen(showTitleBarLogo) }
-                composable(Screen.Routing.route) {
-                    RoutingScreen(
-                        showTitleBarLogo = showTitleBarLogo,
-                        onViewRule = { request ->
-                            routingRuleEditorRequest = null
-                            routingRuleViewerRequest = request
-                            navController.navigate(ROUTING_RULE_VIEWER_ROUTE) { launchSingleTop = true }
-                        },
-                        onEditRule = { request ->
-                            routingRuleViewerRequest = null
-                            routingRuleEditorRequest = request
-                        },
-                    )
-                }
-                composable(Screen.Settings.route) { SettingsScreen(showTitleBarLogo) }
-                composable(ROUTING_RULE_VIEWER_ROUTE) {
-                    val request = routingRuleViewerRequest
-                    if (request == null) {
-                        LaunchedEffect(Unit) { navController.popBackStack() }
-                    } else {
-                        RoutingRuleViewerScreen(
-                            request = request,
-                            onBack = {
-                                navController.popBackStack()
+                },
+            ) { innerPadding ->
+                NavHost(
+                    navController = navController,
+                    startDestination = Screen.Home.route,
+                    // Consumed so the screens' own top bars do not add the rail layout's end inset again.
+                    modifier = Modifier
+                        .padding(innerPadding)
+                        .consumeWindowInsets(innerPadding),
+                ) {
+                    composable(Screen.Home.route) {
+                        HomeScreen(
+                            showTitleBarLogo = showTitleBarLogo,
+                            floatingConnectButton = floatingConnectButton,
+                            pendingSubscriptionLink = pendingSubscriptionLink,
+                            onSubscriptionLinkHandled = onSubscriptionLinkHandled,
+                            onOpenServerConfig = { serverId, name ->
+                                configViewerRequest = ConfigViewerRequest.Server(serverId, name)
+                            },
+                            onViewRunningConfig = { configViewerRequest = ConfigViewerRequest.Running },
+                        )
+                    }
+                    composable(Screen.Logs.route) { LogsScreen(showTitleBarLogo) }
+                    composable(Screen.Routing.route) {
+                        RoutingScreen(
+                            showTitleBarLogo = showTitleBarLogo,
+                            onViewRule = { request ->
+                                routingRuleEditorRequest = null
+                                routingRuleViewerRequest = request
+                                navController.navigate(ROUTING_RULE_VIEWER_ROUTE) { launchSingleTop = true }
+                            },
+                            onEditRule = { request ->
                                 routingRuleViewerRequest = null
+                                routingRuleEditorRequest = request
                             },
                         )
+                    }
+                    composable(Screen.Settings.route) { SettingsScreen(showTitleBarLogo) }
+                    composable(ROUTING_RULE_VIEWER_ROUTE) {
+                        val request = routingRuleViewerRequest
+                        if (request == null) {
+                            LaunchedEffect(Unit) { navController.popBackStack() }
+                        } else {
+                            RoutingRuleViewerScreen(
+                                request = request,
+                                onBack = {
+                                    navController.popBackStack()
+                                    routingRuleViewerRequest = null
+                                },
+                            )
+                        }
                     }
                 }
             }
@@ -297,3 +308,75 @@ private const val ROUTING_EDITOR_EXIT_MS = 140
 private const val ROUTING_RULE_VIEWER_ROUTE = "routing/rule"
 
 private val CompactNavigationBarHeight = 68.dp
+
+@Composable
+private fun AppNavigationBar(
+    showLogs: Boolean,
+    height: Dp,
+    isSelected: (Screen) -> Boolean,
+    onNavigate: (Screen) -> Unit,
+) {
+    AnimatedContent(
+        targetState = showLogs,
+        transitionSpec = { fadeIn(tween(150)) togetherWith fadeOut(tween(150)) },
+        label = "advancedNavigationItems",
+    ) { showLogsItem ->
+        NavigationBar(modifier = Modifier.height(height)) {
+            navigationScreens(showLogsItem).forEach { screen ->
+                NavigationBarItem(
+                    icon = { ScreenIcon(screen) },
+                    label = { Text(stringResource(screen.labelRes)) },
+                    selected = isSelected(screen),
+                    onClick = { onNavigate(screen) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AppNavigationRail(
+    showLogs: Boolean,
+    isSelected: (Screen) -> Boolean,
+    onNavigate: (Screen) -> Unit,
+) {
+    NavigationRail {
+        // Centred rather than top-aligned: on a tablet held in landscape the middle of the edge is
+        // where a thumb rests, and the top corner is the hardest place to reach.
+        Spacer(Modifier.weight(1f))
+        AnimatedContent(
+            targetState = showLogs,
+            transitionSpec = { fadeIn(tween(150)) togetherWith fadeOut(tween(150)) },
+            label = "advancedRailItems",
+        ) { showLogsItem ->
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                navigationScreens(showLogsItem).forEach { screen ->
+                    NavigationRailItem(
+                        icon = { ScreenIcon(screen) },
+                        label = { Text(stringResource(screen.labelRes)) },
+                        selected = isSelected(screen),
+                        onClick = { onNavigate(screen) },
+                    )
+                }
+            }
+        }
+        Spacer(Modifier.weight(1f))
+    }
+}
+
+private fun navigationScreens(showLogs: Boolean): List<Screen> = if (showLogs) {
+    Screen.entries
+} else {
+    Screen.entries.filterNot { it == Screen.Logs }
+}
+
+@Composable
+private fun ScreenIcon(screen: Screen) {
+    val label = stringResource(screen.labelRes)
+    val icon = screen.icon
+    if (icon != null) {
+        Icon(icon, contentDescription = label)
+    } else {
+        Icon(painter = painterResource(requireNotNull(screen.iconRes)), contentDescription = label)
+    }
+}
