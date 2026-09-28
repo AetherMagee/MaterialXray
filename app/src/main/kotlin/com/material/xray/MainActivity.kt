@@ -52,6 +52,7 @@ import com.material.xray.core.locale.notifyAppLocaleChanged
 import com.material.xray.data.db.DatabaseOpenChecker
 import com.material.xray.data.repository.SettingsRepository
 import com.material.xray.service.RecoveryResetManager
+import com.material.xray.ui.adaptive.useNavigationRail
 import com.material.xray.ui.home.HomeDataState
 import com.material.xray.ui.navigation.MainNavigation
 import com.material.xray.ui.recovery.DatabaseRecoveryScreen
@@ -199,7 +200,8 @@ class MainActivity : AppCompatActivity() {
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .navigationBarsPadding()
-                    .padding(start = 16.dp, end = 16.dp, bottom = 76.dp),
+                    // Clears the bottom navigation bar; the rail layout has none to clear.
+                    .padding(start = 16.dp, end = 16.dp, bottom = if (useNavigationRail()) 16.dp else 76.dp),
             )
         }
     }
