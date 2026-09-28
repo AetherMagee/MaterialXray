@@ -37,6 +37,7 @@ import androidx.compose.foundation.indication
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
@@ -50,7 +51,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -154,6 +157,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -182,6 +186,8 @@ import com.material.xray.model.SubscriptionUserAgentMode
 import com.material.xray.service.AppUpdateInstallProgress
 import com.material.xray.service.AppUpdateInstallStage
 import com.material.xray.service.ConnectionEvent
+import com.material.xray.ui.adaptive.SinglePaneMaxWidth
+import com.material.xray.ui.adaptive.TwoPaneMinWidth
 import com.material.xray.ui.components.DropdownOption
 import com.material.xray.ui.components.ReadOnlyDropdownField
 import com.material.xray.ui.components.ScrolledTopAppBar
@@ -359,166 +365,205 @@ fun HomeScreen(
         )
     }
 
-    Scaffold(
-        modifier = Modifier.nestedScroll(topAppBarScrollBehavior.nestedScrollConnection),
-        contentWindowInsets = WindowInsets(0.dp),
-        topBar = {
-            ScrolledTopAppBar(
-                title = stringResource(R.string.app_name),
-                scrollBehavior = topAppBarScrollBehavior,
-                showLogo = showTitleBarLogo,
-            )
-        },
-        floatingActionButton = {
-            ConnectionFab(
-                visible = floatingConnectButton,
-                state = connectionUiState,
-                canStart = uiState.selectedServer != null,
-                onClick = onConnectionClick,
-                onViewConfig = onViewRunningConfig,
-            )
-        },
-    ) { padding ->
-        LazyColumn(
-            state = listState,
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding),
-            contentPadding = homeListContentPadding(floatingConnectButton),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            item {
-                ConnectionPanel(
-                    connectionState = uiState.connectionState,
-                    connectionProgress = uiState.connectionProgress,
-                    geoDataDownloadFraction = uiState.geoDataDownloadFraction,
-                    showProgressDetails = uiState.showAdvancedOptions,
-                    selectedServerName = connectionUiState.displayServerName,
-                    activeBalancer = uiState.activeBalancer,
-                    pingMs = viewModel.activeServerPingMs,
-                    sessionTraffic = viewModel.sessionTraffic,
-                    buttonColor = connectionUiState.buttonColor,
-                    isConnected = connectionUiState.isConnected,
-                    isRestartRequired = connectionUiState.isRestartRequired,
-                    isInterfaceBusy = connectionUiState.isInterfaceBusy,
-                    isTransitioning = connectionUiState.isTransitioning,
-                    isAlwaysOnVpn = connectionUiState.isAlwaysOnVpn,
-                    canStart = uiState.selectedServer != null,
-                    compact = floatingConnectButton,
-                    onClick = onConnectionClick,
-                    onViewConfig = onViewRunningConfig,
+    val connectionDetails = ConnectionDetails(
+        connectionState = uiState.connectionState,
+        connectionProgress = uiState.connectionProgress,
+        geoDataDownloadFraction = uiState.geoDataDownloadFraction,
+        showProgressDetails = uiState.showAdvancedOptions,
+        activeBalancer = uiState.activeBalancer,
+        pingMs = viewModel.activeServerPingMs,
+        sessionTraffic = viewModel.sessionTraffic,
+    )
+    val errorMessage = (uiState.connectionState as? ConnectionState.Error)?.message
+    val updateItem: LazyListScope.() -> Unit = {
+        uiState.availableUpdate?.let { update ->
+            item(contentType = "appUpdate") {
+                AppUpdateBanner(
+                    update = update,
+                    installProgress = uiState.appUpdateInstallProgress,
+                    onInstall = { viewModel.installAppUpdate(update) },
                 )
             }
-
-            uiState.availableUpdate?.let { update ->
-                item(contentType = "appUpdate") {
-                    AppUpdateBanner(
-                        update = update,
-                        installProgress = uiState.appUpdateInstallProgress,
-                        onInstall = { viewModel.installAppUpdate(update) },
+        }
+    }
+    val subscriptionItems: LazyListScope.() -> Unit = {
+        val subscriptions = uiState.subscriptions?.associateBy { it.id }
+            ?.let { byId -> subscriptionOrder.mapNotNull(byId::get) }
+        when {
+            // Not loaded yet. The splash screen normally covers this state on cold start; if
+            // loading is unusually slow, a blank list beats a misleading empty-state card.
+            subscriptions == null -> Unit
+            subscriptions.isEmpty() -> item {
+                EmptySubscriptionsCard(
+                    onPasteFromClipboard = pasteFromClipboard,
+                    onScanQrCode = openQrScanner,
+                    onAddManually = { showAddDialog = true },
+                )
+            }
+            else -> {
+                items(
+                    items = subscriptions,
+                    key = { it.id },
+                    contentType = { "subscription" },
+                ) { subscription ->
+                    val servers = uiState.serversBySubscription[subscription.id].orEmpty()
+                    val manualRouting = subscription.manualRoutingData(
+                        policy = uiState.routingPolicyControl,
+                        selectedProvider = uiState.providerRoutingAvailability,
+                    )
+                    SubscriptionCard(
+                        modifier = Modifier.subscriptionDragVisual(
+                            subscription.id,
+                            draggingSubscriptionId,
+                            dragOffsetY,
+                        ),
+                        subscription = subscription,
+                        isRefreshing = subscription.id in uiState.refreshingSubscriptionIds,
+                        servers = servers,
+                        selectedServerId = uiState.selectedServerId,
+                        defaultPingMethod = uiState.defaultPingMethod,
+                        canApplyRouting = manualRouting.appRouting != null || manualRouting.routing != null,
+                        canCollapse = subscriptions.size > 1,
+                        expanded = subscription.id !in collapsedSubscriptionIds,
+                        canReorder = subscriptions.size > 1,
+                        onDragStart = {
+                            hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                            draggingSubscriptionId = subscription.id
+                            dragOffsetY = 0f
+                        },
+                        onDrag = { delta ->
+                            dragOffsetY = reorderSubscriptionDuringDrag(
+                                subscriptionOrder,
+                                listState,
+                                subscription.id,
+                                delta,
+                                dragOffsetY,
+                                subscriptionSpacingPx,
+                            )
+                        },
+                        onDragFinished = finishSubscriptionDrag,
+                        onExpandedChange = { expanded ->
+                            context.setSubscriptionExpanded(
+                                collapsedSubscriptionIds,
+                                subscription.id,
+                                expanded,
+                            )
+                        },
+                        onDelete = {
+                            if (servers.isEmpty()) {
+                                viewModel.deleteSubscription(subscription)
+                            } else {
+                                removeSubscriptionRequest = subscription to servers.size
+                            }
+                        },
+                        onEdit = { editingSubscriptionId = subscription.id },
+                        onReorder = { showReorderDialog = true },
+                        onRefresh = { viewModel.refreshSubscription(subscription) },
+                        onTestAll = { viewModel.testSubscriptionLatencies(subscription) },
+                        onDefaultPingMethodSelected = { viewModel.setDefaultPingMethod(it) },
+                        onApplyRouting = { viewModel.requestApplySubscriptionRouting(subscription) },
+                        onDescriptionHiddenChange = { hidden ->
+                            viewModel.setSubscriptionDescriptionHidden(subscription.id, hidden)
+                        },
+                        onServerSelected = { viewModel.selectServer(it) },
+                        onTestLatency = { viewModel.testLatency(it) },
+                        onOpenServerConfig = onOpenServerConfig,
                     )
                 }
-            }
-
-            val errorState = uiState.connectionState as? ConnectionState.Error
-            if (errorState != null) {
-                item {
-                    ErrorCard(message = errorState.message)
-                }
-            }
-
-            val subscriptions = uiState.subscriptions?.associateBy { it.id }
-                ?.let { byId -> subscriptionOrder.mapNotNull(byId::get) }
-            when {
-                // Not loaded yet. The splash screen normally covers this state on cold start; if
-                // loading is unusually slow, a blank list beats a misleading empty-state card.
-                subscriptions == null -> Unit
-                subscriptions.isEmpty() -> item {
-                    EmptySubscriptionsCard(
+                item(contentType = "addSubscription") {
+                    AddSubscriptionActionButton(
+                        modifier = Modifier.fillMaxWidth(),
                         onPasteFromClipboard = pasteFromClipboard,
                         onScanQrCode = openQrScanner,
                         onAddManually = { showAddDialog = true },
                     )
                 }
-                else -> {
-                    items(
-                        items = subscriptions,
-                        key = { it.id },
-                        contentType = { "subscription" },
-                    ) { subscription ->
-                        val servers = uiState.serversBySubscription[subscription.id].orEmpty()
-                        val manualRouting = subscription.manualRoutingData(
-                            policy = uiState.routingPolicyControl,
-                            selectedProvider = uiState.providerRoutingAvailability,
-                        )
-                        SubscriptionCard(
-                            modifier = Modifier.subscriptionDragVisual(
-                                subscription.id,
-                                draggingSubscriptionId,
-                                dragOffsetY,
-                            ),
-                            subscription = subscription,
-                            isRefreshing = subscription.id in uiState.refreshingSubscriptionIds,
-                            servers = servers,
-                            selectedServerId = uiState.selectedServerId,
-                            defaultPingMethod = uiState.defaultPingMethod,
-                            canApplyRouting = manualRouting.appRouting != null || manualRouting.routing != null,
-                            canCollapse = subscriptions.size > 1,
-                            expanded = subscription.id !in collapsedSubscriptionIds,
-                            canReorder = subscriptions.size > 1,
-                            onDragStart = {
-                                hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                                draggingSubscriptionId = subscription.id
-                                dragOffsetY = 0f
-                            },
-                            onDrag = { delta ->
-                                dragOffsetY = reorderSubscriptionDuringDrag(
-                                    subscriptionOrder,
-                                    listState,
-                                    subscription.id,
-                                    delta,
-                                    dragOffsetY,
-                                    subscriptionSpacingPx,
-                                )
-                            },
-                            onDragFinished = finishSubscriptionDrag,
-                            onExpandedChange = { expanded ->
-                                context.setSubscriptionExpanded(
-                                    collapsedSubscriptionIds,
-                                    subscription.id,
-                                    expanded,
-                                )
-                            },
-                            onDelete = {
-                                if (servers.isEmpty()) {
-                                    viewModel.deleteSubscription(subscription)
-                                } else {
-                                    removeSubscriptionRequest = subscription to servers.size
-                                }
-                            },
-                            onEdit = { editingSubscriptionId = subscription.id },
-                            onReorder = { showReorderDialog = true },
-                            onRefresh = { viewModel.refreshSubscription(subscription) },
-                            onTestAll = { viewModel.testSubscriptionLatencies(subscription) },
-                            onDefaultPingMethodSelected = { viewModel.setDefaultPingMethod(it) },
-                            onApplyRouting = { viewModel.requestApplySubscriptionRouting(subscription) },
-                            onDescriptionHiddenChange = { hidden ->
-                                viewModel.setSubscriptionDescriptionHidden(subscription.id, hidden)
-                            },
-                            onServerSelected = { viewModel.selectServer(it) },
-                            onTestLatency = { viewModel.testLatency(it) },
-                            onOpenServerConfig = onOpenServerConfig,
+            }
+        }
+    }
+
+    BoxWithConstraints {
+        val screenWidth = maxWidth
+        val twoPane = screenWidth >= TwoPaneMinWidth
+        Scaffold(
+            modifier = Modifier.nestedScroll(topAppBarScrollBehavior.nestedScrollConnection),
+            contentWindowInsets = WindowInsets(0.dp),
+            topBar = {
+                ScrolledTopAppBar(
+                    title = stringResource(R.string.app_name),
+                    scrollBehavior = topAppBarScrollBehavior,
+                    showLogo = showTitleBarLogo,
+                )
+            },
+            floatingActionButton = {
+                // The two-pane layout always has room for the full power button, so the corner
+                // button would only duplicate it.
+                ConnectionFab(
+                    visible = floatingConnectButton && !twoPane,
+                    state = connectionUiState,
+                    canStart = uiState.selectedServer != null,
+                    onClick = onConnectionClick,
+                    onViewConfig = onViewRunningConfig,
+                )
+            },
+        ) { padding ->
+            if (twoPane) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding),
+                ) {
+                    ConnectionPane(
+                        state = connectionUiState,
+                        details = connectionDetails,
+                        errorMessage = errorMessage,
+                        canStart = uiState.selectedServer != null,
+                        onClick = onConnectionClick,
+                        onViewConfig = onViewRunningConfig,
+                        modifier = Modifier
+                            .width((screenWidth * CONNECTION_PANE_WIDTH_FRACTION).coerceIn(ConnectionPaneMinWidth, ConnectionPaneMaxWidth))
+                            .fillMaxHeight()
+                            .padding(start = 16.dp, top = 14.dp, bottom = 14.dp),
+                    )
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight(),
+                        contentPadding = PaddingValues(start = 16.dp, top = 14.dp, end = 16.dp, bottom = 14.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        updateItem()
+                        subscriptionItems()
+                    }
+                }
+            } else {
+                // Past a phone's width the single column stops growing and centres, so cards and
+                // server rows keep a readable line length on a tablet in portrait.
+                val sideGutter = ((screenWidth - SinglePaneMaxWidth) / 2).coerceAtLeast(0.dp)
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding),
+                    contentPadding = homeListContentPadding(floatingConnectButton, sideGutter),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    item {
+                        ConnectionPanel(
+                            state = connectionUiState,
+                            details = connectionDetails,
+                            canStart = uiState.selectedServer != null,
+                            compact = floatingConnectButton,
+                            onClick = onConnectionClick,
+                            onViewConfig = onViewRunningConfig,
                         )
                     }
-                    item(contentType = "addSubscription") {
-                        AddSubscriptionActionButton(
-                            modifier = Modifier.fillMaxWidth(),
-                            onPasteFromClipboard = pasteFromClipboard,
-                            onScanQrCode = openQrScanner,
-                            onAddManually = { showAddDialog = true },
-                        )
-                    }
+                    updateItem()
+                    errorItem(errorMessage)
+                    subscriptionItems()
                 }
             }
         }
@@ -1243,51 +1288,148 @@ private data class ConnectionUiState(
     val displayServerName: String,
 )
 
+/** Connection state that the status text, stats and power button all read from. */
+private class ConnectionDetails(
+    val connectionState: ConnectionState,
+    val connectionProgress: ConnectionProgress?,
+    val geoDataDownloadFraction: Float?,
+    val showProgressDetails: Boolean,
+    val activeBalancer: ActiveBalancerState?,
+    val pingMs: StateFlow<Int?>,
+    val sessionTraffic: StateFlow<SessionTrafficMetrics?>,
+)
+
 @Composable
 private fun ConnectionPanel(
-    connectionState: ConnectionState,
-    connectionProgress: ConnectionProgress?,
-    geoDataDownloadFraction: Float?,
-    showProgressDetails: Boolean,
-    selectedServerName: String,
-    activeBalancer: ActiveBalancerState?,
-    pingMs: StateFlow<Int?>,
-    sessionTraffic: StateFlow<SessionTrafficMetrics?>,
-    buttonColor: Color,
-    isConnected: Boolean,
-    isRestartRequired: Boolean,
-    isInterfaceBusy: Boolean,
-    isTransitioning: Boolean,
-    isAlwaysOnVpn: Boolean,
+    state: ConnectionUiState,
+    details: ConnectionDetails,
     canStart: Boolean,
     compact: Boolean,
     onClick: () -> Unit,
     onViewConfig: () -> Unit,
 ) {
-    val buttonEnabled = (canStart || isConnected || isRestartRequired || isInterfaceBusy) && !isTransitioning
-    val containerColor = if (buttonEnabled) {
-        buttonColor.copy(alpha = 0.15f)
-    } else {
-        buttonColor.copy(alpha = 0.10f)
-    }
-    val contentColor = if (buttonEnabled) {
-        buttonColor
-    } else {
-        buttonColor.copy(alpha = 0.75f)
-    }
-
     Column(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
+        // The status line is normally held open even when empty so the panel does not jump as
+        // progress text and uptime come and go. Idle-and-disconnected has nothing coming, so the
+        // compact layout drops it rather than leave a gap.
+        ConnectionStatusText(
+            state = state,
+            details = details,
+            reserveStatusLine = !compact || details.connectionState !is ConnectionState.Disconnected,
+        )
+
+        if (!compact) {
+            Spacer(modifier = Modifier.height(24.dp))
+            ConnectionButton(
+                state = state,
+                canStart = canStart,
+                size = ConnectionButtonSize,
+                onClick = onClick,
+                onViewConfig = onViewConfig,
+            )
+        }
+
+        AnimatedVisibility(visible = details.connectionState.showsConnectionStats()) {
+            ConnectionStatsBanner(
+                activeBalancer = details.activeBalancer,
+                pingMs = details.pingMs,
+                sessionTraffic = details.sessionTraffic,
+                modifier = Modifier.padding(top = 16.dp),
+            )
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+    }
+}
+
+/**
+ * The connection side of the two-pane home layout. It has a whole column to itself, so besides the
+ * status and a larger power button it keeps the connection error and the live stats in view, where
+ * a narrow column would scroll them away with the list.
+ */
+@Composable
+private fun ConnectionPane(
+    state: ConnectionUiState,
+    details: ConnectionDetails,
+    errorMessage: String?,
+    canStart: Boolean,
+    onClick: () -> Unit,
+    onViewConfig: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier,
+        shape = MaterialTheme.shapes.extraLarge,
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+    ) {
+        BoxWithConstraints {
+            val buttonSize = if (maxHeight < LargeConnectionButtonMinPaneHeight) {
+                ConnectionButtonSize
+            } else {
+                LargeConnectionButtonSize
+            }
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .heightIn(min = maxHeight)
+                    .padding(20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.SpaceBetween,
+            ) {
+                ConnectionStatusText(state = state, details = details, reserveStatusLine = true)
+                Box(modifier = Modifier.padding(vertical = 24.dp)) {
+                    ConnectionButton(
+                        state = state,
+                        canStart = canStart,
+                        size = buttonSize,
+                        onClick = onClick,
+                        onViewConfig = onViewConfig,
+                    )
+                }
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    if (errorMessage != null) {
+                        ErrorCard(message = errorMessage)
+                    }
+                    // Always shown here, with dashes until a connection supplies readings, so the
+                    // pane keeps its shape instead of reflowing on every connect and disconnect.
+                    ConnectionStatsBanner(
+                        // The balancer pool describes a running tunnel; offline it would claim to
+                        // be checking servers that nothing is checking.
+                        activeBalancer = details.activeBalancer.takeIf {
+                            details.connectionState.showsConnectionStats()
+                        },
+                        pingMs = details.pingMs,
+                        sessionTraffic = details.sessionTraffic,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ConnectionStatusText(
+    state: ConnectionUiState,
+    details: ConnectionDetails,
+    reserveStatusLine: Boolean,
+) {
+    val connectionState = details.connectionState
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
-            text = connectionHeading(connectionState, geoDataDownloadFraction),
+            text = connectionHeading(connectionState, details.geoDataDownloadFraction),
             modifier = Modifier.fillMaxWidth(),
             style = MaterialTheme.typography.titleLarge,
             textAlign = TextAlign.Center,
             color = when {
-                isConnected -> MaterialTheme.colorScheme.primary
-                isRestartRequired || isInterfaceBusy -> MaterialTheme.colorScheme.error
+                state.isConnected -> MaterialTheme.colorScheme.primary
+                state.isRestartRequired || state.isInterfaceBusy -> MaterialTheme.colorScheme.error
                 connectionState is ConnectionState.Error -> MaterialTheme.colorScheme.error
                 else -> MaterialTheme.colorScheme.onSurface
             },
@@ -1297,29 +1439,27 @@ private fun ConnectionPanel(
 
         Text(
             text = when {
-                isInterfaceBusy -> stringResource(R.string.home_connection_interface_busy_detail)
-                isRestartRequired -> stringResource(R.string.home_connection_restart_required_detail)
-                else -> selectedServerName
+                state.isInterfaceBusy -> stringResource(R.string.home_connection_interface_busy_detail)
+                state.isRestartRequired -> stringResource(R.string.home_connection_restart_required_detail)
+                else -> state.displayServerName
             },
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
-            maxLines = if (isRestartRequired || isInterfaceBusy) 4 else 1,
+            maxLines = if (state.isRestartRequired || state.isInterfaceBusy) 4 else 1,
             overflow = TextOverflow.Ellipsis,
             textAlign = TextAlign.Center,
         )
-        // The row is normally held open even when empty so the panel does not jump as progress
-        // text and uptime come and go. Idle-and-disconnected has nothing coming, so the compact
-        // layout drops it rather than leave a gap.
-        if (!compact || connectionState !is ConnectionState.Disconnected) {
+        if (reserveStatusLine) {
             Box(
                 modifier = Modifier.height(
                     with(LocalDensity.current) { MaterialTheme.typography.bodySmall.lineHeight.toDp() },
                 ),
                 contentAlignment = Alignment.Center,
             ) {
+                val progress = details.connectionProgress
                 when {
-                    showProgressDetails && connectionProgress != null -> Text(
-                        text = connectionProgressText(connectionProgress),
+                    details.showProgressDetails && progress != null -> Text(
+                        text = connectionProgressText(progress),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
@@ -1330,70 +1470,85 @@ private fun ConnectionPanel(
                 }
             }
         }
+    }
+}
 
-        if (!compact) {
-            Spacer(modifier = Modifier.height(24.dp))
+@Composable
+private fun ConnectionButton(
+    state: ConnectionUiState,
+    canStart: Boolean,
+    size: Dp,
+    onClick: () -> Unit,
+    onViewConfig: () -> Unit,
+) {
+    val buttonColor = state.buttonColor
+    val buttonEnabled = (canStart || state.isConnected || state.isRestartRequired || state.isInterfaceBusy) &&
+        !state.isTransitioning
+    val containerColor = if (buttonEnabled) {
+        buttonColor.copy(alpha = 0.15f)
+    } else {
+        buttonColor.copy(alpha = 0.10f)
+    }
+    val contentColor = if (buttonEnabled) {
+        buttonColor
+    } else {
+        buttonColor.copy(alpha = 0.75f)
+    }
+    // Label and spinner grow with the button, so a larger one in a tablet pane is not a small
+    // word floating in a big circle.
+    val scale = size / ConnectionButtonSize
 
-            Surface(
-                color = containerColor,
-                contentColor = contentColor,
-                shape = CircleShape,
-                modifier = Modifier
-                    .size(124.dp)
-                    .clip(CircleShape)
-                    .combinedClickable(
-                        enabled = buttonEnabled,
-                        onClick = onClick,
-                        onLongClick = {
-                            if (isConnected) {
-                                onViewConfig()
-                            }
-                        },
-                    ),
-            ) {
-                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                    if (isTransitioning) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(54.dp),
-                            strokeWidth = 4.dp,
-                            color = buttonColor,
-                        )
-                    } else {
-                        Text(
-                            text = stringResource(
-                                connectionActionLabel(
-                                    isConnected = isConnected,
-                                    isAlwaysOnVpn = isAlwaysOnVpn,
-                                    isRestartRequired = isRestartRequired,
-                                    isInterfaceBusy = isInterfaceBusy,
-                                ),
-                            ),
-                            modifier = Modifier.padding(horizontal = 8.dp),
-                            style = MaterialTheme.typography.titleLarge,
-                            textAlign = TextAlign.Center,
-                            color = contentColor,
-                            maxLines = 1,
-                            autoSize = TextAutoSize.StepBased(
-                                minFontSize = 10.sp,
-                                maxFontSize = MaterialTheme.typography.titleLarge.fontSize,
-                                stepSize = 1.sp,
-                            ),
-                        )
+    Surface(
+        color = containerColor,
+        contentColor = contentColor,
+        shape = CircleShape,
+        modifier = Modifier
+            .size(size)
+            .clip(CircleShape)
+            .combinedClickable(
+                enabled = buttonEnabled,
+                onClick = onClick,
+                onLongClick = {
+                    if (state.isConnected) {
+                        onViewConfig()
                     }
-                }
+                },
+            ),
+    ) {
+        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+            if (state.isTransitioning) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(54.dp * scale),
+                    strokeWidth = 4.dp,
+                    color = buttonColor,
+                )
+            } else {
+                val maxFontSize = MaterialTheme.typography.titleLarge.fontSize * scale
+                Text(
+                    text = stringResource(
+                        connectionActionLabel(
+                            isConnected = state.isConnected,
+                            isAlwaysOnVpn = state.isAlwaysOnVpn,
+                            isRestartRequired = state.isRestartRequired,
+                            isInterfaceBusy = state.isInterfaceBusy,
+                        ),
+                    ),
+                    modifier = Modifier.padding(horizontal = 8.dp * scale),
+                    style = MaterialTheme.typography.titleLarge.copy(
+                        fontSize = maxFontSize,
+                        lineHeight = MaterialTheme.typography.titleLarge.lineHeight * scale,
+                    ),
+                    textAlign = TextAlign.Center,
+                    color = contentColor,
+                    maxLines = 1,
+                    autoSize = TextAutoSize.StepBased(
+                        minFontSize = 10.sp,
+                        maxFontSize = maxFontSize,
+                        stepSize = 1.sp,
+                    ),
+                )
             }
         }
-
-        AnimatedVisibility(visible = connectionState.showsConnectionStats()) {
-            ConnectionStatsBanner(
-                activeBalancer = activeBalancer,
-                pingMs = pingMs,
-                sessionTraffic = sessionTraffic,
-                modifier = Modifier.padding(top = 16.dp),
-            )
-        }
-
-        Spacer(modifier = Modifier.height(10.dp))
     }
 }
 
@@ -1588,12 +1743,20 @@ private fun connectionActionIcon(
 }
 
 /** The floating button overlays the list, so the last item needs room to scroll clear of it. */
-private fun homeListContentPadding(floatingConnectButton: Boolean) = PaddingValues(
-    start = 16.dp,
+private fun homeListContentPadding(floatingConnectButton: Boolean, sideGutter: Dp) = PaddingValues(
+    start = 16.dp + sideGutter,
     top = 14.dp,
-    end = 16.dp,
+    end = 16.dp + sideGutter,
     bottom = if (floatingConnectButton) 14.dp + FloatingConnectButtonClearance else 14.dp,
 )
+
+private fun LazyListScope.errorItem(message: String?) {
+    if (message != null) {
+        item(contentType = "error") {
+            ErrorCard(message = message)
+        }
+    }
+}
 
 @Composable
 private fun ErrorCard(message: String) {
@@ -2663,6 +2826,15 @@ private val subscriptionUrlRegex = Regex(
 private val trailingUrlPunctuation = setOf('.', ',', ';', ':', '!', '?', ')', ']', '}')
 private val SubscriptionBlockGap = 6.dp
 private val SubscriptionMetadataGap = 10.dp
+
+private val ConnectionButtonSize = 124.dp
+private val LargeConnectionButtonSize = 168.dp
+
+/** Below this the pane keeps the phone-sized button so status and details still fit unscrolled. */
+private val LargeConnectionButtonMinPaneHeight = 560.dp
+private const val CONNECTION_PANE_WIDTH_FRACTION = 0.36f
+private val ConnectionPaneMinWidth = 320.dp
+private val ConnectionPaneMaxWidth = 440.dp
 
 /** 64dp button plus its 16dp scaffold inset, so list content can scroll clear of it. */
 private val FloatingConnectButtonClearance = 80.dp
