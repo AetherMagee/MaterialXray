@@ -14,18 +14,23 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -51,6 +56,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -78,6 +84,7 @@ import com.material.xray.data.parser.ProfileRoutingTarget
 import com.material.xray.model.RoutingPolicyControl
 import com.material.xray.model.RoutingRule
 import com.material.xray.model.RoutingRuleCatalog
+import com.material.xray.ui.adaptive.TwoPaneMinWidth
 import com.material.xray.ui.apps.AppBypassContent
 import com.material.xray.ui.apps.AppRoutingMenuActions
 import com.material.xray.ui.components.AppBarTitle
@@ -186,81 +193,65 @@ fun RoutingScreen(
         previousTab = selectedTab
     }
 
-    Scaffold(
-        contentWindowInsets = WindowInsets(0.dp),
-        topBar = {
-            RoutingTopBar(
-                selectedTab = RoutingTab.entries[pagerState.currentPage],
-                showTitleBarLogo = showTitleBarLogo,
-                selectionMode = selectionMode,
-                selectedRuleIds = selectedRuleIds,
-                rules = rules,
-                onClearSelection = { selectedRuleIds = emptySet() },
-                onRuleAction = ::applyRuleAction,
-            )
-        },
-        bottomBar = {
-            SegmentedTabRow(
-                labels = RoutingTab.entries.map { stringResource(it.titleResource) },
-                selectedIndex = selectedTab,
-                onSelected = { index ->
-                    coroutineScope.launch {
-                        pagerState.animateScrollToPage(index)
-                    }
-                },
-            )
-        },
-    ) { padding ->
-        HorizontalPager(
-            state = pagerState,
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding),
-        ) { page ->
-            when (RoutingTab.entries[page]) {
-                RoutingTab.Rules -> RoutingRulesTab(
-                    customRules = rules,
-                    subscriptionRules = subscriptionRules,
-                    profileRules = profileRouting?.rules.orEmpty(),
-                    providerManaged = routingPolicyControl == RoutingPolicyControl.SubscriptionProvider,
-                    providerName = automaticRoutingProviderName,
-                    selectionMode = selectionMode,
-                    selectedRuleIds = selectedRuleIds,
-                    onRuleToggled = { rule, enabled -> applyRuleAction(RoutingRuleAction.Toggle(rule, enabled)) },
-                    onRuleClick = { rule ->
-                        if (selectionMode) {
-                            selectedRuleIds = selectedRuleIds.toggle(rule.id)
-                        } else {
-                            applyRuleAction(RoutingRuleAction.Edit(rule))
-                        }
-                    },
-                    onRuleLongClick = { rule ->
-                        selectedRuleIds = selectedRuleIds.toggle(rule.id)
-                    },
-                    onSubscriptionRuleClick = { rule -> onViewRule(rule.toViewerRequest()) },
-                    onProfileRuleClick = { rule ->
-                        if (rule.orphaned || rule.editableRule == null) {
-                            onViewRule(rule.toViewerRequest())
-                        } else {
-                            onEditRule(
-                                EditableRoutingRule(
-                                    rule = rule.editableRule,
-                                    isNew = false,
-                                    profileOriginalRuleJson = rule.originalRuleJson,
-                                    profileOriginalIndex = rule.originalIndex,
-                                    rawJson = rule.rawJson,
-                                ),
-                            )
-                        }
-                    },
-                    onProfileRuleToggled = { rule, enabled ->
-                        requestProfileRuleAction(ProfileRoutingRuleAction.Toggle(rule, enabled))
-                    },
-                )
-                RoutingTab.Apps -> AppBypassContent(active = selectedTab == RoutingTab.Apps.ordinal)
-            }
-        }
+    val rulesTab: @Composable () -> Unit = {
+        RoutingRulesTab(
+            customRules = rules,
+            subscriptionRules = subscriptionRules,
+            profileRules = profileRouting?.rules.orEmpty(),
+            providerManaged = routingPolicyControl == RoutingPolicyControl.SubscriptionProvider,
+            providerName = automaticRoutingProviderName,
+            selectionMode = selectionMode,
+            selectedRuleIds = selectedRuleIds,
+            onRuleToggled = { rule, enabled -> applyRuleAction(RoutingRuleAction.Toggle(rule, enabled)) },
+            onRuleClick = { rule ->
+                if (selectionMode) {
+                    selectedRuleIds = selectedRuleIds.toggle(rule.id)
+                } else {
+                    applyRuleAction(RoutingRuleAction.Edit(rule))
+                }
+            },
+            onRuleLongClick = { rule ->
+                selectedRuleIds = selectedRuleIds.toggle(rule.id)
+            },
+            onSubscriptionRuleClick = { rule -> onViewRule(rule.toViewerRequest()) },
+            onProfileRuleClick = { rule ->
+                if (rule.orphaned || rule.editableRule == null) {
+                    onViewRule(rule.toViewerRequest())
+                } else {
+                    onEditRule(
+                        EditableRoutingRule(
+                            rule = rule.editableRule,
+                            isNew = false,
+                            profileOriginalRuleJson = rule.originalRuleJson,
+                            profileOriginalIndex = rule.originalIndex,
+                            rawJson = rule.rawJson,
+                        ),
+                    )
+                }
+            },
+            onProfileRuleToggled = { rule, enabled ->
+                requestProfileRuleAction(ProfileRoutingRuleAction.Toggle(rule, enabled))
+            },
+        )
     }
+    val ruleActions: @Composable () -> Unit = {
+        RuleActions(
+            selectionMode = selectionMode,
+            selectedRuleIds = selectedRuleIds,
+            rules = rules,
+            onClearSelection = { selectedRuleIds = emptySet() },
+            onRuleAction = ::applyRuleAction,
+        )
+    }
+
+    RoutingLayout(
+        pagerState = pagerState,
+        showTitleBarLogo = showTitleBarLogo,
+        selectionCount = selectedRuleIds.size.takeIf { selectionMode },
+        onSelectTab = { index -> coroutineScope.launch { pagerState.animateScrollToPage(index) } },
+        ruleActions = ruleActions,
+        rulesTab = rulesTab,
+    )
 
     if (pendingProfileAction != null) {
         AutomaticRuleRoutingDialog(
@@ -294,27 +285,131 @@ fun RoutingScreen(
     }
 }
 
+@Composable
+private fun RoutingLayout(
+    pagerState: PagerState,
+    showTitleBarLogo: Boolean,
+    selectionCount: Int?,
+    onSelectTab: (Int) -> Unit,
+    ruleActions: @Composable () -> Unit,
+    rulesTab: @Composable () -> Unit,
+) {
+    val selectedTab = pagerState.currentPage
+    BoxWithConstraints {
+        // With the width for it, rules and apps sit side by side, each with its own actions, so
+        // neither has to be paged away to reach the other.
+        val sideBySide = maxWidth >= TwoPaneMinWidth
+        Scaffold(
+            contentWindowInsets = WindowInsets(0.dp),
+            topBar = {
+                RoutingTopBar(
+                    showTitleBarLogo = showTitleBarLogo,
+                    selectionCount = selectionCount.takeIf { sideBySide || selectedTab == RoutingTab.Rules.ordinal },
+                    actions = {
+                        // Side by side, each pane carries its own actions instead.
+                        if (!sideBySide) {
+                            PagedTabActions(appsTabSelected = selectedTab == RoutingTab.Apps.ordinal, ruleActions = ruleActions)
+                        }
+                    },
+                )
+            },
+            bottomBar = {
+                if (!sideBySide) {
+                    SegmentedTabRow(
+                        labels = RoutingTab.entries.map { stringResource(it.titleResource) },
+                        selectedIndex = selectedTab,
+                        onSelected = onSelectTab,
+                    )
+                }
+            },
+        ) { padding ->
+            if (sideBySide) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding),
+                ) {
+                    RoutingPane(
+                        title = stringResource(RoutingTab.Rules.titleResource),
+                        actions = { ruleActions() },
+                        modifier = Modifier.weight(1f),
+                        content = rulesTab,
+                    )
+                    VerticalDivider()
+                    RoutingPane(
+                        title = stringResource(RoutingTab.Apps.titleResource),
+                        actions = { AppRoutingMenuActions() },
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        AppBypassContent(active = true)
+                    }
+                }
+            } else {
+                HorizontalPager(
+                    state = pagerState,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding),
+                ) { page ->
+                    when (RoutingTab.entries[page]) {
+                        RoutingTab.Rules -> rulesTab()
+                        RoutingTab.Apps -> AppBypassContent(active = selectedTab == RoutingTab.Apps.ordinal)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PagedTabActions(appsTabSelected: Boolean, ruleActions: @Composable () -> Unit) {
+    if (appsTabSelected) {
+        AppRoutingMenuActions()
+    } else {
+        ruleActions()
+    }
+}
+
+@Composable
+private fun RoutingPane(
+    title: String,
+    actions: @Composable RowScope.() -> Unit,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    Column(modifier = modifier.fillMaxHeight()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 48.dp)
+                .padding(start = 16.dp, end = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = title,
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.titleMedium,
+            )
+            actions()
+        }
+        Box(modifier = Modifier.weight(1f)) {
+            content()
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun RoutingTopBar(
-    selectedTab: RoutingTab,
     showTitleBarLogo: Boolean,
-    selectionMode: Boolean,
-    selectedRuleIds: Set<String>,
-    rules: List<RoutingRule>,
-    onClearSelection: () -> Unit,
-    onRuleAction: (RoutingRuleAction) -> Unit,
+    selectionCount: Int?,
+    actions: @Composable RowScope.() -> Unit,
 ) {
-    var rulesMenuExpanded by remember { mutableStateOf(false) }
     TopAppBar(
         title = {
             AppBarTitle(
-                if (selectedTab == RoutingTab.Rules && selectionMode) {
-                    pluralStringResource(
-                        R.plurals.routing_rules_selected,
-                        selectedRuleIds.size,
-                        selectedRuleIds.size,
-                    )
+                if (selectionCount != null) {
+                    pluralStringResource(R.plurals.routing_rules_selected, selectionCount, selectionCount)
                 } else {
                     stringResource(R.string.routing_title)
                 },
@@ -323,75 +418,83 @@ private fun RoutingTopBar(
         },
         expandedHeight = 52.dp,
         windowInsets = TopAppBarDefaults.windowInsets,
-        actions = {
-            when {
-                selectedTab == RoutingTab.Apps -> AppRoutingMenuActions()
-                selectionMode -> {
-                    IconButton(onClick = onClearSelection) {
-                        Icon(
-                            Icons.Default.Close,
-                            contentDescription = stringResource(R.string.routing_clear_selection),
-                        )
-                    }
-                    IconButton(
-                        onClick = { onRuleAction(RoutingRuleAction.Delete(selectedRuleIds)) },
-                    ) {
-                        Icon(
-                            Icons.Default.Delete,
-                            contentDescription = stringResource(R.string.routing_delete_selected_rules),
-                        )
-                    }
-                }
-                else -> {
-                    IconButton(onClick = { onRuleAction(RoutingRuleAction.Add) }) {
-                        Icon(
-                            Icons.Default.Add,
-                            contentDescription = stringResource(R.string.routing_add_rule),
-                        )
-                    }
-                    Box {
-                        IconButton(onClick = { rulesMenuExpanded = true }) {
-                            Icon(
-                                Icons.Default.MoreVert,
-                                contentDescription = stringResource(R.string.routing_rules_menu),
-                            )
-                        }
-                        DropdownMenu(
-                            expanded = rulesMenuExpanded,
-                            onDismissRequest = { rulesMenuExpanded = false },
-                        ) {
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.routing_enable_all)) },
-                                enabled = rules.any { !it.enabled },
-                                onClick = {
-                                    rulesMenuExpanded = false
-                                    onRuleAction(RoutingRuleAction.EnableAll)
-                                },
-                            )
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.routing_disable_all)) },
-                                enabled = rules.any { it.enabled },
-                                onClick = {
-                                    rulesMenuExpanded = false
-                                    onRuleAction(RoutingRuleAction.DisableAll)
-                                },
-                            )
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.routing_reset_to_default)) },
-                                onClick = {
-                                    rulesMenuExpanded = false
-                                    onRuleAction(RoutingRuleAction.ResetToDefault)
-                                },
-                            )
-                        }
-                    }
-                }
-            }
-        },
+        actions = actions,
     )
 }
 
-@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun RuleActions(
+    selectionMode: Boolean,
+    selectedRuleIds: Set<String>,
+    rules: List<RoutingRule>,
+    onClearSelection: () -> Unit,
+    onRuleAction: (RoutingRuleAction) -> Unit,
+) {
+    var rulesMenuExpanded by remember { mutableStateOf(false) }
+    when {
+        selectionMode -> {
+            IconButton(onClick = onClearSelection) {
+                Icon(
+                    Icons.Default.Close,
+                    contentDescription = stringResource(R.string.routing_clear_selection),
+                )
+            }
+            IconButton(
+                onClick = { onRuleAction(RoutingRuleAction.Delete(selectedRuleIds)) },
+            ) {
+                Icon(
+                    Icons.Default.Delete,
+                    contentDescription = stringResource(R.string.routing_delete_selected_rules),
+                )
+            }
+        }
+        else -> {
+            IconButton(onClick = { onRuleAction(RoutingRuleAction.Add) }) {
+                Icon(
+                    Icons.Default.Add,
+                    contentDescription = stringResource(R.string.routing_add_rule),
+                )
+            }
+            Box {
+                IconButton(onClick = { rulesMenuExpanded = true }) {
+                    Icon(
+                        Icons.Default.MoreVert,
+                        contentDescription = stringResource(R.string.routing_rules_menu),
+                    )
+                }
+                DropdownMenu(
+                    expanded = rulesMenuExpanded,
+                    onDismissRequest = { rulesMenuExpanded = false },
+                ) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.routing_enable_all)) },
+                        enabled = rules.any { !it.enabled },
+                        onClick = {
+                            rulesMenuExpanded = false
+                            onRuleAction(RoutingRuleAction.EnableAll)
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.routing_disable_all)) },
+                        enabled = rules.any { it.enabled },
+                        onClick = {
+                            rulesMenuExpanded = false
+                            onRuleAction(RoutingRuleAction.DisableAll)
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.routing_reset_to_default)) },
+                        onClick = {
+                            rulesMenuExpanded = false
+                            onRuleAction(RoutingRuleAction.ResetToDefault)
+                        },
+                    )
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun RoutingRulesTab(
     customRules: List<RoutingRule>,
