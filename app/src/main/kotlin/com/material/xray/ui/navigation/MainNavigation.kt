@@ -7,25 +7,34 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarDefaults
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -37,6 +46,7 @@ import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
@@ -53,6 +63,8 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.material.xray.R
+import com.material.xray.ui.adaptive.TwoPaneMinWidth
 import com.material.xray.ui.adaptive.useNavigationRail
 import com.material.xray.ui.configviewer.ConfigViewerRequest
 import com.material.xray.ui.configviewer.ConfigViewerScreen
@@ -141,10 +153,7 @@ fun MainNavigation(
         mutableStateOf<EditableRoutingRule?>(null)
     }
 
-    BackHandler(enabled = configViewerRequest != null) { configViewerRequest = null }
-
     val useRail = useNavigationRail()
-    val showNavigation = currentRoute != ROUTING_RULE_VIEWER_ROUTE
     val navigateTo: (Screen) -> Unit = { screen ->
         navController.navigate(screen.route) {
             popUpTo(navController.graph.startDestinationId) { saveState = true }
@@ -156,9 +165,13 @@ fun MainNavigation(
         currentDestination?.hierarchy?.any { it.route == screen.route } == true
     }
 
-    Box {
+    BoxWithConstraints {
+        // On a wide window the viewers and the editor open as a sheet from the end edge, leaving
+        // the list they were opened from in view instead of replacing the whole app.
+        val detailAsSheet = maxWidth >= TwoPaneMinWidth
+        val sheetWidth = (maxWidth * DETAIL_SHEET_WIDTH_FRACTION).coerceIn(DetailSheetMinWidth, DetailSheetMaxWidth)
         Row {
-            if (useRail && showNavigation) {
+            if (useRail) {
                 AppNavigationRail(
                     showLogs = showAdvancedOptions,
                     isSelected = isSelected,
@@ -169,13 +182,13 @@ fun MainNavigation(
                 modifier = Modifier.weight(1f),
                 // Without a bottom bar to absorb them, the rail layout has to keep content clear
                 // of the gesture area itself, and of a side navigation bar or cutout at the end.
-                contentWindowInsets = if (useRail && showNavigation) {
+                contentWindowInsets = if (useRail) {
                     WindowInsets.safeDrawing.only(WindowInsetsSides.End + WindowInsetsSides.Bottom)
                 } else {
                     WindowInsets(0.dp)
                 },
                 bottomBar = {
-                    if (!useRail && showNavigation) {
+                    if (!useRail) {
                         AppNavigationBar(
                             showLogs = showAdvancedOptions,
                             height = CompactNavigationBarHeight + bottomInset,
@@ -212,7 +225,6 @@ fun MainNavigation(
                             onViewRule = { request ->
                                 routingRuleEditorRequest = null
                                 routingRuleViewerRequest = request
-                                navController.navigate(ROUTING_RULE_VIEWER_ROUTE) { launchSingleTop = true }
                             },
                             onEditRule = { request ->
                                 routingRuleViewerRequest = null
@@ -221,20 +233,6 @@ fun MainNavigation(
                         )
                     }
                     composable(Screen.Settings.route) { SettingsScreen(showTitleBarLogo) }
-                    composable(ROUTING_RULE_VIEWER_ROUTE) {
-                        val request = routingRuleViewerRequest
-                        if (request == null) {
-                            LaunchedEffect(Unit) { navController.popBackStack() }
-                        } else {
-                            RoutingRuleViewerScreen(
-                                request = request,
-                                onBack = {
-                                    navController.popBackStack()
-                                    routingRuleViewerRequest = null
-                                },
-                            )
-                        }
-                    }
                 }
             }
         }
@@ -247,7 +245,11 @@ fun MainNavigation(
             label = "configViewer",
         ) { request ->
             if (request != null) {
-                ConfigViewerScreen(request = request, onBack = { configViewerRequest = null })
+                // Registered as the viewer opens, so it outranks the NavHost's own back handling.
+                BackHandler { configViewerRequest = null }
+                DetailSheet(asSheet = detailAsSheet, width = sheetWidth, onDismiss = { configViewerRequest = null }) {
+                    ConfigViewerScreen(request = request, onBack = { configViewerRequest = null })
+                }
             }
         }
 
@@ -263,11 +265,30 @@ fun MainNavigation(
             label = "routingRuleEditor",
         ) { request ->
             if (request != null) {
-                RoutingRuleEditorScreen(
-                    editableRule = request,
-                    viewModel = hiltViewModel<RoutingViewModel>(requireNotNull(navBackStackEntry)),
-                    onBack = { routingRuleEditorRequest = null },
-                )
+                DetailSheet(asSheet = detailAsSheet, width = sheetWidth, onDismiss = { routingRuleEditorRequest = null }) {
+                    RoutingRuleEditorScreen(
+                        editableRule = request,
+                        viewModel = hiltViewModel<RoutingViewModel>(requireNotNull(navBackStackEntry)),
+                        onBack = { routingRuleEditorRequest = null },
+                    )
+                }
+            }
+        }
+
+        AnimatedContent(
+            targetState = routingRuleViewerRequest,
+            transitionSpec = {
+                fadeIn(tween(CONFIG_VIEWER_FADE_MS)) togetherWith fadeOut(tween(CONFIG_VIEWER_FADE_MS)) using null
+            },
+            label = "routingRuleViewer",
+        ) { request ->
+            if (request != null) {
+                // Opened from the Routing tab, where the NavHost would otherwise take back and pop to
+                // Home underneath the viewer; registering here, on open, puts this handler first.
+                BackHandler { routingRuleViewerRequest = null }
+                DetailSheet(asSheet = detailAsSheet, width = sheetWidth, onDismiss = { routingRuleViewerRequest = null }) {
+                    RoutingRuleViewerScreen(request = request, onBack = { routingRuleViewerRequest = null })
+                }
             }
         }
     }
@@ -305,9 +326,53 @@ private const val SERVER_CONFIG_TAG = "server"
 private const val CONFIG_VIEWER_FADE_MS = 180
 private const val ROUTING_EDITOR_ENTER_MS = 200
 private const val ROUTING_EDITOR_EXIT_MS = 140
-private const val ROUTING_RULE_VIEWER_ROUTE = "routing/rule"
 
 private val CompactNavigationBarHeight = 68.dp
+private const val DETAIL_SHEET_WIDTH_FRACTION = 0.5f
+private val DetailSheetMinWidth = 480.dp
+private val DetailSheetMaxWidth = 640.dp
+
+/**
+ * Hosts a full-screen subpage. On a phone it simply fills the window; on a wide one it becomes a
+ * modal sheet along the end edge over a scrim, and tapping the scrim closes it like back does.
+ */
+@Composable
+private fun DetailSheet(
+    asSheet: Boolean,
+    width: Dp,
+    onDismiss: () -> Unit,
+    content: @Composable () -> Unit,
+) {
+    if (!asSheet) {
+        content()
+        return
+    }
+    Box(modifier = Modifier.fillMaxSize()) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.scrim.copy(alpha = DETAIL_SHEET_SCRIM_ALPHA))
+                .clickable(
+                    interactionSource = null,
+                    indication = null,
+                    onClickLabel = stringResource(R.string.navigation_close_sheet),
+                    onClick = onDismiss,
+                ),
+        )
+        Surface(
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .width(width)
+                .fillMaxHeight(),
+            shape = RoundedCornerShape(topStart = 28.dp, bottomStart = 28.dp),
+            shadowElevation = 6.dp,
+        ) {
+            content()
+        }
+    }
+}
+
+private const val DETAIL_SHEET_SCRIM_ALPHA = 0.32f
 
 @Composable
 private fun AppNavigationBar(
