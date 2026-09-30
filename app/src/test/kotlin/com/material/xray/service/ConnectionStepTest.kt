@@ -136,7 +136,7 @@ class ConnectionStepTest {
             failure = error
         }
 
-        assertEquals("boom", failure?.message)
+        assertEquals("boom", failure.message)
         assertEquals(
             listOf(
                 "operation...",

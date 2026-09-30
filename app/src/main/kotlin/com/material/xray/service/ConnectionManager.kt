@@ -168,7 +168,7 @@ internal class ConnectionManager(
                 appRoutingPlan,
                 runtimeSettings,
                 physicalRouteResult.route,
-            ) ?: return
+            )
             val tproxyPlan = tproxyPreparation.plan
             if (hasConfiguredAppRouting(appRoutingPlan)) {
                 logAppRoutingPlan(appRoutingPlan)
