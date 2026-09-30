@@ -2,8 +2,10 @@ package com.material.xray.service
 
 import com.material.xray.core.xray.TproxyCompatibility
 import com.material.xray.core.xray.XrayState
+import com.material.xray.core.xray.XrayStateReadResult
 import com.material.xray.model.PingMethod
 import com.material.xray.model.RootConnectionBackend
+import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -123,5 +125,27 @@ class XrayServiceModeTest {
             ),
         )
         assertFalse(shouldCleanRecordedRootRuntime(null, connectIfMissing = true))
+    }
+
+    @Test
+    fun `unreadable state needs root cleanup only when root is available`() = runTest {
+        assertTrue(mayHaveRootRuntime(false, XrayStateReadResult.Unreadable, isRootShellAvailable = { true }))
+        assertFalse(mayHaveRootRuntime(false, XrayStateReadResult.Unreadable, isRootShellAvailable = { false }))
+    }
+
+    @Test
+    fun `readable state decides root cleanup without asking for root`() = runTest {
+        val noRootCheck: suspend () -> Boolean = { error("root must not be checked") }
+
+        assertTrue(mayHaveRootRuntime(true, XrayStateReadResult.Absent, noRootCheck))
+        assertTrue(mayHaveRootRuntime(false, XrayStateReadResult.Present(XrayState(physicalInterface = "wlan0")), noRootCheck))
+        assertFalse(
+            mayHaveRootRuntime(
+                false,
+                XrayStateReadResult.Present(XrayState(physicalInterface = VPN_SERVICE_INTERFACE_LABEL)),
+                noRootCheck,
+            ),
+        )
+        assertFalse(mayHaveRootRuntime(false, XrayStateReadResult.Absent, noRootCheck))
     }
 }

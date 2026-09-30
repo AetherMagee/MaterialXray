@@ -805,12 +805,7 @@ class XrayService : VpnService() {
                     return
                 }
             }
-            rootModeConfigured ||
-                // An unreadable state file may still describe a live root-managed runtime, so it
-                // has to be cleaned up like one instead of being mistaken for a clean slate.
-                persistedStateResult is XrayStateReadResult.Unreadable ||
-                persistedStateResult is XrayStateReadResult.Present &&
-                persistedStateResult.state.physicalInterface != VPN_SERVICE_INTERFACE_LABEL -> {
+            mayHaveRootRuntime(rootModeConfigured, persistedStateResult, ::isRootShellAvailable) -> {
                 if (!connectionManager.ensureCleanRootRuntime()) return
             }
             else -> withContext(Dispatchers.IO) { stateFile.delete() }
@@ -842,10 +837,11 @@ class XrayService : VpnService() {
         val config = loadLastServerConfig()
         if (config == null) {
             val persistedStateResult = withContext(Dispatchers.IO) { stateFile.readResult() }
-            val mayHaveRootRuntime = settingsRepo.useRootService.first() ||
-                persistedStateResult is XrayStateReadResult.Unreadable ||
-                persistedStateResult is XrayStateReadResult.Present &&
-                persistedStateResult.state.physicalInterface != VPN_SERVICE_INTERFACE_LABEL
+            val mayHaveRootRuntime = mayHaveRootRuntime(
+                rootModeConfigured = settingsRepo.useRootService.first(),
+                persistedState = persistedStateResult,
+                isRootShellAvailable = ::isRootShellAvailable,
+            )
             if (mayHaveRootRuntime && !connectionManager.ensureCleanRootRuntime()) return
             connectionStateCoordinator.markDisconnected()
             stopSelf()
@@ -1131,6 +1127,10 @@ class XrayService : VpnService() {
     private suspend fun loadLastServerConfig(): ServerConfig? {
         val lastServerId = settingsRepo.lastServerId.first()
         return loadServerConfig(lastServerId)
+    }
+
+    private suspend fun isRootShellAvailable(): Boolean = withContext(Dispatchers.IO) {
+        rootShell.open(RootShell.NetworkNamespace.INIT)
     }
 
     private fun currentAppInstallTime(): Long = packageManager.getPackageInfo(packageName, 0).lastUpdateTime
@@ -2506,6 +2506,24 @@ internal fun effectiveTproxyIpv6(
             compatibility is TproxyCompatibility.Supported &&
             !compatibility.ipv6
         )
+
+/**
+ * Whether a root-managed runtime may still be installed and has to be cleaned before connecting.
+ *
+ * An unreadable state file may describe a live root runtime, so it is not mistaken for a clean
+ * slate. Only root could have installed one, though: without root there is nothing to clean, and
+ * a cleanup that can never succeed would block every connection attempt.
+ */
+internal suspend fun mayHaveRootRuntime(
+    rootModeConfigured: Boolean,
+    persistedState: XrayStateReadResult,
+    isRootShellAvailable: suspend () -> Boolean,
+): Boolean = when {
+    rootModeConfigured -> true
+    persistedState is XrayStateReadResult.Present -> persistedState.state.physicalInterface != VPN_SERVICE_INTERFACE_LABEL
+    persistedState is XrayStateReadResult.Unreadable -> isRootShellAvailable()
+    else -> false
+}
 
 internal fun shouldCleanRecordedRootRuntime(state: XrayState?, connectIfMissing: Boolean): Boolean = connectIfMissing && state != null && state.physicalInterface != VPN_SERVICE_INTERFACE_LABEL
 
