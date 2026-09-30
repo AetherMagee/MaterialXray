@@ -203,8 +203,8 @@ android {
         applicationId = "com.material.xray"
         minSdk = 24
         targetSdk = 36
-        versionCode = 910
-        versionName = "0.9.1"
+        versionCode = 920
+        versionName = "0.9.2"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {
