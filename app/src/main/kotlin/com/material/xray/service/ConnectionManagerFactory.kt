@@ -3,7 +3,6 @@ package com.material.xray.service
 import android.content.Context
 import android.os.SystemClock
 import androidx.annotation.StringRes
-import androidx.core.content.pm.PackageInfoCompat
 import com.material.xray.R
 import com.material.xray.core.app.AppInventory
 import com.material.xray.core.locale.localizedString
@@ -48,7 +47,7 @@ internal interface ConnectionEnvironment {
     val binDir: String
     val appUid: Int
     val processId: Int
-    val appVersionCode: Long
+    val appInstallTime: Long
 
     fun allocateLoopbackApiPort(): Int
     fun elapsedRealtime(): Long
@@ -64,8 +63,8 @@ internal class AndroidConnectionEnvironment(
         get() = context.applicationInfo.uid
     override val processId: Int
         get() = android.os.Process.myPid()
-    override val appVersionCode: Long
-        get() = PackageInfoCompat.getLongVersionCode(context.packageManager.getPackageInfo(context.packageName, 0))
+    override val appInstallTime: Long
+        get() = context.packageManager.getPackageInfo(context.packageName, 0).lastUpdateTime
 
     override fun allocateLoopbackApiPort(): Int = ServerSocket(
         0,

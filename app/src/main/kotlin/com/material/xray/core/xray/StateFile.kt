@@ -49,7 +49,11 @@ data class TproxyGroupState(
 
 @Serializable
 data class XrayState(
-    val appVersionCode: Long? = null,
+    /**
+     * The APK install that started the core. A root core outlives package replacement, so a
+     * different install means it may be running a binary the new package no longer ships.
+     */
+    val appInstallTime: Long? = null,
     val xrayPid: Int = -1,
     val xrayApiPort: Int? = null,
     val tunName: String = "xray0",

@@ -866,7 +866,7 @@ internal class ConnectionManager(
         }
         stateStore.write(
             XrayState(
-                appVersionCode = environment.appVersionCode,
+                appInstallTime = environment.appInstallTime,
                 xrayPid = pid,
                 xrayApiPort = (xrayApiEndpoint as? XrayApiEndpoint.LoopbackTcp)?.port,
                 tunName = tunName,

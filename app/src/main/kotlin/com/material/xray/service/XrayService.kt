@@ -24,7 +24,6 @@ import android.os.PowerManager
 import android.os.SystemClock
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
-import androidx.core.content.pm.PackageInfoCompat
 import com.material.xray.R
 import com.material.xray.core.format.rateUnit
 import com.material.xray.core.format.scaleBytes
@@ -1097,7 +1096,7 @@ class XrayService : VpnService() {
         if (!runtimeSettings.useRootService) return@withContext null
 
         val state = stateFile.read() ?: return@withContext null
-        if (state.appVersionCode != currentAppVersionCode()) return@withContext null
+        if (state.appInstallTime != currentAppInstallTime()) return@withContext null
         if (state.rootConnectionBackend != runtimeSettings.rootConnectionBackend) return@withContext null
         if (state.xrayPid <= 0) return@withContext null
         if (!connectionManager.isRestorableRootProcessAlive(state.xrayPid)) return@withContext null
@@ -1134,9 +1133,7 @@ class XrayService : VpnService() {
         return loadServerConfig(lastServerId)
     }
 
-    private fun currentAppVersionCode(): Long = PackageInfoCompat.getLongVersionCode(
-        packageManager.getPackageInfo(packageName, 0),
-    )
+    private fun currentAppInstallTime(): Long = packageManager.getPackageInfo(packageName, 0).lastUpdateTime
 
     private suspend fun loadServerConfig(serverId: Long): ServerConfig? {
         if (serverId < 0) return null
