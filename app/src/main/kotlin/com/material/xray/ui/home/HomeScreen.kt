@@ -2019,13 +2019,23 @@ private fun SubscriptionCard(
             )
             AnimatedVisibility(visible = !canCollapse || expanded) {
                 Column {
-                    if (metadata.hasVisibleSubscriptionSection()) {
-                        Spacer(modifier = Modifier.height(SubscriptionBlockGap))
+                    // The section collapses as a whole when its only content, the description, is hidden;
+                    // otherwise its spacer and bottom padding would linger around an empty column.
+                    AnimatedVisibility(
+                        visible = metadata.hasVisibleSubscriptionSection(subscription.descriptionHidden),
+                        enter = fadeIn(animationSpec = tween(durationMillis = 120)) +
+                            expandVertically(animationSpec = tween(durationMillis = 180)),
+                        exit = fadeOut(animationSpec = tween(durationMillis = 90)) +
+                            shrinkVertically(animationSpec = tween(durationMillis = 180)),
+                    ) {
+                        Column {
+                            Spacer(modifier = Modifier.height(SubscriptionBlockGap))
+                            SubscriptionMetadataSection(
+                                subscription = subscription,
+                                metadata = metadata,
+                            )
+                        }
                     }
-                    SubscriptionMetadataSection(
-                        subscription = subscription,
-                        metadata = metadata,
-                    )
 
                     if (servers.isEmpty()) {
                         Text(
@@ -2102,9 +2112,9 @@ private fun SubscriptionMetadataSection(
     }
 }
 
-private fun SubscriptionMetadataUiState.hasVisibleSubscriptionSection(): Boolean {
+private fun SubscriptionMetadataUiState.hasVisibleSubscriptionSection(descriptionHidden: Boolean): Boolean {
     val limitedTraffic = traffic?.takeUnless { it.quotaText == null }
-    return announcement.isNotEmpty() ||
+    return (announcement.isNotEmpty() && !descriptionHidden) ||
         limitedTraffic != null
 }
 
