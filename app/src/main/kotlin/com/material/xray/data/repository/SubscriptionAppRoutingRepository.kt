@@ -31,14 +31,12 @@ class SubscriptionAppRoutingRepository(
     suspend fun clear(): Boolean = replaceActiveRouting(null)
 
     private suspend fun replaceActiveRouting(routing: SubscriptionAppRouting?): Boolean {
-        val targetAssignments = routing
-            ?.let { buildProviderAssignments(it) }
-            .orEmpty()
-            .sortedWith(compareBy(AppBypassEntity::profileId, AppBypassEntity::packageName))
-        if (appBypassDao.getAll() == targetAssignments) return false
-
-        appBypassDao.replaceAll(targetAssignments)
-        return true
+        val providerAssignments = routing?.let { buildProviderAssignments(it) }.orEmpty()
+        // Read and replace in one transaction after the slow package scan, so a user edit written
+        // meanwhile is part of the merge instead of being overwritten by a stale snapshot.
+        return appBypassDao.replaceAllWith { current ->
+            mergeProviderAssignments(current, providerAssignments, routing)
+        }
     }
 
     private suspend fun buildProviderAssignments(routing: SubscriptionAppRouting): List<AppBypassEntity> {
@@ -65,4 +63,18 @@ class SubscriptionAppRoutingRepository(
         SubscriptionAppRoutingMode.DefaultSelected -> AppRouteAssignment(AppRouteMode.DefaultSelected)
         SubscriptionAppRoutingMode.DefaultOutbound -> AppRouteAssignment(AppRouteMode.DefaultOutbound)
     }
+}
+
+/**
+ * Provider rows replace every non-manual row, while manual rows survive for apps the provider
+ * does not claim so user edits outside the provider's list outlive a refresh.
+ */
+internal fun mergeProviderAssignments(
+    current: List<AppBypassEntity>,
+    providerAssignments: List<AppBypassEntity>,
+    routing: SubscriptionAppRouting?,
+): List<AppBypassEntity> {
+    val keptManual = current.filter { it.manual && routing?.assignmentModeFor(it.packageName) == null }
+    return (providerAssignments + keptManual)
+        .sortedWith(compareBy(AppBypassEntity::profileId, AppBypassEntity::packageName))
 }

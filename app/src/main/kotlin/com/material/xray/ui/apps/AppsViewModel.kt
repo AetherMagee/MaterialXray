@@ -16,15 +16,18 @@ import com.material.xray.data.db.entity.AppBypassEntity
 import com.material.xray.data.db.entity.AppRouteAssignment
 import com.material.xray.data.db.entity.AppRouteMode
 import com.material.xray.data.db.entity.ServerEntity
+import com.material.xray.data.db.entity.SubscriptionEntity
 import com.material.xray.data.db.entity.routeAssignment
 import com.material.xray.data.db.entity.toAppBypassEntity
 import com.material.xray.data.repository.ProviderRoutingAvailability
 import com.material.xray.data.repository.ProviderRoutingCoordinator
 import com.material.xray.data.repository.ServerRepository
 import com.material.xray.data.repository.SettingsRepository
-import com.material.xray.data.repository.selectedProviderRoutingAvailability
+import com.material.xray.data.repository.providerRoutingAvailability
+import com.material.xray.data.repository.toSubscriptionAppRouting
 import com.material.xray.model.RootConnectionBackend
 import com.material.xray.model.RoutingPolicyControl
+import com.material.xray.model.SubscriptionAppRouting
 import com.material.xray.model.endpointSummary
 import com.material.xray.model.proxyOutboundCount
 import com.material.xray.service.AlwaysOnVpnState
@@ -142,16 +145,21 @@ class AppsViewModel(
     val appSpecificServerNoteShown: StateFlow<Boolean> = settingsRepository.appSpecificServerNoteShown
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
-    private val selectedProviderRouting: StateFlow<ProviderRoutingAvailability?> = combine(
+    private val selectedSubscription: StateFlow<SubscriptionEntity?> = combine(
         settingsRepository.lastServerId,
         serverRepository.observeAll(),
         subscriptionDao.observeAll(),
-        ::selectedProviderRoutingAvailability,
-    ).stateIn(
+    ) { selectedServerId, servers, subscriptions ->
+        val subscriptionId = servers.firstOrNull { it.id == selectedServerId }?.subscriptionId
+        subscriptions.firstOrNull { it.id == subscriptionId }
+    }.stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(5000),
         null,
     )
+    private val selectedProviderRouting: StateFlow<ProviderRoutingAvailability?> = selectedSubscription
+        .map { it?.providerRoutingAvailability() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
     val routingPolicyControl: StateFlow<RoutingPolicyControl> = combine(
         settingsRepository.routingPolicyControl,
         selectedProviderRouting,
@@ -165,6 +173,14 @@ class AppsViewModel(
     val automaticRoutingProviderName: StateFlow<String?> = selectedProviderRouting
         .map { it?.providerName }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    /** The provider's app routing while it is in control, used to tell which apps it manages. */
+    val providerAppRouting: StateFlow<SubscriptionAppRouting?> = combine(
+        routingPolicyControl,
+        selectedSubscription,
+    ) { policy, subscription ->
+        subscription?.toSubscriptionAppRouting()?.takeIf { policy == RoutingPolicyControl.SubscriptionProvider }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     private val bypassedApps = appBypassDao.observeAll()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())

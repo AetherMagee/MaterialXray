@@ -73,38 +73,18 @@ import org.koin.compose.viewmodel.koinViewModel
 fun AppBypassContent(active: Boolean, viewModel: AppsViewModel = koinViewModel()) {
     val lifecycleOwner = LocalLifecycleOwner.current
     val apps by viewModel.apps.collectAsStateWithLifecycle()
-    val routeOptions by viewModel.routeOptions.collectAsStateWithLifecycle()
-    val alwaysProxiedAvailable by viewModel.alwaysProxiedAvailable.collectAsStateWithLifecycle()
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
     val isLoadingApps by viewModel.isLoadingApps.collectAsStateWithLifecycle()
     val appLoadProgress by viewModel.appLoadProgress.collectAsStateWithLifecycle()
-    val appSpecificServerNoteShown by viewModel.appSpecificServerNoteShown.collectAsStateWithLifecycle()
     val routingPolicyControl by viewModel.routingPolicyControl.collectAsStateWithLifecycle()
     val automaticRoutingProviderName by viewModel.automaticRoutingProviderName.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val density = LocalDensity.current
     val iconSize = 40.dp
     val iconPixelSize = remember(density) { with(density) { iconSize.roundToPx() } }
-    val visibleRouteOptions by remember(routeOptions) {
-        derivedStateOf {
-            if (routeOptions.count { it.kind == AppRouteKind.SERVER } == 1) {
-                routeOptions.filterNot { it.kind == AppRouteKind.SERVER }
-            } else {
-                routeOptions
-            }
-        }
-    }
     var editingApp by remember { mutableStateOf<AppItem?>(null) }
-    var pendingManualEdit by remember { mutableStateOf<AppItem?>(null) }
-    var pendingSpecificServerRoute by remember { mutableStateOf<AppRouteSelection?>(null) }
     val pullToRefreshState = rememberPullToRefreshState()
     val showInitialLoading = isLoadingApps && apps.isEmpty()
-
-    fun applyRouteSelection(app: AppItem, option: AppRouteOption) {
-        val currentApp = editingApp?.takeIf { it.appKey == app.appKey } ?: app
-        viewModel.setAppRoute(currentApp, option)
-        editingApp = currentApp.withSelectedRoute(option)
-    }
 
     DisposableEffect(lifecycleOwner, viewModel, active) {
         val observer = LifecycleEventObserver { _, event ->
@@ -118,15 +98,6 @@ fun AppBypassContent(active: Boolean, viewModel: AppsViewModel = koinViewModel()
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
             viewModel.onHidden()
-        }
-    }
-
-    LaunchedEffect(routingPolicyControl) {
-        if (routingPolicyControl == RoutingPolicyControl.User) {
-            pendingManualEdit?.let { app ->
-                pendingManualEdit = null
-                editingApp = app
-            }
         }
     }
 
@@ -228,13 +199,7 @@ fun AppBypassContent(active: Boolean, viewModel: AppsViewModel = koinViewModel()
                                     )
                                 }
                             },
-                            modifier = Modifier.clickable {
-                                if (routingPolicyControl == RoutingPolicyControl.SubscriptionProvider) {
-                                    pendingManualEdit = app
-                                } else {
-                                    editingApp = app
-                                }
-                            },
+                            modifier = Modifier.clickable { editingApp = app },
                         )
                     }
                 }
@@ -243,34 +208,98 @@ fun AppBypassContent(active: Boolean, viewModel: AppsViewModel = koinViewModel()
         }
     }
 
-    if (pendingManualEdit != null) {
-        AutomaticRoutingDialog(
-            providerName = automaticRoutingProviderName,
-            onDismiss = { pendingManualEdit = null },
-            onSwitchToManual = {
-                viewModel.switchToManualRouting()
-            },
+    editingApp?.let { app ->
+        AppRouteEditor(
+            app = app,
+            onAppChange = { editingApp = it },
+            viewModel = viewModel,
         )
     }
+}
 
-    editingApp?.let { app ->
-        AppRoutePickerDialog(
-            app = app,
-            routeOptions = visibleRouteOptions,
-            singleServerRouteHidden = visibleRouteOptions.size != routeOptions.size,
-            showAlwaysProxied = alwaysProxiedAvailable,
-            onDismiss = { editingApp = null },
-            onAlwaysProxiedChanged = { enabled ->
-                val currentApp = editingApp?.takeIf { it.appKey == app.appKey } ?: app
-                viewModel.setAlwaysProxied(currentApp, enabled)
-                editingApp = currentApp.copy(alwaysProxied = enabled)
-            },
-            onSelected = { option ->
-                if (option.kind == AppRouteKind.SERVER && !appSpecificServerNoteShown) {
-                    pendingSpecificServerRoute = AppRouteSelection(app, option)
-                } else {
-                    applyRouteSelection(app, option)
-                }
+@Composable
+private fun AppRouteEditor(
+    app: AppItem,
+    onAppChange: (AppItem?) -> Unit,
+    viewModel: AppsViewModel,
+) {
+    val routeOptions by viewModel.routeOptions.collectAsStateWithLifecycle()
+    val alwaysProxiedAvailable by viewModel.alwaysProxiedAvailable.collectAsStateWithLifecycle()
+    val appSpecificServerNoteShown by viewModel.appSpecificServerNoteShown.collectAsStateWithLifecycle()
+    val routingPolicyControl by viewModel.routingPolicyControl.collectAsStateWithLifecycle()
+    val automaticRoutingProviderName by viewModel.automaticRoutingProviderName.collectAsStateWithLifecycle()
+    val providerAppRouting by viewModel.providerAppRouting.collectAsStateWithLifecycle()
+    val visibleRouteOptions by remember(routeOptions) {
+        derivedStateOf {
+            if (routeOptions.count { it.kind == AppRouteKind.SERVER } == 1) {
+                routeOptions.filterNot { it.kind == AppRouteKind.SERVER }
+            } else {
+                routeOptions
+            }
+        }
+    }
+    var pendingProviderEdit by remember { mutableStateOf<ProviderManagedAppEdit?>(null) }
+    var pendingSpecificServerRoute by remember { mutableStateOf<AppRouteSelection?>(null) }
+
+    fun applyRouteSelection(target: AppItem, option: AppRouteOption) {
+        viewModel.setAppRoute(target, option)
+        onAppChange(target.withSelectedRoute(option))
+    }
+
+    fun selectRoute(target: AppItem, option: AppRouteOption) {
+        if (option.kind == AppRouteKind.SERVER && !appSpecificServerNoteShown) {
+            pendingSpecificServerRoute = AppRouteSelection(target, option)
+        } else {
+            applyRouteSelection(target, option)
+        }
+    }
+
+    fun applyAlwaysProxied(target: AppItem, enabled: Boolean) {
+        viewModel.setAlwaysProxied(target, enabled)
+        onAppChange(target.copy(alwaysProxied = enabled))
+    }
+
+    fun applyEdit(edit: ProviderManagedAppEdit) {
+        when (edit) {
+            is ProviderManagedAppEdit.Route -> selectRoute(edit.app, edit.option)
+            is ProviderManagedAppEdit.AlwaysProxied -> applyAlwaysProxied(edit.app, edit.enabled)
+        }
+    }
+
+    // Only apps the provider assigns a route to need automatic updates turned off before editing.
+    fun requestEdit(edit: ProviderManagedAppEdit) {
+        if (providerAppRouting?.assignmentModeFor(edit.app.packageName) != null) {
+            pendingProviderEdit = edit
+        } else {
+            applyEdit(edit)
+        }
+    }
+
+    LaunchedEffect(routingPolicyControl) {
+        if (routingPolicyControl == RoutingPolicyControl.User) {
+            pendingProviderEdit?.let { edit ->
+                pendingProviderEdit = null
+                applyEdit(edit)
+            }
+        }
+    }
+
+    AppRoutePickerDialog(
+        app = app,
+        routeOptions = visibleRouteOptions,
+        singleServerRouteHidden = visibleRouteOptions.size != routeOptions.size,
+        showAlwaysProxied = alwaysProxiedAvailable,
+        onDismiss = { onAppChange(null) },
+        onAlwaysProxiedChanged = { enabled -> requestEdit(ProviderManagedAppEdit.AlwaysProxied(app, enabled)) },
+        onSelected = { option -> requestEdit(ProviderManagedAppEdit.Route(app, option)) },
+    )
+
+    if (pendingProviderEdit != null) {
+        AutomaticRoutingDialog(
+            providerName = automaticRoutingProviderName,
+            onDismiss = { pendingProviderEdit = null },
+            onSwitchToManual = {
+                viewModel.switchToManualRouting()
             },
         )
     }
@@ -434,6 +463,13 @@ fun AppRoutingMenuActions(viewModel: AppsViewModel = koinViewModel()) {
 private enum class BulkAppRouteAction {
     ResetToDefaults,
     BypassAllApps,
+}
+
+private sealed interface ProviderManagedAppEdit {
+    val app: AppItem
+
+    data class Route(override val app: AppItem, val option: AppRouteOption) : ProviderManagedAppEdit
+    data class AlwaysProxied(override val app: AppItem, val enabled: Boolean) : ProviderManagedAppEdit
 }
 
 private data class AppRouteSelection(

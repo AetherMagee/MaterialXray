@@ -41,9 +41,14 @@ interface AppBypassDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(entities: List<AppBypassEntity>)
 
+    /** Replaces the table with [merge] of its current rows, atomically; returns whether it changed. */
     @Transaction
-    suspend fun replaceAll(entities: List<AppBypassEntity>) {
+    suspend fun replaceAllWith(merge: (List<AppBypassEntity>) -> List<AppBypassEntity>): Boolean {
+        val current = getAll()
+        val target = merge(current)
+        if (current == target) return false
         deleteAll()
-        insertAll(entities)
+        insertAll(target)
+        return true
     }
 }
