@@ -1040,6 +1040,7 @@ class XrayService : VpnService() {
             return true
         }
         connectionStateCoordinator.restoreConnected(restoredState)
+        xrayLogStreamer.showRecentHistory()
         activePhysicalNetwork = currentPhysicalNetworkSnapshot()
         handleStateSideEffects(restoredState)
         updateNotification()

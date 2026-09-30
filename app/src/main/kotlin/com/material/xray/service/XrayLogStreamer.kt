@@ -22,6 +22,7 @@ class XrayLogStreamer(
 ) {
     private val signals = Channel<Unit>(Channel.CONFLATED)
     private val resetRequested = AtomicBoolean(false)
+    private val historyRequested = AtomicBoolean(false)
     private val catchUpLimitRequested = AtomicBoolean(false)
     private var job: Job? = null
     private var observer: FileObserver? = null
@@ -39,11 +40,26 @@ class XrayLogStreamer(
 
         active = true
         catchUpLimitRequested.set(true)
+        if (!initialized) {
+            // Whatever the file already holds was written by a core that may be long gone, even
+            // before the last reboot, so only lines written from now on are streamed unless
+            // showRecentHistory() says that core is still running.
+            offset = logFile.length().takeIf { logFile.isFile } ?: 0L
+            fileInode = logFile.inodeOrNull()
+            initialized = true
+        }
         if (job?.isActive != true) {
             job = scope.launch(Dispatchers.IO) { processSignals() }
         }
         observer?.stopWatching()
         observer = createObserver().also(FileObserver::startWatching)
+        signals.trySend(Unit)
+    }
+
+    /** Replaces the Xray entries with the recent tail of the file, for a core that outlived this service. */
+    fun showRecentHistory() {
+        historyRequested.set(true)
+        resetRequested.set(true)
         signals.trySend(Unit)
     }
 
@@ -94,13 +110,11 @@ class XrayLogStreamer(
     private fun readAvailableLines(forceReset: Boolean, limitCatchUp: Boolean) {
         val currentInode = logFile.inodeOrNull()
         val length = logFile.length().takeIf { logFile.isFile } ?: 0L
-        val firstInitialization = !initialized
-        val shouldReset = forceReset || firstInitialization || currentInode != fileInode || length < offset
+        val shouldReset = forceReset || currentInode != fileInode || length < offset
         if (shouldReset) {
-            if (firstInitialization) logBuffer.clear(LogSource.XRAY)
+            if (historyRequested.getAndSet(false)) logBuffer.clear(LogSource.XRAY)
             offset = if (length > 0L) findLogTailOffset(logFile, LogBuffer.XRAY_TAIL_SIZE) else 0L
             fileInode = currentInode
-            initialized = true
         } else if (limitCatchUp && length > offset) {
             offset = maxOf(offset, findLogTailOffset(logFile, LogBuffer.XRAY_TAIL_SIZE))
         }
