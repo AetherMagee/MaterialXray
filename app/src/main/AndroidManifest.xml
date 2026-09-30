@@ -131,7 +131,10 @@
         <receiver
             android:name=".service.BootReceiver"
             android:exported="false">
-            <intent-filter>
+            <!-- Android starts boot receivers one priority tier at a time, and within a tier
+                 largely in package-name order, so at the default priority the tunnel waited
+                 behind most installed apps. -->
+            <intent-filter android:priority="50">
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
             </intent-filter>
