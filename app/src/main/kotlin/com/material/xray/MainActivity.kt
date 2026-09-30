@@ -95,14 +95,13 @@ class MainActivity : AppCompatActivity() {
         // Hold the splash screen until the home data snapshot is ready, so the first visible
         // frame renders the subscription list, server rows, and selected server together instead
         // of popping in piece by piece. On warm starts the snapshot is already loaded and the
-        // splash screen dismisses on the first frame.
+        // splash screen dismisses on the first frame. A slow or failed load cannot hold it up
+        // longer than the timeout.
         val splashShownAtMillis = SystemClock.uptimeMillis()
         splashScreen.setKeepOnScreenCondition {
-            keepSplashOnScreen(
-                initialDataLoaded = databaseReadiness == DatabaseReadiness.Failed ||
-                    (homeDataState?.data?.value != null && settingsDataState?.data?.value != null),
-                elapsedMillis = SystemClock.uptimeMillis() - splashShownAtMillis,
-            )
+            val initialDataLoaded = databaseReadiness == DatabaseReadiness.Failed ||
+                (homeDataState?.data?.value != null && settingsDataState?.data?.value != null)
+            !initialDataLoaded && SystemClock.uptimeMillis() - splashShownAtMillis < SPLASH_SCREEN_TIMEOUT_MS
         }
         openDatabase()
         setContent {
@@ -259,12 +258,6 @@ internal fun subscriptionLinkFromDeepLink(deepLink: String?): String? {
     return link?.takeIf { it.length > "https://".length }
 }
 
-/**
- * The splash screen stays up only while the home data snapshot is still loading, and never longer
- * than [SPLASH_SCREEN_TIMEOUT_MS], so a slow or failed load cannot hold it up indefinitely.
- */
-internal fun keepSplashOnScreen(initialDataLoaded: Boolean, elapsedMillis: Long): Boolean = !initialDataLoaded && elapsedMillis < SPLASH_SCREEN_TIMEOUT_MS
-
-internal const val SPLASH_SCREEN_TIMEOUT_MS = 2_000L
+private const val SPLASH_SCREEN_TIMEOUT_MS = 2_000L
 private const val DIAGNOSTICS_NOTICE_DURATION_MS = 15_000L
 private const val SUBSCRIPTION_DEEP_LINK_PREFIX = "mxray://add/"

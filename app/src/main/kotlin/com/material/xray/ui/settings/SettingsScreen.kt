@@ -607,7 +607,7 @@ private fun SettingsScreenContent(
                         )
                     }
                 }
-                if (shouldShowTunMtu(rootServiceActive, rootConnectionBackend)) {
+                if (!rootServiceActive || rootConnectionBackend == RootConnectionBackend.Tun) {
                     item(key = "tun_mtu") {
                         Column(
                             modifier = Modifier.padding(horizontal = 16.dp),
@@ -1274,11 +1274,6 @@ internal fun hasIpv4OnlyDnsServers(dnsServers: String, domesticDnsServers: Strin
     if (lists.any(String::isBlank)) return false
     return lists.none { ipv6DnsServers(it).isNotEmpty() }
 }
-
-internal fun shouldShowTunMtu(
-    rootServiceActive: Boolean,
-    backend: RootConnectionBackend,
-): Boolean = !rootServiceActive || backend == RootConnectionBackend.Tun
 
 @Composable
 private fun SettingsNestedSection(

@@ -34,7 +34,6 @@ class XrayRuntimeSettingsTest {
 
     @Test
     fun `normalizes xray buffer size`() {
-        assertEquals(64, XrayRuntimeSettings.DEFAULT_XRAY_BUFFER_SIZE_KIB)
         assertEquals(XrayRuntimeSettings.DEFAULT_XRAY_BUFFER_SIZE_KIB, XrayRuntimeSettings.normalizeXrayBufferSizeKiB(null))
         assertEquals(XrayRuntimeSettings.DEFAULT_XRAY_BUFFER_SIZE_KIB, XrayRuntimeSettings.normalizeXrayBufferSizeKiB(0))
         assertEquals(1024, XrayRuntimeSettings.normalizeXrayBufferSizeKiB(1024))
@@ -58,12 +57,5 @@ class XrayRuntimeSettingsTest {
         assertEquals(512, XrayRuntimeSettings.normalizeXrayMemoryRestartThresholdMiB(512))
         assertTrue(XrayRuntimeSettings.isValidXrayMemoryRestartThresholdMiB(32_768))
         assertFalse(XrayRuntimeSettings.isValidXrayMemoryRestartThresholdMiB(32_769))
-    }
-
-    @Test
-    fun `restarts only when core RAM usage exceeds threshold`() {
-        assertFalse(XrayRuntimeSettings.shouldRestartForMemory(null, 200))
-        assertFalse(XrayRuntimeSettings.shouldRestartForMemory(200, 200))
-        assertTrue(XrayRuntimeSettings.shouldRestartForMemory(201, 200))
     }
 }

@@ -4,7 +4,6 @@ import android.content.Context
 import android.os.Build
 import com.material.xray.R
 import com.material.xray.core.network.addBundledCaFallback
-import com.material.xray.core.network.shouldUseBundledCaFallback
 import com.material.xray.core.root.RootShell
 import com.material.xray.data.db.dao.SubscriptionDao
 import com.material.xray.data.repository.ProviderRoutingCoordinator
@@ -39,7 +38,8 @@ class AppModule {
         val builder = OkHttpClient.Builder()
             .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(15, TimeUnit.SECONDS)
-        if (shouldUseBundledCaFallback(Build.VERSION.SDK_INT)) {
+        // Android 7 lacks root CAs that current certificate chains depend on.
+        if (Build.VERSION.SDK_INT in Build.VERSION_CODES.N..Build.VERSION_CODES.N_MR1) {
             context.resources.openRawResource(R.raw.mozilla_ca_bundle).use(builder::addBundledCaFallback)
         }
         return builder.build()

@@ -170,9 +170,12 @@ class EphemeralXrayCore(
     private fun canConnectSocket(path: String): Boolean {
         val socket = LocalSocket()
         return try {
-            socketConnects {
-                socket.connect(LocalSocketAddress(path, LocalSocketAddress.Namespace.FILESYSTEM))
-            }
+            socket.connect(LocalSocketAddress(path, LocalSocketAddress.Namespace.FILESYSTEM))
+            true
+        } catch (_: IOException) {
+            false
+        } catch (_: UnsupportedOperationException) {
+            false
         } finally {
             runCatching { socket.close() }
         }
@@ -200,13 +203,4 @@ class EphemeralXrayCore(
         private const val WAIT_TIMEOUT_MS = 500L
         private const val STOP_POLL_INTERVAL_MS = 50L
     }
-}
-
-internal fun socketConnects(connect: () -> Unit): Boolean = try {
-    connect()
-    true
-} catch (_: IOException) {
-    false
-} catch (_: UnsupportedOperationException) {
-    false
 }

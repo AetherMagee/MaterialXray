@@ -677,7 +677,11 @@ class HomeViewModel(
         val previouslyActiveServerIds = activeLatencyServerIds
         latencyJob?.cancel()
         val pingMethod = defaultPingMethod.value
-        val pingMethods = latencyMethods(pingMethod, showBothLatencyResults.value)
+        val pingMethods = if (showBothLatencyResults.value) {
+            listOf(PingMethod.Tcping, PingMethod.Httping)
+        } else {
+            listOf(pingMethod)
+        }
         val targetServers = servers.distinctBy { it.id }
         val targetServerIds = targetServers.map { it.id }.toSet()
         val canceledOnlyServerIds = previouslyActiveServerIds - targetServerIds
@@ -884,12 +888,6 @@ internal fun changedServerSortOrders(current: List<Long>, sorted: List<Long>): M
     return sorted.mapIndexedNotNull { index, serverId ->
         if (currentPositions[serverId] == index) null else serverId to index
     }.toMap()
-}
-
-internal fun latencyMethods(primaryMethod: PingMethod, showBoth: Boolean): List<PingMethod> = if (showBoth) {
-    listOf(PingMethod.Tcping, PingMethod.Httping)
-} else {
-    listOf(primaryMethod)
 }
 
 private fun latencyState(

@@ -243,7 +243,7 @@ internal fun oemAutostartTargets(manufacturer: String): List<OemAutostartTarget>
     else -> emptyList()
 }
 
-internal fun isXiaomiManufacturer(manufacturer: String): Boolean = manufacturer.matchesOem("xiaomi", "redmi", "poco")
+private fun isXiaomiManufacturer(manufacturer: String): Boolean = manufacturer.matchesOem("xiaomi", "redmi", "poco")
 
 private fun String.matchesOem(vararg names: String): Boolean {
     val normalized = lowercase().trim()

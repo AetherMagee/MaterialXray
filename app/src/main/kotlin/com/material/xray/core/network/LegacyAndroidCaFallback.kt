@@ -13,8 +13,6 @@ import javax.net.ssl.TrustManagerFactory
 import javax.net.ssl.X509TrustManager
 import okhttp3.OkHttpClient
 
-internal fun shouldUseBundledCaFallback(sdkInt: Int): Boolean = sdkInt in 24..25
-
 internal fun OkHttpClient.Builder.addBundledCaFallback(certificateBundle: InputStream): OkHttpClient.Builder = apply {
     val trustManager = AdditiveX509TrustManager(
         system = loadSystemTrustManager(),

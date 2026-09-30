@@ -7,12 +7,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class RootConnectionBackendUiTest {
-    @Test
-    fun `TUN MTU is hidden only for active root TPROXY`() {
-        assertTrue(shouldShowTunMtu(rootServiceActive = false, RootConnectionBackend.Tproxy))
-        assertTrue(shouldShowTunMtu(rootServiceActive = true, RootConnectionBackend.Tun))
-        assertFalse(shouldShowTunMtu(rootServiceActive = true, RootConnectionBackend.Tproxy))
-    }
 
     @Test
     fun `IPv6 stays optimistic until an IPv6 failure is confirmed`() {

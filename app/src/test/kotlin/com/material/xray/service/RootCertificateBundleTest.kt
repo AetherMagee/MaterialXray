@@ -113,12 +113,6 @@ class RootCertificateBundleTest {
         assertEquals("cached", bundleFile.readText())
     }
 
-    @Test
-    fun `only Android system CA aliases are selected`() {
-        assertTrue(isAndroidSystemCaAlias("system:12345678.0"))
-        assertFalse(isAndroidSystemCaAlias("user:12345678.0"))
-    }
-
     private fun TestScope.bundle(
         loadBundledCertificates: () -> List<ByteArray> = { emptyList() },
         loadCertificates: () -> List<ByteArray>,

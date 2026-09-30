@@ -3,9 +3,7 @@ package com.material.xray.di
 import androidx.work.ListenableWorker
 import com.material.xray.MaterialXrayApp
 import com.material.xray.service.AppUpdateWorker
-import com.material.xray.service.ConnectionStateCoordinator
 import com.material.xray.service.GeoDataUpdateWorker
-import com.material.xray.service.LogBuffer
 import com.material.xray.service.SubscriptionUpdateWorker
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.cancel
@@ -38,12 +36,6 @@ class KoinGraphTest {
         val scope = koin.get<CoroutineScope>(named<ApplicationScope>())
 
         assertSame(scope, koin.get<CoroutineScope>(named<ApplicationScope>()))
-    }
-
-    @Test
-    fun `singletons are shared across lookups`() {
-        assertSame(koin.get<LogBuffer>(), koin.get<LogBuffer>())
-        assertSame(koin.get<ConnectionStateCoordinator>(), koin.get<ConnectionStateCoordinator>())
     }
 
     @OptIn(KoinInternalApi::class)

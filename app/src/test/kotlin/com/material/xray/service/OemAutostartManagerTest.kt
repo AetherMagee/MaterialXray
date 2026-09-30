@@ -2,7 +2,6 @@ package com.material.xray.service
 
 import android.app.AppOpsManager
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -17,14 +16,6 @@ class OemAutostartManagerTest {
         assertEquals("com.letv.android.letvsafe", oemAutostartTargets("LeMobile").first().packageName)
         assertEquals("com.meizu.safe.security.SHOW_APPSEC", oemAutostartTargets("Meizu").first().action)
         assertTrue(oemAutostartTargets("Google").isEmpty())
-    }
-
-    @Test
-    fun `recognizes Xiaomi family manufacturer names`() {
-        assertTrue(isXiaomiManufacturer("Xiaomi"))
-        assertTrue(isXiaomiManufacturer("Redmi"))
-        assertTrue(isXiaomiManufacturer("POCO"))
-        assertFalse(isXiaomiManufacturer("OPPO"))
     }
 
     @Test

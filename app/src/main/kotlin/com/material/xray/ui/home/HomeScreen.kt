@@ -1570,7 +1570,7 @@ private fun connectionHeading(connectionState: ConnectionState, geoDataDownloadF
     ConnectionState.Disconnected -> stringResource(R.string.home_connection_disconnected)
 }
 
-internal fun ConnectionState.showsConnectionStats(): Boolean = this is ConnectionState.Connected ||
+private fun ConnectionState.showsConnectionStats(): Boolean = this is ConnectionState.Connected ||
     this == ConnectionState.ApplyingRoutingChanges
 
 /**

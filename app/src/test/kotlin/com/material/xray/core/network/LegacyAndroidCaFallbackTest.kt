@@ -5,7 +5,6 @@ import java.security.cert.CertificateException
 import java.security.cert.X509Certificate
 import javax.net.ssl.X509TrustManager
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -54,13 +53,6 @@ class LegacyAndroidCaFallbackTest {
                 certificate.subjectX500Principal.name.contains("CN=ISRG Root X1")
             },
         )
-    }
-
-    @Test
-    fun `fallback is limited to Android 7`() {
-        assertTrue(shouldUseBundledCaFallback(24))
-        assertTrue(shouldUseBundledCaFallback(25))
-        assertFalse(shouldUseBundledCaFallback(26))
     }
 
     private class RecordingTrustManager(

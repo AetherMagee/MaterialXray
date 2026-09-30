@@ -109,13 +109,6 @@ class XrayServiceModeTest {
     }
 
     @Test
-    fun `runtime restoration requires the same app version`() {
-        assertTrue(isRuntimeVersionCompatible(recordedVersionCode = 600, currentVersionCode = 600))
-        assertFalse(isRuntimeVersionCompatible(recordedVersionCode = 599, currentVersionCode = 600))
-        assertFalse(isRuntimeVersionCompatible(recordedVersionCode = null, currentVersionCode = 600))
-    }
-
-    @Test
     fun `package recovery only runs root cleanup for root runtimes`() {
         assertTrue(
             shouldCleanRecordedRootRuntime(

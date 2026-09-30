@@ -53,7 +53,7 @@ class CleanupManager(
         val firewallRemoved = cleanupStage("API firewall") { apiFirewall.remove(appUid) }
         val nftablesRemoved = cleanupStage("legacy nftables") { nftables.remove() }
 
-        val routingRemoved = if (!shouldRemoveTunRouting(state?.rootConnectionBackend)) {
+        val routingRemoved = if (state?.rootConnectionBackend == RootConnectionBackend.Tproxy) {
             true
         } else {
             val tunName = state?.tunName ?: fallbackTunName
@@ -116,5 +116,3 @@ internal fun ownedProcessStopCommand(configPath: String, persistedPid: Int?): St
     append("[ -z \"\$alive\" ] || sleep 0.05; for pid in \$alive; do if is_owned \"\$pid\"; then exit 1; ")
     append("fi; done; true")
 }
-
-internal fun shouldRemoveTunRouting(backend: RootConnectionBackend?): Boolean = backend != RootConnectionBackend.Tproxy

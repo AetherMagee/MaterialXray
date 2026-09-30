@@ -89,12 +89,10 @@ private fun loadAndroidCaCertificates(): List<ByteArray> {
         val enumeration = keyStore.aliases()
         while (enumeration.hasMoreElements()) {
             val alias = enumeration.nextElement()
-            if (isAndroidSystemCaAlias(alias)) add(alias)
+            if (alias.startsWith("system:")) add(alias)
         }
     }
     return aliases.sorted().mapNotNull { alias ->
         (keyStore.getCertificate(alias) as? X509Certificate)?.encoded
     }
 }
-
-internal fun isAndroidSystemCaAlias(alias: String): Boolean = alias.startsWith("system:")

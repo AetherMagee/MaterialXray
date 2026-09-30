@@ -1097,7 +1097,7 @@ class XrayService : VpnService() {
         if (!runtimeSettings.useRootService) return@withContext null
 
         val state = stateFile.read() ?: return@withContext null
-        if (!isRuntimeVersionCompatible(state.appVersionCode, currentAppVersionCode())) return@withContext null
+        if (state.appVersionCode != currentAppVersionCode()) return@withContext null
         if (state.rootConnectionBackend != runtimeSettings.rootConnectionBackend) return@withContext null
         if (state.xrayPid <= 0) return@withContext null
         if (!connectionManager.isRestorableRootProcessAlive(state.xrayPid)) return@withContext null
@@ -2509,8 +2509,6 @@ internal fun effectiveTproxyIpv6(
             compatibility is TproxyCompatibility.Supported &&
             !compatibility.ipv6
         )
-
-internal fun isRuntimeVersionCompatible(recordedVersionCode: Long?, currentVersionCode: Long): Boolean = recordedVersionCode == currentVersionCode
 
 internal fun shouldCleanRecordedRootRuntime(state: XrayState?, connectIfMissing: Boolean): Boolean = connectIfMissing && state != null && state.physicalInterface != VPN_SERVICE_INTERFACE_LABEL
 

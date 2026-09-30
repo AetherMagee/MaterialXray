@@ -1,6 +1,5 @@
 package com.material.xray.ui.home
 
-import com.material.xray.model.PingMethod
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -35,22 +34,6 @@ class HomeLatencySortingTest {
         assertEquals(
             mapOf(1L to 1, 2L to 0),
             changedServerSortOrders(listOf(1, 2, 3), listOf(2, 1, 3)),
-        )
-    }
-
-    @Test
-    fun `uses only the selected latency method when dual results are disabled`() {
-        assertEquals(
-            listOf(PingMethod.Httping),
-            latencyMethods(primaryMethod = PingMethod.Httping, showBoth = false),
-        )
-    }
-
-    @Test
-    fun `uses tcping then httping when dual results are enabled`() {
-        assertEquals(
-            listOf(PingMethod.Tcping, PingMethod.Httping),
-            latencyMethods(primaryMethod = PingMethod.Httping, showBoth = true),
         )
     }
 

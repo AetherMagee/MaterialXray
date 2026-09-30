@@ -22,7 +22,7 @@ class BootReceiver :
     private val settingsRepo: SettingsRepository by inject()
 
     override fun onReceive(context: Context, intent: Intent?) {
-        if (!isAutoConnectTrigger(intent?.action)) return
+        if (intent?.action != Intent.ACTION_BOOT_COMPLETED && intent?.action != Intent.ACTION_MY_PACKAGE_REPLACED) return
 
         val pendingResult = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
@@ -47,7 +47,7 @@ class BootReceiver :
 
         val useRootService = settingsRepo.useRootService.first()
         val vpnPermissionGranted = useRootService || VpnService.prepare(context) == null
-        if (!shouldStartAutomaticConnection(autoConnect || recoverAfterReplacement, vpnPermissionGranted)) return
+        if (!vpnPermissionGranted) return
 
         if (recoverAfterReplacement) {
             XrayService.recoverAfterPackageReplacement(context)
@@ -60,14 +60,6 @@ class BootReceiver :
         private const val TAG = "BootReceiver"
     }
 }
-
-internal fun isAutoConnectTrigger(action: String?): Boolean = action == Intent.ACTION_BOOT_COMPLETED ||
-    action == Intent.ACTION_MY_PACKAGE_REPLACED
-
-internal fun shouldStartAutomaticConnection(
-    enabled: Boolean,
-    vpnPermissionGranted: Boolean,
-): Boolean = enabled && vpnPermissionGranted
 
 internal fun shouldRecoverAfterPackageReplacement(
     action: String?,
