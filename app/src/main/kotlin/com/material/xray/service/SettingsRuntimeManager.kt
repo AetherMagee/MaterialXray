@@ -13,9 +13,6 @@ import com.material.xray.data.repository.SettingsRepository
 import com.material.xray.model.ConnectionState
 import com.material.xray.model.LauncherIcon
 import com.material.xray.model.RootConnectionBackend
-import dagger.hilt.android.qualifiers.ApplicationContext
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -24,10 +21,11 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import org.koin.core.annotation.Singleton
 
 @Singleton
-class SettingsRuntimeManager @Inject constructor(
-    @param:ApplicationContext private val context: Context,
+class SettingsRuntimeManager(
+    private val context: Context,
     private val settingsRepository: SettingsRepository,
     private val rootShell: RootShell,
     private val geoDataManager: GeoDataManager,

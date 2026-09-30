@@ -6,13 +6,10 @@ import android.net.LocalSocketAddress
 import com.material.xray.core.process.RedirectedProcess
 import com.material.xray.core.xray.XrayBinary
 import com.material.xray.core.xray.XrayInbound
-import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
 import java.io.IOException
 import java.util.UUID
 import java.util.concurrent.TimeUnit
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.currentCoroutineContext
@@ -20,6 +17,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
+import org.koin.core.annotation.Singleton
 
 class EphemeralXrayCoreException(message: String, cause: Throwable? = null) : IOException(message, cause)
 
@@ -32,8 +30,8 @@ class EphemeralXrayCoreException(message: String, cause: Throwable? = null) : IO
  * interception and cannot set SO_MARK, so the generated config must not rely on fwmark.
  */
 @Singleton
-class EphemeralXrayCore @Inject constructor(
-    @param:ApplicationContext private val context: Context,
+class EphemeralXrayCore(
+    private val context: Context,
     private val baseClient: OkHttpClient,
 ) {
     private val xrayBinary = XrayBinary(context)

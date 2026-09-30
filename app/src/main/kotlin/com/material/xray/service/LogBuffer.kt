@@ -1,10 +1,9 @@
 package com.material.xray.service
 
 import android.util.Log
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import org.koin.core.annotation.Singleton
 
 data class LogEntry(
     val id: Long,
@@ -23,7 +22,7 @@ val LogEntry.displayMessage: String
     get() = if (source == LogSource.XRAY) message.replaceFirst(xrayTimestampPrefix, "") else message
 
 @Singleton
-class LogBuffer @Inject constructor() {
+class LogBuffer {
     private val _entries = MutableStateFlow<List<LogEntry>>(emptyList())
     val entries: StateFlow<List<LogEntry>> = _entries
     private val buffer = ArrayDeque<LogEntry>(MAX_SIZE)

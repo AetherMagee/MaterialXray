@@ -1,6 +1,6 @@
 package com.material.xray.ui.configviewer
 
-import android.content.Context
+import android.app.Application
 import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -16,9 +16,6 @@ import com.material.xray.model.ServerConfig
 import com.material.xray.service.ConnectionRuntimeManager
 import com.material.xray.service.ConnectionStateCoordinator
 import com.material.xray.service.XrayService
-import dagger.hilt.android.lifecycle.HiltViewModel
-import dagger.hilt.android.qualifiers.ApplicationContext
-import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
@@ -32,6 +29,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
+import org.koin.core.annotation.KoinViewModel
 
 /** What the viewer was asked to show. Carries the title so the app bar never has to wait. */
 sealed interface ConfigViewerRequest {
@@ -121,9 +119,9 @@ sealed interface ConfigViewerUiState {
     ) : ConfigViewerUiState
 }
 
-@HiltViewModel
-class ConfigViewerViewModel @Inject constructor(
-    @param:ApplicationContext private val context: Context,
+@KoinViewModel
+class ConfigViewerViewModel(
+    private val context: Application,
     private val serverRepo: ServerRepository,
     private val subscriptionRepo: SubscriptionRepository,
     private val settingsRepo: SettingsRepository,

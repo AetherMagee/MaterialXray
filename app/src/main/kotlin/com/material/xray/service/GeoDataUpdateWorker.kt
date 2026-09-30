@@ -4,33 +4,19 @@ import android.content.Context
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.material.xray.core.xray.GeoDataManager
-import dagger.hilt.EntryPoint
-import dagger.hilt.InstallIn
-import dagger.hilt.android.EntryPointAccessors
-import dagger.hilt.components.SingletonComponent
+import org.koin.android.annotation.KoinWorker
 
+@KoinWorker
 class GeoDataUpdateWorker(
     appContext: Context,
     workerParams: WorkerParameters,
+    private val geoDataManager: GeoDataManager,
 ) : CoroutineWorker(appContext, workerParams) {
 
-    override suspend fun doWork(): Result {
-        val entryPoint = EntryPointAccessors.fromApplication(
-            applicationContext,
-            GeoDataUpdateWorkerEntryPoint::class.java,
-        )
-
-        return runCatching {
-            entryPoint.geoDataManager().refreshForScheduledUpdate()
-        }.fold(
-            onSuccess = { Result.success() },
-            onFailure = { Result.retry() },
-        )
-    }
-
-    @EntryPoint
-    @InstallIn(SingletonComponent::class)
-    interface GeoDataUpdateWorkerEntryPoint {
-        fun geoDataManager(): GeoDataManager
-    }
+    override suspend fun doWork(): Result = runCatching {
+        geoDataManager.refreshForScheduledUpdate()
+    }.fold(
+        onSuccess = { Result.success() },
+        onFailure = { Result.retry() },
+    )
 }

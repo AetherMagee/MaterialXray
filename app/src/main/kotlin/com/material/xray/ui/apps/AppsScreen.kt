@@ -58,7 +58,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.graphics.drawable.toBitmap
-import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -67,10 +66,11 @@ import com.material.xray.R
 import com.material.xray.model.RoutingPolicyControl
 import com.material.xray.ui.components.ScrollFadeEdges
 import com.material.xray.ui.components.SelectableOptionRow
+import org.koin.compose.viewmodel.koinViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AppBypassContent(active: Boolean, viewModel: AppsViewModel = hiltViewModel()) {
+fun AppBypassContent(active: Boolean, viewModel: AppsViewModel = koinViewModel()) {
     val lifecycleOwner = LocalLifecycleOwner.current
     val apps by viewModel.apps.collectAsStateWithLifecycle()
     val routeOptions by viewModel.routeOptions.collectAsStateWithLifecycle()
@@ -318,7 +318,7 @@ private fun SubscriptionRoutingBanner(providerName: String?) {
 }
 
 @Composable
-fun AppRoutingMenuActions(viewModel: AppsViewModel = hiltViewModel()) {
+fun AppRoutingMenuActions(viewModel: AppsViewModel = koinViewModel()) {
     val showSystemApps by viewModel.showSystemApps.collectAsStateWithLifecycle()
     val showWorkProfileApps by viewModel.showWorkProfileApps.collectAsStateWithLifecycle()
     val hasWorkProfileApps by viewModel.hasWorkProfileApps.collectAsStateWithLifecycle()

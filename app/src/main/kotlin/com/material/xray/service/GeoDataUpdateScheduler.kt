@@ -10,16 +10,14 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import com.material.xray.model.GeoDataUpdateInterval
-import dagger.hilt.android.qualifiers.ApplicationContext
 import java.util.concurrent.TimeUnit
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.koin.core.annotation.Singleton
 
 @Singleton
-class GeoDataUpdateScheduler @Inject constructor(
-    @param:ApplicationContext private val context: Context,
+class GeoDataUpdateScheduler(
+    private val context: Context,
 ) {
     suspend fun enqueueInitialRefresh() = withContext(Dispatchers.IO) {
         val preferences = context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)

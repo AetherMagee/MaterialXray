@@ -4,17 +4,16 @@ import com.material.xray.model.ActiveBalancerSelection
 import com.material.xray.model.ConnectionProgress
 import com.material.xray.model.ConnectionState
 import com.material.xray.model.SessionTrafficMetrics
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
+import org.koin.core.annotation.Singleton
 
 @Singleton
-class ConnectionStateCoordinator @Inject constructor() {
+class ConnectionStateCoordinator {
     private val _state = MutableStateFlow<ConnectionState>(ConnectionState.Disconnected)
     val state: StateFlow<ConnectionState> = _state
     private val _connectionProgress = MutableStateFlow<ConnectionProgress?>(null)

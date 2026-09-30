@@ -10,12 +10,10 @@ import android.os.Build
 import android.os.Process
 import android.provider.Settings
 import com.material.xray.core.root.RootShell
-import dagger.hilt.android.qualifiers.ApplicationContext
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import org.koin.core.annotation.Singleton
 
 data class OemAutostartGuidance(
     val required: Boolean,
@@ -24,8 +22,8 @@ data class OemAutostartGuidance(
 )
 
 @Singleton
-class OemAutostartManager @Inject constructor(
-    @param:ApplicationContext private val context: Context,
+class OemAutostartManager(
+    private val context: Context,
     private val rootShell: RootShell,
 ) {
     private val targets = oemAutostartTargets(Build.MANUFACTURER)

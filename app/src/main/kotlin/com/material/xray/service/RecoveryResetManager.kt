@@ -6,18 +6,16 @@ import com.material.xray.core.xray.CleanupManager
 import com.material.xray.core.xray.StateFile
 import com.material.xray.core.xray.XrayStateReadResult
 import com.material.xray.model.ConnectionState
-import dagger.hilt.android.qualifiers.ApplicationContext
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import org.koin.core.annotation.Singleton
 
 /** Stops runtime state without opening the database before Android erases app data. */
 @Singleton
-class RecoveryResetManager @Inject constructor(
-    @param:ApplicationContext private val context: Context,
+class RecoveryResetManager(
+    private val context: Context,
     private val stateCoordinator: ConnectionStateCoordinator,
     private val rootShell: RootShell,
     private val rootlessOrphanStopper: RootlessOrphanStopper,

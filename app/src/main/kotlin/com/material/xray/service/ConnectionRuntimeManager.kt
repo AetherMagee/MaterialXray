@@ -12,16 +12,14 @@ import com.material.xray.data.repository.SettingsRepository
 import com.material.xray.model.ConnectionProgress
 import com.material.xray.model.ConnectionState
 import com.material.xray.model.RootConnectionBackend
-import dagger.hilt.android.qualifiers.ApplicationContext
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
+import org.koin.core.annotation.Singleton
 
 @Singleton
-class ConnectionRuntimeManager @Inject constructor(
-    @param:ApplicationContext private val context: Context,
+class ConnectionRuntimeManager(
+    private val context: Context,
     private val settingsRepository: SettingsRepository,
     private val serverRepository: ServerRepository,
     private val stateCoordinator: ConnectionStateCoordinator,

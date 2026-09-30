@@ -42,7 +42,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
-import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.material.xray.R
 import com.material.xray.model.RoutingPolicyControl
@@ -57,6 +56,7 @@ import java.util.Locale
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import org.koin.compose.viewmodel.koinViewModel
 
 private val routingRuleSaver: Saver<RoutingRule?, String> = Saver(
     save = { value -> value?.let { Json.encodeToString(it) } },
@@ -88,7 +88,7 @@ private val matchModeOptions = listOf(
 internal fun RoutingRuleEditorScreen(
     editableRule: EditableRoutingRule,
     onBack: () -> Unit,
-    viewModel: RoutingViewModel = hiltViewModel(),
+    viewModel: RoutingViewModel = koinViewModel(),
 ) {
     BackHandler(onBack = onBack)
     val rule = editableRule.rule

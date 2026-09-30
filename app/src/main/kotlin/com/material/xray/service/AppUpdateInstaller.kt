@@ -12,13 +12,10 @@ import com.material.xray.data.repository.GitHubReleaseFetcher
 import com.material.xray.data.repository.SettingsRepository
 import com.material.xray.data.repository.githubMirrorUrls
 import com.material.xray.model.AppUpdate
-import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
 import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -29,6 +26,7 @@ import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
+import org.koin.core.annotation.Singleton
 
 enum class AppUpdateInstallStage {
     ResolvingRelease,
@@ -46,8 +44,8 @@ data class AppUpdateInstallProgress(
 )
 
 @Singleton
-class AppUpdateInstaller @Inject constructor(
-    @param:ApplicationContext private val context: Context,
+class AppUpdateInstaller(
+    private val context: Context,
     private val httpClient: AppHttpClient,
     private val releaseFetcher: GitHubReleaseFetcher,
     private val settingsRepository: SettingsRepository,

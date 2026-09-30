@@ -9,14 +9,12 @@ import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
-import dagger.hilt.android.qualifiers.ApplicationContext
 import java.util.concurrent.TimeUnit
-import javax.inject.Inject
-import javax.inject.Singleton
+import org.koin.core.annotation.Singleton
 
 @Singleton
-class SubscriptionUpdateScheduler @Inject constructor(
-    @param:ApplicationContext private val context: Context,
+class SubscriptionUpdateScheduler(
+    private val context: Context,
 ) {
     fun schedulePeriodicUpdates() {
         val request = PeriodicWorkRequestBuilder<SubscriptionUpdateWorker>(

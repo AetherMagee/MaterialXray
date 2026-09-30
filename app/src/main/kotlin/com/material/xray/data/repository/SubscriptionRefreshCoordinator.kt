@@ -6,17 +6,16 @@ import com.material.xray.data.db.entity.ServerEntity
 import com.material.xray.data.db.entity.SubscriptionEntity
 import com.material.xray.service.ConnectionShutdownManager
 import java.io.IOException
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import org.koin.core.annotation.Singleton
 
 @Singleton
-class SubscriptionRefreshCoordinator @Inject constructor(
+class SubscriptionRefreshCoordinator(
     private val subscriptionRepository: SubscriptionRepository,
     private val serverRepository: ServerRepository,
     private val settingsRepository: SettingsRepository,

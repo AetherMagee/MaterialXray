@@ -58,7 +58,7 @@ The app is still under active development. Device-specific behavior is possible,
 
 This project is AI-assisted.
 
-Material Xray is a single-module Kotlin Android app using Jetpack Compose, Hilt, Room, DataStore, and WorkManager. Xray-core handles proxy connections; the app manages subscriptions, configuration, routing, and the service lifecycle.
+Material Xray is a single-module Kotlin Android app using Jetpack Compose, Koin, Room, DataStore, and WorkManager. Xray-core handles proxy connections; the app manages subscriptions, configuration, routing, and the service lifecycle.
 
 ### Build and install
 

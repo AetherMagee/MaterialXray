@@ -4,8 +4,6 @@ import com.material.xray.data.db.dao.SubscriptionDao
 import com.material.xray.model.RoutingPolicyControl
 import com.material.xray.service.PendingRoutingChange
 import com.material.xray.service.RoutingChangeManager
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -33,7 +31,6 @@ internal sealed interface ProviderRoutingSelection {
     ) : ProviderRoutingSelection
 }
 
-@Singleton
 class ProviderRoutingCoordinator internal constructor(
     private val loadSelection: suspend () -> ProviderRoutingSelection,
     private val applyAppRouting: suspend (Long) -> Boolean,
@@ -42,7 +39,6 @@ class ProviderRoutingCoordinator internal constructor(
     private val clearXrayRouting: suspend () -> Boolean,
     private val applyActiveConnectionChange: (PendingRoutingChange) -> Boolean,
 ) {
-    @Inject
     constructor(
         settingsRepository: SettingsRepository,
         serverRepository: ServerRepository,

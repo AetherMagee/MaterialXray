@@ -8,13 +8,10 @@ import com.material.xray.core.xray.XRAY_APP_HTTP_INBOUND_TAG
 import com.material.xray.data.repository.SettingsRepository
 import com.material.xray.model.ConnectionState
 import com.material.xray.service.ConnectionStateCoordinator
-import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
 import java.io.IOException
 import java.net.InetSocketAddress
 import java.net.Proxy
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.first
@@ -26,11 +23,12 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import okhttp3.ConnectionPool
 import okhttp3.OkHttpClient
+import org.koin.core.annotation.Singleton
 
 /** Only the app's HTTP downloads use the private data socket; latency probes use their own client. */
 @Singleton
-class ActiveCoreHttpClient @Inject constructor(
-    @param:ApplicationContext private val context: Context,
+class ActiveCoreHttpClient(
+    private val context: Context,
     private val baseClient: OkHttpClient,
     private val settingsRepository: SettingsRepository,
     private val connectionState: ConnectionStateCoordinator,

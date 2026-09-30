@@ -14,7 +14,7 @@
 
 ## Project Shape
 - This is a single-module Android app; `settings.gradle.kts` includes only `:app` and the namespace/application id is `com.material.xray`.
-- App startup is `MaterialXrayApp` for Hilt and scheduled subscription refresh, then `MainActivity` -> `MaterialXrayTheme` -> `MainNavigation` for Compose tabs.
+- App startup is `MaterialXrayApp` for Koin and scheduled subscription refresh, then `MainActivity` -> `MaterialXrayTheme` -> `MainNavigation` for Compose tabs.
 - The runtime service is `service/XrayService.kt`, a `VpnService` that handles both root-managed service mode and rootless Android `VpnService` mode.
 - Main boundaries: `core/xray` builds Xray config/TUN/routing, `core/root` wraps root shell execution, `data` holds Room/repositories/subscription parsing, and `ui` holds Compose screens.
 
@@ -27,7 +27,9 @@
 - Room schema version is in `AppDatabase`. When changing entities, bump that version and append the SQL for the new step to `DatabaseMigrations.sqlByStartVersion`; `DatabaseModule` registers the whole chain, so nothing else needs editing.
 - Room exports one JSON schema per version into `app/schemas`; commit the new file after building. `DatabaseMigrationChainTest` replays every migration and compares the result against it, so a migration that drifts from the entities fails `testDebugUnitTest`.
 - Only a downgrade falls back to recreating the tables. A failed upgrade throws instead of wiping the user's data, so a broken migration must be fixed rather than absorbed.
-- Hilt and Room use KSP from `app/build.gradle.kts`; prefer Gradle tasks for verification so generated code is produced.
+- Room uses KSP from `app/build.gradle.kts`; prefer Gradle tasks for verification so generated code is produced.
+- Dependency injection is Koin with the Koin Compiler Plugin. Annotate classes with `@Singleton`, `@Factory`, `@KoinViewModel` or `@KoinWorker` (Koin's annotations, not `javax.inject`); `AppModule`'s `@ComponentScan` picks them up and `@KoinApplication` on `MaterialXrayApp` assembles the graph. Third-party types and constructors that need arguments go in `di/AppModule.kt` or `di/DatabaseModule.kt`.
+- The compiler plugin fails the build on a missing binding, but only in a compilation that includes `MaterialXrayApp`; an incremental compile that skips it prints `compile-safety validation skipped`. `KoinGraphTest` checks the parts that only resolve at runtime.
 - `local.properties`, Gradle outputs, `.cxx`, and most local IDE state are gitignored; do not depend on local-only values except SDK path or local signing credentials.
 
 ## CI

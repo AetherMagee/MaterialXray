@@ -7,16 +7,14 @@ import android.os.Build
 import android.os.PowerManager
 import androidx.core.content.pm.PackageInfoCompat
 import com.material.xray.data.repository.SettingsRepository
-import dagger.hilt.android.qualifiers.ApplicationContext
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import org.koin.core.annotation.Singleton
 
 @Singleton
-class StartupDiagnosticsLogger @Inject constructor(
-    @param:ApplicationContext private val context: Context,
+class StartupDiagnosticsLogger(
+    private val context: Context,
     private val settingsRepository: SettingsRepository,
     private val logBuffer: LogBuffer,
 ) {

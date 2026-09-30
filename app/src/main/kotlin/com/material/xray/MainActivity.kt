@@ -58,25 +58,19 @@ import com.material.xray.ui.navigation.MainNavigation
 import com.material.xray.ui.recovery.DatabaseRecoveryScreen
 import com.material.xray.ui.settings.SettingsDataState
 import com.material.xray.ui.theme.MaterialXrayTheme
-import dagger.hilt.android.AndroidEntryPoint
-import javax.inject.Inject
-import javax.inject.Provider
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import org.koin.android.ext.android.get
+import org.koin.android.ext.android.inject
 
-@AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
 
-    @Inject lateinit var databaseOpenChecker: DatabaseOpenChecker
+    private val databaseOpenChecker: DatabaseOpenChecker by inject()
 
-    @Inject lateinit var homeDataStateProvider: Provider<HomeDataState>
+    private val settingsRepository: SettingsRepository by inject()
 
-    @Inject lateinit var settingsDataStateProvider: Provider<SettingsDataState>
-
-    @Inject lateinit var settingsRepository: SettingsRepository
-
-    @Inject lateinit var recoveryResetManager: RecoveryResetManager
+    private val recoveryResetManager: RecoveryResetManager by inject()
 
     private var homeDataState: HomeDataState? = null
     private var settingsDataState: SettingsDataState? = null
@@ -146,8 +140,9 @@ class MainActivity : AppCompatActivity() {
         databaseReadiness = DatabaseReadiness.Checking
         lifecycleScope.launch {
             if (databaseOpenChecker.canRead()) {
-                homeDataState = homeDataStateProvider.get()
-                settingsDataState = settingsDataStateProvider.get()
+                // Resolved only once the database is readable, because both start loading from it.
+                homeDataState = get<HomeDataState>()
+                settingsDataState = get<SettingsDataState>()
                 databaseReadiness = DatabaseReadiness.Ready
             } else {
                 databaseReadiness = DatabaseReadiness.Failed

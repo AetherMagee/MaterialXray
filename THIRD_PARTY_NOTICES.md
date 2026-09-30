@@ -41,17 +41,18 @@ Material Xray uses this bundle only as an additive trust fallback on Android 7 a
 
 The following component families are licensed under the Apache License 2.0. Their direct dependency declarations are recorded in `gradle/libs.versions.toml`, and Gradle resolves their transitive dependencies for each build. The complete license is in `third_party/licenses/Apache-2.0.txt`.
 
-- AndroidX libraries, including Activity, AppCompat, Compose, Core, DataStore, Hilt integrations, Lifecycle, Navigation, Room, SQLite, WorkManager, and their transitive AndroidX modules; Copyright The Android Open Source Project.
+- AndroidX libraries, including Activity, AppCompat, Compose, Core, DataStore, Lifecycle, Navigation, Room, SQLite, WorkManager, and their transitive AndroidX modules; Copyright The Android Open Source Project.
 - Jetpack Compose Material, Material 3, and Material icon libraries; Copyright The Android Open Source Project.
 - Material Symbols vector artwork under `app/src/main/res/drawable/`; Copyright Google LLC.
 - Kotlin standard library, kotlinx.coroutines, and kotlinx.serialization; Copyright JetBrains and Kotlin contributors.
-- Dagger and Hilt; Copyright Google LLC.
+- Koin; Copyright the original author or authors.
+- Stately; Copyright Touchlab.
+- Compose Multiplatform and the JetBrains multiplatform builds of AndroidX Lifecycle and SavedState, pulled in by Koin; Copyright JetBrains s.r.o. and The Android Open Source Project.
 - OkHttp and Okio; Copyright Square, Inc. and contributors.
 - gRPC-Java and PerfMark; Copyright The gRPC Authors and Google LLC.
 - ZXing core; Copyright ZXing authors.
 - Guava, Gson, Error Prone annotations, J2ObjC annotations, and Google Android annotations; Copyright Google LLC and contributors.
 - JSpecify; Copyright the JSpecify Authors.
-- `javax.inject` and Jakarta Inject APIs; Copyright their respective contributors.
 - JSR-305 annotations; Copyright the JSR-305 authors.
 - JetBrains Java annotations; Copyright JetBrains s.r.o.
 - Gradle Wrapper; Copyright Gradle, Inc.

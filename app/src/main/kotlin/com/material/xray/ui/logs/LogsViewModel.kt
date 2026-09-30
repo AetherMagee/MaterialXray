@@ -1,5 +1,6 @@
 package com.material.xray.ui.logs
 
+import android.app.Application
 import android.content.Context
 import android.net.Uri
 import androidx.core.content.FileProvider
@@ -9,21 +10,19 @@ import com.material.xray.core.locale.localizedString
 import com.material.xray.service.LogBuffer
 import com.material.xray.service.LogEntry
 import com.material.xray.service.displayMessage
-import dagger.hilt.android.lifecycle.HiltViewModel
-import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
 import java.io.IOException
-import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.withContext
+import org.koin.core.annotation.KoinViewModel
 
 internal const val LOG_EXPORT_FILE_NAME = "material-xray-logs.txt"
 private const val LOG_EXPORT_DIRECTORY = "logs"
 
-@HiltViewModel
-class LogsViewModel @Inject constructor(
-    @ApplicationContext private val context: Context,
+@KoinViewModel
+class LogsViewModel(
+    private val context: Application,
     private val logBuffer: LogBuffer,
 ) : ViewModel() {
     val entries: StateFlow<List<LogEntry>> = logBuffer.entries

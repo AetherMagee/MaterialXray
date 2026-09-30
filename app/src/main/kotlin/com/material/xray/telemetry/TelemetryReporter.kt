@@ -5,8 +5,6 @@ import com.material.xray.core.xray.TproxyCompatibility
 import com.material.xray.model.ConnectionProgress
 import com.material.xray.model.ConnectionState
 import com.material.xray.model.RootConnectionBackend
-import javax.inject.Inject
-import javax.inject.Singleton
 
 enum class TelemetryServiceMode(val value: String) {
     Root("root"),
@@ -171,12 +169,11 @@ data class TelemetryConnectionContext(
         )
 }
 
-@Singleton
 class TelemetryReporter internal constructor(
     private val client: TelemetryClient,
     private val elapsedRealtime: () -> Long,
 ) {
-    @Inject constructor(client: TelemetryClient) : this(client, SystemClock::elapsedRealtime)
+    constructor(client: TelemetryClient) : this(client, SystemClock::elapsedRealtime)
 
     @Volatile private var enabled = client.isEnabled
     private val lastIssueAt = mutableMapOf<String, Long>()

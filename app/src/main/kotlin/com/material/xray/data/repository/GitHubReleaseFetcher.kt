@@ -3,8 +3,6 @@ package com.material.xray.data.repository
 import com.material.xray.core.network.AppHttpClient
 import com.material.xray.model.AppUpdateCheckStatus
 import java.io.IOException
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -17,6 +15,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import org.koin.core.annotation.Singleton
 
 internal data class GitHubRelease(
     val tagName: String,
@@ -24,7 +23,7 @@ internal data class GitHubRelease(
 )
 
 @Singleton
-class GitHubReleaseFetcher @Inject constructor(
+class GitHubReleaseFetcher(
     private val httpClient: AppHttpClient,
 ) {
     private val json = Json { ignoreUnknownKeys = true }

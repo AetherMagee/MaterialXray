@@ -9,12 +9,9 @@ import com.material.xray.core.xray.buildProxyOutbound
 import com.material.xray.core.xray.toJson
 import com.material.xray.model.PingMethod
 import com.material.xray.model.ServerConfig
-import dagger.hilt.android.qualifiers.ApplicationContext
 import java.net.InetSocketAddress
 import java.net.Socket
 import java.util.concurrent.TimeUnit
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlin.coroutines.resume
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
@@ -30,6 +27,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import org.koin.core.annotation.Singleton
 
 data class LatencyProbeResult(
     val latencyMs: Int,
@@ -99,8 +97,8 @@ private suspend fun executeTimedHttpProbe(
 }
 
 @Singleton
-class ServerLatencyTester @Inject constructor(
-    @ApplicationContext context: Context,
+class ServerLatencyTester(
+    context: Context,
     private val ephemeralCore: EphemeralXrayCore,
 ) {
     private val json = Json { prettyPrint = true }

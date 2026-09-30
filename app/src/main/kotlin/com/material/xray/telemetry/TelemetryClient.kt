@@ -2,11 +2,6 @@ package com.material.xray.telemetry
 
 import android.content.Context
 import android.content.pm.ApplicationInfo
-import dagger.Binds
-import dagger.Module
-import dagger.hilt.InstallIn
-import dagger.hilt.android.qualifiers.ApplicationContext
-import dagger.hilt.components.SingletonComponent
 import io.sentry.Breadcrumb
 import io.sentry.Sentry
 import io.sentry.SentryEvent
@@ -20,8 +15,7 @@ import io.sentry.protocol.Message
 import io.sentry.protocol.User
 import java.io.File
 import java.util.UUID
-import javax.inject.Inject
-import javax.inject.Singleton
+import org.koin.core.annotation.Singleton
 
 interface TelemetryClient {
     val isEnabled: Boolean
@@ -45,14 +39,6 @@ interface TelemetryClient {
     fun captureMessage(message: String, fingerprint: String, tags: Map<String, String>)
 }
 
-@Module
-@InstallIn(SingletonComponent::class)
-abstract class TelemetryModule {
-    @Binds
-    @Singleton
-    abstract fun bindTelemetryClient(client: SentryTelemetryClient): TelemetryClient
-}
-
 interface TelemetryTransaction {
     fun setTag(key: String, value: String)
 
@@ -69,8 +55,8 @@ enum class TelemetryStatus {
 }
 
 @Singleton
-class SentryTelemetryClient @Inject constructor(
-    @param:ApplicationContext private val context: Context,
+class SentryTelemetryClient(
+    private val context: Context,
 ) : TelemetryClient {
     override val isEnabled: Boolean
         get() = Sentry.isEnabled()

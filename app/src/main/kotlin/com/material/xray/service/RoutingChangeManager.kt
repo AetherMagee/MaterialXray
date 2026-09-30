@@ -2,11 +2,9 @@ package com.material.xray.service
 
 import android.content.Context
 import com.material.xray.model.ConnectionState
-import dagger.hilt.android.qualifiers.ApplicationContext
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import org.koin.core.annotation.Singleton
 
 enum class PendingRoutingChange {
     APP_ROUTING,
@@ -15,8 +13,8 @@ enum class PendingRoutingChange {
 }
 
 @Singleton
-class RoutingChangeManager @Inject constructor(
-    @param:ApplicationContext private val context: Context,
+class RoutingChangeManager(
+    private val context: Context,
     private val connectionStateCoordinator: ConnectionStateCoordinator,
 ) {
     private val pendingChanges = PendingRoutingChangeStore()

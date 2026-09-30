@@ -11,8 +11,6 @@ import com.material.xray.core.locale.localizedString
 import com.material.xray.data.repository.ServerRepository
 import com.material.xray.data.repository.SettingsRepository
 import com.material.xray.model.ConnectionState
-import dagger.hilt.android.AndroidEntryPoint
-import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -22,19 +20,19 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.koin.android.ext.android.inject
 
-@AndroidEntryPoint
 class XrayTileService : TileService() {
 
-    @Inject lateinit var settingsRepo: SettingsRepository
+    private val settingsRepo: SettingsRepository by inject()
 
-    @Inject lateinit var serverRepository: ServerRepository
+    private val serverRepository: ServerRepository by inject()
 
-    @Inject lateinit var connectionStateCoordinator: ConnectionStateCoordinator
+    private val connectionStateCoordinator: ConnectionStateCoordinator by inject()
 
-    @Inject lateinit var alwaysOnVpnState: AlwaysOnVpnState
+    private val alwaysOnVpnState: AlwaysOnVpnState by inject()
 
-    @Inject lateinit var routingChangeManager: RoutingChangeManager
+    private val routingChangeManager: RoutingChangeManager by inject()
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var listeningJob: Job? = null

@@ -36,12 +36,11 @@ import com.material.xray.model.ServerConfig
 import com.material.xray.telemetry.ConnectionTelemetryStep
 import com.material.xray.telemetry.TelemetryReporter
 import com.material.xray.telemetry.TelemetrySpan
-import dagger.hilt.android.qualifiers.ApplicationContext
 import java.net.InetAddress
 import java.net.ServerSocket
-import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.koin.core.annotation.Factory
 
 internal interface ConnectionEnvironment {
     val binDir: String
@@ -389,8 +388,9 @@ internal data class ConnectionManagerDependencies(
     val recordTelemetryStepFailure: (ConnectionTelemetryStep) -> Unit = {},
 )
 
-class ConnectionManagerFactory @Inject constructor(
-    @ApplicationContext private val context: Context,
+@Factory
+class ConnectionManagerFactory(
+    private val context: Context,
     private val shell: RootShell,
     private val geoDataManager: GeoDataManager,
     private val appBypassDao: AppBypassDao,

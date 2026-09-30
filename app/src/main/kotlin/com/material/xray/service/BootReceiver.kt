@@ -8,17 +8,18 @@ import android.util.Log
 import com.material.xray.core.xray.StateFile
 import com.material.xray.core.xray.XrayStateReadResult
 import com.material.xray.data.repository.SettingsRepository
-import dagger.hilt.android.AndroidEntryPoint
-import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import org.koin.core.component.KoinComponent
+import org.koin.core.component.inject
 
-@AndroidEntryPoint
-class BootReceiver : BroadcastReceiver() {
+class BootReceiver :
+    BroadcastReceiver(),
+    KoinComponent {
 
-    @Inject lateinit var settingsRepo: SettingsRepository
+    private val settingsRepo: SettingsRepository by inject()
 
     override fun onReceive(context: Context, intent: Intent?) {
         if (!isAutoConnectTrigger(intent?.action)) return

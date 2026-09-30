@@ -1,6 +1,6 @@
 package com.material.xray.ui.settings
 
-import android.content.Context
+import android.app.Application
 import android.net.Uri
 import android.os.SystemClock
 import androidx.annotation.StringRes
@@ -33,9 +33,6 @@ import com.material.xray.service.DatabaseResetManager
 import com.material.xray.service.OemAutostartManager
 import com.material.xray.service.SettingsRuntimeManager
 import com.material.xray.service.XrayService
-import dagger.hilt.android.lifecycle.HiltViewModel
-import dagger.hilt.android.qualifiers.ApplicationContext
-import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -48,6 +45,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.koin.core.annotation.KoinViewModel
 
 data class AssetUpdateMessage(
     @param:StringRes val messageResId: Int,
@@ -62,10 +60,10 @@ data class BackupOperationMessage(
 private const val APP_UPDATE_CHECK_STATUS_MINIMUM_DURATION_MILLIS = 750L
 private const val RUNTIME_MODE_SETTLE_MILLIS = 200L
 
-@HiltViewModel
 @Suppress("TooManyFunctions")
-class SettingsViewModel @Inject constructor(
-    @param:ApplicationContext private val context: Context,
+@KoinViewModel
+class SettingsViewModel(
+    private val context: Application,
     private val settingsRepo: SettingsRepository,
     private val appUpdateChecker: AppUpdateChecker,
     private val backupManager: BackupManager,
