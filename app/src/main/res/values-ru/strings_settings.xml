@@ -11,7 +11,8 @@
     <string name="settings_section_core">Ядро</string>
     <string name="settings_default_outbound_label">Исходящее соединение по умолчанию</string>
     <string name="settings_dns_title">DNS</string>
-    <string name="settings_back">Назад</string>
+    <string name="settings_dns_row_subtitle">Серверы для проксируемых и прямых имён</string>
+    <string name="settings_dns_back">Назад</string>
     <string name="settings_dns_intro">Xray сам обрабатывает каждый запрос на порт 53, поэтому имена, идущие через прокси, не разрешаются в сети, к которой вы подключены.</string>
     <string name="settings_prefer_profile_dns_title">Предпочитать DNS профиля</string>
     <string name="settings_prefer_profile_dns_description">Использовать DNS из JSON-профиля, если он указан. Иначе использовать настройки DNS ниже.</string>
@@ -77,14 +78,13 @@
     <string name="settings_send_hardware_id_description">Добавлять постоянный заголовок x-hwid, чтобы провайдеры могли распознавать это устройство</string>
     <string name="settings_send_hardware_id_locked">Требуется подписке выбранного сервера, отключить нельзя</string>
     <string name="settings_show_advanced_options">Показывать расширенные параметры</string>
-    <string name="settings_show_advanced_options_description">Низкоуровневая настройка, вкладка «Журнал» и сброс базы данных</string>
-    <string name="settings_backup_title">Резервная копия</string>
     <string name="settings_route_mxray_traffic_title">Направлять трафик MXray через Xray</string>
     <string name="settings_route_mxray_traffic_description">Загружать обновления, подписки и данные через активное подключение. Проверки задержки серверов всегда обходят его.</string>
     <string name="settings_diagnostics_title">Диагностика и статистика использования</string>
     <string name="settings_diagnostics_description">Отправлять приватные данные о сбоях, ANR, результатах подключений и надёжности ядра</string>
     <string name="diagnostics_default_notice">MaterialXray по умолчанию отправляет приватные диагностические данные и статистику использования. Конфиденциальная информация не передаётся. Это можно отключить в настройках.</string>
     <string name="diagnostics_dismiss">Закрыть</string>
+    <string name="settings_section_data">Данные</string>
     <string name="settings_export">Экспорт</string>
     <string name="settings_import">Импорт</string>
     <string name="settings_clear_geodata">Очистить геоданные</string>
@@ -126,7 +126,6 @@
     <string name="settings_reset_internal_database_confirmation">Все подписки, серверы и данные маршрутизации приложений будут удалены без возможности восстановления. Настройки приложения сохранятся, а активное подключение будет остановлено.</string>
     <string name="settings_reset">Сбросить</string>
     <string name="settings_internal_database_reset_failed">Не удалось сбросить внутреннюю базу данных</string>
-    <string name="settings_section_general">Общие</string>
     <string name="settings_section_about">О приложении</string>
     <string name="settings_app_update_checks_title">Автоматически проверять обновления</string>
     <string name="settings_app_update_checks_description">Проверять новые выпуски на GitHub каждые 8 часов</string>

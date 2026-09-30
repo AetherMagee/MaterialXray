@@ -14,37 +14,29 @@ import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.annotation.DrawableRes
-import androidx.annotation.StringRes
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyListScope
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
@@ -53,24 +45,17 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.DragIndicator
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.outlined.Dns
-import androidx.compose.material.icons.outlined.Info
-import androidx.compose.material.icons.outlined.Memory
-import androidx.compose.material.icons.outlined.Palette
-import androidx.compose.material.icons.outlined.PowerSettingsNew
-import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
@@ -98,13 +83,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -143,8 +126,6 @@ import com.material.xray.model.XrayRuntimeSettings
 import com.material.xray.model.ipv6DnsServers
 import com.material.xray.model.isInProgress
 import com.material.xray.service.OemAutostartGuidance
-import com.material.xray.ui.adaptive.SinglePaneMaxWidth
-import com.material.xray.ui.adaptive.TwoPaneMinWidth
 import com.material.xray.ui.components.DropdownOption
 import com.material.xray.ui.components.ReadOnlyDropdownField
 import com.material.xray.ui.components.ScrolledTopAppBar
@@ -162,146 +143,43 @@ import org.xmlpull.v1.XmlPullParser
 fun SettingsScreen(showTitleBarLogo: Boolean, viewModel: SettingsViewModel = koinViewModel()) {
     val persistedSettings by viewModel.settings.collectAsStateWithLifecycle()
     val settings = persistedSettings
-    // Sections are local state rather than navigation destinations, because the app keeps a
-    // single flat graph of tabs. The selection is shared by both layouts: a wide window shows it
-    // beside the section list, a narrow one opens it as a page over the list while [sectionOpen],
-    // so rotating keeps whatever section was in view.
-    var selectedSection by rememberSaveable { mutableStateOf(SettingsSection.Service) }
-    var sectionOpen by rememberSaveable { mutableStateOf(false) }
+    // The DNS subpage is local state rather than a navigation destination, because the app keeps a
+    // single flat graph of tabs. It is drawn over the settings list rather than swapped with it, so
+    // the list keeps its scroll position and its event collectors while the subpage is open.
+    var showDnsSettings by rememberSaveable { mutableStateOf(false) }
+    BackHandler(enabled = showDnsSettings) { showDnsSettings = false }
 
     if (settings == null) {
         SettingsLoadingScreen(showTitleBarLogo)
         return
     }
 
-    BoxWithConstraints {
-        val twoPane = maxWidth >= TwoPaneMinWidth
-        BackHandler(enabled = !twoPane && sectionOpen) { sectionOpen = false }
-
+    Box {
         SettingsScreenContent(
             viewModel = viewModel,
             settings = settings,
-            twoPane = twoPane,
-            openSection = selectedSection.takeIf { twoPane || sectionOpen },
-            onOpenSection = { section ->
-                selectedSection = section
-                sectionOpen = true
-            },
-            onCloseSection = { sectionOpen = false },
+            onOpenDnsSettings = { showDnsSettings = true },
         )
+
+        AnimatedContent(
+            targetState = showDnsSettings,
+            transitionSpec = {
+                fadeIn(tween(SUBPAGE_FADE_MS)) togetherWith fadeOut(tween(SUBPAGE_FADE_MS)) using null
+            },
+            label = "dnsSettings",
+        ) { dnsSettingsOpen ->
+            if (dnsSettingsOpen) {
+                DnsSettingsScreen(
+                    settings = settings,
+                    viewModel = viewModel,
+                    onBack = { showDnsSettings = false },
+                )
+            }
+        }
     }
 }
 
 private const val SUBPAGE_FADE_MS = 180
-private val SettingsSectionListWidth = 300.dp
-
-private enum class SettingsSection(
-    @param:StringRes val titleRes: Int,
-    val icon: ImageVector? = null,
-    @param:DrawableRes val iconRes: Int? = null,
-) {
-    Service(R.string.settings_section_service, icon = Icons.Outlined.PowerSettingsNew),
-    Appearance(R.string.settings_section_appearance, icon = Icons.Outlined.Palette),
-    Routing(R.string.settings_section_routing, iconRes = R.drawable.ic_arrow_split_24),
-    Core(R.string.settings_section_core, icon = Icons.Outlined.Memory),
-    Dns(R.string.settings_dns_title, icon = Icons.Outlined.Dns),
-    General(R.string.settings_section_general, icon = Icons.Outlined.Tune),
-    About(R.string.settings_section_about, icon = Icons.Outlined.Info),
-}
-
-private fun LazyListScope.settingsSectionHeader(section: SettingsSection) {
-    item(key = "${section.name}_header", contentType = "sectionHeader") {
-        Text(
-            text = stringResource(section.titleRes),
-            modifier = Modifier.padding(horizontal = 16.dp),
-            style = MaterialTheme.typography.titleMedium,
-        )
-    }
-}
-
-/** One section's rows, capped to a comfortable line length and opening at their top. */
-@Composable
-private fun SettingsSectionContent(content: LazyListScope.() -> Unit) {
-    BoxWithConstraints {
-        val sideGutter = ((maxWidth - SinglePaneMaxWidth) / 2).coerceAtLeast(0.dp)
-        LazyColumn(
-            state = rememberLazyListState(),
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(horizontal = sideGutter, vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-            content = content,
-        )
-    }
-}
-
-/** A full-window settings page for narrow layouts, with a back arrow when [onBack] is given. */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun SettingsPage(
-    title: String,
-    showLogo: Boolean,
-    onBack: (() -> Unit)?,
-    content: @Composable () -> Unit,
-) {
-    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
-    Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-        contentWindowInsets = WindowInsets(0.dp),
-        topBar = {
-            ScrolledTopAppBar(
-                title = title,
-                scrollBehavior = scrollBehavior,
-                showLogo = showLogo,
-                navigationIcon = {
-                    if (onBack != null) {
-                        IconButton(onClick = onBack) {
-                            Icon(
-                                Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = stringResource(R.string.settings_back),
-                            )
-                        }
-                    }
-                },
-            )
-        },
-    ) { padding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding),
-        ) {
-            content()
-        }
-    }
-}
-
-@Composable
-private fun SettingsSectionList(
-    selected: SettingsSection?,
-    onSelect: (SettingsSection) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    LazyColumn(
-        modifier = modifier,
-        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
-    ) {
-        items(SettingsSection.entries, key = { it.name }) { section ->
-            NavigationDrawerItem(
-                label = { Text(stringResource(section.titleRes)) },
-                icon = {
-                    val icon = section.icon
-                    if (icon != null) {
-                        Icon(icon, contentDescription = null)
-                    } else {
-                        Icon(painterResource(requireNotNull(section.iconRes)), contentDescription = null)
-                    }
-                },
-                selected = section == selected,
-                onClick = { onSelect(section) },
-            )
-        }
-    }
-}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Suppress("CyclomaticComplexMethod")
@@ -309,10 +187,7 @@ private fun SettingsSectionList(
 private fun SettingsScreenContent(
     viewModel: SettingsViewModel,
     settings: SettingsSnapshot,
-    twoPane: Boolean,
-    openSection: SettingsSection?,
-    onOpenSection: (SettingsSection) -> Unit,
-    onCloseSection: () -> Unit,
+    onOpenDnsSettings: () -> Unit,
 ) {
     val rootAvailable by viewModel.rootAvailable.collectAsStateWithLifecycle()
     val tproxyCompatibility by viewModel.tproxyCompatibility.collectAsStateWithLifecycle()
@@ -363,6 +238,7 @@ private fun SettingsScreenContent(
     val resources = LocalResources.current
     val lifecycleOwner = LocalLifecycleOwner.current
     rememberSystemState { viewModel.refreshOemAutostartGuidance() }
+    val scrollState = rememberLazyListState()
     var showRootAccessDeniedDialog by rememberSaveable { mutableStateOf(false) }
     var showNotificationFieldsDialog by rememberSaveable { mutableStateOf(false) }
     var showFieldStyleDialog by rememberSaveable { mutableStateOf(false) }
@@ -488,122 +364,220 @@ private fun SettingsScreenContent(
         }
     }
 
-    val serviceItems: LazyListScope.() -> Unit = {
-        item(key = "service") {
-            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                SettingsServiceSection(
-                    rootAvailable = rootAvailable,
-                    rootServiceAvailable = rootServiceAvailable,
-                    rootServiceActive = rootServiceActive,
-                    useRootService = useRootService,
-                    rootConnectionBackend = rootConnectionBackend,
-                    tunnelTetheredClients = tunnelTetheredClients,
-                    tproxyCompatibility = tproxyCompatibility,
-                    autoConnect = autoConnect,
-                    oemAutostartGuidance = oemAutostartGuidance,
-                    onUseRootServiceChange = viewModel::setUseRootService,
-                    onRootConnectionBackendChange = viewModel::setRootConnectionBackend,
-                    onTunnelTetheredClientsChange = viewModel::setTunnelTetheredClients,
-                    onRetryTproxyCompatibility = viewModel::retryTproxyCompatibilityCheck,
-                    onAutoConnectChange = viewModel::setAutoConnect,
-                    onOpenOemAutostartSettings = viewModel::openOemAutostartSettings,
-                )
+    Scaffold(
+        modifier = Modifier.nestedScroll(topAppBarScrollBehavior.nestedScrollConnection),
+        contentWindowInsets = WindowInsets(0.dp),
+        topBar = {
+            ScrolledTopAppBar(
+                title = stringResource(R.string.settings_title),
+                scrollBehavior = topAppBarScrollBehavior,
+                showLogo = showTitleBarLogo,
+            )
+        },
+    ) { padding ->
+        LazyColumn(
+            state = scrollState,
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding),
+            contentPadding = PaddingValues(vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            item(key = "service") {
+                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    SettingsServiceSection(
+                        rootAvailable = rootAvailable,
+                        rootServiceAvailable = rootServiceAvailable,
+                        rootServiceActive = rootServiceActive,
+                        useRootService = useRootService,
+                        rootConnectionBackend = rootConnectionBackend,
+                        tunnelTetheredClients = tunnelTetheredClients,
+                        tproxyCompatibility = tproxyCompatibility,
+                        autoConnect = autoConnect,
+                        oemAutostartGuidance = oemAutostartGuidance,
+                        onUseRootServiceChange = viewModel::setUseRootService,
+                        onRootConnectionBackendChange = viewModel::setRootConnectionBackend,
+                        onTunnelTetheredClientsChange = viewModel::setTunnelTetheredClients,
+                        onRetryTproxyCompatibility = viewModel::retryTproxyCompatibilityCheck,
+                        onAutoConnectChange = viewModel::setAutoConnect,
+                        onOpenOemAutostartSettings = viewModel::openOemAutostartSettings,
+                    )
+                }
             }
-        }
-    }
 
-    val appearanceItems: LazyListScope.() -> Unit = {
-        item(key = "appearance") {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                AppLanguageSetting()
+            item(key = "appearance_header") {
+                Column(
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    HorizontalDivider()
+                    Text(stringResource(R.string.settings_section_appearance), style = MaterialTheme.typography.titleMedium)
+                }
+            }
+            item(key = "appearance") {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    AppLanguageSetting()
 
-                SettingsSwitchRow(
-                    title = stringResource(R.string.settings_show_title_bar_logo),
-                    checked = showTitleBarLogo,
-                    onCheckedChange = viewModel::setShowTitleBarLogo,
-                )
+                    SettingsSwitchRow(
+                        title = stringResource(R.string.settings_show_title_bar_logo),
+                        checked = showTitleBarLogo,
+                        onCheckedChange = viewModel::setShowTitleBarLogo,
+                    )
 
-                SettingsSwitchRow(
-                    title = stringResource(R.string.settings_floating_connect_button_title),
-                    description = stringResource(R.string.settings_floating_connect_button_description),
-                    checked = floatingConnectButton,
-                    onCheckedChange = viewModel::setFloatingConnectButton,
-                )
+                    SettingsSwitchRow(
+                        title = stringResource(R.string.settings_floating_connect_button_title),
+                        description = stringResource(R.string.settings_floating_connect_button_description),
+                        checked = floatingConnectButton,
+                        onCheckedChange = viewModel::setFloatingConnectButton,
+                    )
 
-                SettingsSwitchRow(
-                    title = stringResource(R.string.settings_sort_outbounds_by_latency_title),
-                    description = stringResource(R.string.settings_sort_outbounds_by_latency_description),
-                    checked = sortOutboundsByLatency,
-                    onCheckedChange = viewModel::setSortOutboundsByLatency,
-                )
+                    SettingsSwitchRow(
+                        title = stringResource(R.string.settings_sort_outbounds_by_latency_title),
+                        description = stringResource(R.string.settings_sort_outbounds_by_latency_description),
+                        checked = sortOutboundsByLatency,
+                        onCheckedChange = viewModel::setSortOutboundsByLatency,
+                    )
 
-                SettingsSwitchRow(
-                    title = stringResource(R.string.settings_show_both_latency_results_title),
-                    description = stringResource(R.string.settings_show_both_latency_results_description),
-                    checked = showBothLatencyResults,
-                    onCheckedChange = viewModel::setShowBothLatencyResults,
-                )
+                    SettingsSwitchRow(
+                        title = stringResource(R.string.settings_show_both_latency_results_title),
+                        description = stringResource(R.string.settings_show_both_latency_results_description),
+                        checked = showBothLatencyResults,
+                        onCheckedChange = viewModel::setShowBothLatencyResults,
+                    )
 
-                NotificationSettingsSection(
-                    settings = notificationSettings,
-                    onConfigureFields = { showNotificationFieldsDialog = true },
-                    onConfigureStyle = { showFieldStyleDialog = true },
-                    onConfigureFrequency = { showUpdateFrequencyDialog = true },
-                )
+                    NotificationSettingsSection(
+                        settings = notificationSettings,
+                        onConfigureFields = { showNotificationFieldsDialog = true },
+                        onConfigureStyle = { showFieldStyleDialog = true },
+                        onConfigureFrequency = { showUpdateFrequencyDialog = true },
+                    )
 
-                SettingsNestedSection(title = stringResource(R.string.settings_app_icon_title)) {
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        LauncherIcon.entries.forEach { icon ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 4.dp)
-                                    .selectable(
-                                        selected = icon == launcherIcon,
-                                        role = Role.RadioButton,
-                                        onClick = { viewModel.setLauncherIcon(icon) },
-                                    )
-                                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(stringResource(icon.labelResource), style = MaterialTheme.typography.bodyLarge)
+                    SettingsNestedSection(title = stringResource(R.string.settings_app_icon_title)) {
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            LauncherIcon.entries.forEach { icon ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 4.dp)
+                                        .selectable(
+                                            selected = icon == launcherIcon,
+                                            role = Role.RadioButton,
+                                            onClick = { viewModel.setLauncherIcon(icon) },
+                                        )
+                                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(stringResource(icon.labelResource), style = MaterialTheme.typography.bodyLarge)
+                                    }
+                                    RadioButton(selected = icon == launcherIcon, onClick = null)
                                 }
-                                RadioButton(selected = icon == launcherIcon, onClick = null)
                             }
                         }
                     }
                 }
             }
-        }
-    }
 
-    val routingItems: LazyListScope.() -> Unit = {
-        item(key = "routing") {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                SettingsNestedSection(title = stringResource(R.string.settings_connectivity_title)) {
-                    SettingsSwitchRow(
-                        title = stringResource(R.string.settings_bypass_lan_title),
-                        description = stringResource(R.string.settings_bypass_lan_description),
-                        checked = bypassLan,
-                        onCheckedChange = { viewModel.setBypassLan(it) },
-                    )
+            item(key = "routing_header") {
+                Column(
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    HorizontalDivider()
+                    Text(stringResource(R.string.settings_section_routing), style = MaterialTheme.typography.titleMedium)
+                }
+            }
 
-                    SettingsSwitchRow(
-                        title = stringResource(R.string.settings_allow_ipv6_connections),
-                        checked = allowIpv6,
-                        onCheckedChange = { viewModel.setAllowIpv6(it) },
-                        enabled = isIpv6SelectionEnabled(rootServiceActive, rootConnectionBackend, tproxyCompatibility),
-                    )
+            item(key = "routing") {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    SettingsNestedSection(title = stringResource(R.string.settings_connectivity_title)) {
+                        SettingsSwitchRow(
+                            title = stringResource(R.string.settings_bypass_lan_title),
+                            description = stringResource(R.string.settings_bypass_lan_description),
+                            checked = bypassLan,
+                            onCheckedChange = { viewModel.setBypassLan(it) },
+                        )
 
-                    // The resolver lists carry both address families, so this only happens on a
-                    // hand-written list. Worth saying here, because the switch looks like it
-                    // applies to DNS and in that state it cannot.
-                    if (allowIpv6 && hasIpv4OnlyDnsServers(dnsServers, domesticDnsServers)) {
-                        SettingsNotice(text = stringResource(R.string.settings_allow_ipv6_dns_ipv4_only))
+                        SettingsSwitchRow(
+                            title = stringResource(R.string.settings_allow_ipv6_connections),
+                            checked = allowIpv6,
+                            onCheckedChange = { viewModel.setAllowIpv6(it) },
+                            enabled = isIpv6SelectionEnabled(rootServiceActive, rootConnectionBackend, tproxyCompatibility),
+                        )
+
+                        // The resolver lists carry both address families, so this only happens on a
+                        // hand-written list. Worth saying here, because the switch looks like it
+                        // applies to DNS and in that state it cannot.
+                        if (allowIpv6 && hasIpv4OnlyDnsServers(dnsServers, domesticDnsServers)) {
+                            SettingsNotice(text = stringResource(R.string.settings_allow_ipv6_dns_ipv4_only))
+                        }
                     }
 
+                    SettingsNestedSection(title = stringResource(R.string.settings_routing_policy_title)) {
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            RoutingPolicyControl.entries.forEach { policy ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 4.dp)
+                                        .selectable(
+                                            selected = policy == routingPolicyControl,
+                                            role = Role.RadioButton,
+                                            onClick = { viewModel.setRoutingPolicyControl(policy) },
+                                        )
+                                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(stringResource(policy.labelResource), style = MaterialTheme.typography.bodyLarge)
+                                        Text(
+                                            stringResource(policy.descriptionResource),
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+                                    RadioButton(
+                                        selected = policy == routingPolicyControl,
+                                        onClick = null,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            item(key = "core_header") {
+                Column(
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    HorizontalDivider()
+                    Text(stringResource(R.string.settings_section_core), style = MaterialTheme.typography.titleMedium)
+                }
+            }
+
+            if (rootServiceActive && rootConnectionBackend == RootConnectionBackend.Tun) {
+                item(key = "tun_name") {
+                    Column(
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                    ) {
+                        RootTunNameSetting(
+                            visible = true,
+                            editingTunName = editingTunName,
+                            hasTunNameChanges = hasTunNameChanges,
+                            onEditingTunNameChange = { editingTunName = it },
+                            onSave = { viewModel.setTunName(editingTunName) },
+                        )
+                    }
+                }
+            }
+
+            if (showAdvancedOptions) {
+                item(key = "route_mxray_traffic") {
                     SettingsSwitchRow(
                         title = stringResource(R.string.settings_route_mxray_traffic_title),
                         description = stringResource(R.string.settings_route_mxray_traffic_description),
@@ -611,361 +585,273 @@ private fun SettingsScreenContent(
                         onCheckedChange = viewModel::setRouteMxrayTrafficThroughXray,
                     )
                 }
-
-                SettingsNestedSection(title = stringResource(R.string.settings_routing_policy_title)) {
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        RoutingPolicyControl.entries.forEach { policy ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 4.dp)
-                                    .selectable(
-                                        selected = policy == routingPolicyControl,
-                                        role = Role.RadioButton,
-                                        onClick = { viewModel.setRoutingPolicyControl(policy) },
-                                    )
-                                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(stringResource(policy.labelResource), style = MaterialTheme.typography.bodyLarge)
-                                    Text(
-                                        stringResource(policy.descriptionResource),
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                }
-                                RadioButton(
-                                    selected = policy == routingPolicyControl,
-                                    onClick = null,
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    val coreItems: LazyListScope.() -> Unit = {
-        if (rootServiceActive && rootConnectionBackend == RootConnectionBackend.Tun) {
-            item(key = "tun_name") {
-                Column(
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                ) {
-                    RootTunNameSetting(
-                        visible = true,
-                        editingTunName = editingTunName,
-                        hasTunNameChanges = hasTunNameChanges,
-                        onEditingTunNameChange = { editingTunName = it },
-                        onSave = { viewModel.setTunName(editingTunName) },
-                    )
-                }
-            }
-        }
-
-        item(key = "log_level") {
-            ReadOnlyDropdownField(
-                label = stringResource(R.string.settings_xray_log_level_label),
-                selectedText = stringResource(xrayLogLevel.labelResource),
-                supportingText = stringResource(
-                    R.string.settings_default_value,
-                    stringResource(XrayLogLevel.default.labelResource),
-                ),
-                options = XrayLogLevel.entries.map { level ->
-                    DropdownOption(value = level, label = stringResource(level.labelResource))
-                },
-                onSelected = viewModel::setXrayLogLevel,
-                modifier = Modifier.padding(horizontal = 16.dp),
-            )
-        }
-
-        item(key = "geo_data_update_interval") {
-            Column(
-                modifier = Modifier.padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                AdvancedIntegerSetting(
-                    value = editingGeoDataUpdateIntervalHours,
-                    onValueChange = { editingGeoDataUpdateIntervalHours = it },
-                    label = stringResource(R.string.settings_geo_data_update_interval_label),
-                    supportingText = stringResource(
-                        R.string.settings_geo_data_update_interval_supporting_text,
-                        GeoDataUpdateInterval.MIN_HOURS,
-                        GeoDataUpdateInterval.MAX_HOURS,
-                        GeoDataUpdateInterval.DEFAULT_HOURS,
-                    ),
-                    suffix = stringResource(R.string.settings_hours_abbreviation),
-                    isValid = isGeoDataUpdateIntervalHoursValid,
-                    hasChanges = hasGeoDataUpdateIntervalHoursChanges,
-                    onSave = {
-                        parsedGeoDataUpdateIntervalHours
-                            ?.let(viewModel::setGeoDataUpdateIntervalHours)
-                    },
-                )
-            }
-        }
-
-        item(key = "geoip") {
-            Column(
-                modifier = Modifier.padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                OutlinedTextField(
-                    value = editingGeoipUrl,
-                    onValueChange = { editingGeoipUrl = it },
-                    label = { Text(stringResource(R.string.settings_geoip_url_label)) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    supportingText = {
-                        if (geoipUpdating) {
-                            GeoDataDownloadStatus(geoDataDownloadProgress[GeoDataAsset.GEOIP])
-                        } else {
-                            Text(stringResource(R.string.settings_geoip_url_supporting_text))
-                        }
-                    },
-                    trailingIcon = {
-                        IconButton(
-                            onClick = { viewModel.updateGeoipAsset(editingGeoipUrl) },
-                            enabled = !geoDataOperationInProgress,
-                        ) {
-                            if (geoipUpdating) {
-                                val description = stringResource(R.string.settings_geoip_updating)
-                                GeoDataCircularProgress(
-                                    progress = geoDataDownloadProgress[GeoDataAsset.GEOIP],
-                                    description = description,
-                                )
-                            } else {
-                                Icon(
-                                    Icons.Default.Refresh,
-                                    contentDescription = stringResource(R.string.settings_update_geoip),
-                                )
-                            }
-                        }
-                    },
-                )
-                if (hasGeoipUrlChanges) {
-                    Button(onClick = { viewModel.setGeoipUrl(editingGeoipUrl) }) {
-                        Text(stringResource(R.string.settings_save))
-                    }
-                }
-            }
-        }
-
-        item(key = "geosite") {
-            Column(
-                modifier = Modifier.padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                OutlinedTextField(
-                    value = editingGeositeUrl,
-                    onValueChange = { editingGeositeUrl = it },
-                    label = { Text(stringResource(R.string.settings_geosite_url_label)) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    supportingText = {
-                        if (geositeUpdating) {
-                            GeoDataDownloadStatus(geoDataDownloadProgress[GeoDataAsset.GEOSITE])
-                        } else {
-                            Text(stringResource(R.string.settings_geosite_url_supporting_text))
-                        }
-                    },
-                    trailingIcon = {
-                        IconButton(
-                            onClick = { viewModel.updateGeositeAsset(editingGeositeUrl) },
-                            enabled = !geoDataOperationInProgress,
-                        ) {
-                            if (geositeUpdating) {
-                                val description = stringResource(R.string.settings_geosite_updating)
-                                GeoDataCircularProgress(
-                                    progress = geoDataDownloadProgress[GeoDataAsset.GEOSITE],
-                                    description = description,
-                                )
-                            } else {
-                                Icon(
-                                    Icons.Default.Refresh,
-                                    contentDescription = stringResource(R.string.settings_update_geosite),
-                                )
-                            }
-                        }
-                    },
-                )
-                if (hasGeositeUrlChanges) {
-                    Button(onClick = { viewModel.setGeositeUrl(editingGeositeUrl) }) {
-                        Text(stringResource(R.string.settings_save))
-                    }
-                }
-            }
-        }
-
-        item(key = "clear_geodata") {
-            OutlinedButton(
-                onClick = viewModel::clearGeoData,
-                enabled = connectionState is ConnectionState.Disconnected && !geoDataOperationInProgress,
-                modifier = Modifier.padding(horizontal = 16.dp),
-            ) {
-                Text(
-                    stringResource(
-                        if (geoDataClearing) {
-                            R.string.settings_clearing_geodata
-                        } else {
-                            R.string.settings_clear_geodata
-                        },
-                    ),
-                )
-            }
-        }
-
-        item(key = "default_outbound") {
-            ReadOnlyDropdownField(
-                label = stringResource(R.string.settings_default_outbound_label),
-                selectedText = stringResource(defaultOutbound.labelResource),
-                supportingText = stringResource(defaultOutbound.descriptionResource),
-                options = XrayOutbound.entries.map { outbound ->
-                    DropdownOption(
-                        value = outbound,
-                        label = stringResource(outbound.labelResource),
-                        description = stringResource(outbound.descriptionResource),
-                    )
-                },
-                onSelected = viewModel::setDefaultOutbound,
-                modifier = Modifier.padding(horizontal = 16.dp),
-            )
-        }
-
-        item(key = "passive_health_monitoring") {
-            SettingsSwitchRow(
-                title = stringResource(R.string.settings_passive_health_monitoring_title),
-                description = stringResource(R.string.settings_passive_health_monitoring_description),
-                checked = passiveHealthMonitoringEnabled,
-                onCheckedChange = viewModel::setPassiveHealthMonitoringEnabled,
-            )
-        }
-
-        item(key = "latency_check_url") {
-            Column(
-                modifier = Modifier.padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                OutlinedTextField(
-                    value = editingLatencyCheckUrl,
-                    onValueChange = { editingLatencyCheckUrl = it },
-                    label = { Text(stringResource(R.string.settings_latency_check_url_label)) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    supportingText = { Text(stringResource(R.string.settings_latency_check_url_supporting_text)) },
-                )
-                if (hasLatencyCheckUrlChanges) {
-                    Button(onClick = { viewModel.setLatencyCheckUrl(editingLatencyCheckUrl) }) {
-                        Text(stringResource(R.string.settings_save))
-                    }
-                }
-            }
-        }
-
-        // Tuning that is rarely worth touching stays out of the way until asked for.
-        if (showAdvancedOptions) {
-            item(key = "xray_buffer") {
-                Column(
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                ) {
-                    AdvancedIntegerSetting(
-                        value = editingXrayBufferSizeKiB,
-                        onValueChange = { editingXrayBufferSizeKiB = it },
-                        label = stringResource(R.string.settings_xray_buffer_size_label),
-                        supportingText = stringResource(
-                            R.string.settings_xray_buffer_size_supporting_text,
-                            XrayRuntimeSettings.MIN_XRAY_BUFFER_SIZE_KIB,
-                            XrayRuntimeSettings.MAX_XRAY_BUFFER_SIZE_KIB,
-                            XrayRuntimeSettings.DEFAULT_XRAY_BUFFER_SIZE_KIB,
-                        ),
-                        suffix = stringResource(R.string.settings_kib_abbreviation),
-                        isValid = isXrayBufferSizeKiBValid,
-                        hasChanges = hasXrayBufferSizeKiBChanges,
-                        onSave = { parsedXrayBufferSizeKiB?.let(viewModel::setXrayBufferSizeKiB) },
-                    )
-                }
-            }
-            if (shouldShowTunMtu(rootServiceActive, rootConnectionBackend)) {
-                item(key = "tun_mtu") {
+                item(key = "xray_buffer") {
                     Column(
                         modifier = Modifier.padding(horizontal = 16.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp),
                     ) {
-                        TunMtuSetting(
-                            visible = true,
-                            value = editingTunMtu,
-                            onValueChange = { editingTunMtu = it },
-                            isValid = isTunMtuValid,
-                            hasChanges = hasTunMtuChanges,
-                            onSave = { parsedTunMtu?.let(viewModel::setTunMtu) },
+                        AdvancedIntegerSetting(
+                            value = editingXrayBufferSizeKiB,
+                            onValueChange = { editingXrayBufferSizeKiB = it },
+                            label = stringResource(R.string.settings_xray_buffer_size_label),
+                            supportingText = stringResource(
+                                R.string.settings_xray_buffer_size_supporting_text,
+                                XrayRuntimeSettings.MIN_XRAY_BUFFER_SIZE_KIB,
+                                XrayRuntimeSettings.MAX_XRAY_BUFFER_SIZE_KIB,
+                                XrayRuntimeSettings.DEFAULT_XRAY_BUFFER_SIZE_KIB,
+                            ),
+                            suffix = stringResource(R.string.settings_kib_abbreviation),
+                            isValid = isXrayBufferSizeKiBValid,
+                            hasChanges = hasXrayBufferSizeKiBChanges,
+                            onSave = { parsedXrayBufferSizeKiB?.let(viewModel::setXrayBufferSizeKiB) },
                         )
                     }
                 }
+                if (shouldShowTunMtu(rootServiceActive, rootConnectionBackend)) {
+                    item(key = "tun_mtu") {
+                        Column(
+                            modifier = Modifier.padding(horizontal = 16.dp),
+                            verticalArrangement = Arrangement.spacedBy(16.dp),
+                        ) {
+                            TunMtuSetting(
+                                visible = true,
+                                value = editingTunMtu,
+                                onValueChange = { editingTunMtu = it },
+                                isValid = isTunMtuValid,
+                                hasChanges = hasTunMtuChanges,
+                                onSave = { parsedTunMtu?.let(viewModel::setTunMtu) },
+                            )
+                        }
+                    }
+                }
+                item(key = "memory_restart_threshold") {
+                    Column(
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                    ) {
+                        AdvancedIntegerSetting(
+                            value = editingXrayMemoryRestartThresholdMiB,
+                            onValueChange = { editingXrayMemoryRestartThresholdMiB = it },
+                            label = stringResource(R.string.settings_xray_memory_restart_threshold_label),
+                            supportingText = stringResource(
+                                R.string.settings_xray_memory_restart_threshold_supporting_text,
+                                XrayRuntimeSettings.MIN_XRAY_MEMORY_RESTART_THRESHOLD_MIB,
+                                XrayRuntimeSettings.MAX_XRAY_MEMORY_RESTART_THRESHOLD_MIB,
+                                XrayRuntimeSettings.DEFAULT_XRAY_MEMORY_RESTART_THRESHOLD_MIB,
+                            ),
+                            suffix = stringResource(R.string.settings_mib_abbreviation),
+                            isValid = isXrayMemoryRestartThresholdMiBValid,
+                            hasChanges = hasXrayMemoryRestartThresholdMiBChanges,
+                            onSave = {
+                                parsedXrayMemoryRestartThresholdMiB
+                                    ?.let(viewModel::setXrayMemoryRestartThresholdMiB)
+                            },
+                        )
+                    }
+                }
+                item(key = "passive_health_monitoring") {
+                    SettingsSwitchRow(
+                        title = stringResource(R.string.settings_passive_health_monitoring_title),
+                        description = stringResource(R.string.settings_passive_health_monitoring_description),
+                        checked = passiveHealthMonitoringEnabled,
+                        onCheckedChange = viewModel::setPassiveHealthMonitoringEnabled,
+                    )
+                }
+                item(key = "default_outbound") {
+                    ReadOnlyDropdownField(
+                        label = stringResource(R.string.settings_default_outbound_label),
+                        selectedText = stringResource(defaultOutbound.labelResource),
+                        supportingText = stringResource(defaultOutbound.descriptionResource),
+                        options = XrayOutbound.entries.map { outbound ->
+                            DropdownOption(
+                                value = outbound,
+                                label = stringResource(outbound.labelResource),
+                                description = stringResource(outbound.descriptionResource),
+                            )
+                        },
+                        onSelected = viewModel::setDefaultOutbound,
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                    )
+                }
             }
-            item(key = "memory_restart_threshold") {
+
+            item(key = "dns") {
+                SettingsActionRow(
+                    title = stringResource(R.string.settings_dns_title),
+                    subtitle = stringResource(R.string.settings_dns_row_subtitle),
+                    onClick = onOpenDnsSettings,
+                )
+            }
+
+            if (showAdvancedOptions) {
+                item(key = "log_level") {
+                    ReadOnlyDropdownField(
+                        label = stringResource(R.string.settings_xray_log_level_label),
+                        selectedText = stringResource(xrayLogLevel.labelResource),
+                        supportingText = stringResource(
+                            R.string.settings_default_value,
+                            stringResource(XrayLogLevel.default.labelResource),
+                        ),
+                        options = XrayLogLevel.entries.map { level ->
+                            DropdownOption(value = level, label = stringResource(level.labelResource))
+                        },
+                        onSelected = viewModel::setXrayLogLevel,
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                    )
+                }
+            }
+
+            item(key = "geo_data_update_interval") {
                 Column(
                     modifier = Modifier.padding(horizontal = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
                     AdvancedIntegerSetting(
-                        value = editingXrayMemoryRestartThresholdMiB,
-                        onValueChange = { editingXrayMemoryRestartThresholdMiB = it },
-                        label = stringResource(R.string.settings_xray_memory_restart_threshold_label),
+                        value = editingGeoDataUpdateIntervalHours,
+                        onValueChange = { editingGeoDataUpdateIntervalHours = it },
+                        label = stringResource(R.string.settings_geo_data_update_interval_label),
                         supportingText = stringResource(
-                            R.string.settings_xray_memory_restart_threshold_supporting_text,
-                            XrayRuntimeSettings.MIN_XRAY_MEMORY_RESTART_THRESHOLD_MIB,
-                            XrayRuntimeSettings.MAX_XRAY_MEMORY_RESTART_THRESHOLD_MIB,
-                            XrayRuntimeSettings.DEFAULT_XRAY_MEMORY_RESTART_THRESHOLD_MIB,
+                            R.string.settings_geo_data_update_interval_supporting_text,
+                            GeoDataUpdateInterval.MIN_HOURS,
+                            GeoDataUpdateInterval.MAX_HOURS,
+                            GeoDataUpdateInterval.DEFAULT_HOURS,
                         ),
-                        suffix = stringResource(R.string.settings_mib_abbreviation),
-                        isValid = isXrayMemoryRestartThresholdMiBValid,
-                        hasChanges = hasXrayMemoryRestartThresholdMiBChanges,
+                        suffix = stringResource(R.string.settings_hours_abbreviation),
+                        isValid = isGeoDataUpdateIntervalHoursValid,
+                        hasChanges = hasGeoDataUpdateIntervalHoursChanges,
                         onSave = {
-                            parsedXrayMemoryRestartThresholdMiB
-                                ?.let(viewModel::setXrayMemoryRestartThresholdMiB)
+                            parsedGeoDataUpdateIntervalHours
+                                ?.let(viewModel::setGeoDataUpdateIntervalHours)
                         },
                     )
                 }
             }
-        }
-    }
 
-    val generalItems: LazyListScope.() -> Unit = {
-        item(key = "app_settings") {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                // A provider may pin its hardware ID policy onto the selected server; while
-                // that policy is active the toggle cannot be turned off from Settings.
-                val selectedSubscriptionRequiresHwid =
-                    viewModel.selectedSubscriptionRequiresHwid.collectAsStateWithLifecycle().value
-                val hwidLockedBySubscription = selectedSubscriptionRequiresHwid && subscriptionSendHardwareId
-                SettingsSwitchRow(
-                    title = stringResource(R.string.settings_send_hardware_id_title),
-                    description = stringResource(
-                        if (hwidLockedBySubscription) {
-                            R.string.settings_send_hardware_id_locked
-                        } else {
-                            R.string.settings_send_hardware_id_description
+            item(key = "geoip") {
+                Column(
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    OutlinedTextField(
+                        value = editingGeoipUrl,
+                        onValueChange = { editingGeoipUrl = it },
+                        label = { Text(stringResource(R.string.settings_geoip_url_label)) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        supportingText = {
+                            if (geoipUpdating) {
+                                GeoDataDownloadStatus(geoDataDownloadProgress[GeoDataAsset.GEOIP])
+                            } else {
+                                Text(stringResource(R.string.settings_geoip_url_supporting_text))
+                            }
                         },
-                    ),
-                    checked = subscriptionSendHardwareId,
-                    onCheckedChange = viewModel::setSubscriptionSendHardwareId,
-                    enabled = !hwidLockedBySubscription,
-                )
-                SettingsSwitchRow(
-                    title = stringResource(R.string.settings_diagnostics_title),
-                    description = stringResource(R.string.settings_diagnostics_description),
-                    checked = diagnosticsEnabled,
-                    onCheckedChange = viewModel::setDiagnosticsEnabled,
-                )
+                        trailingIcon = {
+                            IconButton(
+                                onClick = { viewModel.updateGeoipAsset(editingGeoipUrl) },
+                                enabled = !geoDataOperationInProgress,
+                            ) {
+                                if (geoipUpdating) {
+                                    val description = stringResource(R.string.settings_geoip_updating)
+                                    GeoDataCircularProgress(
+                                        progress = geoDataDownloadProgress[GeoDataAsset.GEOIP],
+                                        description = description,
+                                    )
+                                } else {
+                                    Icon(
+                                        Icons.Default.Refresh,
+                                        contentDescription = stringResource(R.string.settings_update_geoip),
+                                    )
+                                }
+                            }
+                        },
+                    )
+                    if (hasGeoipUrlChanges) {
+                        Button(onClick = { viewModel.setGeoipUrl(editingGeoipUrl) }) {
+                            Text(stringResource(R.string.settings_save))
+                        }
+                    }
+                }
             }
-        }
 
-        item(key = "backup") {
-            SettingsNestedSection(title = stringResource(R.string.settings_backup_title)) {
+            item(key = "geosite") {
+                Column(
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    OutlinedTextField(
+                        value = editingGeositeUrl,
+                        onValueChange = { editingGeositeUrl = it },
+                        label = { Text(stringResource(R.string.settings_geosite_url_label)) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        supportingText = {
+                            if (geositeUpdating) {
+                                GeoDataDownloadStatus(geoDataDownloadProgress[GeoDataAsset.GEOSITE])
+                            } else {
+                                Text(stringResource(R.string.settings_geosite_url_supporting_text))
+                            }
+                        },
+                        trailingIcon = {
+                            IconButton(
+                                onClick = { viewModel.updateGeositeAsset(editingGeositeUrl) },
+                                enabled = !geoDataOperationInProgress,
+                            ) {
+                                if (geositeUpdating) {
+                                    val description = stringResource(R.string.settings_geosite_updating)
+                                    GeoDataCircularProgress(
+                                        progress = geoDataDownloadProgress[GeoDataAsset.GEOSITE],
+                                        description = description,
+                                    )
+                                } else {
+                                    Icon(
+                                        Icons.Default.Refresh,
+                                        contentDescription = stringResource(R.string.settings_update_geosite),
+                                    )
+                                }
+                            }
+                        },
+                    )
+                    if (hasGeositeUrlChanges) {
+                        Button(onClick = { viewModel.setGeositeUrl(editingGeositeUrl) }) {
+                            Text(stringResource(R.string.settings_save))
+                        }
+                    }
+                }
+            }
+
+            if (showAdvancedOptions) {
+                item(key = "latency_check_url") {
+                    Column(
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                    ) {
+                        OutlinedTextField(
+                            value = editingLatencyCheckUrl,
+                            onValueChange = { editingLatencyCheckUrl = it },
+                            label = { Text(stringResource(R.string.settings_latency_check_url_label)) },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            supportingText = { Text(stringResource(R.string.settings_latency_check_url_supporting_text)) },
+                        )
+                        if (hasLatencyCheckUrlChanges) {
+                            Button(onClick = { viewModel.setLatencyCheckUrl(editingLatencyCheckUrl) }) {
+                                Text(stringResource(R.string.settings_save))
+                            }
+                        }
+                    }
+                }
+            }
+
+            item(key = "data_header") {
+                Column(
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    HorizontalDivider()
+                    Text(stringResource(R.string.settings_section_data), style = MaterialTheme.typography.titleMedium)
+                }
+            }
+            item(key = "backup") {
                 Row(
                     modifier = Modifier.padding(horizontal = 16.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -984,169 +870,140 @@ private fun SettingsScreenContent(
                     }
                 }
             }
-        }
-
-        item(key = "show_advanced_options") {
-            SettingsSwitchRow(
-                title = stringResource(R.string.settings_show_advanced_options),
-                description = stringResource(R.string.settings_show_advanced_options_description),
-                checked = showAdvancedOptions,
-                onCheckedChange = viewModel::setShowAdvancedOptions,
-            )
-        }
-
-        if (showAdvancedOptions) {
-            item(key = "database_reset") {
-                SettingsActionRow(
-                    title = stringResource(R.string.settings_reset_internal_database),
-                    subtitle = stringResource(
-                        if (databaseResetting) {
-                            R.string.settings_resetting_internal_database
-                        } else {
-                            R.string.settings_reset_internal_database_description
-                        },
-                    ),
-                    enabled = !databaseResetting,
-                    onClick = { showResetDatabaseDialog = true },
-                )
-            }
-        }
-    }
-
-    val aboutItems: LazyListScope.() -> Unit = {
-        item(key = "update_checks") {
-            SettingsSwitchRow(
-                title = stringResource(R.string.settings_app_update_checks_title),
-                description = stringResource(R.string.settings_app_update_checks_description),
-                checked = appUpdateChecksEnabled,
-                onCheckedChange = viewModel::setAppUpdateChecksEnabled,
-            )
-        }
-        item(key = "check_for_updates") {
-            SettingsActionRow(
-                title = stringResource(R.string.settings_check_for_updates),
-                subtitle = appUpdateCheckDescription,
-                enabled = !appUpdateCheckInProgress,
-                inProgress = appUpdateCheckInProgress,
-                onClick = viewModel::checkForAppUpdate,
-            )
-        }
-        item(key = "licenses") {
-            SettingsActionRow(
-                title = stringResource(R.string.settings_open_source_licenses),
-                subtitle = stringResource(R.string.settings_open_source_licenses_description),
-                onClick = { showOpenSourceLicensesDialog = true },
-            )
-        }
-        item(key = "app_version") {
-            val appVersion = remember(context) {
-                runCatching {
-                    @Suppress("DEPRECATION")
-                    context.packageManager.getPackageInfo(context.packageName, 0).versionName
-                }.getOrNull()
-            }
-            Text(
-                text = if (appVersion == null) {
-                    stringResource(R.string.settings_app_version_unknown, stringResource(R.string.app_name))
-                } else {
-                    stringResource(R.string.settings_app_version, stringResource(R.string.app_name), appVersion)
-                },
-                modifier = Modifier.padding(horizontal = 16.dp),
-                style = MaterialTheme.typography.bodyMedium,
-            )
-        }
-        item(key = "xray_version") {
-            Text(
-                xrayCoreVersionText,
-                modifier = Modifier.padding(horizontal = 16.dp),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-
-    fun sectionItems(section: SettingsSection): LazyListScope.() -> Unit = when (section) {
-        SettingsSection.Service -> serviceItems
-        SettingsSection.Appearance -> appearanceItems
-        SettingsSection.Routing -> routingItems
-        SettingsSection.Core -> coreItems
-        SettingsSection.Dns -> {
-            { dnsSettingsItems(settings, viewModel) }
-        }
-        SettingsSection.General -> generalItems
-        SettingsSection.About -> aboutItems
-    }
-
-    if (twoPane) {
-        Scaffold(
-            modifier = Modifier.nestedScroll(topAppBarScrollBehavior.nestedScrollConnection),
-            contentWindowInsets = WindowInsets(0.dp),
-            topBar = {
-                ScrolledTopAppBar(
-                    title = stringResource(R.string.settings_title),
-                    scrollBehavior = topAppBarScrollBehavior,
-                    showLogo = showTitleBarLogo,
-                )
-            },
-        ) { padding ->
-            Row(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding),
-            ) {
-                SettingsSectionList(
-                    selected = openSection,
-                    onSelect = onOpenSection,
-                    modifier = Modifier
-                        .width(SettingsSectionListWidth)
-                        .fillMaxHeight(),
-                )
-                AnimatedContent(
-                    targetState = openSection ?: SettingsSection.entries.first(),
-                    modifier = Modifier.weight(1f),
-                    transitionSpec = { fadeIn(tween(SUBPAGE_FADE_MS)) togetherWith fadeOut(tween(SUBPAGE_FADE_MS)) },
-                    label = "settingsSection",
-                ) { section ->
-                    SettingsSectionContent {
-                        settingsSectionHeader(section)
-                        sectionItems(section)()
+            if (showAdvancedOptions) {
+                item(key = "clear_geodata") {
+                    OutlinedButton(
+                        onClick = viewModel::clearGeoData,
+                        enabled = connectionState is ConnectionState.Disconnected && !geoDataOperationInProgress,
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                    ) {
+                        Text(
+                            stringResource(
+                                if (geoDataClearing) {
+                                    R.string.settings_clearing_geodata
+                                } else {
+                                    R.string.settings_clear_geodata
+                                },
+                            ),
+                        )
                     }
                 }
-            }
-        }
-    } else {
-        // A narrow window opens on the list of sections and pushes each one as a page of its own.
-        AnimatedContent(
-            targetState = openSection,
-            transitionSpec = {
-                val opening = targetState != null
-                (
-                    fadeIn(tween(SUBPAGE_FADE_MS)) +
-                        slideInHorizontally(tween(SUBPAGE_FADE_MS)) { width -> if (opening) width / 8 else -width / 8 }
-                    ) togetherWith fadeOut(tween(SUBPAGE_FADE_MS)) using null
-            },
-            label = "settingsPage",
-        ) { section ->
-            if (section == null) {
-                SettingsPage(
-                    title = stringResource(R.string.settings_title),
-                    showLogo = showTitleBarLogo,
-                    onBack = null,
-                ) {
-                    SettingsSectionList(
-                        selected = null,
-                        onSelect = onOpenSection,
-                        modifier = Modifier.fillMaxSize(),
+                item(key = "database_reset") {
+                    SettingsActionRow(
+                        title = stringResource(R.string.settings_reset_internal_database),
+                        subtitle = stringResource(
+                            if (databaseResetting) {
+                                R.string.settings_resetting_internal_database
+                            } else {
+                                R.string.settings_reset_internal_database_description
+                            },
+                        ),
+                        enabled = !databaseResetting,
+                        onClick = { showResetDatabaseDialog = true },
                     )
                 }
-            } else {
-                SettingsPage(
-                    title = stringResource(section.titleRes),
-                    showLogo = false,
-                    onBack = onCloseSection,
+            }
+
+            item(key = "settings_header") {
+                Column(
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
-                    SettingsSectionContent(content = sectionItems(section))
+                    HorizontalDivider()
+                    Text(stringResource(R.string.settings_title), style = MaterialTheme.typography.titleMedium)
                 }
+            }
+            item(key = "app_settings") {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    // A provider may pin its hardware ID policy onto the selected server; while
+                    // that policy is active the toggle cannot be turned off from Settings.
+                    val selectedSubscriptionRequiresHwid =
+                        viewModel.selectedSubscriptionRequiresHwid.collectAsStateWithLifecycle().value
+                    val hwidLockedBySubscription = selectedSubscriptionRequiresHwid && subscriptionSendHardwareId
+                    SettingsSwitchRow(
+                        title = stringResource(R.string.settings_send_hardware_id_title),
+                        description = stringResource(
+                            if (hwidLockedBySubscription) {
+                                R.string.settings_send_hardware_id_locked
+                            } else {
+                                R.string.settings_send_hardware_id_description
+                            },
+                        ),
+                        checked = subscriptionSendHardwareId,
+                        onCheckedChange = viewModel::setSubscriptionSendHardwareId,
+                        enabled = !hwidLockedBySubscription,
+                    )
+                    SettingsSwitchRow(
+                        title = stringResource(R.string.settings_diagnostics_title),
+                        description = stringResource(R.string.settings_diagnostics_description),
+                        checked = diagnosticsEnabled,
+                        onCheckedChange = viewModel::setDiagnosticsEnabled,
+                    )
+                    SettingsSwitchRow(
+                        title = stringResource(R.string.settings_show_advanced_options),
+                        checked = showAdvancedOptions,
+                        onCheckedChange = viewModel::setShowAdvancedOptions,
+                    )
+                }
+            }
+
+            item(key = "about_header") {
+                Column(
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    HorizontalDivider()
+                    Text(stringResource(R.string.settings_section_about), style = MaterialTheme.typography.titleMedium)
+                }
+            }
+            item(key = "update_checks") {
+                SettingsSwitchRow(
+                    title = stringResource(R.string.settings_app_update_checks_title),
+                    description = stringResource(R.string.settings_app_update_checks_description),
+                    checked = appUpdateChecksEnabled,
+                    onCheckedChange = viewModel::setAppUpdateChecksEnabled,
+                )
+            }
+            item(key = "check_for_updates") {
+                SettingsActionRow(
+                    title = stringResource(R.string.settings_check_for_updates),
+                    subtitle = appUpdateCheckDescription,
+                    enabled = !appUpdateCheckInProgress,
+                    inProgress = appUpdateCheckInProgress,
+                    onClick = viewModel::checkForAppUpdate,
+                )
+            }
+            item(key = "licenses") {
+                SettingsActionRow(
+                    title = stringResource(R.string.settings_open_source_licenses),
+                    subtitle = stringResource(R.string.settings_open_source_licenses_description),
+                    onClick = { showOpenSourceLicensesDialog = true },
+                )
+            }
+            item(key = "app_version") {
+                val appVersion = remember(context) {
+                    runCatching {
+                        @Suppress("DEPRECATION")
+                        context.packageManager.getPackageInfo(context.packageName, 0).versionName
+                    }.getOrNull()
+                }
+                Text(
+                    text = if (appVersion == null) {
+                        stringResource(R.string.settings_app_version_unknown, stringResource(R.string.app_name))
+                    } else {
+                        stringResource(R.string.settings_app_version, stringResource(R.string.app_name), appVersion)
+                    },
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
+            item(key = "xray_version") {
+                Text(
+                    xrayCoreVersionText,
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
     }
@@ -1240,6 +1097,12 @@ private fun SettingsServiceSection(
     onAutoConnectChange: (Boolean) -> Unit,
     onOpenOemAutostartSettings: () -> Unit,
 ) {
+    Text(
+        text = stringResource(R.string.settings_section_service),
+        modifier = Modifier.padding(horizontal = 16.dp),
+        style = MaterialTheme.typography.titleMedium,
+    )
+
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         SettingsSwitchRow(
             title = stringResource(R.string.settings_use_root_service),
