@@ -2,6 +2,7 @@ package com.material.xray.service
 
 import com.material.xray.model.ConnectionState
 import com.material.xray.model.ServerConfig
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -43,9 +44,18 @@ internal class ConnectionLifecycle(
     private val onConnected: () -> Unit,
     private val onExhausted: suspend (ConnectionFailure) -> Unit,
     private val onCommandFailure: suspend (Throwable) -> Unit,
+    private val onIdle: () -> Unit,
 ) {
     private val commandMutex = Mutex()
     private val latestCommandVersion = AtomicLong()
+    private val outstandingCommands = AtomicInteger()
+
+    /**
+     * True from the moment a command is requested until it has finished, including while it waits
+     * for the lock or its settle delay. [onIdle] runs whenever this turns false again.
+     */
+    val isBusy: Boolean
+        get() = outstandingCommands.get() > 0
 
     @Volatile
     var activeConfig: ServerConfig? = null
@@ -66,14 +76,14 @@ internal class ConnectionLifecycle(
     // Catching Throwable is the point here: this is the last barrier before the dispatcher's
     // uncaught handler, which would kill the process with the tunnel still established.
     fun launch(block: suspend () -> Unit) {
-        scope.launch {
+        launchTracked {
             serialized { runCommand(block) }
         }
     }
 
     fun launchLatest(settleDelayMillis: Long = 0, block: suspend () -> Unit) {
         val version = latestCommandVersion.incrementAndGet()
-        scope.launch {
+        launchTracked {
             if (settleDelayMillis > 0) delay(settleDelayMillis)
             serialized {
                 if (version == latestCommandVersion.get()) runCommand(block)
@@ -81,13 +91,37 @@ internal class ConnectionLifecycle(
         }
     }
 
-    suspend fun <T> serialized(block: suspend () -> T): T = commandMutex.withLock {
-        beforeCommand()
+    suspend fun <T> serialized(block: suspend () -> T): T {
+        outstandingCommands.incrementAndGet()
         try {
-            return@withLock block()
+            return commandMutex.withLock {
+                beforeCommand()
+                try {
+                    block()
+                } finally {
+                    afterCommand()
+                }
+            }
         } finally {
-            afterCommand()
+            finishCommand()
         }
+    }
+
+    // The command is counted before the coroutine is dispatched, so a caller that requests one and
+    // then inspects the service state in the same main-thread turn already sees it as pending.
+    private fun launchTracked(block: suspend () -> Unit) {
+        outstandingCommands.incrementAndGet()
+        scope.launch {
+            try {
+                block()
+            } finally {
+                finishCommand()
+            }
+        }
+    }
+
+    private fun finishCommand() {
+        if (outstandingCommands.decrementAndGet() == 0) onIdle()
     }
 
     @Suppress("TooGenericExceptionCaught")

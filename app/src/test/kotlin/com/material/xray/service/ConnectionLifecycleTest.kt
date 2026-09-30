@@ -141,11 +141,56 @@ class ConnectionLifecycleTest {
         assertTrue(backgroundScope.coroutineContext.job.isActive)
     }
 
+    @Test
+    fun `a requested command counts as busy until it and everything queued behind it finish`() = runTest {
+        val releaseFirst = CompletableDeferred<Unit>()
+        var idleCalls = 0
+        lateinit var lifecycle: ConnectionLifecycle
+        val busyWhenIdle = mutableListOf<Boolean>()
+        lifecycle = lifecycle(
+            runAttempt = { true },
+            onIdle = {
+                idleCalls++
+                busyWhenIdle += lifecycle.isBusy
+            },
+        )
+
+        assertFalse(lifecycle.isBusy)
+        lifecycle.launch { releaseFirst.await() }
+        assertTrue(lifecycle.isBusy)
+        lifecycle.launchLatest(200) {}
+        runCurrent()
+        advanceTimeBy(300)
+        runCurrent()
+        assertTrue(lifecycle.isBusy)
+        assertEquals(0, idleCalls)
+
+        releaseFirst.complete(Unit)
+        runCurrent()
+
+        assertFalse(lifecycle.isBusy)
+        assertEquals(1, idleCalls)
+        assertEquals(listOf(false), busyWhenIdle)
+    }
+
+    @Test
+    fun `a failed command still returns the lifecycle to idle`() = runTest {
+        var idleCalls = 0
+        val lifecycle = lifecycle(runAttempt = { true }, onIdle = { idleCalls++ })
+
+        lifecycle.launch { throw IllegalStateException("boom") }
+        runCurrent()
+
+        assertFalse(lifecycle.isBusy)
+        assertEquals(1, idleCalls)
+    }
+
     private fun TestScope.lifecycle(
         runAttempt: suspend (ConnectionRequest) -> Boolean,
         currentFailure: () -> ConnectionFailure = { ConnectionFailure("failed", retryable = true) },
         onExhausted: (ConnectionFailure) -> Unit = {},
         onCommandFailure: suspend (Throwable) -> Unit = {},
+        onIdle: () -> Unit = {},
     ) = ConnectionLifecycle(
         scope = backgroundScope,
         beforeCommand = {},
@@ -155,6 +200,7 @@ class ConnectionLifecycleTest {
         onConnected = {},
         onExhausted = onExhausted,
         onCommandFailure = onCommandFailure,
+        onIdle = onIdle,
     )
 
     private companion object {

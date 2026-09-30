@@ -268,6 +268,9 @@ class XrayService : VpnService() {
                 }
             },
             onCommandFailure = ::handleUnexpectedCommandFailure,
+            onIdle = {
+                if (connectionStateCoordinator.state.value is ConnectionState.Disconnected) updateNotification()
+            },
         )
         healthWatchdog = XrayHealthWatchdog(
             scope = scope,
@@ -2025,6 +2028,11 @@ class XrayService : VpnService() {
     private fun updateNotification(overrideText: String? = null) {
         val state = connectionStateCoordinator.state.value
         if (state is ConnectionState.Disconnected) {
+            // A fresh service starts out Disconnected before its first command has even run, and
+            // commands pass through Disconnected while they rebuild the tunnel. Dropping foreground
+            // then would leave the process throttled as background work for the rest of the
+            // session, so the notification is only withdrawn once the service has gone idle.
+            if (connectionLifecycle.isBusy) return
             lastNotificationContent = null
             getSystemService(NotificationManager::class.java).cancel(NOTIFICATION_ID)
             stopForeground(STOP_FOREGROUND_REMOVE)
