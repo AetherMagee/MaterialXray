@@ -7,13 +7,11 @@ import android.graphics.drawable.Drawable
 import android.os.Process
 import android.os.UserHandle
 import android.os.UserManager
-import dagger.hilt.android.qualifiers.ApplicationContext
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
+import org.koin.core.annotation.Singleton
 
 data class InstalledApp(
     val appKey: String,
@@ -37,8 +35,8 @@ interface AppInventorySource {
 }
 
 @Singleton
-class AppInventory @Inject constructor(
-    @param:ApplicationContext private val context: Context,
+class AppInventory(
+    private val context: Context,
 ) : AppInventorySource {
     suspend fun loadInstalledApps(): List<InstalledApp> = loadSnapshot().apps
 

@@ -6,14 +6,12 @@ import com.material.xray.core.root.RootShell
 import com.material.xray.core.xray.FirewallCommands.IPV4 as IPTABLES
 import com.material.xray.core.xray.FirewallCommands.IPV6 as IP6TABLES
 import com.material.xray.telemetry.TelemetryReporter
-import dagger.hilt.android.qualifiers.ApplicationContext
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import org.koin.core.annotation.Singleton
 
 sealed interface TproxyCompatibility {
     data object Unknown : TproxyCompatibility
@@ -78,9 +76,9 @@ internal fun TproxyCompatibility.isConclusive(): Boolean = when (this) {
 }
 
 @Singleton
-class TproxyCompatibilityDetector @Inject constructor(
+class TproxyCompatibilityDetector(
     private val shell: RootShell,
-    @ApplicationContext context: Context,
+    context: Context,
     private val telemetryReporter: TelemetryReporter,
 ) {
     private val appUid = context.applicationInfo.uid

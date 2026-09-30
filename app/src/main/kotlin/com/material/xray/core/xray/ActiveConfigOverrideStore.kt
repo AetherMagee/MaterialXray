@@ -1,12 +1,10 @@
 package com.material.xray.core.xray
 
 import android.content.Context
-import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.koin.core.annotation.Singleton
 
 /**
  * Stores a hand-edited runtime config that replaces config generation on every connect.
@@ -16,8 +14,8 @@ import kotlinx.coroutines.withContext
  * selected when it was written, which is why every path that changes the selected server clears it.
  */
 @Singleton
-class ActiveConfigOverrideStore @Inject constructor(
-    @ApplicationContext context: Context,
+class ActiveConfigOverrideStore(
+    context: Context,
 ) {
     private val file = context.filesDir.resolve(ACTIVE_CONFIG_OVERRIDE_FILE)
 

@@ -1,6 +1,6 @@
 package com.material.xray.di
 
-import javax.inject.Qualifier
+import org.koin.core.annotation.Qualifier
 
 /**
  * Qualifies the process-wide [kotlinx.coroutines.CoroutineScope] that outlives every screen and

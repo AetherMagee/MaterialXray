@@ -76,7 +76,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.material.xray.R
 import com.material.xray.data.parser.ProfileRoutingRule
@@ -92,6 +91,7 @@ import com.material.xray.ui.components.AppTopBarHeight
 import com.material.xray.ui.components.ScrollFadeEdges
 import com.material.xray.ui.components.SegmentedTabRow
 import kotlinx.coroutines.launch
+import org.koin.compose.viewmodel.koinViewModel
 
 private enum class RoutingTab(@StringRes val titleResource: Int) {
     Rules(R.string.routing_tab_rules),
@@ -120,7 +120,7 @@ fun RoutingScreen(
     showTitleBarLogo: Boolean,
     onViewRule: (RoutingRuleViewerRequest) -> Unit,
     onEditRule: (EditableRoutingRule) -> Unit,
-    viewModel: RoutingViewModel = hiltViewModel(),
+    viewModel: RoutingViewModel = koinViewModel(),
 ) {
     val rules by viewModel.rules.collectAsStateWithLifecycle()
     val subscriptionRules by viewModel.subscriptionRules.collectAsStateWithLifecycle()

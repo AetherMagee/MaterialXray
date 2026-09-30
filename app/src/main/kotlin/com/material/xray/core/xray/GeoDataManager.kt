@@ -3,12 +3,9 @@ package com.material.xray.core.xray
 import android.content.Context
 import com.material.xray.core.network.AppHttpClient
 import com.material.xray.data.repository.SettingsRepository
-import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
 import java.io.IOException
 import java.io.InputStream
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -24,6 +21,7 @@ import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.ResponseBody
+import org.koin.core.annotation.Singleton
 
 internal const val GEOIP_FILE_NAME = "geoip.dat"
 internal const val GEOSITE_FILE_NAME = "geosite.dat"
@@ -88,8 +86,8 @@ enum class GeoDataAsset {
 }
 
 @Singleton
-class GeoDataManager @Inject constructor(
-    @ApplicationContext private val context: Context,
+class GeoDataManager(
+    private val context: Context,
     private val httpClient: AppHttpClient,
     private val settingsRepository: SettingsRepository,
 ) {

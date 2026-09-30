@@ -3,11 +3,10 @@ package com.material.xray.ui.navigation
 import androidx.lifecycle.ViewModel
 import com.material.xray.service.RoutingChangeManager
 import com.material.xray.ui.settings.SettingsDataState
-import dagger.hilt.android.lifecycle.HiltViewModel
-import javax.inject.Inject
+import org.koin.core.annotation.KoinViewModel
 
-@HiltViewModel
-class MainNavigationViewModel @Inject constructor(
+@KoinViewModel
+class MainNavigationViewModel(
     private val routingChangeManager: RoutingChangeManager,
     settingsDataState: SettingsDataState,
 ) : ViewModel() {

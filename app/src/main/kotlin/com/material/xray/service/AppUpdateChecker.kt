@@ -17,15 +17,13 @@ import com.material.xray.data.repository.AppUpdateRepository
 import com.material.xray.data.repository.SettingsRepository
 import com.material.xray.model.AppUpdate
 import com.material.xray.model.AppUpdateCheckStatus
-import dagger.hilt.android.qualifiers.ApplicationContext
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import org.koin.core.annotation.Singleton
 
 @Singleton
-class AppUpdateChecker @Inject constructor(
+class AppUpdateChecker(
     private val repository: AppUpdateRepository,
     private val settingsRepository: SettingsRepository,
     private val notifier: AppUpdateNotifier,
@@ -58,8 +56,8 @@ class AppUpdateChecker @Inject constructor(
 }
 
 @Singleton
-class AppUpdateNotifier @Inject constructor(
-    @param:ApplicationContext private val context: Context,
+class AppUpdateNotifier(
+    private val context: Context,
 ) {
     fun show(update: AppUpdate): Boolean {
         if (!canPostNotifications()) return false

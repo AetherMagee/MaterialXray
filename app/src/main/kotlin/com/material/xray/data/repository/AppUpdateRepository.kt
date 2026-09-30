@@ -9,18 +9,16 @@ import com.material.xray.model.AppUpdate
 import com.material.xray.model.AppUpdateCheckStatus
 import com.material.xray.model.isReleaseNewer
 import com.material.xray.model.isUpdateCheckDue
-import dagger.hilt.android.qualifiers.ApplicationContext
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import org.koin.core.annotation.Singleton
 
 private val Context.appUpdateDataStore by preferencesDataStore(name = "app_update")
 
 @Singleton
-class AppUpdateRepository @Inject constructor(
-    @param:ApplicationContext private val context: Context,
+class AppUpdateRepository(
+    private val context: Context,
     private val releaseFetcher: GitHubReleaseFetcher,
 ) {
     private val store get() = context.appUpdateDataStore

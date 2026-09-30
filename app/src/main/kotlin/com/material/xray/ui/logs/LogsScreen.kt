@@ -55,7 +55,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.material.xray.R
 import com.material.xray.service.LogEntry
@@ -70,6 +69,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import kotlinx.coroutines.launch
+import org.koin.compose.viewmodel.koinViewModel
 
 private enum class LogFilter(@param:StringRes val labelRes: Int) {
     ALL(R.string.logs_filter_all),
@@ -94,7 +94,7 @@ internal fun LogEntry.severity(): LogSeverity = when (source) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LogsScreen(showTitleBarLogo: Boolean, viewModel: LogsViewModel = hiltViewModel()) {
+fun LogsScreen(showTitleBarLogo: Boolean, viewModel: LogsViewModel = koinViewModel()) {
     val allEntries by viewModel.entries.collectAsStateWithLifecycle()
     val pagerState = rememberPagerState(pageCount = { LogFilter.entries.size })
     val coroutineScope = rememberCoroutineScope()

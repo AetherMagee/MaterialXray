@@ -4,8 +4,6 @@ import com.material.xray.data.repository.SettingsRepository
 import com.material.xray.data.repository.SettingsSnapshot
 import com.material.xray.data.repository.SubscriptionRepository
 import com.material.xray.di.ApplicationScope
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.SharingStarted
@@ -13,10 +11,11 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import org.koin.core.annotation.Singleton
 
 /** Process-wide settings snapshot, loaded before the Settings screen is first composed. */
 @Singleton
-class SettingsDataState @Inject constructor(
+class SettingsDataState(
     settingsRepository: SettingsRepository,
     subscriptionRepository: SubscriptionRepository,
     @ApplicationScope scope: CoroutineScope,

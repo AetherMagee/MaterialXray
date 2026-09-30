@@ -2,9 +2,8 @@ package com.material.xray.data.parser
 
 import android.content.Context
 import android.provider.Settings
-import dagger.hilt.android.qualifiers.ApplicationContext
 import java.util.UUID
-import javax.inject.Inject
+import org.koin.core.annotation.Factory
 
 interface SubscriptionDeviceIdentity {
     fun appVersion(): String
@@ -12,8 +11,9 @@ interface SubscriptionDeviceIdentity {
     fun hardwareId(): String
 }
 
-internal class AndroidSubscriptionDeviceIdentity @Inject constructor(
-    @ApplicationContext private val context: Context,
+@Factory
+internal class AndroidSubscriptionDeviceIdentity(
+    private val context: Context,
 ) : SubscriptionDeviceIdentity {
     private val preferences by lazy {
         context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)

@@ -22,9 +22,9 @@ import org.jlleitschuh.gradle.ktlint.reporter.ReporterType
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.ksp)
-    alias(libs.plugins.hilt)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.compose.compiler)
+    alias(libs.plugins.koin.compiler)
     alias(libs.plugins.protobuf)
     alias(libs.plugins.sentry.android)
     id("dev.detekt") version ("2.0.0-alpha.5")
@@ -311,7 +311,7 @@ ktlint {
         reporter(ReporterType.HTML)
     }
     filter {
-        // KSP (Hilt/Room) and protobuf/grpc write Kotlin/Java into build/generated;
+        // KSP (Room) and protobuf/grpc write Kotlin/Java into build/generated;
         // those are attached to the source sets, so exclude them from linting.
         exclude { element -> element.file.path.contains("/generated/") }
     }
@@ -348,7 +348,7 @@ tasks.matching { task ->
 
 protobuf {
     protoc {
-        // Match grpc-protobuf-lite's 3.x javalite runtime; protobuf 4.x jars currently break Hilt metadata parsing.
+        // Match grpc-protobuf-lite's 3.x javalite runtime.
         artifact = "com.google.protobuf:protoc:3.25.8"
     }
     plugins {
@@ -392,10 +392,11 @@ dependencies {
     implementation(libs.core.splashscreen)
     implementation(libs.work.runtime.ktx)
 
-    implementation(libs.hilt.android)
-    ksp(libs.hilt.compiler)
-    ksp(libs.kotlin.metadata.jvm)
-    implementation(libs.hilt.navigation.compose)
+    implementation(platform(libs.koin.bom))
+    implementation(libs.koin.android)
+    implementation(libs.koin.annotations)
+    implementation(libs.koin.androidx.compose)
+    implementation(libs.koin.androidx.workmanager)
 
     implementation(libs.room.runtime)
     ksp(libs.room.compiler)

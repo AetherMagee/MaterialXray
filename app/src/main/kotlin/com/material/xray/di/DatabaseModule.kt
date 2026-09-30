@@ -7,20 +7,15 @@ import com.material.xray.data.db.DatabaseMigrations
 import com.material.xray.data.db.dao.AppBypassDao
 import com.material.xray.data.db.dao.ServerDao
 import com.material.xray.data.db.dao.SubscriptionDao
-import dagger.Module
-import dagger.Provides
-import dagger.hilt.InstallIn
-import dagger.hilt.android.qualifiers.ApplicationContext
-import dagger.hilt.components.SingletonComponent
-import javax.inject.Singleton
+import org.koin.core.annotation.Factory
+import org.koin.core.annotation.Module
+import org.koin.core.annotation.Singleton
 
 @Module
-@InstallIn(SingletonComponent::class)
-object DatabaseModule {
+class DatabaseModule {
 
-    @Provides
     @Singleton
-    fun provideDatabase(@ApplicationContext context: Context): AppDatabase = Room.databaseBuilder(
+    fun database(context: Context): AppDatabase = Room.databaseBuilder(
         context,
         AppDatabase::class.java,
         AppDatabase.DATABASE_NAME,
@@ -30,12 +25,12 @@ object DatabaseModule {
         // An incompatible schema must fail without deleting subscriptions or routing data.
         .build()
 
-    @Provides
-    fun provideServerDao(db: AppDatabase): ServerDao = db.serverDao()
+    @Factory
+    fun serverDao(db: AppDatabase): ServerDao = db.serverDao()
 
-    @Provides
-    fun provideSubscriptionDao(db: AppDatabase): SubscriptionDao = db.subscriptionDao()
+    @Factory
+    fun subscriptionDao(db: AppDatabase): SubscriptionDao = db.subscriptionDao()
 
-    @Provides
-    fun provideAppBypassDao(db: AppDatabase): AppBypassDao = db.appBypassDao()
+    @Factory
+    fun appBypassDao(db: AppDatabase): AppBypassDao = db.appBypassDao()
 }

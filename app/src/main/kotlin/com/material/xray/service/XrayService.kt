@@ -69,12 +69,10 @@ import com.material.xray.telemetry.CoreRecoveryCause
 import com.material.xray.telemetry.TelemetryConnectionContext
 import com.material.xray.telemetry.TelemetryReporter
 import com.material.xray.telemetry.TelemetryServiceMode
-import dagger.hilt.android.AndroidEntryPoint
 import java.io.FileDescriptor
 import java.io.PrintWriter
 import java.text.NumberFormat
 import java.util.Locale
-import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -94,38 +92,38 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import org.koin.android.ext.android.inject
 
 @Suppress("LargeClass")
-@AndroidEntryPoint
 class XrayService : VpnService() {
 
-    @Inject lateinit var rootShell: RootShell
+    private val rootShell: RootShell by inject()
 
-    @Inject lateinit var appBypassDao: AppBypassDao
+    private val appBypassDao: AppBypassDao by inject()
 
-    @Inject lateinit var serverRepository: ServerRepository
+    private val serverRepository: ServerRepository by inject()
 
-    @Inject lateinit var settingsRepo: SettingsRepository
+    private val settingsRepo: SettingsRepository by inject()
 
-    @Inject lateinit var connectionStateCoordinator: ConnectionStateCoordinator
+    private val connectionStateCoordinator: ConnectionStateCoordinator by inject()
 
-    @Inject lateinit var alwaysOnVpnState: AlwaysOnVpnState
+    private val alwaysOnVpnState: AlwaysOnVpnState by inject()
 
-    @Inject lateinit var logBuffer: LogBuffer
+    private val logBuffer: LogBuffer by inject()
 
-    @Inject lateinit var connectionManagerFactory: ConnectionManagerFactory
+    private val connectionManagerFactory: ConnectionManagerFactory by inject()
 
-    @Inject lateinit var providerRoutingCoordinator: ProviderRoutingCoordinator
+    private val providerRoutingCoordinator: ProviderRoutingCoordinator by inject()
 
-    @Inject lateinit var startupDiagnosticsLogger: StartupDiagnosticsLogger
+    private val startupDiagnosticsLogger: StartupDiagnosticsLogger by inject()
 
-    @Inject lateinit var serverLatencyTester: ServerLatencyTester
+    private val serverLatencyTester: ServerLatencyTester by inject()
 
-    @Inject lateinit var tproxyCompatibilityDetector: TproxyCompatibilityDetector
+    private val tproxyCompatibilityDetector: TproxyCompatibilityDetector by inject()
 
-    @Inject lateinit var activeConfigOverrideStore: ActiveConfigOverrideStore
+    private val activeConfigOverrideStore: ActiveConfigOverrideStore by inject()
 
-    @Inject lateinit var telemetryReporter: TelemetryReporter
+    private val telemetryReporter: TelemetryReporter by inject()
 
     private lateinit var connectionManager: ConnectionManager
     private lateinit var connectionLifecycle: ConnectionLifecycle

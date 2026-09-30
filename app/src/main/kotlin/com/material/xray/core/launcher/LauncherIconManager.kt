@@ -4,13 +4,11 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.pm.PackageManager
 import com.material.xray.model.LauncherIcon
-import dagger.hilt.android.qualifiers.ApplicationContext
-import javax.inject.Inject
-import javax.inject.Singleton
+import org.koin.core.annotation.Singleton
 
 @Singleton
-class LauncherIconManager @Inject constructor(
-    @param:ApplicationContext private val context: Context,
+class LauncherIconManager(
+    private val context: Context,
 ) {
     fun apply(icon: LauncherIcon) {
         val packageManager = context.packageManager

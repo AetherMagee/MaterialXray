@@ -1,16 +1,15 @@
 package com.material.xray.data.db
 
 import android.util.Log
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import org.koin.core.annotation.Singleton
 
 @Singleton
-class DatabaseOpenChecker @Inject constructor(private val database: AppDatabase) {
+class DatabaseOpenChecker(private val database: AppDatabase) {
     private val mutex = Mutex()
     private var result: Boolean? = null
 

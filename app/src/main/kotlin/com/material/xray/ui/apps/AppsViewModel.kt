@@ -1,6 +1,6 @@
 package com.material.xray.ui.apps
 
-import android.content.Context
+import android.app.Application
 import android.graphics.drawable.Drawable
 import androidx.annotation.PluralsRes
 import androidx.annotation.StringRes
@@ -30,9 +30,6 @@ import com.material.xray.model.proxyOutboundCount
 import com.material.xray.service.AlwaysOnVpnState
 import com.material.xray.service.PendingRoutingChange
 import com.material.xray.service.RoutingChangeManager
-import dagger.hilt.android.lifecycle.HiltViewModel
-import dagger.hilt.android.qualifiers.ApplicationContext
-import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -46,6 +43,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import org.koin.core.annotation.KoinViewModel
 
 data class AppItem(
     val appKey: String,
@@ -103,9 +101,9 @@ private data class AppListFilters(
     val showWorkProfileApps: Boolean,
 )
 
-@HiltViewModel
-class AppsViewModel @Inject constructor(
-    @param:ApplicationContext private val context: Context,
+@KoinViewModel
+class AppsViewModel(
+    private val context: Application,
     private val appBypassDao: AppBypassDao,
     private val subscriptionDao: SubscriptionDao,
     private val serverRepository: ServerRepository,

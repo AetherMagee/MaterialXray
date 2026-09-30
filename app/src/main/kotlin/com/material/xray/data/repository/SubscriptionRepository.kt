@@ -18,17 +18,16 @@ import com.material.xray.model.SubscriptionRouting
 import com.material.xray.model.SubscriptionUserAgentMode
 import com.material.xray.model.parseSubscriptionHeaders
 import java.io.IOException
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import org.koin.core.annotation.Singleton
 
 @Singleton
-class SubscriptionRepository @Inject constructor(
+class SubscriptionRepository(
     private val database: AppDatabase,
     private val subscriptionDao: SubscriptionDao,
     private val serverDao: ServerDao,

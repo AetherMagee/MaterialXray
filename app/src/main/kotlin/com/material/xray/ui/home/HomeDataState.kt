@@ -15,10 +15,7 @@ import com.material.xray.di.ApplicationScope
 import com.material.xray.model.ServerConfig
 import com.material.xray.model.endpointSummary
 import com.material.xray.model.proxyOutboundCount
-import dagger.hilt.android.qualifiers.ApplicationContext
 import java.util.Locale
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.SharingStarted
@@ -28,6 +25,7 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.serialization.json.Json
+import org.koin.core.annotation.Singleton
 
 /**
  * Everything the Home screen needs to render its first frame, produced as one atomic snapshot so
@@ -53,8 +51,8 @@ data class HomeData(
  *   render fully populated, and lets the UI distinguish "not loaded yet" from "no subscriptions".
  */
 @Singleton
-class HomeDataState @Inject constructor(
-    @param:ApplicationContext private val context: Context,
+class HomeDataState(
+    private val context: Context,
     subscriptionRepository: SubscriptionRepository,
     serverRepository: ServerRepository,
     settingsRepository: SettingsRepository,

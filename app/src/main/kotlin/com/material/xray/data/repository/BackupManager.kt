@@ -20,11 +20,8 @@ import com.material.xray.model.ServerConfig
 import com.material.xray.service.AppUpdateScheduler
 import com.material.xray.service.ConnectionStateCoordinator
 import com.material.xray.service.XrayService
-import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.ByteArrayOutputStream
 import java.io.IOException
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.first
@@ -35,10 +32,11 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import org.koin.core.annotation.Singleton
 
 @Singleton
-class BackupManager @Inject constructor(
-    @param:ApplicationContext private val context: Context,
+class BackupManager(
+    private val context: Context,
     private val database: AppDatabase,
     private val subscriptionDao: SubscriptionDao,
     private val serverDao: ServerDao,

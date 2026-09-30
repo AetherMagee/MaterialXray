@@ -16,8 +16,6 @@ import com.material.xray.service.SubscriptionUpdateScheduler
 import com.material.xray.telemetry.DiagnosticsConsentMirror
 import com.material.xray.telemetry.TelemetryReporter
 import com.material.xray.telemetry.initializeSentryTelemetry
-import dagger.hilt.android.HiltAndroidApp
-import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.delay
@@ -25,42 +23,51 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import org.koin.android.ext.android.inject
+import org.koin.android.ext.koin.androidContext
+import org.koin.androidx.workmanager.koin.workManagerFactory
+import org.koin.core.annotation.KoinApplication
+import org.koin.core.qualifier.named
+import org.koin.plugin.module.dsl.startKoin
 
-@HiltAndroidApp
+@KoinApplication
 class MaterialXrayApp : Application() {
 
-    @Inject lateinit var subscriptionUpdateScheduler: SubscriptionUpdateScheduler
+    private val subscriptionUpdateScheduler: SubscriptionUpdateScheduler by inject()
 
-    @Inject lateinit var appUpdateScheduler: AppUpdateScheduler
+    private val appUpdateScheduler: AppUpdateScheduler by inject()
 
-    @Inject lateinit var geoDataUpdateScheduler: GeoDataUpdateScheduler
+    private val geoDataUpdateScheduler: GeoDataUpdateScheduler by inject()
 
-    @Inject lateinit var settingsRepository: SettingsRepository
+    private val settingsRepository: SettingsRepository by inject()
 
-    @Inject lateinit var launcherIconManager: LauncherIconManager
+    private val launcherIconManager: LauncherIconManager by inject()
 
-    @Inject lateinit var backupManager: BackupManager
+    private val backupManager: BackupManager by inject()
 
-    @Inject lateinit var databaseOpenChecker: DatabaseOpenChecker
+    private val databaseOpenChecker: DatabaseOpenChecker by inject()
 
-    @Inject lateinit var startupDiagnosticsLogger: StartupDiagnosticsLogger
+    private val startupDiagnosticsLogger: StartupDiagnosticsLogger by inject()
 
-    @Inject lateinit var oemAutostartManager: OemAutostartManager
+    private val oemAutostartManager: OemAutostartManager by inject()
 
-    @Inject lateinit var telemetryReporter: TelemetryReporter
+    private val telemetryReporter: TelemetryReporter by inject()
 
-    @Inject @ApplicationScope
-    lateinit var appScope: CoroutineScope
+    private val appScope: CoroutineScope by inject(named<ApplicationScope>())
 
     override fun onCreate() {
         val diagnosticsConsentMirror = DiagnosticsConsentMirror(this)
-        // This must precede Hilt's injection in super.onCreate() so opted-in users can report
-        // failures while the application graph and eager startup state are being constructed.
+        // This must precede starting Koin so opted-in users can report failures while the
+        // application graph and eager startup state are being constructed.
         if (diagnosticsConsentMirror.isEnabled()) initializeSentryTelemetry(this)
-        // Initialize locales before Hilt constructs UI data when MainActivity starts, so its
+        // Initialize locales before Koin constructs UI data when MainActivity starts, so its
         // first locale-dependent server summaries use the selected language on API <= 32.
         initializeAppLocales(this)
         super.onCreate()
+        startKoin<MaterialXrayApp> {
+            androidContext(this@MaterialXrayApp)
+            workManagerFactory()
+        }
         appScope.launch(start = CoroutineStart.UNDISPATCHED) {
             settingsRepository.diagnosticsEnabled.distinctUntilChanged().collectLatest { enabled ->
                 diagnosticsConsentMirror.setEnabled(enabled)

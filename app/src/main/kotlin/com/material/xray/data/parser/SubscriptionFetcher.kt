@@ -33,7 +33,6 @@ import com.material.xray.model.SubscriptionUserAgentMode
 import java.io.IOException
 import java.security.SecureRandom
 import java.security.cert.X509Certificate
-import javax.inject.Inject
 import javax.net.ssl.SSLContext
 import javax.net.ssl.X509TrustManager
 import kotlinx.coroutines.CancellationException
@@ -52,6 +51,7 @@ import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
+import org.koin.core.annotation.Singleton
 
 data class FetchedSubscription(
     val configs: List<ServerConfig>,
@@ -83,7 +83,8 @@ class SubscriptionFetchException(
     }
 }
 
-class SubscriptionFetcher @Inject constructor(
+@Singleton
+class SubscriptionFetcher(
     private val httpClient: AppHttpClient,
     private val deviceIdentity: SubscriptionDeviceIdentity,
 ) {

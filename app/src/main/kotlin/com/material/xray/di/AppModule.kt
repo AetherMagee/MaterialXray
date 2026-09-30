@@ -3,37 +3,39 @@ package com.material.xray.di
 import android.content.Context
 import android.os.Build
 import com.material.xray.R
-import com.material.xray.core.network.ActiveCoreHttpClient
-import com.material.xray.core.network.AppHttpClient
 import com.material.xray.core.network.addBundledCaFallback
 import com.material.xray.core.network.shouldUseBundledCaFallback
 import com.material.xray.core.root.RootShell
-import com.material.xray.data.parser.AndroidSubscriptionDeviceIdentity
-import com.material.xray.data.parser.SubscriptionFetcher
-import dagger.Module
-import dagger.Provides
-import dagger.hilt.InstallIn
-import dagger.hilt.android.qualifiers.ApplicationContext
-import dagger.hilt.components.SingletonComponent
+import com.material.xray.data.db.dao.SubscriptionDao
+import com.material.xray.data.repository.ProviderRoutingCoordinator
+import com.material.xray.data.repository.ServerRepository
+import com.material.xray.data.repository.SettingsRepository
+import com.material.xray.data.repository.SubscriptionAppRoutingRepository
+import com.material.xray.data.repository.SubscriptionRoutingRepository
+import com.material.xray.service.RoutingChangeManager
+import com.material.xray.telemetry.TelemetryClient
+import com.material.xray.telemetry.TelemetryReporter
 import java.util.concurrent.TimeUnit
-import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import okhttp3.OkHttpClient
+import org.koin.core.annotation.ComponentScan
+import org.koin.core.annotation.Configuration
+import org.koin.core.annotation.Module
+import org.koin.core.annotation.Singleton
 
-@Module
-@InstallIn(SingletonComponent::class)
-object AppModule {
+@Module(includes = [DatabaseModule::class])
+@Configuration
+@ComponentScan("com.material.xray")
+class AppModule {
 
-    @Provides
     @Singleton
     @ApplicationScope
-    fun provideApplicationScope(): CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    fun applicationScope(): CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
-    @Provides
     @Singleton
-    fun provideOkHttpClient(@ApplicationContext context: Context): OkHttpClient {
+    fun okHttpClient(context: Context): OkHttpClient {
         val builder = OkHttpClient.Builder()
             .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(15, TimeUnit.SECONDS)
@@ -43,18 +45,27 @@ object AppModule {
         return builder.build()
     }
 
-    @Provides
     @Singleton
-    fun provideRootShell(): RootShell = RootShell()
+    fun rootShell(): RootShell = RootShell()
 
-    @Provides
+    // The primary constructors of these two take test seams, so the graph uses the secondary ones.
     @Singleton
-    fun provideAppHttpClient(impl: ActiveCoreHttpClient): AppHttpClient = impl
+    fun telemetryReporter(client: TelemetryClient): TelemetryReporter = TelemetryReporter(client)
 
-    @Provides
     @Singleton
-    fun provideSubscriptionFetcher(
-        client: AppHttpClient,
-        @ApplicationContext context: Context,
-    ): SubscriptionFetcher = SubscriptionFetcher(client, AndroidSubscriptionDeviceIdentity(context))
+    fun providerRoutingCoordinator(
+        settingsRepository: SettingsRepository,
+        serverRepository: ServerRepository,
+        subscriptionDao: SubscriptionDao,
+        subscriptionAppRoutingRepository: SubscriptionAppRoutingRepository,
+        subscriptionRoutingRepository: SubscriptionRoutingRepository,
+        routingChangeManager: RoutingChangeManager,
+    ): ProviderRoutingCoordinator = ProviderRoutingCoordinator(
+        settingsRepository,
+        serverRepository,
+        subscriptionDao,
+        subscriptionAppRoutingRepository,
+        subscriptionRoutingRepository,
+        routingChangeManager,
+    )
 }

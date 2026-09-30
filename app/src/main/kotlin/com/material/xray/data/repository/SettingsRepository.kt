@@ -24,9 +24,6 @@ import com.material.xray.model.XrayLogLevel
 import com.material.xray.model.XrayOutbound
 import com.material.xray.model.XrayRuntimeSettings
 import com.material.xray.telemetry.DiagnosticsConsentMirror
-import dagger.hilt.android.qualifiers.ApplicationContext
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
@@ -34,6 +31,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
+import org.koin.core.annotation.Singleton
 
 data class SettingsSnapshot(
     val tunName: String,
@@ -76,10 +74,10 @@ private val Context.dataStore by preferencesDataStore(
     produceMigrations = { listOf(SettingsDefaultMigration()) },
 )
 
-@Singleton
 @Suppress("TooManyFunctions")
-class SettingsRepository @Inject constructor(
-    @param:ApplicationContext private val context: Context,
+@Singleton
+class SettingsRepository(
+    private val context: Context,
 ) {
     private val store get() = context.dataStore
     private val json = Json { ignoreUnknownKeys = true }

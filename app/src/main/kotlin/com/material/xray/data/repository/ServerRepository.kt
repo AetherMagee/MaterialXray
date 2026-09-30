@@ -3,13 +3,12 @@ package com.material.xray.data.repository
 import com.material.xray.data.db.dao.ServerDao
 import com.material.xray.data.db.entity.ServerEntity
 import com.material.xray.model.ServerConfig
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.json.Json
+import org.koin.core.annotation.Singleton
 
 @Singleton
-class ServerRepository @Inject constructor(
+class ServerRepository(
     private val serverDao: ServerDao,
 ) {
     private val json = Json { ignoreUnknownKeys = true }

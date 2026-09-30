@@ -9,11 +9,10 @@ import com.material.xray.data.db.entity.AppRouteMode
 import com.material.xray.data.db.entity.toAppBypassEntity
 import com.material.xray.model.SubscriptionAppRouting
 import com.material.xray.model.SubscriptionAppRoutingMode
-import javax.inject.Inject
-import javax.inject.Singleton
+import org.koin.core.annotation.Singleton
 
 @Singleton
-class SubscriptionAppRoutingRepository @Inject constructor(
+class SubscriptionAppRoutingRepository(
     private val appBypassDao: AppBypassDao,
     private val subscriptionDao: SubscriptionDao,
     private val appInventory: AppInventory,

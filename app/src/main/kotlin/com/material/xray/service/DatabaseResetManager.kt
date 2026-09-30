@@ -5,18 +5,16 @@ import com.material.xray.core.xray.ActiveConfigOverrideStore
 import com.material.xray.data.db.AppDatabase
 import com.material.xray.data.repository.SettingsRepository
 import com.material.xray.model.ConnectionState
-import dagger.hilt.android.qualifiers.ApplicationContext
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import org.koin.core.annotation.Singleton
 
 @Singleton
-class DatabaseResetManager @Inject constructor(
-    @param:ApplicationContext private val context: Context,
+class DatabaseResetManager(
+    private val context: Context,
     private val database: AppDatabase,
     private val settingsRepository: SettingsRepository,
     private val routingChangeManager: RoutingChangeManager,

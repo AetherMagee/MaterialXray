@@ -85,7 +85,6 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -93,13 +92,14 @@ import androidx.lifecycle.repeatOnLifecycle
 import com.material.xray.R
 import com.material.xray.model.Protocol
 import com.material.xray.ui.components.ScrolledTopAppBar
+import org.koin.compose.viewmodel.koinViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ConfigViewerScreen(
     request: ConfigViewerRequest,
     onBack: () -> Unit,
-    viewModel: ConfigViewerViewModel = hiltViewModel(),
+    viewModel: ConfigViewerViewModel = koinViewModel(),
 ) {
     LaunchedEffect(request) { viewModel.load(request) }
 

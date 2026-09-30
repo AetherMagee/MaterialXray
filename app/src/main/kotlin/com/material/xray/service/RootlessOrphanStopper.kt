@@ -4,13 +4,13 @@ import android.content.Context
 import android.system.Os
 import android.system.OsConstants
 import com.material.xray.core.xray.ACTIVE_CONFIG_FILE
-import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
-import javax.inject.Inject
 import kotlinx.coroutines.delay
+import org.koin.core.annotation.Factory
 
 /** Stops only a recorded child that still belongs to this app and uses its Xray config. */
-class RootlessOrphanStopper @Inject constructor(@param:ApplicationContext private val context: Context) {
+@Factory
+class RootlessOrphanStopper(private val context: Context) {
     suspend fun stop(pid: Int): Boolean {
         if (pid <= 0) return true
         when (inspect(pid)) {

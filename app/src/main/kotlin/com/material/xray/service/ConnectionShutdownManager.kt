@@ -6,15 +6,13 @@ import com.material.xray.R
 import com.material.xray.core.locale.localizedString
 import com.material.xray.model.ConnectionProgress
 import com.material.xray.model.ConnectionState
-import dagger.hilt.android.qualifiers.ApplicationContext
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
+import org.koin.core.annotation.Singleton
 
 @Singleton
-class ConnectionShutdownManager @Inject constructor(
-    @param:ApplicationContext private val context: Context,
+class ConnectionShutdownManager(
+    private val context: Context,
     private val stateCoordinator: ConnectionStateCoordinator,
     private val log: LogBuffer,
 ) {

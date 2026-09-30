@@ -60,7 +60,6 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -90,13 +89,14 @@ import com.material.xray.ui.settings.SettingsScreen
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
 fun MainNavigation(
     pendingSubscriptionLink: String?,
     onSubscriptionLinkHandled: () -> Unit,
 ) {
-    val viewModel: MainNavigationViewModel = hiltViewModel()
+    val viewModel: MainNavigationViewModel = koinViewModel()
     val navController = rememberNavController()
     val lifecycleOwner = LocalLifecycleOwner.current
     val settings by viewModel.settings.collectAsStateWithLifecycle()
@@ -282,7 +282,7 @@ fun MainNavigation(
                 DetailSheet(asSheet = detailAsSheet, width = sheetWidth, onDismiss = { routingRuleEditorRequest = null }) {
                     RoutingRuleEditorScreen(
                         editableRule = request,
-                        viewModel = hiltViewModel<RoutingViewModel>(requireNotNull(navBackStackEntry)),
+                        viewModel = koinViewModel<RoutingViewModel>(viewModelStoreOwner = requireNotNull(navBackStackEntry)),
                         onBack = { routingRuleEditorRequest = null },
                     )
                 }

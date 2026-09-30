@@ -2,12 +2,11 @@ package com.material.xray.data.repository
 
 import com.material.xray.data.db.dao.SubscriptionDao
 import com.material.xray.model.SubscriptionRouting
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.coroutines.flow.first
+import org.koin.core.annotation.Singleton
 
 @Singleton
-class SubscriptionRoutingRepository @Inject constructor(
+class SubscriptionRoutingRepository(
     private val settingsRepository: SettingsRepository,
     private val subscriptionDao: SubscriptionDao,
 ) {

@@ -1,6 +1,6 @@
 package com.material.xray.ui.home
 
-import android.content.Context
+import android.app.Application
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.material.xray.R
@@ -50,13 +50,10 @@ import com.material.xray.service.PendingRoutingChange
 import com.material.xray.service.RoutingChangeManager
 import com.material.xray.service.SubscriptionUpdateScheduler
 import com.material.xray.service.XrayService
-import dagger.hilt.android.lifecycle.HiltViewModel
-import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.IOException
 import java.net.ConnectException
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
-import javax.inject.Inject
 import javax.net.ssl.SSLException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -82,6 +79,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
+import org.koin.core.annotation.KoinViewModel
 
 data class ServerListItem(
     val entity: ServerEntity,
@@ -133,9 +131,9 @@ sealed interface HomeUiEvent {
 const val LATENCY_TESTING = Int.MIN_VALUE
 private const val SERVER_SELECTION_SETTLE_MILLIS = 200L
 
-@HiltViewModel
-class HomeViewModel @Inject constructor(
-    @param:ApplicationContext private val context: Context,
+@KoinViewModel
+class HomeViewModel(
+    private val context: Application,
     homeDataState: HomeDataState,
     private val settingsRepo: SettingsRepository,
     private val appUpdateRepository: AppUpdateRepository,

@@ -16,8 +16,6 @@ import com.material.xray.model.RoutingRule
 import com.material.xray.model.RoutingRuleCatalog
 import com.material.xray.model.SubscriptionRouting
 import com.material.xray.service.RoutingChangeManager
-import dagger.hilt.android.lifecycle.HiltViewModel
-import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -27,9 +25,10 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import org.koin.core.annotation.KoinViewModel
 
-@HiltViewModel
-class RoutingViewModel @Inject constructor(
+@KoinViewModel
+class RoutingViewModel(
     private val settingsRepository: SettingsRepository,
     private val routingChangeManager: RoutingChangeManager,
     private val serverRepository: ServerRepository,

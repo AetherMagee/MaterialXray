@@ -117,7 +117,6 @@ import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.core.os.LocaleListCompat
-import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -155,11 +154,12 @@ import com.material.xray.ui.text.descriptionResource
 import com.material.xray.ui.text.labelResource
 import java.util.Locale
 import kotlinx.coroutines.flow.collect
+import org.koin.compose.viewmodel.koinViewModel
 import org.xmlpull.v1.XmlPullParser
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(showTitleBarLogo: Boolean, viewModel: SettingsViewModel = hiltViewModel()) {
+fun SettingsScreen(showTitleBarLogo: Boolean, viewModel: SettingsViewModel = koinViewModel()) {
     val persistedSettings by viewModel.settings.collectAsStateWithLifecycle()
     val settings = persistedSettings
     // Sections are local state rather than navigation destinations, because the app keeps a
