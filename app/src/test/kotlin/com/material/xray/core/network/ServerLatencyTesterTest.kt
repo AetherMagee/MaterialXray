@@ -1,5 +1,8 @@
 package com.material.xray.core.network
 
+import java.io.IOException
+import java.net.ConnectException
+import java.net.SocketTimeoutException
 import java.util.ArrayDeque
 import kotlinx.coroutines.test.runTest
 import okhttp3.OkHttpClient
@@ -54,7 +57,7 @@ class ServerLatencyTesterTest {
             nanoTime = clock(0, 80, 100, 130),
         )
 
-        assertEquals(30, latency)
+        assertEquals(ProbeAttempt(30), latency)
         assertEquals(2, requestCount)
     }
 
@@ -69,7 +72,7 @@ class ServerLatencyTesterTest {
             nanoTime = clock(0, 100, 145),
         )
 
-        assertEquals(45, latency)
+        assertEquals(ProbeAttempt(45), latency)
         assertTrue(responses.isEmpty())
     }
 
@@ -99,6 +102,39 @@ class ServerLatencyTesterTest {
         )
 
         assertTrue(bodies.all { it.source().exhausted() })
+    }
+
+    @Test
+    fun `HTTP probe reports the last failure when every attempt fails`() = runTest {
+        val responses = ArrayDeque(listOf(500, 403))
+        val client = clientReturning { responses.removeFirst() }
+
+        val attempt = measureBestHttpLatency(client = client, request = request, nanoTime = { 0L })
+
+        assertEquals(ProbeAttempt.failed("HTTP 403"), attempt)
+    }
+
+    @Test
+    fun `HTTP probe reports the exception that failed the request`() = runTest {
+        val client = OkHttpClient.Builder()
+            .addInterceptor { throw SocketTimeoutException("timeout") }
+            .build()
+
+        val attempt = measureBestHttpLatency(client = client, request = request, nanoTime = { 0L })
+
+        assertEquals(ProbeAttempt.failed("timeout"), attempt)
+    }
+
+    @Test
+    fun `failure description keeps the cause on a single line`() {
+        val error = EphemeralXrayCoreException("Xray core did not start: first\nsecond", IOException("disk full"))
+
+        assertEquals("Xray core did not start: first | second: disk full", describeFailure(error))
+    }
+
+    @Test
+    fun `failure description falls back to the exception type`() {
+        assertEquals("ConnectException", describeFailure(ConnectException()))
     }
 
     private fun clientReturning(code: () -> Int): OkHttpClient = OkHttpClient.Builder()

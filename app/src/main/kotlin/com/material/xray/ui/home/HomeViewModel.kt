@@ -7,6 +7,7 @@ import com.material.xray.R
 import com.material.xray.core.locale.forAppLanguage
 import com.material.xray.core.locale.localizedString
 import com.material.xray.core.network.ServerLatencyTester
+import com.material.xray.core.network.describeFailure
 import com.material.xray.core.xray.ActiveConfigOverrideStore
 import com.material.xray.core.xray.GeoDataManager
 import com.material.xray.core.xray.combinedGeoDataDownloadProgress
@@ -46,6 +47,8 @@ import com.material.xray.service.AppUpdateInstaller
 import com.material.xray.service.ConnectionEvent
 import com.material.xray.service.ConnectionRuntimeManager
 import com.material.xray.service.ConnectionStateCoordinator
+import com.material.xray.service.LogBuffer
+import com.material.xray.service.LogSource
 import com.material.xray.service.PendingRoutingChange
 import com.material.xray.service.RoutingChangeManager
 import com.material.xray.service.SubscriptionUpdateScheduler
@@ -153,6 +156,7 @@ class HomeViewModel(
     alwaysOnVpnState: AlwaysOnVpnState,
     private val routingChangeManager: RoutingChangeManager,
     private val serverLatencyTester: ServerLatencyTester,
+    private val logBuffer: LogBuffer,
     geoDataManager: GeoDataManager,
 ) : ViewModel() {
     private var serverSelectionJob: Job? = null
@@ -753,6 +757,7 @@ class HomeViewModel(
         return sortedOrder
     }
 
+    @Suppress("TooGenericExceptionCaught")
     private suspend fun runLatencyProbe(
         runId: Long,
         server: ServerEntity,
@@ -764,7 +769,8 @@ class HomeViewModel(
                 latencySemaphore.withPermit { measureLatency(server, primaryMethod, methods) }
             } catch (error: CancellationException) {
                 throw error
-            } catch (_: Exception) {
+            } catch (error: Exception) {
+                logLatencyFailure(server, methods, describeFailure(error))
                 latencyState(primaryMethod, methods.associateWith { -1 })
             }
 
@@ -783,29 +789,39 @@ class HomeViewModel(
         primaryMethod: PingMethod,
         methods: List<PingMethod>,
     ): ServerLatencyState {
-        val config = runCatching { serverRepo.parseConfig(server) }.getOrNull()
-            ?: return latencyState(primaryMethod, methods.associateWith { -1 })
+        val config = runCatching { serverRepo.parseConfig(server) }.getOrElse { error ->
+            logLatencyFailure(server, methods, "Could not parse config: ${describeFailure(error)}")
+            return latencyState(primaryMethod, methods.associateWith { -1 })
+        }
         val probeUrl = settingsRepo.latencyCheckUrl.first()
         val dnsServers = settingsRepo.dnsServers.first()
         val domesticDnsServers = settingsRepo.domesticDnsServers.first()
         val allowIpv6 = settingsRepo.allowIpv6.first()
         val latencyByMethod = buildMap {
             methods.forEach { method ->
-                put(
-                    method,
-                    serverLatencyTester.measure(
-                        server = config,
-                        method = method,
-                        probeUrl = probeUrl,
-                        dnsServers = dnsServers,
-                        domesticDnsServers = domesticDnsServers,
-                        allowIpv6 = allowIpv6,
-                    ).latencyMs,
+                val result = serverLatencyTester.measure(
+                    server = config,
+                    method = method,
+                    probeUrl = probeUrl,
+                    dnsServers = dnsServers,
+                    domesticDnsServers = domesticDnsServers,
+                    allowIpv6 = allowIpv6,
                 )
+                logBuffer.append(
+                    LogSource.APP,
+                    latencyLogLine(server, method, result.failure?.let { "failed: $it" } ?: "${result.latencyMs} ms"),
+                )
+                put(method, result.latencyMs)
             }
         }
         return latencyState(primaryMethod, latencyByMethod)
     }
+
+    private fun logLatencyFailure(server: ServerEntity, methods: List<PingMethod>, reason: String) {
+        logBuffer.appendAll(LogSource.APP, methods.map { latencyLogLine(server, it, "failed: $reason") })
+    }
+
+    private fun latencyLogLine(server: ServerEntity, method: PingMethod, outcome: String) = "Ping ${server.name} (${server.address}:${server.port}) ${method.name}: $outcome"
 
     private suspend fun runSubscriptionOperation(block: suspend () -> Unit) {
         try {

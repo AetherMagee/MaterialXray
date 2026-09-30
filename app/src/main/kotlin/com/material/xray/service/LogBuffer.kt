@@ -14,7 +14,7 @@ data class LogEntry(
 
 enum class LogSource { APP, XRAY }
 
-private val xrayTimestampPrefix = Regex(
+internal val xrayTimestampPrefix = Regex(
     "^\\d{4}/\\d{2}/\\d{2} \\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?\\s+",
 )
 

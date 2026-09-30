@@ -45,6 +45,7 @@ class EphemeralXrayCore(
      * @param startTimeoutMs how long to wait for the core to start listening. Full configs with geo
      * rules take longer to load than a minimal single-outbound config.
      * @param buildConfig produces the full Xray JSON config for the given inbound.
+     * @param block receives the proxied client and the core's log file, which is deleted once it returns.
      * @throws EphemeralXrayCoreException when the core cannot be started for any reason; [block] has
      * not run yet in that case, so callers may safely fall back.
      */
@@ -52,13 +53,13 @@ class EphemeralXrayCore(
         inboundTag: String,
         startTimeoutMs: Long = DEFAULT_START_TIMEOUT_MS,
         buildConfig: (XrayInbound.PrivateHttp) -> String,
-        block: suspend (OkHttpClient) -> T,
+        block: suspend (client: OkHttpClient, logFile: File) -> T,
     ): T {
         val core = withContext(Dispatchers.IO) { startCore(inboundTag, startTimeoutMs, buildConfig) }
         try {
             val client = privateUnixHttpProxyClient(baseClient, core.inbound.path)
             try {
-                return block(client)
+                return block(client, core.logFile)
             } finally {
                 evictProxyConnections { client.connectionPool.evictAll() }
             }
@@ -70,6 +71,7 @@ class EphemeralXrayCore(
     private inner class RunningCore(
         private val process: RedirectedProcess,
         val inbound: XrayInbound.PrivateHttp,
+        val logFile: File,
         private val files: List<File>,
     ) {
         suspend fun close() {
@@ -106,7 +108,7 @@ class EphemeralXrayCore(
                 )
             }
             started = true
-            return RunningCore(spawned, inbound, listOf(configFile, logFile, File(inbound.path)))
+            return RunningCore(spawned, inbound, logFile, listOf(configFile, logFile, File(inbound.path)))
         } catch (e: IOException) {
             throw if (e is EphemeralXrayCoreException) e else EphemeralXrayCoreException("Failed to start Xray core", e)
         } finally {

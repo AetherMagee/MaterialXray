@@ -9,6 +9,8 @@ import com.material.xray.core.xray.buildProxyOutbound
 import com.material.xray.core.xray.toJson
 import com.material.xray.model.PingMethod
 import com.material.xray.model.ServerConfig
+import com.material.xray.service.xrayTimestampPrefix
+import java.io.File
 import java.net.InetSocketAddress
 import java.net.Socket
 import java.util.concurrent.TimeUnit
@@ -32,23 +34,58 @@ import org.koin.core.annotation.Singleton
 data class LatencyProbeResult(
     val latencyMs: Int,
     val method: PingMethod,
+    /** Why the probe failed; null when [latencyMs] is a measurement. */
+    val failure: String? = null,
 )
+
+/** One probe outcome: a latency, or -1 with the reason it failed. */
+internal data class ProbeAttempt(
+    val latencyMs: Int,
+    val failure: String? = null,
+) {
+    val succeeded: Boolean
+        get() = latencyMs >= 0
+
+    /** Any success beats a failure; a later failure replaces an earlier one so the latest reason is kept. */
+    fun isBetterThan(other: ProbeAttempt?): Boolean = when {
+        other == null || !other.succeeded -> true
+        else -> succeeded && latencyMs < other.latencyMs
+    }
+
+    fun toResult(method: PingMethod) = LatencyProbeResult(latencyMs, method, failure)
+
+    companion object {
+        fun failed(reason: String) = ProbeAttempt(latencyMs = -1, failure = reason)
+    }
+}
 
 internal suspend fun measureBestHttpLatency(
     client: OkHttpClient,
     request: Request,
     nanoTime: () -> Long = { SystemClock.elapsedRealtimeNanos() },
-): Int {
-    var best = -1
-    repeat(HTTP_PROBE_ATTEMPTS) {
+): ProbeAttempt = bestAttempt(HTTP_PROBE_ATTEMPTS) { executeTimedHttpProbe(client, request, nanoTime) }
+
+/** Keeps the fastest success, or the last failure when every attempt failed. */
+private suspend fun bestAttempt(attempts: Int, probe: suspend () -> ProbeAttempt): ProbeAttempt {
+    var best: ProbeAttempt? = null
+    repeat(attempts) {
         currentCoroutineContext().ensureActive()
-        val latency = executeTimedHttpProbe(client, request, nanoTime)
-        if (latency >= 0 && (best == -1 || latency < best)) {
-            best = latency
-        }
+        val attempt = probe()
+        currentCoroutineContext().ensureActive()
+        if (attempt.isBetterThan(best)) best = attempt
     }
-    return best
+    return checkNotNull(best) { "attempts must be positive" }
 }
+
+internal fun describeFailure(error: Throwable): String = buildString {
+    append(error.message?.takeIf(String::isNotBlank) ?: error.javaClass.simpleName)
+    error.cause?.let { cause ->
+        append(": ")
+        append(cause.message?.takeIf(String::isNotBlank) ?: cause.javaClass.simpleName)
+    }
+}.toSingleLine()
+
+private fun String.toSingleLine(): String = lines().map(String::trim).filter(String::isNotEmpty).joinToString(" | ")
 
 internal fun mergeDnsServerSettings(
     dnsServers: String,
@@ -60,11 +97,12 @@ internal fun mergeDnsServerSettings(
     .distinct()
     .joinToString(",")
 
+@Suppress("TooGenericExceptionCaught")
 private suspend fun executeTimedHttpProbe(
     client: OkHttpClient,
     request: Request,
     nanoTime: () -> Long,
-): Int = suspendCancellableCoroutine { continuation ->
+): ProbeAttempt = suspendCancellableCoroutine { continuation ->
     val call = client.newCall(request)
     continuation.invokeOnCancellation {
         call.cancel()
@@ -72,9 +110,9 @@ private suspend fun executeTimedHttpProbe(
 
     try {
         val startedAt = nanoTime()
-        val latency = call.execute().use { response ->
+        val attempt = call.execute().use { response ->
             if (response.code !in HTTP_SUCCESS_CODES) {
-                -1
+                ProbeAttempt.failed("HTTP ${response.code}")
             } else {
                 response.body.byteStream().use { input ->
                     val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
@@ -83,15 +121,15 @@ private suspend fun executeTimedHttpProbe(
                     }
                 }
                 val elapsedMs = (nanoTime() - startedAt) / NANOS_PER_MILLISECOND
-                elapsedMs.toInt().coerceAtLeast(1)
+                ProbeAttempt(elapsedMs.toInt().coerceAtLeast(1))
             }
         }
         if (continuation.isActive) {
-            continuation.resume(latency)
+            continuation.resume(attempt)
         }
-    } catch (_: Exception) {
+    } catch (e: Exception) {
         if (continuation.isActive) {
-            continuation.resume(-1)
+            continuation.resume(ProbeAttempt.failed(describeFailure(e)))
         }
     }
 }
@@ -114,28 +152,20 @@ class ServerLatencyTester(
     ): LatencyProbeResult = withContext(Dispatchers.IO) {
         withTimeoutOrNull(TEST_TIMEOUT_MS) {
             when (method) {
-                PingMethod.Httping -> {
-                    val e2eLatency = measureHttpProbeThroughXray(
-                        server = serverAddressResolver.resolveOrNull(server, allowIpv6)
-                            ?: return@withTimeoutOrNull LatencyProbeResult(
-                                latencyMs = -1,
-                                method = PingMethod.Httping,
-                            ),
-                        probeUrl = probeUrl.trim().ifBlank { DEFAULT_PROBE_URL },
-                        dnsServers = mergeDnsServerSettings(dnsServers, domesticDnsServers),
-                        allowIpv6 = allowIpv6,
-                    )
-                    LatencyProbeResult(
-                        latencyMs = e2eLatency,
-                        method = PingMethod.Httping,
-                    )
-                }
-                PingMethod.Tcping -> LatencyProbeResult(
-                    latencyMs = measureTcpConnect(server.address, server.port),
-                    method = PingMethod.Tcping,
-                )
+                PingMethod.Httping -> measureHttpProbeThroughXray(
+                    server = serverAddressResolver.resolveOrNull(server, allowIpv6)
+                        ?: return@withTimeoutOrNull LatencyProbeResult(
+                            latencyMs = -1,
+                            method = PingMethod.Httping,
+                            failure = "Could not resolve server address ${server.address}",
+                        ),
+                    probeUrl = probeUrl.trim().ifBlank { DEFAULT_PROBE_URL },
+                    dnsServers = mergeDnsServerSettings(dnsServers, domesticDnsServers),
+                    allowIpv6 = allowIpv6,
+                ).toResult(PingMethod.Httping)
+                PingMethod.Tcping -> measureTcpConnect(server.address, server.port).toResult(PingMethod.Tcping)
             }
-        } ?: LatencyProbeResult(latencyMs = -1, method = method)
+        } ?: LatencyProbeResult(latencyMs = -1, method = method, failure = "Timed out after $TEST_TIMEOUT_MS ms")
     }
 
     private suspend fun measureHttpProbeThroughXray(
@@ -143,14 +173,29 @@ class ServerLatencyTester(
         probeUrl: String,
         dnsServers: String,
         allowIpv6: Boolean,
-    ): Int = try {
+    ): ProbeAttempt = try {
         ephemeralCore.withHttpProxy(
             inboundTag = LATENCY_INBOUND_TAG,
             buildConfig = { inbound -> buildLatencyConfig(server, inbound, dnsServers, allowIpv6) },
-        ) { client -> requestProbeThroughProxy(client, probeUrl) }
-    } catch (_: EphemeralXrayCoreException) {
-        -1
+        ) { client, logFile ->
+            val attempt = requestProbeThroughProxy(client, probeUrl)
+            val coreErrors = if (attempt.succeeded) null else readCoreErrors(logFile)
+            if (coreErrors == null) attempt else attempt.copy(failure = "${attempt.failure}; xray: $coreErrors")
+        }
+    } catch (e: EphemeralXrayCoreException) {
+        ProbeAttempt.failed(describeFailure(e))
     }
+
+    /** The last errors the probe core logged, which usually name the real cause of a failed request. */
+    private fun readCoreErrors(logFile: File): String? = runCatching {
+        logFile.readLines()
+            .filter { line -> CORE_ERROR_MARKERS.any { it in line } }
+            .map { it.replaceFirst(xrayTimestampPrefix, "").take(CORE_ERROR_LINE_CHARS) }
+            .distinct()
+            .takeLast(CORE_ERROR_LINES)
+            .joinToString(" | ")
+            .ifEmpty { null }
+    }.getOrNull()
 
     private fun buildLatencyConfig(
         server: ServerConfig,
@@ -163,7 +208,8 @@ class ServerLatencyTester(
                 "log",
                 buildJsonObject {
                     put("access", "none")
-                    put("loglevel", "error")
+                    // Xray reports why an outbound failed only at the info level.
+                    put("loglevel", "info")
                 },
             )
             put("dns", buildDns(dnsServers, allowIpv6 = allowIpv6))
@@ -208,7 +254,7 @@ class ServerLatencyTester(
         return json.encodeToString(JsonObject.serializer(), config)
     }
 
-    private suspend fun requestProbeThroughProxy(proxyClient: OkHttpClient, probeUrl: String): Int {
+    private suspend fun requestProbeThroughProxy(proxyClient: OkHttpClient, probeUrl: String): ProbeAttempt {
         val client = proxyClient.newBuilder()
             .connectTimeout(HTTP_TIMEOUT_MS, TimeUnit.MILLISECONDS)
             .readTimeout(HTTP_TIMEOUT_MS, TimeUnit.MILLISECONDS)
@@ -220,28 +266,20 @@ class ServerLatencyTester(
                 .url(probeUrl)
                 .header("Cache-Control", "no-cache")
                 .build()
-        }.getOrElse { return -1 }
+        }.getOrElse { return ProbeAttempt.failed("Invalid probe URL $probeUrl") }
 
         return measureBestHttpLatency(client, request)
     }
 
-    private suspend fun measureTcpConnect(address: String, port: Int, attempts: Int = TCPING_ATTEMPTS): Int {
+    private suspend fun measureTcpConnect(address: String, port: Int): ProbeAttempt {
         val host = address.trim().trim('[', ']')
-        if (host.isBlank() || port !in 1..65535) return -1
+        if (host.isBlank() || port !in 1..65535) return ProbeAttempt.failed("Invalid server address $address:$port")
 
-        var best = -1
-        repeat(attempts) {
-            currentCoroutineContext().ensureActive()
-            val latency = socketConnectTime(host, port)
-            currentCoroutineContext().ensureActive()
-            if (latency >= 0 && (best == -1 || latency < best)) {
-                best = latency
-            }
-        }
-        return best
+        return bestAttempt(TCPING_ATTEMPTS) { socketConnectTime(host, port) }
     }
 
-    private suspend fun socketConnectTime(host: String, port: Int): Int = suspendCancellableCoroutine { continuation ->
+    @Suppress("TooGenericExceptionCaught")
+    private suspend fun socketConnectTime(host: String, port: Int): ProbeAttempt = suspendCancellableCoroutine { continuation ->
         val socket = Socket()
         continuation.invokeOnCancellation {
             runCatching { socket.close() }
@@ -255,11 +293,11 @@ class ServerLatencyTester(
             val elapsedMs = (SystemClock.elapsedRealtimeNanos() - startedAt) / NANOS_PER_MILLISECOND
             val latency = elapsedMs.toInt().coerceAtLeast(1)
             if (continuation.isActive) {
-                continuation.resume(latency)
+                continuation.resume(ProbeAttempt(latency))
             }
-        } catch (_: Exception) {
+        } catch (e: Exception) {
             if (continuation.isActive) {
-                continuation.resume(-1)
+                continuation.resume(ProbeAttempt.failed(describeFailure(e)))
             }
         } finally {
             runCatching { socket.close() }
@@ -273,6 +311,9 @@ class ServerLatencyTester(
         const val TCPING_ATTEMPTS = 2
         const val TCP_CONNECT_TIMEOUT_MS = 3_000
         const val LATENCY_INBOUND_TAG = "latency-http"
+        val CORE_ERROR_MARKERS = listOf("[Warning]", "[Error]", "failed")
+        const val CORE_ERROR_LINES = 2
+        const val CORE_ERROR_LINE_CHARS = 500
     }
 }
 
