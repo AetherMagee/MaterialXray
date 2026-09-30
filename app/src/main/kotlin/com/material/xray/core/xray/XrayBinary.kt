@@ -12,7 +12,9 @@ internal interface XrayBinaryEnvironment {
     val filesDir: File
     val nativeLibraryDir: File?
     fun openAsset(name: String): InputStream
-    fun appVersion(): String
+
+    /** Changes on every APK install, including ones that replace bundled binaries without a version bump. */
+    fun installStamp(): String
 }
 
 internal class AndroidXrayBinaryEnvironment(
@@ -26,8 +28,8 @@ internal class AndroidXrayBinaryEnvironment(
 
     override fun openAsset(name: String): InputStream = context.assets.open(name)
 
-    override fun appVersion(): String = runCatching {
-        context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "unknown"
+    override fun installStamp(): String = runCatching {
+        context.packageManager.getPackageInfo(context.packageName, 0).lastUpdateTime.toString()
     }.getOrDefault("unknown")
 }
 
@@ -58,14 +60,14 @@ class XrayBinary internal constructor(
         }
 
         val versionFile = File(binaryDir, "version")
-        val currentVersion = getAppVersion()
+        val currentStamp = environment.installStamp()
         val needsExtract = !File(binaryDir, "xray").exists() ||
             !versionFile.exists() ||
-            versionFile.readText() != currentVersion
+            versionFile.readText() != currentStamp
 
         if (needsExtract) {
             if (!extractAsset(assetName, "xray", executable = true)) return false
-            versionFile.writeText(currentVersion)
+            versionFile.writeText(currentStamp)
         }
 
         return File(binaryDir, "xray").let { it.exists() && it.canExecute() }
@@ -120,15 +122,15 @@ class XrayBinary internal constructor(
         ?.takeIf { it.isNotBlank() }
 
     private fun extractAsset(assetName: String, targetName: String, executable: Boolean): Boolean = runCatching {
-        val target = File(binaryDir, targetName)
+        // Writing in place fails with ETXTBSY while a core still runs the old binary; a rename
+        // swaps the file and leaves that core on the old inode until it is restarted.
+        val staged = File(binaryDir, "$targetName.tmp")
         environment.openAsset(assetName).use { input ->
-            target.outputStream().use { output -> input.copyTo(output) }
+            staged.outputStream().use { output -> input.copyTo(output) }
         }
-        if (executable) target.setExecutable(true, false)
-        true
+        if (executable) staged.setExecutable(true, false)
+        staged.renameTo(File(binaryDir, targetName))
     }.getOrDefault(false)
-
-    private fun getAppVersion(): String = environment.appVersion()
 
     private companion object {
         private const val VERSION_TIMEOUT_SECONDS = 2L

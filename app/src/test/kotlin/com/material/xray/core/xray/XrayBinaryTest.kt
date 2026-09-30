@@ -13,11 +13,11 @@ import org.junit.Test
 class XrayBinaryTest {
 
     @Test
-    fun `ensureExtracted extracts arm64 binary and records app version`() = withTempDir { dir ->
+    fun `ensureExtracted extracts arm64 binary and records install stamp`() = withTempDir { dir ->
         val environment = FakeEnvironment(
             filesDir = dir,
             assets = mapOf("xray_arm64" to "binary-v1"),
-            version = "1.0",
+            stamp = "1.0",
         )
         val xrayBinary = XrayBinary(environment, supportedAbis = { arrayOf("arm64-v8a") })
 
@@ -37,13 +37,30 @@ class XrayBinaryTest {
         val environment = FakeEnvironment(
             filesDir = dir,
             assets = mapOf("xray_arm64" to "replacement"),
-            version = "1.0",
+            stamp = "1.0",
         )
 
         assertTrue(XrayBinary(environment, supportedAbis = { arrayOf("arm64-v8a") }).ensureRootBinaryExtracted())
 
         assertEquals("existing", File(binDir, "xray").readText())
         assertFalse(environment.openedAssets.contains("xray_arm64"))
+    }
+
+    @Test
+    fun `ensureExtracted replaces binary when install stamp changes`() = withTempDir { dir ->
+        val binDir = File(dir, "bin").apply { mkdirs() }
+        File(binDir, "xray").writeText("existing")
+        File(binDir, "version").writeText("1000")
+        val environment = FakeEnvironment(
+            filesDir = dir,
+            assets = mapOf("xray_arm64" to "replacement"),
+            stamp = "2000",
+        )
+
+        assertTrue(XrayBinary(environment, supportedAbis = { arrayOf("arm64-v8a") }).ensureRootBinaryExtracted())
+
+        assertEquals("replacement", File(binDir, "xray").readText())
+        assertEquals("2000", File(binDir, "version").readText())
     }
 
     @Test
@@ -57,7 +74,7 @@ class XrayBinaryTest {
             filesDir = dir,
             nativeLibraryDir = nativeDir,
             assets = mapOf("xray_arm64" to "asset"),
-            version = "1.0",
+            stamp = "1.0",
         )
         val xrayBinary = XrayBinary(environment, supportedAbis = { arrayOf("arm64-v8a") })
 
@@ -112,7 +129,7 @@ class XrayBinaryTest {
         override val filesDir: File,
         override val nativeLibraryDir: File? = null,
         private val assets: Map<String, String> = emptyMap(),
-        private val version: String = "test",
+        private val stamp: String = "test",
     ) : XrayBinaryEnvironment {
         val openedAssets = mutableListOf<String>()
 
@@ -121,7 +138,7 @@ class XrayBinaryTest {
             return ByteArrayInputStream(assets.getValue(name).toByteArray())
         }
 
-        override fun appVersion(): String = version
+        override fun installStamp(): String = stamp
     }
 
     private fun withTempDir(block: (File) -> Unit) {
