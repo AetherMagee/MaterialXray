@@ -3,6 +3,7 @@ package com.material.xray.core.xray
 import android.content.Context
 import android.os.Build
 import com.material.xray.core.root.RootShell
+import com.material.xray.core.root.shellQuote
 import com.material.xray.core.xray.FirewallCommands.IPV4 as IPTABLES
 import com.material.xray.core.xray.FirewallCommands.IPV6 as IP6TABLES
 import com.material.xray.telemetry.TelemetryReporter

@@ -10,6 +10,7 @@ import android.os.Build
 import android.os.Process
 import android.provider.Settings
 import com.material.xray.core.root.RootShell
+import com.material.xray.core.root.shellQuote
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow

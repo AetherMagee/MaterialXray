@@ -1,5 +1,6 @@
 package com.material.xray.core.xray
 
+import com.material.xray.core.root.shellQuote
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows

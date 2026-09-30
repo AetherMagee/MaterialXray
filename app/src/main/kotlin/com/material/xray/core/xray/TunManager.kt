@@ -4,6 +4,7 @@ import com.material.xray.core.app.appUidRangeForProfile
 import com.material.xray.core.app.isApplicationUid
 import com.material.xray.core.app.profileIdForUid
 import com.material.xray.core.root.RootShell
+import com.material.xray.core.root.shellQuote
 import com.material.xray.core.xray.FirewallCommands.IPV4
 import com.material.xray.core.xray.FirewallCommands.IPV6
 

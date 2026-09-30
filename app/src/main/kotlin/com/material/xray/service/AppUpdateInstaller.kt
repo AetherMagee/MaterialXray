@@ -8,6 +8,7 @@ import androidx.core.content.FileProvider
 import androidx.core.net.toUri
 import com.material.xray.core.network.AppHttpClient
 import com.material.xray.core.root.RootShell
+import com.material.xray.core.root.shellQuote
 import com.material.xray.data.repository.GitHubReleaseFetcher
 import com.material.xray.data.repository.SettingsRepository
 import com.material.xray.data.repository.githubMirrorUrls

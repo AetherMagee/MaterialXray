@@ -5,6 +5,7 @@ import android.os.SystemClock
 import android.util.Log
 import com.material.xray.core.nftables.NftablesManager
 import com.material.xray.core.root.RootShell
+import com.material.xray.core.root.shellQuote
 import com.material.xray.model.RootConnectionBackend
 import java.io.File
 

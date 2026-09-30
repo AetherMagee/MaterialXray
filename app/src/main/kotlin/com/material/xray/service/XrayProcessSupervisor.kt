@@ -6,6 +6,7 @@ import android.os.PowerManager
 import android.system.Os
 import android.system.OsConstants
 import com.material.xray.core.root.RootShell
+import com.material.xray.core.root.shellQuote
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream

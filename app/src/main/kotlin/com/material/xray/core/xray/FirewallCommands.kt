@@ -1,5 +1,7 @@
 package com.material.xray.core.xray
 
+import com.material.xray.core.root.shellQuote
+
 /** All firewall callers use the same bounded wait for Android's shared xtables lock. */
 internal object FirewallCommands {
     const val IPV4 = "iptables -w 2"
@@ -40,8 +42,6 @@ internal object FirewallCommands {
 
 /** Braces keep an individual command's || or semicolons from masking an earlier failure. */
 internal fun Iterable<String>.shellAnd(): String = joinToString(" && ") { "{ $it; }" }
-
-internal fun shellQuote(value: String): String = "'${value.replace("'", "'\\''")}'"
 
 internal data class FirewallRestoreBatch(
     val tool: String,

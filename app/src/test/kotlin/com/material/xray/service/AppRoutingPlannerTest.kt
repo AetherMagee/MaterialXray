@@ -284,14 +284,8 @@ class AppRoutingPlannerTest {
     ) : AppBypassDao {
         override fun observeAll(): Flow<List<AppBypassEntity>> = flowOf(assignments)
         override suspend fun getAll(): List<AppBypassEntity> = assignments
-        override suspend fun getExcluded(): List<AppBypassEntity> = assignments.filter { it.excluded }
-        override suspend fun getProxyAssignments(): List<AppBypassEntity> = assignments.filter { !it.excluded && it.serverId != null }
-
-        override suspend fun getDefaultProxyAssignments(): List<AppBypassEntity> = assignments.filter { !it.excluded && it.serverId == null && it.routeMode != "default_outbound" }
-
         override suspend fun upsert(entity: AppBypassEntity) = Unit
         override suspend fun updateServerId(oldServerId: Long, newServerId: Long) = Unit
-        override suspend fun delete(profileId: Int, packageName: String) = Unit
         override suspend fun deleteAll() = Unit
         override suspend fun insertAll(entities: List<AppBypassEntity>) = Unit
     }
