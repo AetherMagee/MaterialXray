@@ -33,7 +33,7 @@ class SettingsDefaultMigrationTest {
         val migrated = migration.migrate(preferences)
 
         assertNull(migrated[SettingsRepository.XRAY_BUFFER_SIZE_KIB])
-        assertEquals(8, migrated[SETTINGS_DEFAULTS_REVISION])
+        assertEquals(CURRENT_SETTINGS_DEFAULTS_REVISION, migrated[SETTINGS_DEFAULTS_REVISION])
     }
 
     @Test
@@ -52,7 +52,7 @@ class SettingsDefaultMigrationTest {
         val migrated = SettingsDefaultMigration().migrate(preferences)
 
         assertNull(migrated[SettingsRepository.TUN_NAME])
-        assertEquals(8, migrated[SETTINGS_DEFAULTS_REVISION])
+        assertEquals(CURRENT_SETTINGS_DEFAULTS_REVISION, migrated[SETTINGS_DEFAULTS_REVISION])
     }
 
     @Test
@@ -66,7 +66,7 @@ class SettingsDefaultMigrationTest {
         val migrated = SettingsDefaultMigration().migrate(preferences)
 
         assertNull(migrated[latencyDnsServers])
-        assertEquals(8, migrated[SETTINGS_DEFAULTS_REVISION])
+        assertEquals(CURRENT_SETTINGS_DEFAULTS_REVISION, migrated[SETTINGS_DEFAULTS_REVISION])
     }
 
     @Test
@@ -128,7 +128,7 @@ class SettingsDefaultMigrationTest {
             "77.88.8.8,77.88.8.1,2a02:6b8::feed:0ff,2a02:6b8:0:1::feed:0ff",
             migrated[SettingsRepository.DOMESTIC_DNS_SERVERS],
         )
-        assertEquals(8, migrated[SETTINGS_DEFAULTS_REVISION])
+        assertEquals(CURRENT_SETTINGS_DEFAULTS_REVISION, migrated[SETTINGS_DEFAULTS_REVISION])
     }
 
     @Test
@@ -161,7 +161,7 @@ class SettingsDefaultMigrationTest {
         val migrated = SettingsDefaultMigration().migrate(preferences)
 
         assertEquals(current, migrated[SettingsRepository.DNS_SERVERS])
-        assertEquals(8, migrated[SETTINGS_DEFAULTS_REVISION])
+        assertEquals(CURRENT_SETTINGS_DEFAULTS_REVISION, migrated[SETTINGS_DEFAULTS_REVISION])
     }
 
     @Test
@@ -207,7 +207,7 @@ class SettingsDefaultMigrationTest {
 
         assertNull(migratedIpv4[SettingsRepository.DNS_SERVERS])
         assertNull(migratedDualStack[SettingsRepository.DNS_SERVERS])
-        assertEquals(8, migratedIpv4[SETTINGS_DEFAULTS_REVISION])
+        assertEquals(CURRENT_SETTINGS_DEFAULTS_REVISION, migratedIpv4[SETTINGS_DEFAULTS_REVISION])
     }
 
     @Test
@@ -285,7 +285,7 @@ class SettingsDefaultMigrationTest {
             setOf("ru-direct", "block-ads"),
             migrated[SettingsRepository.DELETED_DEFAULT_ROUTING_RULE_IDS],
         )
-        assertEquals(8, migrated[SETTINGS_DEFAULTS_REVISION])
+        assertEquals(CURRENT_SETTINGS_DEFAULTS_REVISION, migrated[SETTINGS_DEFAULTS_REVISION])
     }
 
     @Test
@@ -304,7 +304,7 @@ class SettingsDefaultMigrationTest {
 
     @Test
     fun `current revision does not rerun migrations`() = runTest {
-        val preferences = mutablePreferencesOf(SETTINGS_DEFAULTS_REVISION to 8)
+        val preferences = mutablePreferencesOf(SETTINGS_DEFAULTS_REVISION to CURRENT_SETTINGS_DEFAULTS_REVISION)
 
         assertFalse(SettingsDefaultMigration().shouldMigrate(preferences))
     }

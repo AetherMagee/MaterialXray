@@ -103,7 +103,7 @@ private fun validateSettingsDefaultsRevision(
     }
 }
 
-private const val CURRENT_SETTINGS_DEFAULTS_REVISION = 8
+internal const val CURRENT_SETTINGS_DEFAULTS_REVISION = 8
 private const val PREVIOUS_XRAY_BUFFER_SIZE_KIB = 512
 private const val PREVIOUS_TUN_NAME = "xray0"
 private const val PREVIOUS_DNS_SERVERS = "1.1.1.1,1.0.0.1"
