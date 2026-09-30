@@ -38,7 +38,9 @@ import com.material.xray.telemetry.TelemetryReporter
 import com.material.xray.telemetry.TelemetrySpan
 import java.net.InetAddress
 import java.net.ServerSocket
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.withContext
 import org.koin.core.annotation.Factory
 
@@ -384,6 +386,7 @@ internal data class ConnectionManagerDependencies(
     val activeRouting: ActiveRoutingController,
     val apiClientFactory: ConnectionApiClientFactory,
     val xrayRoutingUpdater: ConnectionXrayRoutingUpdater,
+    val prepareCertificateBundle: suspend () -> Unit,
     val startTelemetrySpan: (ConnectionProgress, ConnectionTelemetryStep?) -> TelemetrySpan? = { _, _ -> null },
     val recordTelemetryStepFailure: (ConnectionTelemetryStep) -> Unit = {},
 )
@@ -403,6 +406,7 @@ class ConnectionManagerFactory(
     private val serverAddressResolver by lazy { ServerAddressResolver(context) }
     private val rootCertificateBundle by lazy {
         AndroidRootCertificateBundle(
+            refreshScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
             loadBundledCertificates = {
                 context.resources.openRawResource(R.raw.mozilla_ca_bundle).use { input ->
                     loadX509Certificates(input).map { certificate -> certificate.encoded }
@@ -426,13 +430,11 @@ class ConnectionManagerFactory(
             environment = runtimeEnvironment,
             commandRunner = RootShellCommandRunner(shell),
             xrayBinary = xrayBinary,
-            certificateBundle = rootCertificateBundle,
             log = log,
         )
         val userProcess = UserXrayProcessSupervisor(
             environment = runtimeEnvironment,
             xrayBinary = xrayBinary,
-            certificateBundle = rootCertificateBundle,
         )
         val routingPlanBuilder = AppRoutingPlanner(
             appBypassDao = appBypassDao,
@@ -473,6 +475,9 @@ class ConnectionManagerFactory(
                 binaryPath = { xrayBinary.androidBinaryPath },
                 binDir = environment.binDir,
             ),
+            prepareCertificateBundle = {
+                rootCertificateBundle.prepare(context.filesDir.resolve(XRAY_CERTIFICATE_BUNDLE_FILE))
+            },
             startTelemetrySpan = telemetryReporter::startConnectionStep,
             recordTelemetryStepFailure = telemetryReporter::recordConnectionStepFailure,
         )

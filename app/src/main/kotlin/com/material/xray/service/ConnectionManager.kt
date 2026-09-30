@@ -55,6 +55,7 @@ internal class ConnectionManager(
     private val activeRouting = dependencies.activeRouting
     private val apiClientFactory = dependencies.apiClientFactory
     private val xrayRoutingUpdater = dependencies.xrayRoutingUpdater
+    private val prepareCertificateBundle = dependencies.prepareCertificateBundle
     private val stepExecutor = ConnectionStepExecutor(
         elapsedRealtime = environment::elapsedRealtime,
         log = { message -> log.append(LogSource.APP, message) },
@@ -401,6 +402,14 @@ internal class ConnectionManager(
             ) {
                 strategy.prepareLogFile()
             },
+        )
+        executeStep(
+            ConnectionStep(
+                "Prepare CA certificate bundle",
+                ConnectionProgress.PreparingRuntime,
+                telemetryStep = ConnectionTelemetryStep.PrepareCertificateBundle,
+                action = prepareCertificateBundle,
+            ),
         )
         return tunName
     }

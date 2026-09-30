@@ -36,6 +36,7 @@ enum class ConnectionFailureReason(val value: String) {
     PreviousRuntimeCleanupFailed("previous_runtime_cleanup_failed"),
     TunInterfaceDetectionFailed("tun_interface_detection_failed"),
     RuntimeLogPreparationFailed("runtime_log_preparation_failed"),
+    CertificateBundlePreparationFailed("certificate_bundle_preparation_failed"),
     TproxyGuardInstallFailed("tproxy_guard_install_failed"),
     ApiAccessSetupFailed("api_access_setup_failed"),
     CoreBinarySetupFailed("core_binary_setup_failed"),
@@ -88,6 +89,11 @@ enum class ConnectionTelemetryStep(
         "runtime.log.prepare",
         ConnectionFailureStage.Preparation,
         ConnectionFailureReason.RuntimeLogPreparationFailed,
+    ),
+    PrepareCertificateBundle(
+        "runtime.certificates.prepare",
+        ConnectionFailureStage.Preparation,
+        ConnectionFailureReason.CertificateBundlePreparationFailed,
     ),
     InstallTproxyGuard(
         "tproxy.guard.install",

@@ -1030,6 +1030,7 @@ class ConnectionManagerTest {
                     apiClients.clients
                 },
                 xrayRoutingUpdater = xrayRoutingUpdater,
+                prepareCertificateBundle = {},
             ),
         )
     }

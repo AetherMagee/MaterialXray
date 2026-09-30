@@ -101,7 +101,6 @@ internal class XrayProcessSupervisor(
     private val environment: XrayRuntimeEnvironment,
     private val commandRunner: RootCommandRunner,
     private val xrayBinary: XrayProcessBinary,
-    private val certificateBundle: RootCertificateBundle,
     private val log: LogBuffer,
 ) : RootXrayProcessController {
     val logFile: String
@@ -120,7 +119,6 @@ internal class XrayProcessSupervisor(
     override suspend fun start(binDir: String, primaryGid: Int?): Int {
         require(primaryGid == null || primaryGid > 0)
         val certificateBundleFile = environment.filesDir.resolve(XRAY_CERTIFICATE_BUNDLE_FILE)
-        certificateBundle.update(certificateBundleFile)
         val xrayCommand = buildString {
             append("cd ${shellQuote(binDir)} && exec env ")
             rootXrayEnvironment(binDir, certificateBundleFile.absolutePath).forEach { (key, value) ->
@@ -261,7 +259,6 @@ internal class XrayProcessSupervisor(
 internal class UserXrayProcessSupervisor(
     private val environment: XrayRuntimeEnvironment,
     private val xrayBinary: XrayProcessBinary,
-    private val certificateBundle: RootCertificateBundle,
     private val processLauncher: UserXrayProcessLauncher = AndroidUserXrayProcessLauncher(),
 ) : UserXrayProcessController {
     // Probes and lifecycle commands arrive from different dispatchers, so the tracked PID needs
@@ -275,7 +272,6 @@ internal class UserXrayProcessSupervisor(
 
     override suspend fun prepareLogFile() {
         withContext(Dispatchers.IO) { FileOutputStream(logFile, false).use { } }
-        certificateBundle.update(certificateBundleFile)
     }
 
     // Deliberately not dispatched elsewhere. The caller owns the tunnel ParcelFileDescriptor and

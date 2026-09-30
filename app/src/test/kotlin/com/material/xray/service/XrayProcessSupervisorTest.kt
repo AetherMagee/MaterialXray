@@ -63,20 +63,6 @@ class XrayProcessSupervisorTest {
     }
 
     @Test
-    fun `start aborts before root launch when certificate bundle update fails`() = runTest {
-        val commands = FakeRootCommandRunner()
-        val supervisor = supervisor(
-            commandRunner = commands,
-            certificateBundle = RootCertificateBundle { throw IllegalStateException("no certificates") },
-        )
-
-        val failure = runCatching { supervisor.start("/tmp/xray bin") }.exceptionOrNull()
-
-        assertEquals("no certificates", failure?.message)
-        assertTrue(commands.commands.isEmpty())
-    }
-
-    @Test
     fun `process liveness and kill reject invalid pids without shelling out`() = runTest {
         val commands = FakeRootCommandRunner()
         val supervisor = supervisor(commandRunner = commands)
@@ -202,21 +188,17 @@ class XrayProcessSupervisorTest {
     }
 
     @Test
-    fun `user process prepares CA bundle and passes it to xray`() = runTest {
+    fun `user process passes the CA bundle to xray`() = runTest {
         val directory = Files.createTempDirectory("user-xray-process-test").toFile()
         val launcher = FakeUserXrayProcessLauncher()
-        var bundleFile: File? = null
         val supervisor = userSupervisor(
             environment = FakeRuntimeEnvironment(filesDir = directory),
             processLauncher = launcher,
-            certificateBundle = RootCertificateBundle { bundleFile = it },
         )
 
         try {
-            supervisor.prepareLogFile()
             supervisor.start(binDir = "/tmp/xray bin", tunFd = 89)
 
-            assertEquals(directory.resolve(XRAY_CERTIFICATE_BUNDLE_FILE), bundleFile)
             assertEquals(
                 directory.resolve(XRAY_CERTIFICATE_BUNDLE_FILE).absolutePath,
                 launcher.startedEnvironment?.get("SSL_CERT_FILE"),
@@ -278,24 +260,20 @@ class XrayProcessSupervisorTest {
     private fun supervisor(
         environment: XrayRuntimeEnvironment = FakeRuntimeEnvironment(),
         commandRunner: FakeRootCommandRunner = FakeRootCommandRunner(),
-        certificateBundle: RootCertificateBundle = RootCertificateBundle { },
         log: LogBuffer = LogBuffer(),
     ) = XrayProcessSupervisor(
         environment = environment,
         commandRunner = commandRunner,
         xrayBinary = FakeXrayProcessBinary(),
-        certificateBundle = certificateBundle,
         log = log,
     )
 
     private fun userSupervisor(
         environment: XrayRuntimeEnvironment = FakeRuntimeEnvironment(),
         processLauncher: UserXrayProcessLauncher = FakeUserXrayProcessLauncher(),
-        certificateBundle: RootCertificateBundle = RootCertificateBundle { },
     ) = UserXrayProcessSupervisor(
         environment = environment,
         xrayBinary = FakeXrayProcessBinary(),
-        certificateBundle = certificateBundle,
         processLauncher = processLauncher,
     )
 
