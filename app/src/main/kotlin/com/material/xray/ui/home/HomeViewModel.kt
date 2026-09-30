@@ -377,6 +377,8 @@ class HomeViewModel(
         viewModelScope.launch {
             try {
                 appUpdateInstaller.confirmInstallPermissionRationale()
+            } catch (error: CancellationException) {
+                throw error
             } catch (_: Exception) {
                 _uiEvents.send(HomeUiEvent.Toast(context.localizedString(R.string.home_app_update_install_failed)))
             }
