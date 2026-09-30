@@ -1,4 +1,4 @@
-3e38d72dfc5eb65c91df0e5583e9b6676c32232041da47de6ae73946b526d66c  Xray-linux-arm64-v8a-v26.9.9.zip
-f18625edf2360df8f857d8a2d947f69dd137b31849e7b9b530200d7e5f482766  Xray-android-arm64-v8a-v26.9.9.zip
-c1defe42b6db958a97c5e049a02a00a4baaedaca7b51c1c229f0830e288acef5  app/src/main/assets/xray_arm64
-477e56669351d7e4262ccb854242a8900d83420e2396f937dcf39150ac6718aa  app/src/main/jniLibs/arm64-v8a/libxray.so
+9886f077f9fd8e6713b84c377c1c7db4e53b9bfa8c276a5bd12561139522b473  Xray-linux-arm64-v8a-v26.9.30.zip
+dbe43ff5a3547ecf8bce2f10af802cdbb97f1eb9af5b6dddd04dbcf3105ede8e  Xray-android-arm64-v8a-v26.9.30.zip
+d16ca768110de6ed098dfc2e9068cbdadf886c9b9715671ee252b1339a50452d  app/src/main/assets/xray_arm64
+6de04c5f5492c0d050f520a1aad10b68ec6fd21907599b95572ad8807dd833cb  app/src/main/jniLibs/arm64-v8a/libxray.so
