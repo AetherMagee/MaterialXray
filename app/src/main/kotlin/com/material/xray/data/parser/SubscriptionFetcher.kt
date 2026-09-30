@@ -260,6 +260,8 @@ class SubscriptionFetcher(
                 init(null, arrayOf(trustManager), SecureRandom())
             }
             builder.sslSocketFactory(sslContext.socketFactory, trustManager)
+                // Self-signed panel certificates rarely match the host, and are often reached by IP.
+                .hostnameVerifier { _, _ -> true }
         }
         return builder.build()
     }

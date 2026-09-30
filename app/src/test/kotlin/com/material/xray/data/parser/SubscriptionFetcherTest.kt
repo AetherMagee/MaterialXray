@@ -589,7 +589,7 @@ class SubscriptionFetcherTest {
     }
 
     @Test
-    fun `insecure updates still reject a certificate for the wrong host`() = runTest {
+    fun `insecure updates accept a certificate for the wrong host`() = runTest {
         val certificate = HeldCertificate.Builder()
             .commonName("wrong.example")
             .addSubjectAlternativeName("wrong.example")
@@ -606,14 +606,12 @@ class SubscriptionFetcherTest {
                 .dns { listOf(InetAddress.getByName("127.0.0.1")) }
                 .build()
 
-            val error = runCatching {
-                SubscriptionFetcher(DirectHttpClient(client), testDeviceIdentity).fetchWithMetadata(
-                    url = server.url("/sub").toString(),
-                    allowInsecureUpdates = true,
-                )
-            }.exceptionOrNull()
+            val subscription = SubscriptionFetcher(DirectHttpClient(client), testDeviceIdentity).fetchWithMetadata(
+                url = server.url("/sub").toString(),
+                allowInsecureUpdates = true,
+            )
 
-            assertTrue(error is javax.net.ssl.SSLPeerUnverifiedException)
+            assertEquals(1, subscription.configs.size)
         }
     }
 
