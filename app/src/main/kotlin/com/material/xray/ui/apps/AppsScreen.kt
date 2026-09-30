@@ -665,7 +665,11 @@ private fun AppRoutePickerDialog(
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clickable(enabled = enabled) { onAlwaysProxiedChanged(!app.alwaysProxied) }
+                                    .clickable(
+                                        interactionSource = null,
+                                        indication = null,
+                                        enabled = enabled,
+                                    ) { onAlwaysProxiedChanged(!app.alwaysProxied) }
                                     .padding(vertical = 4.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {

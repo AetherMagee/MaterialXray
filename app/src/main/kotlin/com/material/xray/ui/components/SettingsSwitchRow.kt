@@ -40,6 +40,8 @@ fun SettingsSwitchRow(
             .padding(vertical = 4.dp)
             .toggleable(
                 value = checked,
+                interactionSource = null,
+                indication = null,
                 enabled = enabled,
                 role = Role.Switch,
                 onValueChange = onCheckedChange,

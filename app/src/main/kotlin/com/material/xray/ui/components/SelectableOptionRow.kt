@@ -39,6 +39,8 @@ fun SelectableOptionRow(
             .heightIn(min = 48.dp)
             .selectable(
                 selected = selected,
+                interactionSource = null,
+                indication = null,
                 onClick = onSelected,
                 role = Role.RadioButton,
             )
