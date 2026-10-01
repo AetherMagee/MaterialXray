@@ -10,6 +10,7 @@ import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.locks.ReentrantLock
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.withContext
@@ -20,6 +21,7 @@ import kotlinx.coroutines.withContext
  */
 class RootShell(
     private val appProcessId: Int = AndroidProcess.myPid(),
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     enum class NetworkNamespace {
         CURRENT,
@@ -50,7 +52,7 @@ class RootShell(
         val isSuccess get() = exitCode == 0
     }
 
-    suspend fun open(requiredNamespace: NetworkNamespace? = null): Boolean = withContext(Dispatchers.IO) {
+    suspend fun open(requiredNamespace: NetworkNamespace? = null): Boolean = withContext(ioDispatcher) {
         val expectedGeneration = closeGeneration.get()
         runInterruptible {
             withInterruptibleLock {
@@ -69,7 +71,7 @@ class RootShell(
         command: String,
         namespace: NetworkNamespace? = null,
         timeoutMs: Long = DEFAULT_COMMAND_TIMEOUT_MS,
-    ): Result = withContext(Dispatchers.IO) {
+    ): Result = withContext(ioDispatcher) {
         val expectedGeneration = closeGeneration.get()
         runInterruptible {
             withInterruptibleLock {

@@ -12,6 +12,7 @@ import com.material.xray.data.repository.SettingsRepository
 import com.material.xray.model.ConnectionProgress
 import com.material.xray.model.ConnectionState
 import com.material.xray.model.RootConnectionBackend
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
@@ -24,6 +25,7 @@ class ConnectionRuntimeManager(
     private val serverRepository: ServerRepository,
     private val stateCoordinator: ConnectionStateCoordinator,
     private val log: LogBuffer,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     private val stateFile = StateFile(context)
     private val activeConfigFile = context.filesDir.resolve(ACTIVE_CONFIG_FILE)
@@ -58,7 +60,7 @@ class ConnectionRuntimeManager(
         }
     }
 
-    suspend fun readActiveConfig(): String? = withContext(Dispatchers.IO) {
+    suspend fun readActiveConfig(): String? = withContext(ioDispatcher) {
         runCatching { activeConfigFile.takeIf { it.isFile }?.readText() }
             .getOrNull()
             ?.takeIf { it.isNotBlank() }
@@ -75,7 +77,7 @@ class ConnectionRuntimeManager(
         data object RecordedRootRuntime : RuntimeDetection
     }
 
-    private suspend fun detectRuntime(): RuntimeDetection? = withContext(Dispatchers.IO) {
+    private suspend fun detectRuntime(): RuntimeDetection? = withContext(ioDispatcher) {
         val persistedState = stateFile.read()
         if (!settingsRepository.useRootService.first() && persistedState?.transitionGuard == null) return@withContext null
         val activeTunName = persistedState

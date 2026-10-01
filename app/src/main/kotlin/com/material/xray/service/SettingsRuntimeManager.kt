@@ -13,6 +13,7 @@ import com.material.xray.data.repository.SettingsRepository
 import com.material.xray.model.ConnectionState
 import com.material.xray.model.LauncherIcon
 import com.material.xray.model.RootConnectionBackend
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -34,6 +35,7 @@ class SettingsRuntimeManager(
     private val stateCoordinator: ConnectionStateCoordinator,
     private val tproxyCompatibilityDetector: TproxyCompatibilityDetector,
     private val log: LogBuffer,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     private val _rootAvailable = MutableStateFlow<Boolean?>(null)
     private val _xrayCoreVersion = MutableStateFlow<String?>(null)
@@ -59,7 +61,7 @@ class SettingsRuntimeManager(
             reloadActiveConnectionIfConnected()
             return true
         }
-        val available = withContext(Dispatchers.IO) { rootShell.open(RootShell.NetworkNamespace.INIT) }
+        val available = withContext(ioDispatcher) { rootShell.open(RootShell.NetworkNamespace.INIT) }
         _rootAvailable.value = available
         if (!available) return false
         settingsRepository.setUseRootService(true)
@@ -145,7 +147,7 @@ class SettingsRuntimeManager(
     }
 
     suspend fun checkRootAvailability(): Boolean {
-        val available = withContext(Dispatchers.IO) { rootShell.open(RootShell.NetworkNamespace.INIT) }
+        val available = withContext(ioDispatcher) { rootShell.open(RootShell.NetworkNamespace.INIT) }
         _rootAvailable.value = available
         if (!available && settingsRepository.useRootService.first()) {
             settingsRepository.setUseRootService(false)
@@ -154,7 +156,7 @@ class SettingsRuntimeManager(
         return available
     }
 
-    suspend fun readXrayCoreVersion(): String = withContext(Dispatchers.IO) {
+    suspend fun readXrayCoreVersion(): String = withContext(ioDispatcher) {
         XrayBinary(context).readVersion() ?: "unknown"
     }
 

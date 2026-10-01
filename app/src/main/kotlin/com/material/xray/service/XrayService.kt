@@ -72,6 +72,7 @@ import java.io.FileDescriptor
 import java.io.PrintWriter
 import java.text.NumberFormat
 import java.util.Locale
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -94,7 +95,9 @@ import kotlinx.serialization.json.Json
 import org.koin.android.ext.android.inject
 
 @Suppress("LargeClass")
-class XrayService : VpnService() {
+class XrayService(
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+) : VpnService() {
 
     private val rootShell: RootShell by inject()
 
@@ -704,7 +707,7 @@ class XrayService : VpnService() {
                     telemetryStep = ConnectionTelemetryStep.RootAccess,
                     isSuccessful = { it },
                     action = {
-                        withContext(Dispatchers.IO) { rootShell.open(RootShell.NetworkNamespace.INIT) }
+                        withContext(ioDispatcher) { rootShell.open(RootShell.NetworkNamespace.INIT) }
                     },
                 ),
             )
@@ -790,7 +793,7 @@ class XrayService : VpnService() {
         stopProcessWatchdog()
         closeVpnInterface()
 
-        val persistedStateResult = withContext(Dispatchers.IO) { stateFile.readResult() }
+        val persistedStateResult = withContext(ioDispatcher) { stateFile.readResult() }
         val rootModeConfigured = settingsRepo.useRootService.first()
         when {
             state is ConnectionState.Connected -> {
@@ -808,7 +811,7 @@ class XrayService : VpnService() {
             mayHaveRootRuntime(rootModeConfigured, persistedStateResult, ::isRootShellAvailable) -> {
                 if (!connectionManager.ensureCleanRootRuntime()) return
             }
-            else -> withContext(Dispatchers.IO) { stateFile.delete() }
+            else -> withContext(ioDispatcher) { stateFile.delete() }
         }
 
         val config = loadLastServerConfig()
@@ -836,7 +839,7 @@ class XrayService : VpnService() {
 
         val config = loadLastServerConfig()
         if (config == null) {
-            val persistedStateResult = withContext(Dispatchers.IO) { stateFile.readResult() }
+            val persistedStateResult = withContext(ioDispatcher) { stateFile.readResult() }
             val mayHaveRootRuntime = mayHaveRootRuntime(
                 rootModeConfigured = settingsRepo.useRootService.first(),
                 persistedState = persistedStateResult,
@@ -997,7 +1000,7 @@ class XrayService : VpnService() {
 
         val restoredState = detectRestorableRunningConnection()
         if (restoredState == null) {
-            val staleState = withContext(Dispatchers.IO) { stateFile.read() }
+            val staleState = withContext(ioDispatcher) { stateFile.read() }
             recoverMissingRuntime(staleState, connectIfMissing)?.let { return it }
             logBuffer.append(LogSource.APP, "No restorable running Xray state was found")
             connectionStateCoordinator.markDisconnected()
@@ -1087,7 +1090,7 @@ class XrayService : VpnService() {
         updateNotification()
     }
 
-    private suspend fun detectRestorableRunningConnection(): ConnectionState.Connected? = withContext(Dispatchers.IO) {
+    private suspend fun detectRestorableRunningConnection(): ConnectionState.Connected? = withContext(ioDispatcher) {
         val runtimeSettings = settingsRepo.runtimeSettingsSnapshot()
         if (!runtimeSettings.useRootService) return@withContext null
 
@@ -1129,7 +1132,7 @@ class XrayService : VpnService() {
         return loadServerConfig(lastServerId)
     }
 
-    private suspend fun isRootShellAvailable(): Boolean = withContext(Dispatchers.IO) {
+    private suspend fun isRootShellAvailable(): Boolean = withContext(ioDispatcher) {
         rootShell.open(RootShell.NetworkNamespace.INIT)
     }
 
@@ -1168,7 +1171,7 @@ class XrayService : VpnService() {
         pauseBalancerSelectionTracker()
         balancerSelectionTag = balancerTag
 
-        balancerSelectionJob = scope.launch(Dispatchers.IO) {
+        balancerSelectionJob = scope.launch(ioDispatcher) {
             while (isActive && connectionStateCoordinator.state.value is ConnectionState.Connected) {
                 val selection = connectionManager.readBalancerSelection(balancerTag)
                 // Null is reserved for the first sample; an empty result keeps the header visible
@@ -1226,7 +1229,7 @@ class XrayService : VpnService() {
     private fun startPingTracker() {
         if (pingJob?.isActive == true) return
 
-        pingJob = scope.launch(Dispatchers.IO) {
+        pingJob = scope.launch(ioDispatcher) {
             while (isActive && connectionStateCoordinator.state.value is ConnectionState.Connected) {
                 val latencyMs = measureActivePing()
                 connectionStateCoordinator.updateActivePing(latencyMs)
@@ -1350,7 +1353,7 @@ class XrayService : VpnService() {
 
         pauseMetrics()
         metricsIntervalMs = intervalMs
-        metricsJob = scope.launch(Dispatchers.IO) {
+        metricsJob = scope.launch(ioDispatcher) {
             // The previous traffic sample is owned by this coroutine: sharing it as a field let a
             // cancelled loop's late write leak a stale sample into the next metrics session.
             //
@@ -1701,7 +1704,7 @@ class XrayService : VpnService() {
             ?: return@runConnectionCommand NetworkRetargetResult.Done
         val previousNetwork = activePhysicalNetwork
         val currentNetwork = currentPhysicalNetworkSnapshot()
-        val currentRoute = withContext(Dispatchers.IO) {
+        val currentRoute = withContext(ioDispatcher) {
             connectionManager.detectPhysicalRoute(latestState.tunName)
         }
         if (reason == PERIODIC_ROOT_ROUTE_VERIFICATION_REASON && !passiveHealthMonitoringEnabled) {
@@ -1752,7 +1755,7 @@ class XrayService : VpnService() {
         )
         updateNotification(localizedString(R.string.notification_status_refreshing_physical_route))
         val runtimeSettings = settingsRepo.runtimeSettingsSnapshot()
-        val result = withContext(Dispatchers.IO) {
+        val result = withContext(ioDispatcher) {
             connectionManager.updatePhysicalBypassRoute(
                 connectedState = latestState,
                 physicalRoute = currentRoute,
@@ -1854,7 +1857,7 @@ class XrayService : VpnService() {
         networkPlan.dnsServers.forEach(builder::addDnsServer)
 
         addDisallowedPackage(builder, packageName, ignoreMissing = true)
-        val appRouteAssignments = withContext(Dispatchers.IO) { appBypassDao.getAll() }
+        val appRouteAssignments = withContext(ioDispatcher) { appBypassDao.getAll() }
         val bypassPackages = appRouteAssignments
             .filter { entity ->
                 when (entity.routeAssignment()) {

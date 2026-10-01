@@ -12,6 +12,7 @@ import java.io.File
 import java.io.IOException
 import java.net.InetSocketAddress
 import java.net.Proxy
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.first
@@ -32,13 +33,14 @@ class ActiveCoreHttpClient(
     private val baseClient: OkHttpClient,
     private val settingsRepository: SettingsRepository,
     private val connectionState: ConnectionStateCoordinator,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : AppHttpClient {
     override suspend fun <T> use(block: suspend (OkHttpClient) -> T): T {
         if (!settingsRepository.routeMxrayTrafficThroughXray.first()) return block(baseClient)
         if (connectionState.state.value !is ConnectionState.Connected) return block(baseClient)
 
         val privateDir = context.filesDir.resolve("bin")
-        val socketPath = withContext(Dispatchers.IO) {
+        val socketPath = withContext(ioDispatcher) {
             File(context.filesDir, ACTIVE_CONFIG_FILE)
                 .takeIf(File::isFile)
                 ?.readText()
@@ -49,13 +51,16 @@ class ActiveCoreHttpClient(
         return try {
             block(proxyClient)
         } finally {
-            evictProxyConnections { proxyClient.connectionPool.evictAll() }
+            evictProxyConnections(ioDispatcher) { proxyClient.connectionPool.evictAll() }
         }
     }
 }
 
-internal suspend fun evictProxyConnections(evict: () -> Unit) {
-    withContext(NonCancellable + Dispatchers.IO) { evict() }
+internal suspend fun evictProxyConnections(
+    ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    evict: () -> Unit,
+) {
+    withContext(NonCancellable + ioDispatcher) { evict() }
 }
 
 internal fun privateUnixHttpProxyClient(baseClient: OkHttpClient, socketPath: String): OkHttpClient = baseClient.newBuilder()

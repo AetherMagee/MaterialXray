@@ -4,6 +4,7 @@ import com.material.xray.core.network.AppHttpClient
 import com.material.xray.model.AppUpdateCheckStatus
 import java.io.IOException
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -25,6 +26,7 @@ internal data class GitHubRelease(
 @Singleton
 class GitHubReleaseFetcher(
     private val httpClient: AppHttpClient,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -32,7 +34,7 @@ class GitHubReleaseFetcher(
         currentVersionName: String,
         onStatus: suspend (AppUpdateCheckStatus) -> Unit = {},
     ): GitHubRelease = httpClient.use { client ->
-        withContext(Dispatchers.IO) {
+        withContext(ioDispatcher) {
             fetchLatestRelease(client, currentVersionName, onStatus)
         }
     }

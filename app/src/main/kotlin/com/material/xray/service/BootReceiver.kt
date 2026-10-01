@@ -8,6 +8,7 @@ import android.util.Log
 import com.material.xray.core.xray.StateFile
 import com.material.xray.core.xray.XrayStateReadResult
 import com.material.xray.data.repository.SettingsRepository
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
@@ -15,8 +16,9 @@ import kotlinx.coroutines.launch
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 
-class BootReceiver :
-    BroadcastReceiver(),
+class BootReceiver(
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+) : BroadcastReceiver(),
     KoinComponent {
 
     private val settingsRepo: SettingsRepository by inject()
@@ -25,7 +27,7 @@ class BootReceiver :
         if (intent?.action != Intent.ACTION_BOOT_COMPLETED && intent?.action != Intent.ACTION_MY_PACKAGE_REPLACED) return
 
         val pendingResult = goAsync()
-        CoroutineScope(Dispatchers.IO).launch {
+        CoroutineScope(ioDispatcher).launch {
             // A detached coroutine has no other handler; an escaped exception here would crash
             // the whole app process in the middle of automatic connection handling.
             runCatching { autoConnectIfConfigured(context, intent.action) }

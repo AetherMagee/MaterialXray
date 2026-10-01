@@ -5,6 +5,7 @@ import com.material.xray.core.xray.ActiveConfigOverrideStore
 import com.material.xray.data.db.AppDatabase
 import com.material.xray.data.repository.SettingsRepository
 import com.material.xray.model.ConnectionState
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.first
@@ -20,6 +21,7 @@ class DatabaseResetManager(
     private val routingChangeManager: RoutingChangeManager,
     private val stateCoordinator: ConnectionStateCoordinator,
     private val activeConfigOverrideStore: ActiveConfigOverrideStore,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     suspend fun reset() {
         if (stateCoordinator.state.value.requiresRuntimeDisconnect()) {
@@ -32,7 +34,7 @@ class DatabaseResetManager(
         }
 
         withContext(NonCancellable) {
-            withContext(Dispatchers.IO) { database.clearAllTables() }
+            withContext(ioDispatcher) { database.clearAllTables() }
             settingsRepository.setLastServerId(-1)
             activeConfigOverrideStore.clear()
             routingChangeManager.clearPendingChanges()

@@ -34,6 +34,7 @@ import com.material.xray.service.AlwaysOnVpnState
 import com.material.xray.service.PendingRoutingChange
 import com.material.xray.service.RoutingChangeManager
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -115,6 +116,7 @@ class AppsViewModel(
     private val providerRoutingCoordinator: ProviderRoutingCoordinator,
     private val routingChangeManager: RoutingChangeManager,
     private val appInventory: AppInventory,
+    private val defaultDispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) : ViewModel() {
 
     private val _searchQuery = MutableStateFlow("")
@@ -206,7 +208,7 @@ class AppsViewModel(
         }
     }
         // Building a route option parses each server's config JSON.
-        .flowOn(Dispatchers.Default)
+        .flowOn(defaultDispatcher)
         .stateIn(
             viewModelScope,
             SharingStarted.WhileSubscribed(5000),
@@ -269,7 +271,7 @@ class AppsViewModel(
     }
         // Joining assignments over every installed app and re-sorting is linear in the size of
         // the app list; keep it off the main dispatcher.
-        .flowOn(Dispatchers.Default)
+        .flowOn(defaultDispatcher)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     fun refreshApps() {

@@ -34,6 +34,7 @@ import com.material.xray.service.OemAutostartManager
 import com.material.xray.service.SettingsRuntimeManager
 import com.material.xray.service.XrayService
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
@@ -74,6 +75,7 @@ class SettingsViewModel(
     private val oemAutostartManager: OemAutostartManager,
     private val geoDataManager: GeoDataManager,
     settingsDataState: SettingsDataState,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : ViewModel() {
     private val _geoipUpdating = MutableStateFlow(false)
     private val _geositeUpdating = MutableStateFlow(false)
@@ -435,7 +437,7 @@ class SettingsViewModel(
         if (_backupBusy.value) return
         viewModelScope.launch {
             _backupBusy.value = true
-            val result = runCatching { withContext(Dispatchers.IO) { backupManager.export(uri) } }
+            val result = runCatching { withContext(ioDispatcher) { backupManager.export(uri) } }
             result.exceptionOrNull()?.let { error ->
                 if (error is CancellationException) throw error
             }
@@ -458,7 +460,7 @@ class SettingsViewModel(
         if (_backupBusy.value) return
         viewModelScope.launch {
             _backupBusy.value = true
-            val result = runCatching { withContext(Dispatchers.IO) { backupManager.prepareImport(uri) } }
+            val result = runCatching { withContext(ioDispatcher) { backupManager.prepareImport(uri) } }
             result.onSuccess { prepared ->
                 preparedBackupImport = prepared
                 _backupImportSummary.value = prepared.summary
@@ -487,7 +489,7 @@ class SettingsViewModel(
         if (_backupBusy.value) return
         viewModelScope.launch {
             _backupBusy.value = true
-            val result = runCatching { withContext(Dispatchers.IO) { backupManager.restore(prepared) } }
+            val result = runCatching { withContext(ioDispatcher) { backupManager.restore(prepared) } }
             result.exceptionOrNull()?.let { error ->
                 if (error is CancellationException) throw error
             }

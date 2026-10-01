@@ -6,6 +6,7 @@ import com.material.xray.data.repository.SettingsRepository
 import java.io.File
 import java.io.IOException
 import java.io.InputStream
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -90,6 +91,7 @@ class GeoDataManager(
     private val context: Context,
     private val httpClient: AppHttpClient,
     private val settingsRepository: SettingsRepository,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     private val binaryDir get() = File(context.filesDir, "bin")
     private val geoipSourceFile get() = File(binaryDir, "geoip-source")
@@ -102,11 +104,11 @@ class GeoDataManager(
 
     val downloadProgress: StateFlow<Map<GeoDataAsset, GeoDataDownloadProgress>> = _downloadProgress.asStateFlow()
 
-    suspend fun needsRefresh(): Boolean = withContext(Dispatchers.IO) {
+    suspend fun needsRefresh(): Boolean = withContext(ioDispatcher) {
         downloadMutex.withLock { resolveState().needsDownload }
     }
 
-    suspend fun ensureReady(): GeoDataStatus = withContext(Dispatchers.IO) {
+    suspend fun ensureReady(): GeoDataStatus = withContext(ioDispatcher) {
         downloadMutex.withLock {
             binaryDir.mkdirs()
             val state = resolveState()
@@ -140,7 +142,7 @@ class GeoDataManager(
         }
     }
 
-    suspend fun refresh(asset: GeoDataAsset) = withContext(Dispatchers.IO) {
+    suspend fun refresh(asset: GeoDataAsset) = withContext(ioDispatcher) {
         downloadMutex.withLock {
             binaryDir.mkdirs()
             val state = resolveState()
@@ -163,7 +165,7 @@ class GeoDataManager(
         }
     }
 
-    suspend fun clearCachedData() = withContext(Dispatchers.IO) {
+    suspend fun clearCachedData() = withContext(ioDispatcher) {
         downloadMutex.withLock {
             listOf(
                 File(binaryDir, GEOIP_FILE_NAME),
@@ -185,7 +187,7 @@ class GeoDataManager(
     }
 
     /** Downloads outside the connection lock, then installs each completed file under the lock. */
-    suspend fun refreshForScheduledUpdate() = withContext(Dispatchers.IO) {
+    suspend fun refreshForScheduledUpdate() = withContext(ioDispatcher) {
         val (state, generation) = downloadMutex.withLock { resolveState() to cacheGeneration }
         if (state.needsDownload) return@withContext
         trackDownloads(GeoDataAsset.entries.toSet()) {

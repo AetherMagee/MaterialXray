@@ -12,6 +12,7 @@ import androidx.work.WorkManager
 import androidx.work.await
 import com.material.xray.model.GeoDataUpdateInterval
 import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.koin.core.annotation.Singleton
@@ -19,8 +20,9 @@ import org.koin.core.annotation.Singleton
 @Singleton
 class GeoDataUpdateScheduler(
     private val context: Context,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
-    suspend fun enqueueInitialRefresh() = withContext(Dispatchers.IO) {
+    suspend fun enqueueInitialRefresh() = withContext(ioDispatcher) {
         val preferences = context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
         if (preferences.getBoolean(INITIAL_REFRESH_SCHEDULED_KEY, false)) return@withContext
 

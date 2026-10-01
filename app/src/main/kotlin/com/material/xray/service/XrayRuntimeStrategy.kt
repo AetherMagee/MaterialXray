@@ -3,6 +3,7 @@ package com.material.xray.service
 import android.os.ParcelFileDescriptor
 import com.material.xray.core.xray.XRAY_API_SOCKET_NAME_PREFIX
 import com.material.xray.core.xray.XrayApiEndpoint
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -137,6 +138,7 @@ internal class VpnServiceXrayRuntimeStrategy(
     private val processSupervisor: UserXrayProcessController,
     private val stateStore: ConnectionStateStore,
     private val xrayBinary: ConnectionXrayBinary,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : XrayRuntimeStrategy {
     override val managesSystemRouting = false
 
@@ -174,7 +176,7 @@ internal class VpnServiceXrayRuntimeStrategy(
 
     override suspend fun readResidentMemoryMb(pid: Int): Long? = processSupervisor.readResidentMemoryMb(pid)
 
-    override suspend fun readActiveConnectionCount(pid: Int): Int? = withContext(Dispatchers.IO) {
+    override suspend fun readActiveConnectionCount(pid: Int): Int? = withContext(ioDispatcher) {
         processSupervisor.readActiveConnectionCount(pid)
     }
 

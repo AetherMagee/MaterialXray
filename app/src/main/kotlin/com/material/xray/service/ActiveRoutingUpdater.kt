@@ -5,6 +5,7 @@ import com.material.xray.core.xray.TunManager
 import com.material.xray.core.xray.XrayState
 import com.material.xray.model.ConnectionProgress
 import com.material.xray.model.ConnectionState
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -81,15 +82,16 @@ internal interface TunRoutingGateway {
 
 internal class StateFileRoutingStateStore(
     private val stateFile: StateFile,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : ConnectionStateStore {
-    override suspend fun read(): XrayState? = withContext(Dispatchers.IO) { stateFile.read() }
+    override suspend fun read(): XrayState? = withContext(ioDispatcher) { stateFile.read() }
 
     override suspend fun write(state: XrayState) {
-        withContext(Dispatchers.IO) { stateFile.write(state) }
+        withContext(ioDispatcher) { stateFile.write(state) }
     }
 
     override suspend fun delete() {
-        withContext(Dispatchers.IO) { stateFile.delete() }
+        withContext(ioDispatcher) { stateFile.delete() }
     }
 }
 

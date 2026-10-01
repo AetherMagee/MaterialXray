@@ -7,6 +7,7 @@ import android.graphics.drawable.Drawable
 import android.os.Process
 import android.os.UserHandle
 import android.os.UserManager
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -37,6 +38,7 @@ interface AppInventorySource {
 @Singleton
 class AppInventory(
     private val context: Context,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : AppInventorySource {
     suspend fun loadInstalledApps(): List<InstalledApp> = loadSnapshot().apps
 
@@ -49,7 +51,7 @@ class AppInventory(
     private suspend fun loadSnapshot(
         includeUiMetadata: Boolean,
         onProgress: ((processed: Int, total: Int) -> Unit)? = null,
-    ): AppInventorySnapshot = withContext(Dispatchers.IO) {
+    ): AppInventorySnapshot = withContext(ioDispatcher) {
         val pm = context.packageManager
         val currentProfileId = profileIdForUid(context.applicationInfo.uid)
         val profiles = userProfiles()

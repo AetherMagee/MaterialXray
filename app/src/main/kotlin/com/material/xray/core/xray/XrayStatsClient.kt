@@ -7,12 +7,14 @@ import com.xray.app.stats.command.SysStatsRequest
 import io.grpc.ManagedChannel
 import io.grpc.StatusRuntimeException
 import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 internal class XrayStatsClient(
     private val endpoint: XrayApiEndpoint = XrayApiEndpoint.UnixSocket(XRAY_API_SOCKET_NAME_PREFIX),
     private val timeoutMs: Long = XRAY_API_TIMEOUT_MS,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : AutoCloseable {
     private val channelDelegate = lazy(LazyThreadSafetyMode.SYNCHRONIZED, ::buildChannel)
     private val channel by channelDelegate
@@ -22,7 +24,7 @@ internal class XrayStatsClient(
 
     suspend fun queryOutboundTrafficStatsBytes(): Map<String, Long> = queryStats(pattern = "outbound")
 
-    suspend fun queryStats(pattern: String, reset: Boolean = false): Map<String, Long> = withContext(Dispatchers.IO) {
+    suspend fun queryStats(pattern: String, reset: Boolean = false): Map<String, Long> = withContext(ioDispatcher) {
         withBlockingStub { stub ->
             val response = stub.queryStats(
                 QueryStatsRequest.newBuilder()
@@ -37,7 +39,7 @@ internal class XrayStatsClient(
         }
     }
 
-    suspend fun getSysStats(): XraySysStats? = withContext(Dispatchers.IO) {
+    suspend fun getSysStats(): XraySysStats? = withContext(ioDispatcher) {
         withBlockingStub { stub ->
             val response = stub.getSysStats(SysStatsRequest.getDefaultInstance())
             XraySysStats(

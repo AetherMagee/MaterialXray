@@ -17,6 +17,7 @@ import java.io.File
 import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -52,6 +53,7 @@ class AppUpdateInstaller(
     private val settingsRepository: SettingsRepository,
     private val rootShell: RootShell,
     private val oemAutostartManager: OemAutostartManager,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     private val installMutex = Mutex()
     private val _installProgress = MutableStateFlow<AppUpdateInstallProgress?>(null)
@@ -81,7 +83,7 @@ class AppUpdateInstaller(
             val downloadUrl = update.apkDownloadUrl ?: releaseFetcher
                 .fetchLatestRelease(currentVersionName)
                 .apkDownloadUrl
-            val apk = httpClient.use { client -> withContext(Dispatchers.IO) { downloadApk(client, downloadUrl) } }
+            val apk = httpClient.use { client -> withContext(ioDispatcher) { downloadApk(client, downloadUrl) } }
             _installProgress.value = AppUpdateInstallProgress(
                 stage = AppUpdateInstallStage.PreparingInstallation,
                 fraction = null,

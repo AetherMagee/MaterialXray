@@ -12,6 +12,7 @@ import com.material.xray.service.LogEntry
 import com.material.xray.service.displayMessage
 import java.io.File
 import java.io.IOException
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.withContext
@@ -24,6 +25,7 @@ private const val LOG_EXPORT_DIRECTORY = "logs"
 class LogsViewModel(
     private val context: Application,
     private val logBuffer: LogBuffer,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : ViewModel() {
     val entries: StateFlow<List<LogEntry>> = logBuffer.entries
 
@@ -53,7 +55,7 @@ class LogsViewModel(
         )
     }
 
-    suspend fun saveLogs(destination: Uri) = withContext(Dispatchers.IO) {
+    suspend fun saveLogs(destination: Uri) = withContext(ioDispatcher) {
         val outputStream = context.contentResolver.openOutputStream(destination, "wt")
             ?: throw IOException("Unable to open the selected log file")
         outputStream.bufferedWriter(Charsets.UTF_8).use { writer ->
@@ -61,7 +63,7 @@ class LogsViewModel(
         }
     }
 
-    suspend fun createShareFile(): Uri = withContext(Dispatchers.IO) {
+    suspend fun createShareFile(): Uri = withContext(ioDispatcher) {
         val exportDirectory = File(context.cacheDir, LOG_EXPORT_DIRECTORY)
         if (!exportDirectory.isDirectory && !exportDirectory.mkdirs()) {
             throw IOException("Unable to create the log export directory")

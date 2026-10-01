@@ -59,6 +59,7 @@ import java.net.SocketTimeoutException
 import java.net.UnknownHostException
 import javax.net.ssl.SSLException
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
@@ -158,6 +159,7 @@ class HomeViewModel(
     private val serverLatencyTester: ServerLatencyTester,
     private val logBuffer: LogBuffer,
     geoDataManager: GeoDataManager,
+    private val defaultDispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) : ViewModel() {
     private var serverSelectionJob: Job? = null
     private var latencyJob: Job? = null
@@ -204,7 +206,7 @@ class HomeViewModel(
     }
         // Overlaying the latency states copies every list item and reruns on each probe result;
         // keep that churn off the main dispatcher.
-        .flowOn(Dispatchers.Default)
+        .flowOn(defaultDispatcher)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), homeData.value?.serverItems.orEmpty())
 
     val serversBySubscription: StateFlow<Map<Long, List<ServerListItem>>> = serverItems
@@ -283,7 +285,7 @@ class HomeViewModel(
         )
     }
         // Matching the balancer outbound parses server configs from the whole subscription.
-        .flowOn(Dispatchers.Default)
+        .flowOn(defaultDispatcher)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(), null)
 
     /**

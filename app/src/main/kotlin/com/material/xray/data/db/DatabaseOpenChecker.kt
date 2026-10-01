@@ -2,6 +2,7 @@ package com.material.xray.data.db
 
 import android.util.Log
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -9,12 +10,15 @@ import kotlinx.coroutines.withContext
 import org.koin.core.annotation.Singleton
 
 @Singleton
-class DatabaseOpenChecker(private val database: AppDatabase) {
+class DatabaseOpenChecker(
+    private val database: AppDatabase,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+) {
     private val mutex = Mutex()
     private var result: Boolean? = null
 
     suspend fun canRead(): Boolean = mutex.withLock {
-        result?.takeIf { it } ?: withContext(Dispatchers.IO) {
+        result?.takeIf { it } ?: withContext(ioDispatcher) {
             try {
                 // Opening runs Room migrations and schema validation; the query also verifies
                 // that the main user-data table can be read before any screen uses it.

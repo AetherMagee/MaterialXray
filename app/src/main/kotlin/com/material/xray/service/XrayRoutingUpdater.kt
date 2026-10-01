@@ -7,6 +7,7 @@ import com.material.xray.core.xray.cliServerAddress
 import java.io.File
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -27,8 +28,9 @@ internal fun interface ConnectionXrayRoutingUpdater {
 internal class XrayCliRoutingUpdater(
     private val binaryPath: () -> String?,
     private val binDir: String,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : ConnectionXrayRoutingUpdater {
-    override suspend fun replace(endpoint: XrayApiEndpoint, routing: JsonObject): XrayRoutingUpdateResult = withContext(Dispatchers.IO) {
+    override suspend fun replace(endpoint: XrayApiEndpoint, routing: JsonObject): XrayRoutingUpdateResult = withContext(ioDispatcher) {
         replaceOnIoThread(endpoint, routing)
     }
 

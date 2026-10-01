@@ -15,6 +15,7 @@ import java.net.InetSocketAddress
 import java.net.Socket
 import java.util.concurrent.TimeUnit
 import kotlin.coroutines.resume
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -137,6 +138,7 @@ private suspend fun executeTimedHttpProbe(
 class ServerLatencyTester(
     context: Context,
     private val ephemeralCore: EphemeralXrayCore,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     private val json = Json { prettyPrint = true }
     private val serverAddressResolver = ServerAddressResolver(context)
@@ -148,7 +150,7 @@ class ServerLatencyTester(
         dnsServers: String,
         domesticDnsServers: String,
         allowIpv6: Boolean,
-    ): LatencyProbeResult = withContext(Dispatchers.IO) {
+    ): LatencyProbeResult = withContext(ioDispatcher) {
         withTimeoutOrNull(TEST_TIMEOUT_MS) {
             when (method) {
                 PingMethod.Httping -> measureHttpProbeThroughXray(

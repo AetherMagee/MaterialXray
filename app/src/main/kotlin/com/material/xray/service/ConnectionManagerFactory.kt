@@ -37,6 +37,7 @@ import com.material.xray.telemetry.TelemetryReporter
 import com.material.xray.telemetry.TelemetrySpan
 import java.net.InetAddress
 import java.net.ServerSocket
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -142,6 +143,7 @@ internal interface ConnectionXrayBinary : XrayProcessBinary {
 // the main thread.
 internal class XrayBinaryConnectionAdapter(
     private val binary: XrayBinary,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : ConnectionXrayBinary {
     override val binaryPath: String?
         get() = binary.binaryPath
@@ -150,14 +152,14 @@ internal class XrayBinaryConnectionAdapter(
 
     override fun configPath(): String = binary.configPath()
 
-    override suspend fun ensureAvailable(): Boolean = withContext(Dispatchers.IO) { binary.ensureAvailable() }
+    override suspend fun ensureAvailable(): Boolean = withContext(ioDispatcher) { binary.ensureAvailable() }
 
-    override suspend fun readConfig(): String? = withContext(Dispatchers.IO) { binary.readConfig() }
+    override suspend fun readConfig(): String? = withContext(ioDispatcher) { binary.readConfig() }
 
-    override suspend fun readOverrideConfig(): String? = withContext(Dispatchers.IO) { binary.readOverrideConfig() }
+    override suspend fun readOverrideConfig(): String? = withContext(ioDispatcher) { binary.readOverrideConfig() }
 
     override suspend fun writeConfig(configJson: String) {
-        withContext(Dispatchers.IO) { binary.writeConfig(configJson) }
+        withContext(ioDispatcher) { binary.writeConfig(configJson) }
     }
 }
 
@@ -394,11 +396,12 @@ class ConnectionManagerFactory(
     private val stateCoordinator: ConnectionStateCoordinator,
     private val log: LogBuffer,
     private val telemetryReporter: TelemetryReporter,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     private val serverAddressResolver by lazy { ServerAddressResolver(context) }
     private val rootCertificateBundle by lazy {
         AndroidRootCertificateBundle(
-            refreshScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
+            refreshScope = CoroutineScope(SupervisorJob() + ioDispatcher),
             loadBundledCertificates = {
                 context.resources.openRawResource(R.raw.mozilla_ca_bundle).use { input ->
                     loadX509Certificates(input).map { certificate -> certificate.encoded }

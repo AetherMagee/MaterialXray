@@ -11,6 +11,7 @@ import com.material.xray.core.xray.XRAY_EXECUTABLE_NAME
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -112,6 +113,7 @@ internal class XrayProcessSupervisor(
     private val commandRunner: RootCommandRunner,
     private val xrayBinary: XrayProcessBinary,
     private val log: LogBuffer,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : RootXrayProcessController {
     val logFile: String
         get() = environment.filesDir.resolve(XRAY_LOG_FILE_NAME).absolutePath
@@ -119,10 +121,10 @@ internal class XrayProcessSupervisor(
     override suspend fun prepareLogFile() {
         val file = environment.filesDir.resolve(XRAY_LOG_FILE_NAME)
         runCatching {
-            withContext(Dispatchers.IO) { FileOutputStream(file, false).use { } }
+            withContext(ioDispatcher) { FileOutputStream(file, false).use { } }
         }.getOrElse {
             commandRunner.execute("rm -f $logFile")
-            withContext(Dispatchers.IO) { FileOutputStream(file, false).use { } }
+            withContext(ioDispatcher) { FileOutputStream(file, false).use { } }
         }
     }
 
@@ -279,6 +281,7 @@ internal class UserXrayProcessSupervisor(
     private val environment: XrayRuntimeEnvironment,
     private val xrayBinary: XrayProcessBinary,
     private val processLauncher: UserXrayProcessLauncher = AndroidUserXrayProcessLauncher(),
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : UserXrayProcessController {
     // Probes and lifecycle commands arrive from different dispatchers, so the tracked PID needs
     // cross-thread visibility.
@@ -290,7 +293,7 @@ internal class UserXrayProcessSupervisor(
         get() = environment.filesDir.resolve(XRAY_CERTIFICATE_BUNDLE_FILE)
 
     override suspend fun prepareLogFile() {
-        withContext(Dispatchers.IO) { FileOutputStream(logFile, false).use { } }
+        withContext(ioDispatcher) { FileOutputStream(logFile, false).use { } }
     }
 
     // Deliberately not dispatched elsewhere. The caller owns the tunnel ParcelFileDescriptor and

@@ -21,6 +21,7 @@ import com.material.xray.model.XrayRuntimeSettings
 import com.material.xray.telemetry.ConnectionTelemetryStep
 import java.io.IOException
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
@@ -37,6 +38,7 @@ internal class ConnectionManager(
     private val stateCoordinator: ConnectionStateCoordinator,
     private val log: LogBuffer,
     dependencies: ConnectionManagerDependencies,
+    private val defaultDispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) : XrayHealthProbe {
     private val environment = dependencies.environment
     private val rootRuntime = dependencies.rootRuntime
@@ -737,7 +739,7 @@ internal class ConnectionManager(
         return generatedConfig
     }
 
-    private suspend fun generateXrayConfig(config: GeneratedXrayConfig): String = withContext(Dispatchers.Default) {
+    private suspend fun generateXrayConfig(config: GeneratedXrayConfig): String = withContext(defaultDispatcher) {
         val settings = config.runtimeSettings
         configGenerator.generate(
             server = config.server,
@@ -777,7 +779,7 @@ internal class ConnectionManager(
         clearOutboundInterfaces: Boolean,
     ): Boolean {
         val override = xrayBinary.readOverrideConfig() ?: return false
-        val patched = withContext(Dispatchers.Default) {
+        val patched = withContext(defaultDispatcher) {
             configGenerator.applyRuntimeIdentity(
                 configJson = override,
                 tunName = runtimeSettings.tunName,

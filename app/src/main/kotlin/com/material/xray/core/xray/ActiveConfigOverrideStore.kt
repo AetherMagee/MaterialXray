@@ -2,6 +2,7 @@ package com.material.xray.core.xray
 
 import android.content.Context
 import java.io.File
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.koin.core.annotation.Singleton
@@ -16,11 +17,12 @@ import org.koin.core.annotation.Singleton
 @Singleton
 class ActiveConfigOverrideStore(
     context: Context,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     private val file = context.filesDir.resolve(ACTIVE_CONFIG_OVERRIDE_FILE)
 
     /** False when the override could not be written, so the caller does not report a phantom save. */
-    suspend fun save(configJson: String): Boolean = withContext(Dispatchers.IO) {
+    suspend fun save(configJson: String): Boolean = withContext(ioDispatcher) {
         // Written via a temporary file so a connect reading it concurrently sees either the old
         // document or the new one, never a half-written one.
         val temp = File(file.parentFile, "$ACTIVE_CONFIG_OVERRIDE_FILE.tmp")
@@ -31,11 +33,11 @@ class ActiveConfigOverrideStore(
     }
 
     /** Matches what the connect path treats as an override, so the UI never disagrees with it. */
-    suspend fun exists(): Boolean = withContext(Dispatchers.IO) {
+    suspend fun exists(): Boolean = withContext(ioDispatcher) {
         runCatching { file.takeIf { it.isFile }?.readText() }.getOrNull()?.isNotBlank() == true
     }
 
-    suspend fun clear(): Unit = withContext(Dispatchers.IO) {
+    suspend fun clear(): Unit = withContext(ioDispatcher) {
         try {
             file.delete()
         } catch (_: Exception) {

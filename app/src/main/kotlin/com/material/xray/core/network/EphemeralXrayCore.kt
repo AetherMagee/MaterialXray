@@ -10,6 +10,7 @@ import java.io.File
 import java.io.IOException
 import java.util.UUID
 import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.currentCoroutineContext
@@ -33,6 +34,7 @@ class EphemeralXrayCoreException(message: String, cause: Throwable? = null) : IO
 class EphemeralXrayCore(
     private val context: Context,
     private val baseClient: OkHttpClient,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     private val xrayBinary = XrayBinary(context)
 
@@ -55,16 +57,16 @@ class EphemeralXrayCore(
         buildConfig: (XrayInbound.PrivateHttp) -> String,
         block: suspend (client: OkHttpClient, logFile: File) -> T,
     ): T {
-        val core = withContext(Dispatchers.IO) { startCore(inboundTag, startTimeoutMs, buildConfig) }
+        val core = withContext(ioDispatcher) { startCore(inboundTag, startTimeoutMs, buildConfig) }
         try {
             val client = privateUnixHttpProxyClient(baseClient, core.inbound.path)
             try {
                 return block(client, core.logFile)
             } finally {
-                evictProxyConnections { client.connectionPool.evictAll() }
+                evictProxyConnections(ioDispatcher) { client.connectionPool.evictAll() }
             }
         } finally {
-            withContext(NonCancellable + Dispatchers.IO) { core.close() }
+            withContext(NonCancellable + ioDispatcher) { core.close() }
         }
     }
 

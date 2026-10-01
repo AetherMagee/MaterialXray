@@ -8,6 +8,7 @@ import java.io.FileInputStream
 import java.io.IOException
 import java.io.RandomAccessFile
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -19,6 +20,7 @@ import kotlinx.coroutines.launch
 class XrayLogStreamer(
     private val logFile: File,
     private val logBuffer: LogBuffer,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     private val signals = Channel<Unit>(Channel.CONFLATED)
     private val resetRequested = AtomicBoolean(false)
@@ -49,7 +51,7 @@ class XrayLogStreamer(
             initialized = true
         }
         if (job?.isActive != true) {
-            job = scope.launch(Dispatchers.IO) { processSignals() }
+            job = scope.launch(ioDispatcher) { processSignals() }
         }
         observer?.stopWatching()
         observer = createObserver().also(FileObserver::startWatching)

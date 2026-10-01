@@ -16,6 +16,7 @@ import com.material.xray.model.ServerConfig
 import com.material.xray.model.endpointSummary
 import com.material.xray.model.proxyOutboundCount
 import java.util.Locale
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.SharingStarted
@@ -57,6 +58,7 @@ class HomeDataState(
     serverRepository: ServerRepository,
     settingsRepository: SettingsRepository,
     @ApplicationScope scope: CoroutineScope,
+    private val defaultDispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) {
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -83,7 +85,7 @@ class HomeDataState(
     }
         // Building the list items decodes every server config JSON, which grows with the number
         // of servers; keep that work off the main dispatcher.
-        .flowOn(Dispatchers.Default)
+        .flowOn(defaultDispatcher)
         .stateIn(scope, SharingStarted.Eagerly, null)
 
     private fun buildServerItems(servers: List<ServerEntity>): List<ServerListItem> {

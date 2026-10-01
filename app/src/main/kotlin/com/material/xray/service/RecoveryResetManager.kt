@@ -6,6 +6,7 @@ import com.material.xray.core.xray.CleanupManager
 import com.material.xray.core.xray.StateFile
 import com.material.xray.core.xray.XrayStateReadResult
 import com.material.xray.model.ConnectionState
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
@@ -19,6 +20,7 @@ class RecoveryResetManager(
     private val stateCoordinator: ConnectionStateCoordinator,
     private val rootShell: RootShell,
     private val rootlessOrphanStopper: RootlessOrphanStopper,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     suspend fun prepareForReset(): Boolean {
         if (stateCoordinator.state.value.requiresRuntimeDisconnect()) {
@@ -29,7 +31,7 @@ class RecoveryResetManager(
             if (settled != ConnectionState.Disconnected) return false
         }
 
-        return withContext(Dispatchers.IO) {
+        return withContext(ioDispatcher) {
             val recorded = StateFile(context).readResult()
             when (rootCleanupDecision(recorded)) {
                 RootCleanupDecision.None -> if (recorded is XrayStateReadResult.Present) {

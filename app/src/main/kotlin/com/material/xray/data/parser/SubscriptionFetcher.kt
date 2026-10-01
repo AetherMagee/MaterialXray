@@ -36,6 +36,7 @@ import java.security.cert.X509Certificate
 import javax.net.ssl.SSLContext
 import javax.net.ssl.X509TrustManager
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
@@ -87,6 +88,7 @@ class SubscriptionFetchException(
 class SubscriptionFetcher(
     private val httpClient: AppHttpClient,
     private val deviceIdentity: SubscriptionDeviceIdentity,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     private val parser = ShareLinkParser()
     private val json = Json {
@@ -124,7 +126,7 @@ class SubscriptionFetcher(
             throw SubscriptionFetchException(SubscriptionFetchException.Reason.INSECURE_TRANSPORT)
         }
         return httpClient.use { baseClient ->
-            withContext(Dispatchers.IO) {
+            withContext(ioDispatcher) {
                 // Strict requests carry the subscription token plus identity headers, so no hop may leave
                 // the device in cleartext. OkHttp follows redirects internally, so enforce that boundary at
                 // the client level. The per-subscription opt-in deliberately relaxes both transport checks.

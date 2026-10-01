@@ -11,6 +11,7 @@ import com.material.xray.core.locale.localizedString
 import com.material.xray.data.repository.ServerRepository
 import com.material.xray.data.repository.SettingsRepository
 import com.material.xray.model.ConnectionState
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -22,7 +23,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.android.ext.android.inject
 
-class XrayTileService : TileService() {
+class XrayTileService(
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+) : TileService() {
 
     private val settingsRepo: SettingsRepository by inject()
 
@@ -106,7 +109,7 @@ class XrayTileService : TileService() {
     }
 
     private suspend fun connectSelectedServer() {
-        val serverConfig = withContext(Dispatchers.IO) {
+        val serverConfig = withContext(ioDispatcher) {
             val selectedServerId = settingsRepo.lastServerId.first()
             if (selectedServerId < 0) return@withContext null
 

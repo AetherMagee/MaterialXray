@@ -15,6 +15,7 @@ import com.material.xray.service.RoutingChangeManager
 import com.material.xray.telemetry.TelemetryClient
 import com.material.xray.telemetry.TelemetryReporter
 import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -31,7 +32,9 @@ class AppModule {
 
     @Singleton
     @ApplicationScope
-    fun applicationScope(): CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    fun applicationScope(
+        defaultDispatcher: CoroutineDispatcher = Dispatchers.Default,
+    ): CoroutineScope = CoroutineScope(SupervisorJob() + defaultDispatcher)
 
     @Singleton
     fun okHttpClient(context: Context): OkHttpClient {

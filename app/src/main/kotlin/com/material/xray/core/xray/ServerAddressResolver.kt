@@ -16,6 +16,7 @@ import java.util.concurrent.Executor
 import kotlin.coroutines.resume
 import kotlin.random.Random
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -34,6 +35,7 @@ import okhttp3.Dns
 class ServerAddressResolver(
     private val context: Context? = null,
     private val hostLookup: (suspend (String) -> List<String>)? = null,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     data class Result(
         val server: ServerConfig,
@@ -46,7 +48,7 @@ class ServerAddressResolver(
     private val directExecutor = Executor { it.run() }
     private val successfulLookups = ConcurrentHashMap<String, CachedLookup>()
 
-    suspend fun resolve(server: ServerConfig, allowIpv6: Boolean = false): Result = withContext(Dispatchers.IO) {
+    suspend fun resolve(server: ServerConfig, allowIpv6: Boolean = false): Result = withContext(ioDispatcher) {
         if (server.rawConfigJson.isNotBlank()) {
             return@withContext resolveRawConfig(server, allowIpv6)
         }

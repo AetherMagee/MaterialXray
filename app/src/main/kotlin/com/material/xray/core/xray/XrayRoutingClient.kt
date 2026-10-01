@@ -12,12 +12,14 @@ import com.xray.core.app.observatory.command.ObservatoryServiceGrpc
 import io.grpc.ManagedChannel
 import io.grpc.StatusRuntimeException
 import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 internal class XrayRoutingClient(
     private val endpoint: XrayApiEndpoint = XrayApiEndpoint.UnixSocket(XRAY_API_SOCKET_NAME_PREFIX),
     private val timeoutMs: Long = XRAY_API_TIMEOUT_MS,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : AutoCloseable {
     private val channelDelegate = lazy(LazyThreadSafetyMode.SYNCHRONIZED, ::buildChannel)
     private val channel by channelDelegate
@@ -28,7 +30,7 @@ internal class XrayRoutingClient(
         ObservatoryServiceGrpc.newBlockingStub(channel)
     }
 
-    suspend fun queryBalancerSelection(balancerTag: String): ActiveBalancerSelection? = withContext(Dispatchers.IO) {
+    suspend fun queryBalancerSelection(balancerTag: String): ActiveBalancerSelection? = withContext(ioDispatcher) {
         withChannel {
             val response = routingStub.withDeadlineAfter(timeoutMs, TimeUnit.MILLISECONDS).getBalancerInfo(
                 GetBalancerInfoRequest.newBuilder()

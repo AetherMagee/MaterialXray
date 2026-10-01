@@ -16,6 +16,7 @@ import com.material.xray.model.RoutingRule
 import com.material.xray.model.RoutingRuleCatalog
 import com.material.xray.model.SubscriptionRouting
 import com.material.xray.service.RoutingChangeManager
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -33,6 +34,7 @@ class RoutingViewModel(
     private val routingChangeManager: RoutingChangeManager,
     private val serverRepository: ServerRepository,
     private val subscriptionDao: SubscriptionDao,
+    private val defaultDispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) : ViewModel() {
     val rules: StateFlow<List<RoutingRule>> = settingsRepository.customRoutingRules
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -43,7 +45,7 @@ class RoutingViewModel(
         servers.firstOrNull { it.id == selectedServerId }
             ?.let { entity -> runCatching { serverRepository.parseConfig(entity) }.getOrNull() }
             ?.let(ProfileRoutingInspector::inspect)
-    }.flowOn(Dispatchers.Default)
+    }.flowOn(defaultDispatcher)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
     private val selectedProviderRouting: StateFlow<ProviderRoutingAvailability?> = combine(
         settingsRepository.lastServerId,

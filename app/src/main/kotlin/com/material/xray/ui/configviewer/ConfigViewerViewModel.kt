@@ -16,6 +16,7 @@ import com.material.xray.model.ServerConfig
 import com.material.xray.service.ConnectionRuntimeManager
 import com.material.xray.service.ConnectionStateCoordinator
 import com.material.xray.service.XrayService
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
@@ -129,6 +130,7 @@ class ConfigViewerViewModel(
     private val activeConfigOverrideStore: ActiveConfigOverrideStore,
     private val subscriptionFetcher: SubscriptionFetcher,
     private val stateCoordinator: ConnectionStateCoordinator,
+    private val defaultDispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow<ConfigViewerUiState>(ConfigViewerUiState.Loading)
     val uiState: StateFlow<ConfigViewerUiState> = _uiState.asStateFlow()
@@ -263,7 +265,7 @@ class ConfigViewerViewModel(
 
         if (stateCoordinator.state.value is ConnectionState.Connected) XrayService.reload(context)
         _events.send(R.string.config_viewer_saved)
-        _uiState.value = withContext(Dispatchers.Default) {
+        _uiState.value = withContext(defaultDispatcher) {
             text.toJsonDocument(showDisclaimer = false, overrideActive = true)
         }
     }
@@ -272,7 +274,7 @@ class ConfigViewerViewModel(
     private suspend fun validateServerEdit(draft: EditDraft): ServerConfig? = when (draft) {
         is EditDraft.Json -> {
             val state = _uiState.value as? ConfigViewerUiState.JsonEditor
-            val parsed = withContext(Dispatchers.Default) { subscriptionFetcher.parseJsonConfig(draft.text) }
+            val parsed = withContext(defaultDispatcher) { subscriptionFetcher.parseJsonConfig(draft.text) }
             if (parsed == null && state != null) {
                 _uiState.value = state.copy(errorRes = R.string.config_viewer_error_invalid_json)
             }
@@ -315,7 +317,7 @@ class ConfigViewerViewModel(
 
         // Re-parsing and tokenizing the whole document is more work than belongs on the main
         // thread once a subscription ships a multi-outbound config.
-        return withContext(Dispatchers.Default) {
+        return withContext(defaultDispatcher) {
             val rawJson = config.rawConfigJson
             if (rawJson.isBlank()) {
                 ConfigViewerUiState.Params(
@@ -337,7 +339,7 @@ class ConfigViewerViewModel(
             ?: return ConfigViewerUiState.Message(R.string.home_no_active_xray_config)
         val overrideActive = activeConfigOverrideStore.exists()
         // This is the config the core was handed, so there is nothing left to warn about.
-        return withContext(Dispatchers.Default) {
+        return withContext(defaultDispatcher) {
             raw.toJsonDocument(showDisclaimer = false, overrideActive = overrideActive)
         }
     }
