@@ -21,7 +21,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -50,6 +49,7 @@ import com.material.xray.model.RoutingRuleOperator
 import com.material.xray.model.XrayOutbound
 import com.material.xray.ui.components.DropdownOption
 import com.material.xray.ui.components.ReadOnlyDropdownField
+import com.material.xray.ui.components.TooltipIconButton
 import com.material.xray.ui.text.catchAllEffectResource
 import com.material.xray.ui.text.descriptionResource
 import java.util.Locale
@@ -171,7 +171,7 @@ internal fun RoutingRuleEditorScreen(
             TopAppBar(
                 title = { Text(stringResource(R.string.routing_edit_rule_title)) },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    TooltipIconButton(tooltip = stringResource(R.string.routing_rule_viewer_back), onClick = onBack) {
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = stringResource(R.string.routing_rule_viewer_back),

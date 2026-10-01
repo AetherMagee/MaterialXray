@@ -51,7 +51,6 @@ import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
@@ -96,6 +95,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import com.material.xray.R
 import com.material.xray.model.Protocol
 import com.material.xray.ui.components.ScrolledTopAppBar
+import com.material.xray.ui.components.TooltipIconButton
 import org.koin.compose.viewmodel.koinViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -159,7 +159,7 @@ fun ConfigViewerScreen(
                 scrollBehavior = scrollBehavior,
                 showLogo = false,
                 navigationIcon = {
-                    IconButton(onClick = if (editing) viewModel::cancelEdit else onBack) {
+                    TooltipIconButton(tooltip = stringResource(if (editing) R.string.config_viewer_cancel_edit else R.string.config_viewer_back), onClick = if (editing) viewModel::cancelEdit else onBack) {
                         Icon(
                             imageVector = if (editing) Icons.Default.Close else Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = stringResource(
@@ -170,12 +170,13 @@ fun ConfigViewerScreen(
                 },
                 actions = {
                     if (editing) {
-                        IconButton(onClick = onSave) {
+                        TooltipIconButton(tooltip = stringResource(R.string.config_viewer_save), onClick = onSave) {
                             Icon(Icons.Default.Check, contentDescription = stringResource(R.string.config_viewer_save))
                         }
                     } else {
                         if (copyable != null) {
-                            IconButton(
+                            TooltipIconButton(
+                                tooltip = stringResource(R.string.config_viewer_copy),
                                 onClick = {
                                     context.copyToClipboard(clipboardLabel, copyable)
                                     Toast.makeText(context, copiedMessage, Toast.LENGTH_SHORT).show()
@@ -188,7 +189,7 @@ fun ConfigViewerScreen(
                             }
                         }
                         guarded?.let { isGuarded ->
-                            IconButton(onClick = viewModel::toggleGuard) {
+                            TooltipIconButton(tooltip = stringResource(if (isGuarded) R.string.config_viewer_unguard else R.string.config_viewer_guard), onClick = viewModel::toggleGuard) {
                                 Icon(
                                     imageVector = if (isGuarded) Icons.Filled.Shield else Icons.Outlined.Shield,
                                     contentDescription = stringResource(
@@ -198,7 +199,7 @@ fun ConfigViewerScreen(
                             }
                         }
                         if (uiState.isEditable()) {
-                            IconButton(onClick = viewModel::beginEdit) {
+                            TooltipIconButton(tooltip = stringResource(R.string.config_viewer_edit), onClick = viewModel::beginEdit) {
                                 Icon(Icons.Default.Edit, contentDescription = stringResource(R.string.config_viewer_edit))
                             }
                         }
@@ -518,7 +519,7 @@ private fun EditFieldItem(field: EditField, onValueChange: (String) -> Unit) {
             null
         } else {
             {
-                IconButton(onClick = { revealed = !revealed }) {
+                TooltipIconButton(tooltip = stringResource(if (revealed) R.string.config_viewer_hide_secret else R.string.config_viewer_reveal_secret), onClick = { revealed = !revealed }) {
                     Icon(
                         imageVector = if (revealed) Icons.Default.VisibilityOff else Icons.Default.Visibility,
                         contentDescription = stringResource(
@@ -680,7 +681,7 @@ private fun ParamRowItem(row: ParamRow) {
             )
         }
         if (row.isSecret) {
-            IconButton(onClick = { revealed = !revealed }, modifier = Modifier.size(36.dp)) {
+            TooltipIconButton(tooltip = stringResource(if (revealed) R.string.config_viewer_hide_secret else R.string.config_viewer_reveal_secret), onClick = { revealed = !revealed }, modifier = Modifier.size(36.dp)) {
                 Icon(
                     imageVector = if (revealed) Icons.Default.VisibilityOff else Icons.Default.Visibility,
                     contentDescription = stringResource(

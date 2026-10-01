@@ -93,7 +93,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -192,6 +191,7 @@ import com.material.xray.ui.components.ReadOnlyDropdownField
 import com.material.xray.ui.components.ScrolledTopAppBar
 import com.material.xray.ui.components.SelectableOptionRow
 import com.material.xray.ui.components.SettingsSwitchRow
+import com.material.xray.ui.components.TooltipIconButton
 import com.material.xray.ui.components.rememberSystemState
 import com.material.xray.ui.text.descriptionResource
 import com.material.xray.ui.text.labelResource
@@ -1975,26 +1975,24 @@ private fun SubscriptionCard(
         buildSubscriptionMetadataUiState(subscription, resources)
     }
 
-    ElevatedCard(
-        modifier = modifier
-            .fillMaxWidth()
-            .then(
-                if (canReorder && !expanded) {
-                    Modifier.pointerInput(subscription.id) {
-                        detectDragGesturesAfterLongPress(
-                            onDragStart = { currentOnDragStart() },
-                            onDragEnd = { currentOnDragFinished() },
-                            onDragCancel = { currentOnDragFinished() },
-                            onDrag = { change, amount ->
-                                change.consume()
-                                currentOnDrag(amount.y)
-                            },
-                        )
-                    }
-                } else {
-                    Modifier
+    val reorderModifier = if (canReorder && !expanded) {
+        Modifier.pointerInput(subscription.id) {
+            detectDragGesturesAfterLongPress(
+                onDragStart = { currentOnDragStart() },
+                onDragEnd = { currentOnDragFinished() },
+                onDragCancel = { currentOnDragFinished() },
+                onDrag = { change, amount ->
+                    change.consume()
+                    currentOnDrag(amount.y)
                 },
-            ),
+            )
+        }
+    } else {
+        Modifier
+    }
+
+    ElevatedCard(
+        modifier = modifier.fillMaxWidth(),
         colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
@@ -2005,6 +2003,7 @@ private fun SubscriptionCard(
                 defaultPingMethod = defaultPingMethod,
                 canCollapse = canCollapse,
                 expanded = expanded,
+                reorderModifier = reorderModifier,
                 onExpandedChange = onExpandedChange,
                 onRefresh = onRefresh,
                 onTestAll = onTestAll,
@@ -2161,6 +2160,7 @@ private fun SubscriptionHeader(
     defaultPingMethod: PingMethod,
     canCollapse: Boolean,
     expanded: Boolean,
+    reorderModifier: Modifier,
     onExpandedChange: (Boolean) -> Unit,
     onRefresh: () -> Unit,
     onTestAll: () -> Unit,
@@ -2230,6 +2230,7 @@ private fun SubscriptionHeader(
             modifier = Modifier
                 .weight(1f)
                 .heightIn(min = 48.dp)
+                .then(reorderModifier)
                 .then(
                     if (canCollapse) {
                         Modifier.clickable(
@@ -2263,7 +2264,7 @@ private fun SubscriptionHeader(
                 )
             }
         }
-        IconButton(onClick = onRefresh, enabled = !isRefreshing) {
+        TooltipIconButton(tooltip = stringResource(R.string.home_subscription_refresh_content_description, subscription.name), onClick = onRefresh, enabled = !isRefreshing) {
             if (isRefreshing) {
                 val updatingDescription = stringResource(
                     R.string.home_subscription_updating_content_description,
@@ -2306,7 +2307,7 @@ private fun SubscriptionHeader(
             )
         }
         Box {
-            IconButton(onClick = { showMenu = true }) {
+            TooltipIconButton(tooltip = stringResource(R.string.home_subscription_menu_content_description), onClick = { showMenu = true }) {
                 Icon(
                     Icons.Default.MoreVert,
                     contentDescription = stringResource(R.string.home_subscription_menu_content_description),

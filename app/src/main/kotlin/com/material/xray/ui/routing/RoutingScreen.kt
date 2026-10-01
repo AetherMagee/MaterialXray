@@ -46,7 +46,6 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -90,6 +89,7 @@ import com.material.xray.ui.components.AppBarTitle
 import com.material.xray.ui.components.AppTopBarHeight
 import com.material.xray.ui.components.ScrollFadeEdges
 import com.material.xray.ui.components.SegmentedTabRow
+import com.material.xray.ui.components.TooltipIconButton
 import kotlinx.coroutines.launch
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -434,13 +434,14 @@ private fun RuleActions(
     var rulesMenuExpanded by remember { mutableStateOf(false) }
     when {
         selectionMode -> {
-            IconButton(onClick = onClearSelection) {
+            TooltipIconButton(tooltip = stringResource(R.string.routing_clear_selection), onClick = onClearSelection) {
                 Icon(
                     Icons.Default.Close,
                     contentDescription = stringResource(R.string.routing_clear_selection),
                 )
             }
-            IconButton(
+            TooltipIconButton(
+                tooltip = stringResource(R.string.routing_delete_selected_rules),
                 onClick = { onRuleAction(RoutingRuleAction.Delete(selectedRuleIds)) },
             ) {
                 Icon(
@@ -450,14 +451,14 @@ private fun RuleActions(
             }
         }
         else -> {
-            IconButton(onClick = { onRuleAction(RoutingRuleAction.Add) }) {
+            TooltipIconButton(tooltip = stringResource(R.string.routing_add_rule), onClick = { onRuleAction(RoutingRuleAction.Add) }) {
                 Icon(
                     Icons.Default.Add,
                     contentDescription = stringResource(R.string.routing_add_rule),
                 )
             }
             Box {
-                IconButton(onClick = { rulesMenuExpanded = true }) {
+                TooltipIconButton(tooltip = stringResource(R.string.routing_rules_menu), onClick = { rulesMenuExpanded = true }) {
                     Icon(
                         Icons.Default.MoreVert,
                         contentDescription = stringResource(R.string.routing_rules_menu),

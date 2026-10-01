@@ -33,7 +33,6 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -64,6 +63,7 @@ import com.material.xray.ui.components.AppBarTitle
 import com.material.xray.ui.components.AppTopBarHeight
 import com.material.xray.ui.components.ScrollFadeEdges
 import com.material.xray.ui.components.SegmentedTabRow
+import com.material.xray.ui.components.TooltipIconButton
 import java.io.IOException
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -133,7 +133,8 @@ fun LogsScreen(showTitleBarLogo: Boolean, viewModel: LogsViewModel = koinViewMod
                 windowInsets = TopAppBarDefaults.windowInsets,
                 actions = {
                     Box {
-                        IconButton(
+                        TooltipIconButton(
+                            tooltip = stringResource(R.string.logs_export),
                             enabled = !isExporting,
                             onClick = { showExportMenu = true },
                         ) {
@@ -194,13 +195,13 @@ fun LogsScreen(showTitleBarLogo: Boolean, viewModel: LogsViewModel = koinViewMod
                             )
                         }
                     }
-                    IconButton(onClick = {
+                    TooltipIconButton(tooltip = stringResource(R.string.logs_copy_all), onClick = {
                         viewModel.copyAll()
                         Toast.makeText(context, R.string.logs_copied, Toast.LENGTH_SHORT).show()
                     }) {
                         Icon(Icons.Default.ContentCopy, contentDescription = stringResource(R.string.logs_copy_all))
                     }
-                    IconButton(onClick = { viewModel.clear() }) {
+                    TooltipIconButton(tooltip = stringResource(R.string.logs_clear), onClick = { viewModel.clear() }) {
                         Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.logs_clear))
                     }
                 },

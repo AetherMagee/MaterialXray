@@ -31,7 +31,6 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -53,6 +52,7 @@ import com.material.xray.data.db.DatabaseOpenChecker
 import com.material.xray.data.repository.SettingsRepository
 import com.material.xray.service.RecoveryResetManager
 import com.material.xray.ui.adaptive.useNavigationRail
+import com.material.xray.ui.components.TooltipIconButton
 import com.material.xray.ui.home.HomeDataState
 import com.material.xray.ui.navigation.MainNavigation
 import com.material.xray.ui.recovery.DatabaseRecoveryScreen
@@ -240,7 +240,7 @@ private fun DiagnosticsNotice(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
-                IconButton(onClick = onDismiss) {
+                TooltipIconButton(tooltip = stringResource(R.string.diagnostics_dismiss), onClick = onDismiss) {
                     Icon(
                         imageVector = Icons.Outlined.Close,
                         contentDescription = stringResource(R.string.diagnostics_dismiss),

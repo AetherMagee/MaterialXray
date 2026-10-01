@@ -54,7 +54,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -130,6 +129,7 @@ import com.material.xray.ui.components.DropdownOption
 import com.material.xray.ui.components.ReadOnlyDropdownField
 import com.material.xray.ui.components.ScrolledTopAppBar
 import com.material.xray.ui.components.SettingsSwitchRow
+import com.material.xray.ui.components.TooltipIconButton
 import com.material.xray.ui.components.rememberSystemState
 import com.material.xray.ui.text.descriptionResource
 import com.material.xray.ui.text.labelResource
@@ -746,7 +746,8 @@ private fun SettingsScreenContent(
                             }
                         },
                         trailingIcon = {
-                            IconButton(
+                            TooltipIconButton(
+                                tooltip = stringResource(R.string.settings_update_geoip),
                                 onClick = { viewModel.updateGeoipAsset(editingGeoipUrl) },
                                 enabled = !geoDataOperationInProgress,
                             ) {
@@ -792,7 +793,8 @@ private fun SettingsScreenContent(
                             }
                         },
                         trailingIcon = {
-                            IconButton(
+                            TooltipIconButton(
+                                tooltip = stringResource(R.string.settings_update_geosite),
                                 onClick = { viewModel.updateGeositeAsset(editingGeositeUrl) },
                                 enabled = !geoDataOperationInProgress,
                             ) {

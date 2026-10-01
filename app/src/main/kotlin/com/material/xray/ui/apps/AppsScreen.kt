@@ -30,7 +30,6 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -66,6 +65,7 @@ import com.material.xray.R
 import com.material.xray.model.RoutingPolicyControl
 import com.material.xray.ui.components.ScrollFadeEdges
 import com.material.xray.ui.components.SelectableOptionRow
+import com.material.xray.ui.components.TooltipIconButton
 import org.koin.compose.viewmodel.koinViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -376,14 +376,15 @@ fun AppRoutingMenuActions(viewModel: AppsViewModel = koinViewModel()) {
     }
 
     Row(verticalAlignment = Alignment.CenterVertically) {
-        IconButton(
+        TooltipIconButton(
+            tooltip = stringResource(R.string.apps_refresh),
             onClick = { viewModel.refreshApps() },
             enabled = !isLoadingApps,
         ) {
             Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.apps_refresh))
         }
         Box {
-            IconButton(onClick = { appRoutingMenuExpanded = true }) {
+            TooltipIconButton(tooltip = stringResource(R.string.apps_routing_menu), onClick = { appRoutingMenuExpanded = true }) {
                 Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.apps_routing_menu))
             }
             DropdownMenu(
