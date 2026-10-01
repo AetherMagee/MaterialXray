@@ -581,33 +581,6 @@ class TunManager internal constructor(
         "ip route replace default dev ${physicalRoute.dev} table $bypassTable"
     }
 
-    private suspend fun executeRoutingCommands(
-        commands: List<String>,
-        force: Boolean = false,
-        continueOnFailure: Boolean = false,
-    ): RoutingResult {
-        if (commands.isEmpty()) return RoutingResult(success = true)
-        require(
-            commands.all { command ->
-                command.startsWith(IPV4_RULE_COMMAND_PREFIX) || command.startsWith(IPV6_RULE_COMMAND_PREFIX)
-            },
-        ) { "Only IPv4 and IPv6 rule commands can be batched" }
-        val commandGroups = listOf(
-            commands.filter { it.startsWith(IPV4_RULE_COMMAND_PREFIX) },
-            commands.filter { it.startsWith(IPV6_RULE_COMMAND_PREFIX) },
-        )
-        val batches = commandGroups.flatMap { group ->
-            group.chunked(IP_RULE_BATCH_SIZE).map { chunk -> ipRuleBatchCommand(chunk, force) }
-        }
-        val command = if (continueOnFailure) {
-            "status=0; ${batches.joinToString("; ") { batch -> "( $batch ) || status=1" }}; exit \$status"
-        } else {
-            batches.shellAnd()
-        }
-        val result = executeCommand(command)
-        return if (result.isSuccess) RoutingResult(success = true) else result.toRoutingError(command)
-    }
-
     private fun flushRouteTablesCommand(routeTables: List<Int>, routeCommand: String): String = routeTables.distinct()
         .map { table -> "$routeCommand flush table $table 2>/dev/null" }.shellAnd()
 
@@ -682,19 +655,6 @@ class TunManager internal constructor(
             "table $guardTable prio $UPDATE_GUARD_PRIORITY"
     }
 
-    private fun ipRuleBatchCommand(commands: List<String>, force: Boolean = false): String {
-        if (commands.isEmpty()) return "true"
-        val ipv6 = commands.first().startsWith(IPV6_RULE_COMMAND_PREFIX)
-        val prefix = if (ipv6) IPV6_RULE_COMMAND_PREFIX else IPV4_RULE_COMMAND_PREFIX
-        require(commands.all { it.startsWith(prefix) }) { "Mixed IP rule address families" }
-        val commandPrefix = if (ipv6) "ip -6 " else "ip "
-        val batchLines = commands.map { command -> command.removePrefix(commandPrefix) }
-        val arguments = batchLines.joinToString(" ") { line -> shellQuote(line) }
-        val ipCommand = if (ipv6) "ip -6" else "ip"
-        val forceOption = if (force) " -force" else ""
-        return "printf '%s\\n' $arguments | $ipCommand$forceOption -batch -"
-    }
-
     private fun ipBatchCommand(commands: List<String>, ipv6: Boolean, force: Boolean = false): String {
         val arguments = commands.joinToString(" ") { line -> shellQuote(line) }
         val ipCommand = if (ipv6) "ip -6" else "ip"
@@ -737,13 +697,6 @@ class TunManager internal constructor(
         }
     }
 
-    private fun String.referencesAnyLookupTable(routeTables: Set<Int>): Boolean {
-        val fields = trim().split(Regex("\\s+"))
-        return fields.zipWithNext().any { (key, value) ->
-            key == "lookup" && (value.toIntOrNull() ?: NAMED_ROUTE_TABLES[value]) in routeTables
-        }
-    }
-
     companion object {
         private const val APP_ROUTE_TABLE_OFFSET = 10
         private const val UPDATE_GUARD_ROUTE_TABLE_OFFSET = 2
@@ -759,12 +712,8 @@ class TunManager internal constructor(
         private const val TETHER_INPUT_CHAIN = "MXTI"
         private const val TETHER_DNS_IPV4 = "198.18.0.1"
         private const val TETHER_DNS_IPV6 = "2001:db8::1"
-        private const val IPV4_RULE_COMMAND_PREFIX = "ip rule "
-        private const val IPV6_RULE_COMMAND_PREFIX = "ip -6 rule "
-        private const val IP_RULE_BATCH_SIZE = 128
         private const val TUN_WAIT_TIMEOUT_EXIT_CODE = 124
         private const val TUN_PROCESS_EXIT_CODE = 125
-        private val NAMED_ROUTE_TABLES = mapOf("default" to 253, "main" to 254, "local" to 255)
         private val IPV4_ALWAYS_BYPASS_CIDRS = listOf(
             "0.0.0.0/8",
             "127.0.0.0/8",
