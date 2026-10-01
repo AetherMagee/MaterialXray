@@ -11,6 +11,9 @@
     <string name="logs_filter_app">App</string>
     <string name="logs_filter_xray" translatable="false">Xray</string>
     <string name="logs_copy_all">Copy all</string>
+    <string name="logs_cancel_selection">Cancel selection</string>
+    <string name="logs_copy_selected">Copy selected</string>
+    <string name="logs_selected_count">%1$d selected</string>
     <string name="logs_export">Export logs</string>
     <string name="logs_save_to_file">Save to file</string>
     <string name="logs_saved">Logs saved</string>

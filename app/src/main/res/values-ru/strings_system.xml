@@ -10,6 +10,9 @@
     <string name="logs_filter_all">Все</string>
     <string name="logs_filter_app">Приложение</string>
     <string name="logs_copy_all">Копировать всё</string>
+    <string name="logs_cancel_selection">Отменить выбор</string>
+    <string name="logs_copy_selected">Копировать выбранное</string>
+    <string name="logs_selected_count">Выбрано: %1$d</string>
     <string name="logs_export">Экспорт журнала</string>
     <string name="logs_save_to_file">Сохранить в файл</string>
     <string name="logs_saved">Журнал сохранён</string>

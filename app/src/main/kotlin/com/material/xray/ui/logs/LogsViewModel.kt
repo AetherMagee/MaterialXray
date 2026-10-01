@@ -38,14 +38,17 @@ class LogsViewModel(
         clipboard.setPrimaryClip(android.content.ClipData.newPlainText(label, logBuffer.formatAll()))
     }
 
-    fun copyEntry(entry: LogEntry) {
+    fun copyEntries(entries: List<LogEntry>) {
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-        val time = java.text.SimpleDateFormat("HH:mm:ss.SSS", java.util.Locale.US)
-            .format(java.util.Date(entry.timestamp))
+        val timeFormat = java.text.SimpleDateFormat("HH:mm:ss.SSS", java.util.Locale.US)
+        val text = entries.joinToString("\n") { entry ->
+            val time = timeFormat.format(java.util.Date(entry.timestamp))
+            "$time [${entry.source.name}] ${entry.displayMessage}"
+        }
         clipboard.setPrimaryClip(
             android.content.ClipData.newPlainText(
-                context.localizedString(R.string.clipboard_label_log_entry),
-                "$time [${entry.source.name}] ${entry.displayMessage}",
+                context.localizedString(R.string.clipboard_label_logs, context.localizedString(R.string.app_name)),
+                text,
             ),
         )
     }
