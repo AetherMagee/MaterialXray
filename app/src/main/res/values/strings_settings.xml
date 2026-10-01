@@ -43,6 +43,7 @@
     <string name="settings_geosite_url_supporting_text">Specify direct URL for the geosite.dat download.</string>
     <string name="settings_geo_data_last_updated">Last updated on %1$s, %2$s.</string>
     <string name="settings_delete_geo_asset_title">Delete downloaded %1$s assets?</string>
+    <string name="settings_delete_all_geo_assets_title">Delete all downloaded geodata assets?</string>
     <string name="settings_delete_geo_asset_message">This will free %1$s on device.</string>
     <string name="settings_delete">Delete</string>
     <string name="settings_geo_asset_deleted">%1$s deleted</string>

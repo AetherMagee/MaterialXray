@@ -43,6 +43,7 @@
     <string name="settings_geosite_url_supporting_text">Укажите прямую ссылку для скачивания geosite.dat.</string>
     <string name="settings_geo_data_last_updated">Последнее обновление: %1$s, %2$s.</string>
     <string name="settings_delete_geo_asset_title">Удалить загруженные файлы %1$s?</string>
+    <string name="settings_delete_all_geo_assets_title">Удалить все загруженные файлы геоданных?</string>
     <string name="settings_delete_geo_asset_message">Это освободит %1$s на устройстве.</string>
     <string name="settings_delete">Удалить</string>
     <string name="settings_geo_asset_deleted">Файлы %1$s удалены</string>

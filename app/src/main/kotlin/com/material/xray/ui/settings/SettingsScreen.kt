@@ -120,7 +120,6 @@ import com.material.xray.core.xray.TproxyCompatibility
 import com.material.xray.data.repository.BackupSummary
 import com.material.xray.data.repository.SettingsSnapshot
 import com.material.xray.model.AppUpdateCheckStatus
-import com.material.xray.model.ConnectionState
 import com.material.xray.model.GeoDataUpdateInterval
 import com.material.xray.model.LauncherIcon
 import com.material.xray.model.NotificationField
@@ -230,6 +229,7 @@ private fun SettingsScreenContent(
     val passiveHealthMonitoringEnabled = settings.passiveHealthMonitoringEnabled
     val xrayLogLevel = settings.xrayLogLevel
     val geoDataOperationInProgress = geoipUpdating || geositeUpdating || geoDataClearing
+    val geoDataClearingAllowed = canClearGeoData(connectionState) && !geoDataClearing
     val defaultOutbound = settings.defaultOutbound
     val launcherIcon = settings.launcherIcon
     val showTitleBarLogo = settings.showTitleBarLogo
@@ -258,6 +258,7 @@ private fun SettingsScreenContent(
     var showResetDatabaseDialog by rememberSaveable { mutableStateOf(false) }
     var showOpenSourceLicensesDialog by rememberSaveable { mutableStateOf(false) }
     var geoDataToDelete by rememberSaveable { mutableStateOf<GeoDataAsset?>(null) }
+    var showClearGeoDataDialog by rememberSaveable { mutableStateOf(false) }
     val rootServiceAvailable = rootAvailable != false
     val rootServiceActive = useRootService && rootAvailable == true
 
@@ -754,7 +755,7 @@ private fun SettingsScreenContent(
                                 GeoDataSupportingText(
                                     description = stringResource(R.string.settings_geoip_url_supporting_text),
                                     lastUpdated = geoDataLastUpdated[GeoDataAsset.GEOIP].takeIf { showAdvancedOptions },
-                                    enabled = !geoipUpdating && !geoDataClearing,
+                                    enabled = !geoipUpdating && geoDataClearingAllowed,
                                     onClick = { geoDataToDelete = GeoDataAsset.GEOIP },
                                 )
                             }
@@ -809,7 +810,7 @@ private fun SettingsScreenContent(
                                 GeoDataSupportingText(
                                     description = stringResource(R.string.settings_geosite_url_supporting_text),
                                     lastUpdated = geoDataLastUpdated[GeoDataAsset.GEOSITE].takeIf { showAdvancedOptions },
-                                    enabled = !geositeUpdating && !geoDataClearing,
+                                    enabled = !geositeUpdating && geoDataClearingAllowed,
                                     onClick = { geoDataToDelete = GeoDataAsset.GEOSITE },
                                 )
                             }
@@ -899,8 +900,8 @@ private fun SettingsScreenContent(
             if (showAdvancedOptions) {
                 item(key = "clear_geodata") {
                     OutlinedButton(
-                        onClick = { viewModel.clearGeoData() },
-                        enabled = connectionState is ConnectionState.Disconnected && !geoDataOperationInProgress,
+                        onClick = { showClearGeoDataDialog = true },
+                        enabled = canClearGeoData(connectionState) && !geoDataOperationInProgress,
                         modifier = Modifier.padding(horizontal = 16.dp),
                     ) {
                         Text(
@@ -1068,11 +1069,23 @@ private fun SettingsScreenContent(
         DeleteGeoDataDialog(
             asset = asset,
             bytes = geoDataCachedSizes[asset] ?: 0L,
-            enabled = !geoDataClearing && !(if (asset == GeoDataAsset.GEOIP) geoipUpdating else geositeUpdating),
+            enabled = geoDataClearingAllowed && !(if (asset == GeoDataAsset.GEOIP) geoipUpdating else geositeUpdating),
             onDismiss = { geoDataToDelete = null },
             onConfirm = {
                 viewModel.clearGeoData(asset)
                 geoDataToDelete = null
+            },
+        )
+    }
+    if (showClearGeoDataDialog) {
+        DeleteGeoDataDialog(
+            asset = null,
+            bytes = geoDataCachedSizes.values.sum(),
+            enabled = canClearGeoData(connectionState) && !geoDataOperationInProgress,
+            onDismiss = { showClearGeoDataDialog = false },
+            onConfirm = {
+                viewModel.clearGeoData()
+                showClearGeoDataDialog = false
             },
         )
     }
@@ -1812,7 +1825,7 @@ private fun GeoDataSupportingText(description: String, lastUpdated: Long?, enabl
 
 @Composable
 private fun DeleteGeoDataDialog(
-    asset: GeoDataAsset,
+    asset: GeoDataAsset?,
     bytes: Long,
     enabled: Boolean,
     onDismiss: () -> Unit,
@@ -1823,7 +1836,15 @@ private fun DeleteGeoDataDialog(
     val sizeStart = message.indexOf(size)
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.settings_delete_geo_asset_title, asset.displayName)) },
+        title = {
+            Text(
+                if (asset == null) {
+                    stringResource(R.string.settings_delete_all_geo_assets_title)
+                } else {
+                    stringResource(R.string.settings_delete_geo_asset_title, asset.displayName)
+                },
+            )
+        },
         text = {
             Text(
                 buildAnnotatedString {

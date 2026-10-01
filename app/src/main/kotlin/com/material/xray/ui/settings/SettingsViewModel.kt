@@ -61,6 +61,15 @@ data class BackupOperationMessage(
 private const val APP_UPDATE_CHECK_STATUS_MINIMUM_DURATION_MILLIS = 750L
 private const val RUNTIME_MODE_SETTLE_MILLIS = 200L
 
+internal fun canClearGeoData(state: ConnectionState): Boolean = when (state) {
+    ConnectionState.Connecting,
+    ConnectionState.ApplyingRoutingChanges,
+    ConnectionState.UpdatingRoutingData,
+    ConnectionState.Disconnecting,
+    -> false
+    else -> true
+}
+
 @Suppress("TooManyFunctions")
 @KoinViewModel
 class SettingsViewModel(
@@ -410,7 +419,8 @@ class SettingsViewModel(
 
     fun clearGeoData(asset: GeoDataAsset? = null) {
         if (_geoDataClearing.value) return
-        if (asset == null && (isGeoDataOperationInProgress() || connectionState.value !is ConnectionState.Disconnected)) return
+        if (!canClearGeoData(connectionState.value)) return
+        if (asset == null && isGeoDataOperationInProgress()) return
         val assetUpdating = when (asset) {
             GeoDataAsset.GEOIP -> _geoipUpdating.value
             GeoDataAsset.GEOSITE -> _geositeUpdating.value
