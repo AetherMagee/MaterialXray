@@ -6,25 +6,14 @@ import androidx.lifecycle.viewModelScope
 import com.material.xray.R
 import com.material.xray.core.locale.forAppLanguage
 import com.material.xray.core.locale.localizedString
-import com.material.xray.core.network.ServerLatencyTester
-import com.material.xray.core.network.describeFailure
-import com.material.xray.core.xray.ActiveConfigOverrideStore
 import com.material.xray.core.xray.GeoDataManager
 import com.material.xray.core.xray.combinedGeoDataDownloadProgress
 import com.material.xray.data.db.entity.ServerEntity
 import com.material.xray.data.db.entity.SubscriptionEntity
 import com.material.xray.data.parser.SubscriptionFetchException
-import com.material.xray.data.repository.AppUpdateRepository
-import com.material.xray.data.repository.ProviderRoutingActiveUpdate
 import com.material.xray.data.repository.ProviderRoutingAvailability
-import com.material.xray.data.repository.ProviderRoutingCoordinator
 import com.material.xray.data.repository.ServerRepository
-import com.material.xray.data.repository.ServerSelectionCoordinator
 import com.material.xray.data.repository.SettingsRepository
-import com.material.xray.data.repository.SubscriptionAppRoutingRepository
-import com.material.xray.data.repository.SubscriptionRefreshCoordinator
-import com.material.xray.data.repository.SubscriptionRepository
-import com.material.xray.data.repository.SubscriptionRoutingRepository
 import com.material.xray.data.repository.selectedProviderRoutingAvailability
 import com.material.xray.data.repository.toSubscriptionAppRouting
 import com.material.xray.data.repository.toSubscriptionRouting
@@ -41,17 +30,10 @@ import com.material.xray.model.maskedBalancerOutboundAddress
 import com.material.xray.model.matchesBalancerOutbound
 import com.material.xray.model.primaryBalancerTag
 import com.material.xray.service.AlwaysOnVpnState
-import com.material.xray.service.AppUpdateChecker
 import com.material.xray.service.AppUpdateInstallProgress
-import com.material.xray.service.AppUpdateInstaller
 import com.material.xray.service.ConnectionEvent
 import com.material.xray.service.ConnectionRuntimeManager
 import com.material.xray.service.ConnectionStateCoordinator
-import com.material.xray.service.LogBuffer
-import com.material.xray.service.LogSource
-import com.material.xray.service.PendingRoutingChange
-import com.material.xray.service.RoutingChangeManager
-import com.material.xray.service.SubscriptionUpdateScheduler
 import com.material.xray.service.XrayService
 import java.io.IOException
 import java.net.ConnectException
@@ -133,31 +115,20 @@ sealed interface HomeUiEvent {
 }
 
 const val LATENCY_TESTING = Int.MIN_VALUE
-private const val SERVER_SELECTION_SETTLE_MILLIS = 200L
 
 @KoinViewModel
 class HomeViewModel(
     private val context: Application,
     homeDataState: HomeDataState,
     private val settingsRepo: SettingsRepository,
-    private val appUpdateRepository: AppUpdateRepository,
-    private val appUpdateChecker: AppUpdateChecker,
-    private val appUpdateInstaller: AppUpdateInstaller,
     private val serverRepo: ServerRepository,
-    private val subscriptionRepo: SubscriptionRepository,
-    private val subscriptionAppRoutingRepository: SubscriptionAppRoutingRepository,
-    private val subscriptionRoutingRepository: SubscriptionRoutingRepository,
-    private val subscriptionRefreshCoordinator: SubscriptionRefreshCoordinator,
-    private val serverSelectionCoordinator: ServerSelectionCoordinator,
-    private val providerRoutingCoordinator: ProviderRoutingCoordinator,
-    private val subscriptionUpdateScheduler: SubscriptionUpdateScheduler,
+    private val appUpdates: HomeAppUpdates,
+    private val serverController: HomeServerController,
+    private val subscriptionOperations: SubscriptionOperations,
+    private val latencyMeasurer: ServerLatencyMeasurer,
     private val connectionStateCoordinator: ConnectionStateCoordinator,
     private val connectionRuntimeManager: ConnectionRuntimeManager,
-    private val activeConfigOverrideStore: ActiveConfigOverrideStore,
     alwaysOnVpnState: AlwaysOnVpnState,
-    private val routingChangeManager: RoutingChangeManager,
-    private val serverLatencyTester: ServerLatencyTester,
-    private val logBuffer: LogBuffer,
     geoDataManager: GeoDataManager,
     private val defaultDispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) : ViewModel() {
@@ -187,9 +158,9 @@ class HomeViewModel(
         .map { it?.subscriptions }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), homeData.value?.subscriptions)
 
-    val availableUpdate: StateFlow<AppUpdate?> = appUpdateRepository.availableUpdate
+    val availableUpdate: StateFlow<AppUpdate?> = appUpdates.availableUpdate
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
-    val appUpdateInstallProgress: StateFlow<AppUpdateInstallProgress?> = appUpdateInstaller.installProgress
+    val appUpdateInstallProgress: StateFlow<AppUpdateInstallProgress?> = appUpdates.installProgress
 
     private val allServers: StateFlow<List<ServerEntity>> = homeData
         .map { it?.servers.orEmpty() }
@@ -310,7 +281,7 @@ class HomeViewModel(
      */
     private fun liveReadingSharing() = SharingStarted.WhileSubscribed(LIVE_READING_GRACE_MILLIS)
 
-    val refreshingSubscriptionIds = subscriptionRepo.refreshingSubscriptionIds
+    val refreshingSubscriptionIds = subscriptionOperations.refreshingSubscriptionIds
     private val _pendingSubscriptionRouting = MutableStateFlow<SubscriptionRoutingData?>(null)
     val pendingSubscriptionRouting: StateFlow<SubscriptionRoutingData?> = _pendingSubscriptionRouting.asStateFlow()
 
@@ -321,7 +292,7 @@ class HomeViewModel(
     /** Server the user picked whose subscription requires the hardware ID, which is currently off. */
     private val _pendingHwidServerSelection = MutableStateFlow<Long?>(null)
     val pendingHwidServerSelection: StateFlow<Long?> = _pendingHwidServerSelection.asStateFlow()
-    val showInstallPermissionRationale: StateFlow<Boolean> = appUpdateInstaller.installPermissionRationaleRequired
+    val showInstallPermissionRationale: StateFlow<Boolean> = appUpdates.installPermissionRationaleRequired
 
     init {
         refreshTunnelInterfaceState()
@@ -329,8 +300,7 @@ class HomeViewModel(
 
     fun connect() {
         val server = selectedServer.value ?: return
-        routingChangeManager.clearPendingChanges()
-        XrayService.connect(context, server)
+        serverController.connect(server)
     }
 
     fun disconnect() {
@@ -344,55 +314,31 @@ class HomeViewModel(
     }
 
     fun checkForAppUpdateIfDue() {
-        viewModelScope.launch {
-            try {
-                appUpdateChecker.check()
-            } catch (error: CancellationException) {
-                throw error
-            } catch (_: Exception) {
-                // Update checks are best-effort and should not interrupt the Home screen.
-            }
-        }
+        viewModelScope.launch { appUpdates.checkIfDue() }
     }
 
     fun installAppUpdate(update: AppUpdate) {
-        viewModelScope.launch {
-            try {
-                appUpdateInstaller.install(update)
-            } catch (error: CancellationException) {
-                throw error
-            } catch (_: Exception) {
-                _uiEvents.send(HomeUiEvent.Toast(context.localizedString(R.string.home_app_update_install_failed)))
-            }
-        }
+        runAppUpdateStep { appUpdates.install(update) }
     }
 
     fun resumePendingAppUpdateInstall() {
-        viewModelScope.launch {
-            try {
-                appUpdateInstaller.resumePendingInstall()
-            } catch (error: CancellationException) {
-                throw error
-            } catch (_: Exception) {
-                _uiEvents.send(HomeUiEvent.Toast(context.localizedString(R.string.home_app_update_install_failed)))
-            }
-        }
+        runAppUpdateStep { appUpdates.resumePendingInstall() }
     }
 
     fun confirmInstallPermissionRationale() {
-        viewModelScope.launch {
-            try {
-                appUpdateInstaller.confirmInstallPermissionRationale()
-            } catch (error: CancellationException) {
-                throw error
-            } catch (_: Exception) {
-                _uiEvents.send(HomeUiEvent.Toast(context.localizedString(R.string.home_app_update_install_failed)))
-            }
-        }
+        runAppUpdateStep { appUpdates.confirmInstallPermissionRationale() }
     }
 
     fun dismissInstallPermissionRationale() {
-        appUpdateInstaller.dismissInstallPermissionRationale()
+        appUpdates.dismissInstallPermissionRationale()
+    }
+
+    private fun runAppUpdateStep(step: suspend () -> Boolean) {
+        viewModelScope.launch {
+            if (!step()) {
+                _uiEvents.send(HomeUiEvent.Toast(context.localizedString(R.string.home_app_update_install_failed)))
+            }
+        }
     }
 
     fun selectServer(serverId: Long) {
@@ -403,20 +349,11 @@ class HomeViewModel(
     }
 
     private suspend fun selectServerChecked(serverId: Long) {
-        // A provider may require the hardware ID for its servers. When the user keeps it off,
-        // surface the choice instead of silently selecting the server. Re-tapping the already
-        // selected server keeps the nudge: that selection then violates the provider policy.
-        if (requiresHardwareIdConsent(serverId)) {
-            _pendingHwidServerSelection.value = serverId
-            return
+        when (serverController.blocker(serverId)) {
+            ServerSelectionBlocker.HardwareIdRequired -> _pendingHwidServerSelection.value = serverId
+            ServerSelectionBlocker.EditedActiveConfig -> _pendingServerSelection.value = serverId
+            null -> serverController.apply(serverId)
         }
-        // The edited active config was written against the currently selected server, so
-        // moving away from it throws the edit away. Say so before it happens.
-        if (serverId != settingsRepo.lastServerId.first() && activeConfigOverrideStore.exists()) {
-            _pendingServerSelection.value = serverId
-            return
-        }
-        applyServerSelection(serverId)
     }
 
     fun confirmHwidRequiredSelection() {
@@ -424,8 +361,7 @@ class HomeViewModel(
         _pendingHwidServerSelection.value = null
         serverSelectionJob?.cancel()
         serverSelectionJob = viewModelScope.launch {
-            settingsRepo.setSubscriptionSendHardwareId(true)
-            refreshServersForHwidPolicy(serverId)
+            serverController.enableHardwareId(serverId)
             // Re-enter the normal flow so a pending edited-config confirmation still applies.
             selectServerChecked(serverId)
         }
@@ -435,65 +371,18 @@ class HomeViewModel(
         _pendingHwidServerSelection.value = null
     }
 
-    // The servers on screen were fetched without the hardware ID header; HWID-gated providers
-    // typically hand out a different server set once it is sent, so refetch right away.
-    private suspend fun refreshServersForHwidPolicy(serverId: Long) {
-        val subscriptionId = serverRepo.getById(serverId)?.subscriptionId ?: return
-        val subscription = subscriptionRepo.getById(subscriptionId) ?: return
-        try {
-            subscriptionRefreshCoordinator.refreshSubscription(subscription.id, subscription.url)
-        } catch (error: CancellationException) {
-            throw error
-        } catch (_: Exception) {
-            // The next scheduled refresh can pick the provider up instead.
-        }
-    }
-
-    private suspend fun requiresHardwareIdConsent(serverId: Long): Boolean {
-        val serverEntity = serverRepo.getById(serverId) ?: return false
-        val subscription = subscriptionRepo.getById(serverEntity.subscriptionId) ?: return false
-        if (!subscription.requiresHardwareId) return false
-        return !settingsRepo.subscriptionSendHardwareId.first()
-    }
-
     fun confirmDiscardEditedActiveConfig() {
         val serverId = _pendingServerSelection.value ?: return
         _pendingServerSelection.value = null
         serverSelectionJob?.cancel()
         serverSelectionJob = viewModelScope.launch {
-            activeConfigOverrideStore.clear()
-            applyServerSelection(serverId)
+            serverController.discardEditedActiveConfig()
+            serverController.apply(serverId)
         }
     }
 
     fun dismissDiscardEditedActiveConfig() {
         _pendingServerSelection.value = null
-    }
-
-    private suspend fun applyServerSelection(serverId: Long) {
-        val selectionChanged = serverSelectionCoordinator.withSelectionLock {
-            if (serverId == settingsRepo.lastServerId.first()) return@withSelectionLock false
-            val serverEntity = serverRepo.getById(serverId) ?: return@withSelectionLock false
-            runCatching { serverRepo.parseConfig(serverEntity) }.getOrNull() ?: return@withSelectionLock false
-            settingsRepo.setLastServerId(serverId)
-            true
-        }
-        if (!selectionChanged) return
-
-        delay(SERVER_SELECTION_SETTLE_MILLIS)
-        serverSelectionCoordinator.withSelectionLock {
-            if (serverId != settingsRepo.lastServerId.first()) return@withSelectionLock
-            providerRoutingCoordinator.refreshSelectedServer(ProviderRoutingActiveUpdate.DEFER)
-
-            val state = connectionState.value
-            if (state is ConnectionState.Connected ||
-                state is ConnectionState.ApplyingRoutingChanges ||
-                state is ConnectionState.Error
-            ) {
-                routingChangeManager.clearPendingChanges()
-                XrayService.switchServer(context)
-            }
-        }
     }
 
     fun addSubscription(
@@ -507,7 +396,7 @@ class HomeViewModel(
     ) {
         viewModelScope.launch {
             runSubscriptionOperation {
-                subscriptionRepo.add(
+                subscriptionOperations.add(
                     name = name,
                     url = url,
                     preferJson = preferJson,
@@ -522,7 +411,7 @@ class HomeViewModel(
 
     fun addLink(link: String) {
         viewModelScope.launch {
-            runSubscriptionOperation { subscriptionRepo.addLink(link) }
+            runSubscriptionOperation { subscriptionOperations.addLink(link) }
         }
     }
 
@@ -538,8 +427,7 @@ class HomeViewModel(
     fun applyPendingSubscriptionRouting() {
         viewModelScope.launch {
             val data = _pendingSubscriptionRouting.value ?: return@launch
-            data.appRouting?.let { applySubscriptionRouting(it) }
-            data.routing?.let { applySubscriptionRouting(it) }
+            subscriptionOperations.applyRouting(data)
             _pendingSubscriptionRouting.value = null
         }
     }
@@ -549,7 +437,7 @@ class HomeViewModel(
     }
 
     fun deleteSubscription(sub: SubscriptionEntity) {
-        viewModelScope.launch { subscriptionRefreshCoordinator.deleteSubscription(sub) }
+        viewModelScope.launch { subscriptionOperations.delete(sub) }
     }
 
     fun updateSubscription(
@@ -564,40 +452,18 @@ class HomeViewModel(
         customHeaders: String,
     ) {
         viewModelScope.launch {
-            val normalizedIntervalHours = autoUpdateIntervalHours.coerceAtLeast(0)
-            val normalizedCustomUserAgent = customUserAgent.trim().ifBlank { null }
-            val normalizedCustomHeaders = customHeaders.trim().ifBlank { null }
-            val identityChanged = userAgentMode != SubscriptionUserAgentMode.fromValue(sub.userAgentMode) ||
-                normalizedCustomUserAgent != sub.customUserAgent ||
-                normalizedCustomHeaders != sub.customHeaders
-            val hasSubscriptionChanges = name.trim() != sub.name ||
-                url.trim() != sub.url ||
-                preferJson != (sub.preferJson ?: true) ||
-                allowInsecureUpdates != sub.allowInsecureUpdates ||
-                identityChanged
-            val hasIntervalChanges = normalizedIntervalHours != sub.autoUpdateIntervalHours
-
-            if (hasSubscriptionChanges) {
-                runSubscriptionOperation {
-                    subscriptionRefreshCoordinator.updateSubscription(
-                        sub.copy(
-                            preferJson = preferJson,
-                            allowInsecureUpdates = allowInsecureUpdates,
-                            autoUpdateIntervalHours = normalizedIntervalHours,
-                            userAgentMode = userAgentMode.value,
-                            customUserAgent = normalizedCustomUserAgent,
-                            customHeaders = normalizedCustomHeaders,
-                        ),
-                        name,
-                        url,
-                    )
-                }
-            } else if (hasIntervalChanges) {
-                subscriptionRepo.setAutoUpdateInterval(sub.id, normalizedIntervalHours)
-            }
-
-            if (hasIntervalChanges) {
-                subscriptionUpdateScheduler.enqueueDueCheckNow()
+            runSubscriptionOperation {
+                subscriptionOperations.update(
+                    sub = sub,
+                    name = name,
+                    url = url,
+                    preferJson = preferJson,
+                    allowInsecureUpdates = allowInsecureUpdates,
+                    autoUpdateIntervalHours = autoUpdateIntervalHours,
+                    userAgentMode = userAgentMode,
+                    customUserAgent = customUserAgent,
+                    customHeaders = customHeaders,
+                )
             }
         }
     }
@@ -605,7 +471,7 @@ class HomeViewModel(
     fun refreshAll() {
         viewModelScope.launch {
             runSubscriptionOperation {
-                val result = subscriptionRefreshCoordinator.refreshAll()
+                val result = subscriptionOperations.refreshAll()
                 reportBatchRefreshFailures(result.failures)
             }
         }
@@ -613,40 +479,25 @@ class HomeViewModel(
 
     fun refreshSubscription(sub: SubscriptionEntity) {
         viewModelScope.launch {
-            runSubscriptionOperation {
-                subscriptionRefreshCoordinator.refreshSubscription(sub.id, sub.url)
-            }
+            runSubscriptionOperation { subscriptionOperations.refresh(sub) }
         }
     }
 
     fun setSubscriptionAutoUpdateInterval(subId: Long, intervalHours: Int) {
         viewModelScope.launch {
-            subscriptionRepo.setAutoUpdateInterval(subId, intervalHours)
-            subscriptionUpdateScheduler.enqueueDueCheckNow()
+            subscriptionOperations.setAutoUpdateInterval(subId, intervalHours)
         }
     }
 
     fun setSubscriptionDescriptionHidden(subId: Long, hidden: Boolean) {
         viewModelScope.launch {
-            subscriptionRepo.setDescriptionHidden(subId, hidden)
+            subscriptionOperations.setDescriptionHidden(subId, hidden)
         }
     }
 
     fun reorderSubscriptions(subscriptionIds: List<Long>) {
         viewModelScope.launch {
-            subscriptionRepo.updateSortOrders(subscriptionIds)
-        }
-    }
-
-    private suspend fun applySubscriptionRouting(routing: SubscriptionAppRouting) {
-        if (subscriptionAppRoutingRepository.apply(routing)) {
-            routingChangeManager.markPendingChanges(PendingRoutingChange.APP_ROUTING)
-        }
-    }
-
-    private suspend fun applySubscriptionRouting(routing: SubscriptionRouting) {
-        if (subscriptionRoutingRepository.apply(routing)) {
-            routingChangeManager.markPendingChanges(PendingRoutingChange.XRAY_ROUTING)
+            subscriptionOperations.reorder(subscriptionIds)
         }
     }
 
@@ -766,15 +617,7 @@ class HomeViewModel(
         methods: List<PingMethod>,
     ) {
         try {
-            val latency = try {
-                latencySemaphore.withPermit { measureLatency(server, primaryMethod, methods) }
-            } catch (error: CancellationException) {
-                throw error
-            } catch (error: Exception) {
-                logLatencyFailure(server, methods, describeFailure(error))
-                latencyState(primaryMethod, methods.associateWith { -1 })
-            }
-
+            val latency = latencySemaphore.withPermit { latencyMeasurer.measure(server, primaryMethod, methods) }
             if (latencyRunId == runId) {
                 latencyByServerId.update { it + (server.id to latency) }
             }
@@ -784,45 +627,6 @@ class HomeViewModel(
             }
         }
     }
-
-    private suspend fun measureLatency(
-        server: ServerEntity,
-        primaryMethod: PingMethod,
-        methods: List<PingMethod>,
-    ): ServerLatencyState {
-        val config = runCatching { serverRepo.parseConfig(server) }.getOrElse { error ->
-            logLatencyFailure(server, methods, "Could not parse config: ${describeFailure(error)}")
-            return latencyState(primaryMethod, methods.associateWith { -1 })
-        }
-        val probeUrl = settingsRepo.latencyCheckUrl.first()
-        val dnsServers = settingsRepo.dnsServers.first()
-        val domesticDnsServers = settingsRepo.domesticDnsServers.first()
-        val allowIpv6 = settingsRepo.allowIpv6.first()
-        val latencyByMethod = buildMap {
-            methods.forEach { method ->
-                val result = serverLatencyTester.measure(
-                    server = config,
-                    method = method,
-                    probeUrl = probeUrl,
-                    dnsServers = dnsServers,
-                    domesticDnsServers = domesticDnsServers,
-                    allowIpv6 = allowIpv6,
-                )
-                logBuffer.append(
-                    LogSource.APP,
-                    latencyLogLine(server, method, result.failure?.let { "failed: $it" } ?: "${result.latencyMs} ms"),
-                )
-                put(method, result.latencyMs)
-            }
-        }
-        return latencyState(primaryMethod, latencyByMethod)
-    }
-
-    private fun logLatencyFailure(server: ServerEntity, methods: List<PingMethod>, reason: String) {
-        logBuffer.appendAll(LogSource.APP, methods.map { latencyLogLine(server, it, "failed: $reason") })
-    }
-
-    private fun latencyLogLine(server: ServerEntity, method: PingMethod, outcome: String) = "Ping ${server.name} (${server.address}:${server.port}) ${method.name}: $outcome"
 
     private suspend fun runSubscriptionOperation(block: suspend () -> Unit) {
         try {
@@ -909,7 +713,7 @@ internal fun changedServerSortOrders(current: List<Long>, sorted: List<Long>): M
     }.toMap()
 }
 
-private fun latencyState(
+internal fun latencyState(
     primaryMethod: PingMethod,
     latencyByMethod: Map<PingMethod, Int>,
 ): ServerLatencyState = ServerLatencyState(
