@@ -10,7 +10,7 @@
     <string name="settings_routing_policy_title">Routing policy</string>
     <string name="settings_section_core">Core</string>
     <string name="settings_default_outbound_label">Default Outbound</string>
-    <string name="settings_dns_title">DNS</string>
+    <string name="settings_dns_title">Configure DNS</string>
     <string name="settings_dns_row_subtitle">Resolvers for proxied and direct names</string>
     <string name="settings_dns_back">Back</string>
     <string name="settings_dns_intro">Xray answers every port 53 query itself, so names routed through the proxy are never looked up on the network you are on.</string>
@@ -80,8 +80,8 @@
     <string name="settings_send_hardware_id_description">Include a stable x-hwid header so providers can recognise this device</string>
     <string name="settings_send_hardware_id_locked">Required by the subscription of the selected server and cannot be turned off</string>
     <string name="settings_show_advanced_options">Show advanced options</string>
-    <string name="settings_route_mxray_traffic_title">Route MXray traffic through Xray</string>
-    <string name="settings_route_mxray_traffic_description">Send app updates, subscriptions, and data downloads through the active connection. Server latency checks always bypass it.</string>
+    <string name="settings_route_mxray_traffic_title">Route app traffic through Xray</string>
+    <string name="settings_route_mxray_traffic_description">Material Xray will route internal data updates through the active connection. Server latency checks always bypass it.</string>
     <string name="settings_diagnostics_title">Diagnostics and usage statistics</string>
     <string name="settings_diagnostics_description">Send private crash and core reliability data</string>
     <string name="diagnostics_default_notice">MaterialXray sends private diagnostics and usage statistics by default. No sensitive information is shared. You can turn this off in Settings.</string>
@@ -152,7 +152,7 @@
     <string name="settings_update_check_retry_connection">Couldn\'t reach %1$s. Trying %2$s&#8230;</string>
     <string name="settings_update_check_retry_invalid_response">%1$s returned HTTP %2$d with invalid release data. Trying %3$s&#8230;</string>
     <string name="settings_update_check_comparing">Received release details from %1$s (HTTP %2$d). Comparing versions&#8230;</string>
-    <string name="settings_update_check_up_to_date">You\'re running the latest version.</string>
+    <string name="settings_update_check_up_to_date">You\'re running the latest version</string>
     <string name="settings_update_check_available">Version %1$s is available.</string>
     <string name="settings_update_check_failed">Couldn\'t finish checking for updates. Try again later.</string>
     <string name="settings_app_version">%1$s v%2$s</string>

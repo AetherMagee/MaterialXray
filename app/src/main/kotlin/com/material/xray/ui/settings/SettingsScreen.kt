@@ -693,6 +693,7 @@ private fun SettingsScreenContent(
                 SettingsActionRow(
                     title = stringResource(R.string.settings_dns_title),
                     subtitle = stringResource(R.string.settings_dns_row_subtitle),
+                    navigates = true,
                     onClick = onOpenDnsSettings,
                 )
             }
@@ -1994,6 +1995,7 @@ private fun SettingsActionRow(
     onClick: () -> Unit,
     enabled: Boolean = true,
     inProgress: Boolean = false,
+    navigates: Boolean = false,
 ) {
     val contentEnabled = enabled || inProgress
     val titleColor = if (contentEnabled) {
@@ -2029,7 +2031,7 @@ private fun SettingsActionRow(
                 modifier = Modifier.size(24.dp),
                 strokeWidth = 2.dp,
             )
-        } else {
+        } else if (navigates) {
             Icon(
                 imageVector = Icons.Filled.ChevronRight,
                 contentDescription = null,
@@ -2086,6 +2088,7 @@ private fun AppLanguageSetting() {
     SettingsActionRow(
         title = stringResource(R.string.settings_app_language_title),
         subtitle = selectedLanguageName,
+        navigates = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU,
         onClick = {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 context.startActivity(
