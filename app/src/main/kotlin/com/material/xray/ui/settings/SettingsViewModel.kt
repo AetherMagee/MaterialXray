@@ -99,6 +99,8 @@ class SettingsViewModel(
     val geoDataClearing: StateFlow<Boolean> = _geoDataClearing.asStateFlow()
     val connectionState = connectionStateCoordinator.state
     val geoDataDownloadProgress = geoDataManager.downloadProgress
+    val geoDataLastUpdated = geoDataManager.lastUpdated
+    val geoDataCachedSizes = geoDataManager.cachedSizes
     val assetUpdateEvents: Flow<AssetUpdateMessage> = _assetUpdateEvents.receiveAsFlow()
     val rootAccessDeniedEvents: Flow<Unit> = _rootAccessDeniedEvents.receiveAsFlow()
     val databaseResetEvents: Flow<Boolean> = _databaseResetEvents.receiveAsFlow()
@@ -114,6 +116,7 @@ class SettingsViewModel(
 
     init {
         viewModelScope.launch { settingsRuntimeManager.loadRuntimeDiagnostics() }
+        viewModelScope.launch { geoDataManager.loadLastUpdated() }
     }
 
     fun setTunName(name: String) = updateXrayConfigStringSetting(name, currentSettings().tunName, settingsRepo::setTunName)
@@ -405,17 +408,30 @@ class SettingsViewModel(
         )
     }
 
-    fun clearGeoData() {
-        if (isGeoDataOperationInProgress() || connectionState.value !is ConnectionState.Disconnected) return
+    fun clearGeoData(asset: GeoDataAsset? = null) {
+        if (_geoDataClearing.value) return
+        if (asset == null && (isGeoDataOperationInProgress() || connectionState.value !is ConnectionState.Disconnected)) return
+        val assetUpdating = when (asset) {
+            GeoDataAsset.GEOIP -> _geoipUpdating.value
+            GeoDataAsset.GEOSITE -> _geositeUpdating.value
+            null -> false
+        }
+        if (assetUpdating) return
         _geoDataClearing.value = true
         viewModelScope.launch {
             try {
-                val result = runCatching { geoDataManager.clearCachedData() }
+                val result = runCatching { geoDataManager.clearCachedData(asset) }
                 result.exceptionOrNull()?.let { error ->
                     if (error is CancellationException) throw error
                 }
                 if (result.isSuccess) {
-                    _assetUpdateEvents.send(AssetUpdateMessage(R.string.settings_geodata_cleared))
+                    _assetUpdateEvents.send(
+                        if (asset == null) {
+                            AssetUpdateMessage(R.string.settings_geodata_cleared)
+                        } else {
+                            AssetUpdateMessage(R.string.settings_geo_asset_deleted, asset.displayName)
+                        },
+                    )
                 } else {
                     val detail = requireNotNull(result.exceptionOrNull()).message
                     _assetUpdateEvents.send(

@@ -41,8 +41,13 @@
     <string name="settings_geoip_url_supporting_text">Укажите прямую ссылку для скачивания geoip.dat.</string>
     <string name="settings_geosite_url_label">URL-адрес GeoSite</string>
     <string name="settings_geosite_url_supporting_text">Укажите прямую ссылку для скачивания geosite.dat.</string>
+    <string name="settings_geo_data_last_updated">Последнее обновление: %1$s, %2$s.</string>
+    <string name="settings_delete_geo_asset_title">Удалить загруженные файлы %1$s?</string>
+    <string name="settings_delete_geo_asset_message">Это освободит %1$s на устройстве.</string>
+    <string name="settings_delete">Удалить</string>
+    <string name="settings_geo_asset_deleted">Файлы %1$s удалены</string>
     <string name="settings_geo_data_update_interval_label">Интервал обновления геоданных</string>
-    <string name="settings_geo_data_update_interval_supporting_text">Частота проверки обновлений файлов GeoIP и GeoSite. Диапазон: %1$d–%2$d ч. По умолчанию: %3$d ч.</string>
+    <string name="settings_geo_data_update_interval_supporting_text">Частота проверки обновлений файлов GeoIP и GeoSite. Диапазон: %1$d–%2$d ч. По умолчанию: %3$d ч.\nУкажите 0, чтобы отключить автоматические обновления.</string>
     <string name="settings_hours_abbreviation">ч</string>
     <string name="settings_latency_check_url_label">URL-адрес для проверки задержки</string>
     <string name="settings_latency_check_url_supporting_text">HTTP-адрес используется для проверки задержки узлов.</string>

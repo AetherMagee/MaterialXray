@@ -29,6 +29,12 @@ internal const val GEOSITE_FILE_NAME = "geosite.dat"
 
 internal fun normalizeGeoDataUrl(url: String): String = url.trim()
 
+internal fun geoDataUpdatedAt(targetFile: File, updatedAtFile: File): Long? {
+    if (!targetFile.isFile) return null
+    return updatedAtFile.takeIf(File::isFile)?.readText()?.trim()?.toLongOrNull()?.takeIf { it > 0L }
+        ?: targetFile.lastModified().takeIf { it > 0L }
+}
+
 internal fun seedBundledGeoData(
     configuredUrl: String,
     defaultUrl: String,
@@ -81,9 +87,9 @@ data class GeoDataStatus(
     val downloaded: Boolean,
 )
 
-enum class GeoDataAsset {
-    GEOIP,
-    GEOSITE,
+enum class GeoDataAsset(val fileName: String, val displayName: String) {
+    GEOIP(GEOIP_FILE_NAME, "GeoIP"),
+    GEOSITE(GEOSITE_FILE_NAME, "GeoSite"),
 }
 
 @Singleton
@@ -99,10 +105,18 @@ class GeoDataManager(
     private val geoipUpdatedAtFile get() = File(binaryDir, "geoip-updated-at")
     private val geositeUpdatedAtFile get() = File(binaryDir, "geosite-updated-at")
     private val downloadMutex = Mutex()
-    private var cacheGeneration = 0L
+    private val cacheGenerations = GeoDataAsset.entries.associateWith { 0L }.toMutableMap()
     private val _downloadProgress = MutableStateFlow<Map<GeoDataAsset, GeoDataDownloadProgress>>(emptyMap())
+    private val _lastUpdated = MutableStateFlow<Map<GeoDataAsset, Long?>>(emptyMap())
+    private val _cachedSizes = MutableStateFlow<Map<GeoDataAsset, Long>>(emptyMap())
 
     val downloadProgress: StateFlow<Map<GeoDataAsset, GeoDataDownloadProgress>> = _downloadProgress.asStateFlow()
+    val lastUpdated: StateFlow<Map<GeoDataAsset, Long?>> = _lastUpdated.asStateFlow()
+    val cachedSizes: StateFlow<Map<GeoDataAsset, Long>> = _cachedSizes.asStateFlow()
+
+    suspend fun loadLastUpdated() = withContext(ioDispatcher) {
+        downloadMutex.withLock { updateLastUpdated() }
+    }
 
     suspend fun needsRefresh(): Boolean = withContext(ioDispatcher) {
         downloadMutex.withLock { resolveState().needsDownload }
@@ -144,8 +158,7 @@ class GeoDataManager(
 
     suspend fun refresh(asset: GeoDataAsset) = withContext(ioDispatcher) {
         downloadMutex.withLock {
-            binaryDir.mkdirs()
-            val state = resolveState()
+            val state = resolveState(seedBundled = false)
             trackDownloads(setOf(asset)) {
                 httpClient.use { client ->
                     when (asset) {
@@ -165,30 +178,31 @@ class GeoDataManager(
         }
     }
 
-    suspend fun clearCachedData() = withContext(ioDispatcher) {
+    suspend fun clearCachedData(asset: GeoDataAsset? = null) = withContext(ioDispatcher) {
         downloadMutex.withLock {
-            listOf(
-                File(binaryDir, GEOIP_FILE_NAME),
-                File(binaryDir, GEOSITE_FILE_NAME),
-                File(binaryDir, "$GEOIP_FILE_NAME.download"),
-                File(binaryDir, "$GEOSITE_FILE_NAME.download"),
-                geoipSourceFile,
-                geositeSourceFile,
-                geoipUpdatedAtFile,
-                geositeUpdatedAtFile,
-            ).forEach { file ->
-                if (file.exists() && !file.delete()) {
-                    throw IOException("Unable to delete ${file.name}")
+            val assets = asset?.let { listOf(it) } ?: GeoDataAsset.entries
+            assets.forEach { current ->
+                val isGeoip = current == GeoDataAsset.GEOIP
+                listOf(
+                    File(binaryDir, current.fileName),
+                    File(binaryDir, "${current.fileName}.download"),
+                    if (isGeoip) geoipSourceFile else geositeSourceFile,
+                    if (isGeoip) geoipUpdatedAtFile else geositeUpdatedAtFile,
+                ).forEach { file ->
+                    if (file.exists() && !file.delete()) {
+                        throw IOException("Unable to delete ${file.name}")
+                    }
                 }
+                cacheGenerations[current] = cacheGenerations.getValue(current) + 1
             }
-            cacheGeneration++
-            _downloadProgress.value = emptyMap()
+            _downloadProgress.update { it - assets.toSet() }
+            updateLastUpdated()
         }
     }
 
     /** Downloads outside the connection lock, then installs each completed file under the lock. */
     suspend fun refreshForScheduledUpdate() = withContext(ioDispatcher) {
-        val (state, generation) = downloadMutex.withLock { resolveState() to cacheGeneration }
+        val (state, generations) = downloadMutex.withLock { resolveState() to cacheGenerations.toMap() }
         if (state.needsDownload) return@withContext
         trackDownloads(GeoDataAsset.entries.toSet()) {
             httpClient.use { client ->
@@ -202,7 +216,7 @@ class GeoDataManager(
                                 state.geoipFile,
                                 geoipSourceFile,
                                 geoipUpdatedAtFile,
-                                generation,
+                                generations.getValue(GeoDataAsset.GEOIP),
                             )
                         }
                     }
@@ -215,7 +229,7 @@ class GeoDataManager(
                                 state.geositeFile,
                                 geositeSourceFile,
                                 geositeUpdatedAtFile,
-                                generation,
+                                generations.getValue(GeoDataAsset.GEOSITE),
                             )
                         }
                     }
@@ -239,13 +253,13 @@ class GeoDataManager(
         try {
             download(asset, client, url, stagedFile)
             downloadMutex.withLock {
-                if (generation != cacheGeneration) return@withLock
-                val current = resolveState()
+                if (generation != cacheGenerations.getValue(asset)) return@withLock
+                val current = resolveState(seedBundled = false)
                 val currentUrl = when (asset) {
                     GeoDataAsset.GEOIP -> current.geoipUrl
                     GeoDataAsset.GEOSITE -> current.geositeUrl
                 }
-                if (current.needsDownload || currentUrl != url) return@withLock
+                if (currentUrl != url) return@withLock
                 if (!stagedFile.renameTo(targetFile)) {
                     throw IOException("Unable to install refreshed ${targetFile.name}")
                 }
@@ -259,6 +273,15 @@ class GeoDataManager(
 
     private fun markUpdated(updatedAtFile: File) {
         updatedAtFile.writeText(System.currentTimeMillis().toString())
+        updateLastUpdated()
+    }
+
+    private fun updateLastUpdated() {
+        _lastUpdated.value = mapOf(
+            GeoDataAsset.GEOIP to geoDataUpdatedAt(File(binaryDir, GEOIP_FILE_NAME), geoipUpdatedAtFile),
+            GeoDataAsset.GEOSITE to geoDataUpdatedAt(File(binaryDir, GEOSITE_FILE_NAME), geositeUpdatedAtFile),
+        )
+        _cachedSizes.value = GeoDataAsset.entries.associateWith { File(binaryDir, it.fileName).length() }
     }
 
     private fun download(asset: GeoDataAsset, client: OkHttpClient, sourceUrl: String, targetFile: File) {
@@ -322,7 +345,7 @@ class GeoDataManager(
 
     private fun File.readTextOrNull(): String? = takeIf(File::exists)?.readText()?.trim()
 
-    private suspend fun resolveState(): ResolvedGeoDataState {
+    private suspend fun resolveState(seedBundled: Boolean = true): ResolvedGeoDataState {
         binaryDir.mkdirs()
 
         val configuredGeoipUrl = normalizeGeoDataUrl(settingsRepository.geoipUrl.first())
@@ -331,18 +354,21 @@ class GeoDataManager(
         val geositeUrl = configuredGeositeUrl.ifEmpty { SettingsRepository.DEFAULT_GEOSITE_URL }
         val geoipFile = File(binaryDir, GEOIP_FILE_NAME)
         val geositeFile = File(binaryDir, GEOSITE_FILE_NAME)
-        seedBundledGeoData(
-            geoipUrl,
-            SettingsRepository.DEFAULT_GEOIP_URL,
-            geoipFile,
-            geoipSourceFile,
-        ) { context.assets.open(GEOIP_FILE_NAME) }
-        seedBundledGeoData(
-            geositeUrl,
-            SettingsRepository.DEFAULT_GEOSITE_URL,
-            geositeFile,
-            geositeSourceFile,
-        ) { context.assets.open(GEOSITE_FILE_NAME) }
+        if (seedBundled) {
+            seedBundledGeoData(
+                geoipUrl,
+                SettingsRepository.DEFAULT_GEOIP_URL,
+                geoipFile,
+                geoipSourceFile,
+            ) { context.assets.open(GEOIP_FILE_NAME) }
+            seedBundledGeoData(
+                geositeUrl,
+                SettingsRepository.DEFAULT_GEOSITE_URL,
+                geositeFile,
+                geositeSourceFile,
+            ) { context.assets.open(GEOSITE_FILE_NAME) }
+        }
+        updateLastUpdated()
         val needsDownload = geoipSourceFile.readTextOrNull() != geoipUrl ||
             geositeSourceFile.readTextOrNull() != geositeUrl ||
             !geoipFile.exists() ||

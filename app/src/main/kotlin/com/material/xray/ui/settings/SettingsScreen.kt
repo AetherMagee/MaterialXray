@@ -9,6 +9,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Process
 import android.provider.Settings
+import android.text.format.DateFormat
 import android.text.format.Formatter
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
@@ -92,7 +93,15 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLinkStyles
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.withLink
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.core.app.ActivityCompat
@@ -134,6 +143,7 @@ import com.material.xray.ui.components.rememberSystemState
 import com.material.xray.ui.components.rememberTrailingIconFade
 import com.material.xray.ui.text.descriptionResource
 import com.material.xray.ui.text.labelResource
+import java.util.Date
 import java.util.Locale
 import kotlinx.coroutines.flow.collect
 import org.koin.compose.viewmodel.koinViewModel
@@ -197,6 +207,8 @@ private fun SettingsScreenContent(
     val geoDataClearing by viewModel.geoDataClearing.collectAsStateWithLifecycle()
     val connectionState by viewModel.connectionState.collectAsStateWithLifecycle()
     val geoDataDownloadProgress by viewModel.geoDataDownloadProgress.collectAsStateWithLifecycle()
+    val geoDataLastUpdated by viewModel.geoDataLastUpdated.collectAsStateWithLifecycle()
+    val geoDataCachedSizes by viewModel.geoDataCachedSizes.collectAsStateWithLifecycle()
     val xrayCoreVersion by viewModel.xrayCoreVersion.collectAsStateWithLifecycle()
     val databaseResetting by viewModel.databaseResetting.collectAsStateWithLifecycle()
     val backupBusy by viewModel.backupBusy.collectAsStateWithLifecycle()
@@ -245,6 +257,7 @@ private fun SettingsScreenContent(
     var showUpdateFrequencyDialog by rememberSaveable { mutableStateOf(false) }
     var showResetDatabaseDialog by rememberSaveable { mutableStateOf(false) }
     var showOpenSourceLicensesDialog by rememberSaveable { mutableStateOf(false) }
+    var geoDataToDelete by rememberSaveable { mutableStateOf<GeoDataAsset?>(null) }
     val rootServiceAvailable = rootAvailable != false
     val rootServiceActive = useRootService && rootAvailable == true
 
@@ -738,7 +751,12 @@ private fun SettingsScreenContent(
                             if (geoipUpdating) {
                                 GeoDataDownloadStatus(geoDataDownloadProgress[GeoDataAsset.GEOIP])
                             } else {
-                                Text(stringResource(R.string.settings_geoip_url_supporting_text))
+                                GeoDataSupportingText(
+                                    description = stringResource(R.string.settings_geoip_url_supporting_text),
+                                    lastUpdated = geoDataLastUpdated[GeoDataAsset.GEOIP].takeIf { showAdvancedOptions },
+                                    enabled = !geoipUpdating && !geoDataClearing,
+                                    onClick = { geoDataToDelete = GeoDataAsset.GEOIP },
+                                )
                             }
                         },
                         trailingIcon = {
@@ -788,7 +806,12 @@ private fun SettingsScreenContent(
                             if (geositeUpdating) {
                                 GeoDataDownloadStatus(geoDataDownloadProgress[GeoDataAsset.GEOSITE])
                             } else {
-                                Text(stringResource(R.string.settings_geosite_url_supporting_text))
+                                GeoDataSupportingText(
+                                    description = stringResource(R.string.settings_geosite_url_supporting_text),
+                                    lastUpdated = geoDataLastUpdated[GeoDataAsset.GEOSITE].takeIf { showAdvancedOptions },
+                                    enabled = !geositeUpdating && !geoDataClearing,
+                                    onClick = { geoDataToDelete = GeoDataAsset.GEOSITE },
+                                )
                             }
                         },
                         trailingIcon = {
@@ -876,7 +899,7 @@ private fun SettingsScreenContent(
             if (showAdvancedOptions) {
                 item(key = "clear_geodata") {
                     OutlinedButton(
-                        onClick = viewModel::clearGeoData,
+                        onClick = { viewModel.clearGeoData() },
                         enabled = connectionState is ConnectionState.Disconnected && !geoDataOperationInProgress,
                         modifier = Modifier.padding(horizontal = 16.dp),
                     ) {
@@ -1040,6 +1063,18 @@ private fun SettingsScreenContent(
     )
     if (showOpenSourceLicensesDialog) {
         OpenSourceLicensesDialog(onDismiss = { showOpenSourceLicensesDialog = false })
+    }
+    geoDataToDelete?.let { asset ->
+        DeleteGeoDataDialog(
+            asset = asset,
+            bytes = geoDataCachedSizes[asset] ?: 0L,
+            enabled = !geoDataClearing && !(if (asset == GeoDataAsset.GEOIP) geoipUpdating else geositeUpdating),
+            onDismiss = { geoDataToDelete = null },
+            onConfirm = {
+                viewModel.clearGeoData(asset)
+                geoDataToDelete = null
+            },
+        )
     }
 }
 
@@ -1748,6 +1783,65 @@ private fun AdvancedIntegerSetting(
             Text(stringResource(R.string.settings_save))
         }
     }
+}
+
+@Composable
+private fun GeoDataSupportingText(description: String, lastUpdated: Long?, enabled: Boolean, onClick: () -> Unit) {
+    val context = LocalContext.current
+    val updatedText = lastUpdated?.let { timestamp ->
+        val date = Date(timestamp)
+        stringResource(
+            R.string.settings_geo_data_last_updated,
+            DateFormat.getLongDateFormat(context).format(date),
+            DateFormat.format("HH:mm:ss", date),
+        )
+    }
+    val linkStyle = SpanStyle(color = MaterialTheme.colorScheme.primary, textDecoration = TextDecoration.Underline)
+    Text(
+        buildAnnotatedString {
+            append(description)
+            if (updatedText != null) {
+                append("\n\n")
+                withLink(LinkAnnotation.Clickable("delete_asset", TextLinkStyles(style = linkStyle)) { if (enabled) onClick() }) {
+                    append(updatedText)
+                }
+            }
+        },
+    )
+}
+
+@Composable
+private fun DeleteGeoDataDialog(
+    asset: GeoDataAsset,
+    bytes: Long,
+    enabled: Boolean,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    val size = Formatter.formatShortFileSize(LocalContext.current, bytes)
+    val message = stringResource(R.string.settings_delete_geo_asset_message, size)
+    val sizeStart = message.indexOf(size)
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.settings_delete_geo_asset_title, asset.displayName)) },
+        text = {
+            Text(
+                buildAnnotatedString {
+                    append(message.substring(0, sizeStart))
+                    withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(size) }
+                    append(message.substring(sizeStart + size.length))
+                },
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = onConfirm, enabled = enabled) {
+                Text(stringResource(R.string.settings_delete), color = MaterialTheme.colorScheme.error)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.settings_cancel)) }
+        },
+    )
 }
 
 @Composable

@@ -40,6 +40,11 @@ class GeoDataUpdateScheduler(
 
     fun schedulePeriodicRefresh(intervalHours: Int) {
         val normalizedIntervalHours = GeoDataUpdateInterval.normalize(intervalHours).toLong()
+        if (normalizedIntervalHours == 0L) {
+            WorkManager.getInstance(context).cancelUniqueWork(PERIODIC_WORK_NAME)
+            WorkManager.getInstance(context).cancelUniqueWork(INITIAL_WORK_NAME)
+            return
+        }
         val request = PeriodicWorkRequestBuilder<GeoDataUpdateWorker>(
             normalizedIntervalHours,
             TimeUnit.HOURS,
