@@ -3,10 +3,17 @@ package com.material.xray.ui.components
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.padding
@@ -129,14 +136,19 @@ fun ScrolledTopAppBar(
 @Composable
 fun AppBarTitle(title: String, showLogo: Boolean) {
     Row(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (showLogo) {
+        AnimatedVisibility(
+            visible = showLogo,
+            enter = fadeIn(tween(180)) + expandHorizontally(tween(180), expandFrom = Alignment.Start) +
+                slideInHorizontally(tween(180)) { -it },
+            exit = fadeOut(tween(180)) + shrinkHorizontally(tween(180), shrinkTowards = Alignment.Start) +
+                slideOutHorizontally(tween(180)) { -it },
+        ) {
             Icon(
                 painter = painterResource(R.drawable.ic_launcher_default_monochrome),
                 contentDescription = null,
-                modifier = Modifier.padding(start = 8.dp).size(24.dp),
+                modifier = Modifier.padding(horizontal = 8.dp).size(24.dp),
             )
         }
         Text(title)
