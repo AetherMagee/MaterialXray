@@ -25,7 +25,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -63,6 +62,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.material.xray.R
 import com.material.xray.model.RoutingPolicyControl
+import com.material.xray.ui.components.AnimatedDropdownMenu
 import com.material.xray.ui.components.ScrollFadeEdges
 import com.material.xray.ui.components.SelectableOptionRow
 import com.material.xray.ui.components.TooltipIconButton
@@ -387,7 +387,7 @@ fun AppRoutingMenuActions(viewModel: AppsViewModel = koinViewModel()) {
             TooltipIconButton(tooltip = stringResource(R.string.apps_routing_menu), onClick = { appRoutingMenuExpanded = true }) {
                 Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.apps_routing_menu))
             }
-            DropdownMenu(
+            AnimatedDropdownMenu(
                 expanded = appRoutingMenuExpanded,
                 onDismissRequest = { appRoutingMenuExpanded = false },
             ) {

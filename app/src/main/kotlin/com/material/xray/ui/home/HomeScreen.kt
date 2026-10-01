@@ -85,7 +85,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -185,6 +184,7 @@ import com.material.xray.service.AppUpdateInstallStage
 import com.material.xray.service.ConnectionEvent
 import com.material.xray.ui.adaptive.SinglePaneMaxWidth
 import com.material.xray.ui.adaptive.TwoPaneMinWidth
+import com.material.xray.ui.components.AnimatedDropdownMenu
 import com.material.xray.ui.components.DropdownOption
 import com.material.xray.ui.components.ExpansionArrow
 import com.material.xray.ui.components.ReadOnlyDropdownField
@@ -1883,7 +1883,7 @@ private fun AddSubscriptionActionButton(
         ) {
             Text(stringResource(R.string.home_add_server_or_subscription))
         }
-        DropdownMenu(
+        AnimatedDropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },
         ) {
@@ -2325,7 +2325,7 @@ private fun SubscriptionHeader(
                     contentDescription = stringResource(R.string.home_subscription_menu_content_description),
                 )
             }
-            DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
+            AnimatedDropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
                 DropdownMenuItem(
                     text = { Text(stringResource(R.string.home_action_edit)) },
                     leadingIcon = {

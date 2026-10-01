@@ -36,7 +36,6 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Share
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -79,6 +78,7 @@ import com.material.xray.R
 import com.material.xray.service.LogEntry
 import com.material.xray.service.LogSource
 import com.material.xray.service.displayMessage
+import com.material.xray.ui.components.AnimatedDropdownMenu
 import com.material.xray.ui.components.AppBarTitle
 import com.material.xray.ui.components.AppTopBarHeight
 import com.material.xray.ui.components.ScrollFadeEdges
@@ -203,7 +203,7 @@ fun LogsScreen(showTitleBarLogo: Boolean, viewModel: LogsViewModel = koinViewMod
                             ) {
                                 Icon(Icons.Default.Save, contentDescription = stringResource(R.string.logs_export))
                             }
-                            DropdownMenu(
+                            AnimatedDropdownMenu(
                                 expanded = showExportMenu,
                                 onDismissRequest = { showExportMenu = false },
                             ) {

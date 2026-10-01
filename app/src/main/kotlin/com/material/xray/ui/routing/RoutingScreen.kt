@@ -42,7 +42,6 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -85,6 +84,7 @@ import com.material.xray.model.RoutingRuleCatalog
 import com.material.xray.ui.adaptive.TwoPaneMinWidth
 import com.material.xray.ui.apps.AppBypassContent
 import com.material.xray.ui.apps.AppRoutingMenuActions
+import com.material.xray.ui.components.AnimatedDropdownMenu
 import com.material.xray.ui.components.AppBarTitle
 import com.material.xray.ui.components.AppTopBarHeight
 import com.material.xray.ui.components.ScrollFadeEdges
@@ -464,7 +464,7 @@ private fun RuleActions(
                         contentDescription = stringResource(R.string.routing_rules_menu),
                     )
                 }
-                DropdownMenu(
+                AnimatedDropdownMenu(
                     expanded = rulesMenuExpanded,
                     onDismissRequest = { rulesMenuExpanded = false },
                 ) {
