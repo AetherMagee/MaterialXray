@@ -7,6 +7,7 @@
 - Single test class: `./gradlew :app:testDebugUnitTest --tests com.material.xray.core.xray.ConfigGeneratorTest`.
 - Single Kotlin backtick-named test: `./gradlew :app:testDebugUnitTest --tests "com.material.xray.core.xray.ConfigGeneratorTest.generates TUN inbound with correct name and MTU"`.
 - Final lint and broader local verification: `./gradlew :app:lintDebug` and `./gradlew :app:check`.
+- Type-resolving static analysis: `./gradlew :app:detektDebug :app:detektDebugUnitTest`. These tasks compile the sources first. prek's plain `:app:detekt` is quicker, but it silently skips every rule that needs types.
 - Formatting is not applied by building. `prek` verifies it with `ktlintCheck`; fix it with `./gradlew :app:ktlintFormat`.
 - Iterate with targeted unit tests. Run the full unit-test suite before final QA, then defer assembly and lint until source edits are finished because they rerun expensive dexing and analysis work.
 - Device-only flows need a connected device/emulator: `./gradlew :app:installDebug` and `./gradlew :app:connectedDebugAndroidTest`.
@@ -37,7 +38,7 @@
 - `.github/workflows/release.yml` manually builds, signs, uploads, and publishes a release APK.
 
 ## QA
-- Finish all source edits, then run `./gradlew :app:testDebugUnitTest :app:assembleDebug` first.
+- Finish all source edits, then run `./gradlew :app:testDebugUnitTest :app:assembleDebug :app:detektDebug :app:detektDebugUnitTest` first.
 - After those checks pass and no further source changes are planned, run the expensive final lint with `./gradlew :app:lintDebug`.
 - Run `prek run --all-files` last so ktlint and detekt validate the final worktree.
 - Do not call a repository change truly 'done' until all three QA commands succeed. These build-dependent checks intentionally run locally rather than in CI or prek.
