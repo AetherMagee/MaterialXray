@@ -204,11 +204,11 @@
     <string name="home_headers_example">По одному на строку, например: X-Hwid: 0123456789abcdef</string>
 
     <string name="home_subscription_unlimited_traffic">∞ трафика</string>
-    <string name="home_subscription_unlimited_traffic_downloaded">∞ трафика, ↓ %1$s</string>
+    <string name="home_subscription_unlimited_traffic_downloaded">∞ трафика, %1$s использовано</string>
     <string name="home_subscription_used_of_total">%1$s из %2$s</string>
-    <string name="home_subscription_downloaded">↓ %1$s</string>
-    <string name="home_subscription_downloaded_with_expiry">↓ %1$s\n%2$s</string>
-    <string name="home_subscription_downloaded_expired">↓ %1$s\nсрок истёк</string>
+    <string name="home_subscription_downloaded">%1$s использовано</string>
+    <string name="home_subscription_downloaded_with_expiry">%1$s использовано\n%2$s</string>
+    <string name="home_subscription_downloaded_expired">%1$s использовано\nсрок истёк</string>
     <string name="home_subscription_expired_inline">срок истёк</string>
     <string name="home_subscription_expired_standalone">Срок истёк</string>
     <string name="home_subscription_expires_today_inline">истекает сегодня</string>

@@ -57,10 +57,10 @@ class SubscriptionMetadataFormatterTest {
             zoneId = zoneId,
         )
 
-        assertEquals("∞ traffic, ↓ 5.0 GB", state.traffic?.summary)
+        assertEquals("∞ traffic, 5.0 GB used", state.traffic?.summary)
         assertNull(state.traffic?.quotaText)
         assertEquals(
-            "↓ 5.0 GB\n8 days left",
+            "5.0 GB used\n8 days left",
             state.headerDetailText(EnglishSubscriptionMetadataText),
         )
     }
@@ -109,11 +109,11 @@ class SubscriptionMetadataFormatterTest {
         override fun getString(resourceId: Int, vararg arguments: Any): String {
             val value = when (resourceId) {
                 R.string.home_subscription_unlimited_traffic -> "∞ traffic"
-                R.string.home_subscription_unlimited_traffic_downloaded -> "∞ traffic, ↓ %1\$s"
+                R.string.home_subscription_unlimited_traffic_downloaded -> "∞ traffic, %1\$s used"
                 R.string.home_subscription_used_of_total -> "%1\$s of %2\$s"
-                R.string.home_subscription_downloaded -> "↓ %1\$s"
-                R.string.home_subscription_downloaded_with_expiry -> "↓ %1\$s\n%2\$s"
-                R.string.home_subscription_downloaded_expired -> "↓ %1\$s\nexpired"
+                R.string.home_subscription_downloaded -> "%1\$s used"
+                R.string.home_subscription_downloaded_with_expiry -> "%1\$s used\n%2\$s"
+                R.string.home_subscription_downloaded_expired -> "%1\$s used\nexpired"
                 R.string.home_subscription_expired_inline -> "expired"
                 R.string.home_subscription_expired_standalone -> "Expired"
                 R.string.home_subscription_expires_today_inline -> "expires today"

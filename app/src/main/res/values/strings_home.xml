@@ -192,11 +192,11 @@
     <string name="home_headers_example">One per line, for example: X-Hwid: 0123456789abcdef</string>
 
     <string name="home_subscription_unlimited_traffic">∞ traffic</string>
-    <string name="home_subscription_unlimited_traffic_downloaded">∞ traffic, ↓ %1$s</string>
+    <string name="home_subscription_unlimited_traffic_downloaded">∞ traffic, %1$s used</string>
     <string name="home_subscription_used_of_total">%1$s of %2$s</string>
-    <string name="home_subscription_downloaded">↓ %1$s</string>
-    <string name="home_subscription_downloaded_with_expiry">↓ %1$s\n%2$s</string>
-    <string name="home_subscription_downloaded_expired">↓ %1$s\nexpired</string>
+    <string name="home_subscription_downloaded">%1$s used</string>
+    <string name="home_subscription_downloaded_with_expiry">%1$s used\n%2$s</string>
+    <string name="home_subscription_downloaded_expired">%1$s used\nexpired</string>
     <string name="home_subscription_expired_inline">expired</string>
     <string name="home_subscription_expired_standalone">Expired</string>
     <string name="home_subscription_expires_today_inline">expires today</string>

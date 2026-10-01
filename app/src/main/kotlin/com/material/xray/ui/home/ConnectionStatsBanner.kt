@@ -8,8 +8,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.ArrowDownward
-import androidx.compose.material.icons.outlined.ArrowUpward
 import androidx.compose.material.icons.outlined.Bolt
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -19,8 +17,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.platform.LocalLocale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -77,7 +77,7 @@ internal fun ConnectionStatsBanner(
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     StatCell(
-                        icon = Icons.Outlined.Bolt,
+                        icon = rememberVectorPainter(Icons.Outlined.Bolt),
                         label = stringResource(
                             if ((activeBalancer?.servers?.size ?: 0) > 1) R.string.home_stats_average_ping else R.string.home_stats_ping,
                         ),
@@ -85,13 +85,13 @@ internal fun ConnectionStatsBanner(
                         modifier = Modifier.weight(1f),
                     )
                     StatCell(
-                        icon = Icons.Outlined.ArrowDownward,
+                        icon = painterResource(R.drawable.ic_download_triangle),
                         label = stringResource(R.string.home_stats_download),
                         value = traffic?.let { formatRate(it.downlinkBps, locale) },
                         modifier = Modifier.weight(1f),
                     )
                     StatCell(
-                        icon = Icons.Outlined.ArrowUpward,
+                        icon = painterResource(R.drawable.ic_upload_triangle),
                         label = stringResource(R.string.home_stats_upload),
                         value = traffic?.let { formatRate(it.uplinkBps, locale) },
                         modifier = Modifier.weight(1f),
@@ -106,7 +106,7 @@ internal fun ConnectionStatsBanner(
 
 @Composable
 private fun StatCell(
-    icon: ImageVector,
+    icon: Painter,
     label: String,
     value: String?,
     modifier: Modifier = Modifier,
@@ -125,7 +125,7 @@ private fun StatCell(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
-                imageVector = icon,
+                painter = icon,
                 contentDescription = null,
                 modifier = Modifier.size(14.dp),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
