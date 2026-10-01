@@ -919,17 +919,6 @@ class TproxyManager internal constructor(
             guardedState = plan.runtimeState,
         )
 
-        private fun tetherInputRules(
-            tool: String,
-            chain: String,
-            upstream: String,
-            target: String,
-            guardedState: TproxyRuntimeState? = null,
-        ): List<String> = buildList {
-            add("$tool -t filter -N $chain")
-            addAll(tetherInputRuleCommands(tool, chain, upstream, target, guardedState))
-        }
-
         private fun tetherInputRuleCommands(
             tool: String,
             chain: String,

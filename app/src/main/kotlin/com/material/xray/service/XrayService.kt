@@ -2012,17 +2012,6 @@ class XrayService : VpnService() {
         if (!table.isNullOrBlank()) append(" table $table")
     }
 
-    private fun describeNetworkChange(
-        previousNetwork: PhysicalNetworkSnapshot?,
-        currentNetwork: PhysicalNetworkSnapshot?,
-    ): String = when {
-        previousNetwork != null && currentNetwork != null ->
-            "${previousNetwork.describe()} -> ${currentNetwork.describe()}"
-        previousNetwork != null -> "${previousNetwork.describe()} -> unknown"
-        currentNetwork != null -> "unknown -> ${currentNetwork.describe()}"
-        else -> "active physical network changed"
-    }
-
     private fun updateNotification(overrideText: String? = null) {
         val state = connectionStateCoordinator.state.value
         if (state is ConnectionState.Disconnected) {
@@ -2300,12 +2289,6 @@ class XrayService : VpnService() {
     ) {
         fun sameNetwork(other: PhysicalNetworkSnapshot): Boolean = handle == other.handle &&
             interfaceName == other.interfaceName
-
-        fun describe(): String = buildString {
-            append("$label#$handle")
-            if (!interfaceName.isNullOrBlank()) append(" on $interfaceName")
-            append(if (validated) " validated" else " unvalidated")
-        }
     }
 
     private data class NotificationMetrics(

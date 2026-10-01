@@ -754,8 +754,6 @@ class SettingsRepository(
         }
     }.getOrDefault(emptyMap())
 
-    private fun encodeRoutingRuleStates(states: Map<String, Boolean>): String = json.encodeToString(kotlinx.serialization.builtins.MapSerializer(String.serializer(), Boolean.serializer()), states)
-
     private fun decodeRoutingRules(
         rulesEncoded: String?,
         rulesVersion: Int?,

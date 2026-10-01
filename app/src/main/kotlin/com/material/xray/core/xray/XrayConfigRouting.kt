@@ -248,8 +248,6 @@ private fun lanDomainRoutingRule() = buildJsonObject {
     put("outboundTag", "direct")
 }
 
-private fun String.commaSeparatedValues(): List<String> = split(",").map { it.trim() }.filter { it.isNotEmpty() }
-
 // Xray-core #2248 can permanently cache empty Cloudflare UDP responses for individual names, so every
 // bare Cloudflare resolver literal is rewritten to a non-UDP endpoint. Cloudflare serves its resolver
 // IPs in the DoH certificate, so an address without an explicit port becomes a DoH URL; an address that
@@ -285,5 +283,3 @@ private fun String.isIpv4DnsServerWithPort(): Boolean {
 
 private val CLOUDFLARE_IPV4_DNS = setOf("1.1.1.1", "1.0.0.1", "1.1.1.2", "1.0.0.2", "1.1.1.3", "1.0.0.3")
 private const val CLOUDFLARE_IPV6_DNS_PREFIX = "2606:4700:4700::"
-
-private fun List<String>.cleanEntries(): List<String> = map { it.trim() }.filter { it.isNotEmpty() }
