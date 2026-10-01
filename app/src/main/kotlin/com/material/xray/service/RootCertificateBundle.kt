@@ -8,6 +8,7 @@ import java.security.KeyStore
 import java.security.cert.X509Certificate
 import java.util.Base64
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -25,6 +26,7 @@ internal class AndroidRootCertificateBundle(
     private val refreshDelayMillis: Long = CACHED_BUNDLE_REFRESH_DELAY_MS,
     private val loadBundledCertificates: () -> List<ByteArray> = { emptyList() },
     private val loadCertificates: () -> List<ByteArray> = ::loadAndroidCaCertificates,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : RootCertificateBundle {
     private val refreshedInProcess = AtomicBoolean()
 
@@ -33,9 +35,9 @@ internal class AndroidRootCertificateBundle(
     // an earlier connection is therefore used as is, and rebuilt once per process after the
     // connection that asked for it has had time to settle, so CA store changes reach the next one.
     override suspend fun prepare(file: File) {
-        val cached = withContext(Dispatchers.IO) { file.isFile && file.length() > 0L }
+        val cached = withContext(ioDispatcher) { file.isFile && file.length() > 0L }
         if (!cached) {
-            withContext(Dispatchers.IO) { write(file) }
+            withContext(ioDispatcher) { write(file) }
             refreshedInProcess.set(true)
             return
         }

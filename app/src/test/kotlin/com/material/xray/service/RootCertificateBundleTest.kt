@@ -3,6 +3,7 @@ package com.material.xray.service
 import java.io.File
 import java.nio.file.Files
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
@@ -121,6 +122,8 @@ class RootCertificateBundleTest {
         refreshDelayMillis = REFRESH_DELAY_MS,
         loadBundledCertificates = loadBundledCertificates,
         loadCertificates = loadCertificates,
+        // A real IO dispatcher would let runTest skip the refresh delay while prepare() waits on it.
+        ioDispatcher = StandardTestDispatcher(testScheduler),
     )
 
     private companion object {
