@@ -240,7 +240,7 @@ internal class XrayProcessSupervisor(
                 log.append(
                     LogSource.APP,
                     "Background-data allowlist update skipped for uid=$packageUid${
-                        details.takeIf { it.isNotEmpty() }?.let { ": $it" } ?: ""
+                        details.takeIf { it.isNotEmpty() }?.let { ": $it" }.orEmpty()
                     }",
                 )
             }

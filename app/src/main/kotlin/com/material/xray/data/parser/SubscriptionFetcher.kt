@@ -349,8 +349,7 @@ class SubscriptionFetcher(
                 address = findFirstStringRecursive("address").orEmpty(),
                 port = findFirstIntRecursive("port") ?: 0,
                 password = findFirstStringRecursive("id")
-                    ?: findFirstStringRecursive("password")
-                    ?: "",
+                    ?: findFirstStringRecursive("password").orEmpty(),
                 extra = emptyMap(),
             )
 
@@ -564,12 +563,11 @@ class SubscriptionFetcher(
         address = outbound.findFirstStringRecursive("address").orEmpty(),
         port = outbound.findFirstIntRecursive("port") ?: 0,
         password = outbound.findFirstStringRecursive("id")
-            ?: outbound.findFirstStringRecursive("password")
-            ?: "",
+            ?: outbound.findFirstStringRecursive("password").orEmpty(),
         extra = emptyMap(),
     )
 
-    private fun firstString(primary: JsonObject?, fallback: JsonObject, key: String): String = primary?.findString(key) ?: fallback.findFirstStringRecursive(key) ?: ""
+    private fun firstString(primary: JsonObject?, fallback: JsonObject, key: String): String = primary?.findString(key) ?: fallback.findFirstStringRecursive(key).orEmpty()
 
     private fun firstString(primary: JsonObject?, fallback: JsonObject?, vararg keys: String): String? {
         for (key in keys) {
@@ -705,8 +703,7 @@ class SubscriptionFetcher(
         val tlsSettings = streamSettings?.findObject("tlsSettings")
         val realitySettings = streamSettings?.findObject("realitySettings")
         return tlsSettings?.findArray("alpn")?.stringList()
-            ?: realitySettings?.findArray("alpn")?.stringList()
-            ?: emptyList()
+            ?: realitySettings?.findArray("alpn")?.stringList().orEmpty()
     }
 
     private fun JsonObject.findElement(name: String): JsonElement? = entries.firstOrNull { it.key.equals(name, ignoreCase = true) }?.value

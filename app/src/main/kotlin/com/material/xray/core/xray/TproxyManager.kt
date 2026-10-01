@@ -143,14 +143,14 @@ class TproxyManager internal constructor(
 
     suspend fun updateTetherAddresses(plan: TproxyTrafficPlan): TunManager.RoutingResult {
         val state = plan.runtimeState
-        require(state.tetherUpstreamInterface != null)
+        requireNotNull(state.tetherUpstreamInterface)
         val result = execute(tetherAddressUpdateCommand(plan), "TPROXY tether address update")
         if (result.success) localAddressTracker.markInstalled(state.localAddresses, state.ipv6Enabled)
         return result
     }
 
     suspend fun updateTetherUpstream(plan: TproxyTrafficPlan, previousUpstream: String): TunManager.RoutingResult {
-        require(plan.runtimeState.tetherUpstreamInterface != null)
+        requireNotNull(plan.runtimeState.tetherUpstreamInterface)
         val upstreamGuard = execute(installUpstreamGuardCommand(previousUpstream, plan.runtimeState.tetherUpstreamInterface), "TPROXY upstream guard setup")
         if (!upstreamGuard.success) return upstreamGuard
         val guard = installGuard(plan)

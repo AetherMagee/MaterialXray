@@ -11,7 +11,7 @@ object TrojanParser {
         val password = parsed.rawUserInfo ?: return null
         val host = parsed.host ?: return null
         val port = parsed.port.takeIfValidPort() ?: return null
-        val fragment = parsed.rawFragment?.let(::decodeUriComponentLeniently) ?: ""
+        val fragment = parsed.rawFragment?.let(::decodeUriComponentLeniently).orEmpty()
         val params = parseQuery(parsed.rawQuery ?: "")
 
         ServerConfig(
@@ -22,15 +22,15 @@ object TrojanParser {
             password = decodeUriComponentLeniently(password),
             transport = ServerConfig.Transport(
                 type = params["type"] ?: "tcp",
-                path = params["path"] ?: "",
-                host = params["host"] ?: "",
-                serviceName = params["serviceName"] ?: "",
+                path = params["path"].orEmpty(),
+                host = params["host"].orEmpty(),
+                serviceName = params["serviceName"].orEmpty(),
             ),
             security = ServerConfig.Security(
                 type = params["security"] ?: "tls",
-                sni = params["sni"] ?: "",
-                fingerprint = params["fp"] ?: "",
-                alpn = params["alpn"]?.split(",") ?: emptyList(),
+                sni = params["sni"].orEmpty(),
+                fingerprint = params["fp"].orEmpty(),
+                alpn = params["alpn"]?.split(",").orEmpty(),
             ),
             rawUri = uri,
         )

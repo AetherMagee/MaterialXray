@@ -31,6 +31,11 @@ exceptions:
   TooGenericExceptionCaught:
     active: false
 
+performance:
+  # Android APIs such as getString and addMigrations only take varargs, so the copy is unavoidable.
+  SpreadOperator:
+    active: false
+
 style:
   MaxLineLength:
     active: false

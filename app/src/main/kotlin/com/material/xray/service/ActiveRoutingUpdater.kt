@@ -7,7 +7,6 @@ import com.material.xray.model.ConnectionProgress
 import com.material.xray.model.ConnectionState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.SerializationException
 
 sealed interface PhysicalRouteUpdateResult {
     data class Applied(val route: TunManager.PhysicalRoute) : PhysicalRouteUpdateResult
@@ -353,9 +352,6 @@ internal class ActiveRoutingUpdater(
         logRoutingPlanFailure(failurePrefix, error)
         null
     } catch (error: IllegalStateException) {
-        logRoutingPlanFailure(failurePrefix, error)
-        null
-    } catch (error: SerializationException) {
         logRoutingPlanFailure(failurePrefix, error)
         null
     }

@@ -100,17 +100,13 @@ class EphemeralXrayCore(
             configFile.writeText(buildConfigOrThrow(buildConfig, inbound))
             val spawned = startProcess(binaryPath, binDir, configFile, logFile)
             process = spawned
-            if (!waitForSocket(inbound.path, spawned, startTimeoutMs)) {
-                spawned.awaitOutput()
-                val tail = runCatching { logFile.readText().takeLast(LOG_TAIL_CHARS).trim() }.getOrDefault("")
-                throw EphemeralXrayCoreException(
-                    if (tail.isBlank()) "Xray core did not start" else "Xray core did not start: $tail",
-                )
-            }
+            awaitSocketOrThrow(inbound, spawned, logFile, startTimeoutMs)
             started = true
             return RunningCore(spawned, inbound, logFile, listOf(configFile, logFile, File(inbound.path)))
+        } catch (e: EphemeralXrayCoreException) {
+            throw e
         } catch (e: IOException) {
-            throw if (e is EphemeralXrayCoreException) e else EphemeralXrayCoreException("Failed to start Xray core", e)
+            throw EphemeralXrayCoreException("Failed to start Xray core", e)
         } finally {
             if (!started) {
                 withContext(NonCancellable) {
@@ -121,6 +117,20 @@ class EphemeralXrayCore(
                 }
             }
         }
+    }
+
+    private suspend fun awaitSocketOrThrow(
+        inbound: XrayInbound.PrivateHttp,
+        process: RedirectedProcess,
+        logFile: File,
+        startTimeoutMs: Long,
+    ) {
+        if (waitForSocket(inbound.path, process, startTimeoutMs)) return
+        process.awaitOutput()
+        val tail = runCatching { logFile.readText().takeLast(LOG_TAIL_CHARS).trim() }.getOrDefault("")
+        throw EphemeralXrayCoreException(
+            if (tail.isBlank()) "Xray core did not start" else "Xray core did not start: $tail",
+        )
     }
 
     private fun resolveBinaryPath(): String = xrayBinary.binaryPath

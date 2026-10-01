@@ -28,7 +28,7 @@ class BootReceiver :
         CoroutineScope(Dispatchers.IO).launch {
             // A detached coroutine has no other handler; an escaped exception here would crash
             // the whole app process in the middle of automatic connection handling.
-            runCatching { autoConnectIfConfigured(context, intent?.action) }
+            runCatching { autoConnectIfConfigured(context, intent.action) }
                 .onFailure { error -> Log.e(TAG, "Automatic connection failed", error) }
             pendingResult.finish()
         }

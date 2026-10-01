@@ -9,6 +9,7 @@ import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
+import androidx.work.await
 import com.material.xray.model.GeoDataUpdateInterval
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
@@ -31,7 +32,7 @@ class GeoDataUpdateScheduler(
             INITIAL_WORK_NAME,
             ExistingWorkPolicy.KEEP,
             request,
-        ).result.get()
+        ).await()
         preferences.edit().putBoolean(INITIAL_REFRESH_SCHEDULED_KEY, true).apply()
     }
 

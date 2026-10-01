@@ -28,7 +28,6 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 
@@ -316,8 +315,6 @@ internal class ConnectionManager(
         } catch (error: IllegalArgumentException) {
             fail(error.message ?: environment.localizedString(R.string.error_unknown))
         } catch (error: IllegalStateException) {
-            fail(error.message ?: environment.localizedString(R.string.error_unknown))
-        } catch (error: SerializationException) {
             fail(error.message ?: environment.localizedString(R.string.error_unknown))
         }
     }
@@ -621,8 +618,8 @@ internal class ConnectionManager(
         log.append(
             LogSource.APP,
             "Physical bypass route: dev=${route.dev}" +
-                (route.gateway?.let { " via=$it" } ?: "") +
-                (route.table?.let { " table=$it" } ?: ""),
+                route.gateway?.let { " via=$it" }.orEmpty() +
+                route.table?.let { " table=$it" }.orEmpty(),
         )
         return PhysicalRouteResult(success = true, route = route)
     }
@@ -1282,9 +1279,6 @@ internal class ConnectionManager(
         } catch (error: IllegalStateException) {
             log.append(LogSource.APP, "Live routing update skipped: ${error.message}")
             return false
-        } catch (error: SerializationException) {
-            log.append(LogSource.APP, "Live routing update skipped: ${error.message}")
-            return false
         }
         val nextConfig = nextConfigJson.toJsonObjectOrNull() ?: return false
         if (currentConfig.withoutRouting() != nextConfig.withoutRouting()) {
@@ -1586,9 +1580,6 @@ internal class ConnectionManager(
             log.append(LogSource.APP, "Could not prepare TPROXY reconnect guard: ${error.message}")
             return false
         } catch (error: IllegalStateException) {
-            log.append(LogSource.APP, "Could not prepare TPROXY reconnect guard: ${error.message}")
-            return false
-        } catch (error: SerializationException) {
             log.append(LogSource.APP, "Could not prepare TPROXY reconnect guard: ${error.message}")
             return false
         }

@@ -113,7 +113,7 @@ class SettingsRuntimeManager(
                     log.append(
                         LogSource.APP,
                         "TPROXY compatibility: unsupported reason=${result.reason}" +
-                            (details?.let { ", details=$it" } ?: ""),
+                            details?.let { ", details=$it" }.orEmpty(),
                     )
                     demoteTproxyBackend(result)
                 }

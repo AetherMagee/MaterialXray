@@ -14,7 +14,7 @@ object VlessParser {
         val userInfo = parsed.rawUserInfo ?: return null
         val host = parsed.host ?: return null
         val port = parsed.port.takeIfValidPort() ?: return null
-        val fragment = parsed.rawFragment?.let(::decodeUriComponentLeniently) ?: ""
+        val fragment = parsed.rawFragment?.let(::decodeUriComponentLeniently).orEmpty()
         val params = parseQuery(parsed.rawQuery ?: "")
 
         ServerConfig(
@@ -25,18 +25,18 @@ object VlessParser {
             password = decodeUriComponentLeniently(userInfo),
             transport = ServerConfig.Transport(
                 type = params["type"] ?: "tcp",
-                path = params["path"] ?: "",
-                host = params["host"] ?: "",
-                serviceName = params["serviceName"] ?: "",
-                mode = params["mode"] ?: "",
+                path = params["path"].orEmpty(),
+                host = params["host"].orEmpty(),
+                serviceName = params["serviceName"].orEmpty(),
+                mode = params["mode"].orEmpty(),
             ),
             security = ServerConfig.Security(
                 type = params["security"] ?: "none",
-                sni = params["sni"] ?: "",
-                fingerprint = params["fp"] ?: "",
-                alpn = params["alpn"]?.split(",") ?: emptyList(),
-                publicKey = params["pbk"] ?: "",
-                shortId = params["sid"] ?: "",
+                sni = params["sni"].orEmpty(),
+                fingerprint = params["fp"].orEmpty(),
+                alpn = params["alpn"]?.split(",").orEmpty(),
+                publicKey = params["pbk"].orEmpty(),
+                shortId = params["sid"].orEmpty(),
             ),
             extra = buildMap {
                 params["encryption"]?.let { put("encryption", it) }

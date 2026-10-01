@@ -61,8 +61,8 @@ object Hysteria2Parser {
             transport = ServerConfig.Transport(type = "hysteria"),
             security = ServerConfig.Security(
                 type = "tls",
-                sni = params["sni"] ?: params["peer"] ?: "",
-                fingerprint = params["fp"] ?: "",
+                sni = params["sni"] ?: params["peer"].orEmpty(),
+                fingerprint = params["fp"].orEmpty(),
                 alpn = params["alpn"]?.split(',')?.filter { it.isNotBlank() } ?: listOf("h3"),
             ),
             extra = buildMap {

@@ -14,7 +14,7 @@ object VmessParser {
         val decoded = decodeLenientBase64ToUtf8(encoded) ?: return null
         val json = Json.parseToJsonElement(decoded).jsonObject
 
-        fun str(key: String) = json[key]?.jsonPrimitive?.contentOrNull ?: ""
+        fun str(key: String) = json[key]?.jsonPrimitive?.contentOrNull.orEmpty()
 
         val port = str("port").toValidPortOrNull() ?: return null
         val address = str("add").ifEmpty { return null }

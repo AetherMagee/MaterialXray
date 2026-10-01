@@ -66,7 +66,7 @@ class BackupManager(
         BackupImportPlanner.create(snapshot).toSummary()
     }
 
-    suspend fun prepareImport(uri: Uri): PreparedBackupImport {
+    fun prepareImport(uri: Uri): PreparedBackupImport {
         val backup = decodeBackup(readBackup(uri))
         return PreparedBackupImport(createImportPlan(backup))
     }
@@ -226,10 +226,10 @@ class BackupManager(
     private suspend fun disconnectActiveConnection() {
         if (!connectionStateCoordinator.state.value.isRunning()) return
         XrayService.disconnect(context, force = true)
-        check(
+        checkNotNull(
             withTimeoutOrNull(DISCONNECT_TIMEOUT_MILLIS) {
                 connectionStateCoordinator.state.first { !it.isRunning() }
-            } != null,
+            },
         ) { "Timed out waiting for the active connection to stop" }
     }
 

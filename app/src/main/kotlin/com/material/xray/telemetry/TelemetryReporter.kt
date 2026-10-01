@@ -319,8 +319,8 @@ class TelemetryReporter internal constructor(
         activeConnectionContext = connection
         if (clearPriorFailure) activeConnectionFailure = null
         connection.scopeTags.forEach(client::setTag)
-        activeConnectionTrace?.apply {
-            connection.metricAttributes.forEach { (key, value) -> setTag(key, value.toString()) }
+        activeConnectionTrace?.let { trace ->
+            connection.metricAttributes.forEach { (key, value) -> trace.setTag(key, value.toString()) }
         }
         recordActiveConnectionAttempt()
     }

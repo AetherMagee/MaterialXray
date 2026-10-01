@@ -24,10 +24,10 @@ class DatabaseResetManager(
     suspend fun reset() {
         if (stateCoordinator.state.value.requiresRuntimeDisconnect()) {
             XrayService.disconnect(context, force = true)
-            check(
+            checkNotNull(
                 withTimeoutOrNull(DISCONNECT_TIMEOUT_MILLIS) {
                     stateCoordinator.state.first { !it.requiresRuntimeDisconnect() }
-                } != null,
+                },
             ) { "Timed out waiting for the active connection to stop" }
         }
 

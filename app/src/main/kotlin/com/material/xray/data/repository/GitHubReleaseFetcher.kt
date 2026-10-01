@@ -93,7 +93,7 @@ class GitHubReleaseFetcher(
 
     private fun parseRepository(repository: JsonObject): GitHubRepository {
         val id = repository["id"]?.jsonPrimitive?.contentOrNull?.toLongOrNull()
-        if (id != GITHUB_REPOSITORY_ID) throw IllegalArgumentException("Unexpected GitHub repository ID")
+        require(id == GITHUB_REPOSITORY_ID) { "Unexpected GitHub repository ID" }
         val fullName = repository["full_name"]
             ?.jsonPrimitive
             ?.contentOrNull
