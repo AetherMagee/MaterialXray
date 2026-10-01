@@ -15,6 +15,8 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -72,6 +74,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -83,6 +86,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
@@ -108,6 +112,7 @@ fun ConfigViewerScreen(
     val saveModePrompt by viewModel.saveModePrompt.collectAsStateWithLifecycle()
     val title = request.title()
     val context = LocalContext.current
+    val layoutDirection = LocalLayoutDirection.current
     val resources = LocalResources.current
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
     val copiedMessage = stringResource(R.string.config_viewer_copied)
@@ -145,8 +150,8 @@ fun ConfigViewerScreen(
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-        // The viewer is drawn over the whole app, past the bottom navigation bar, so nothing else
-        // is left to keep the content clear of the system navigation bar.
+        // Keep the bottom inset; previews include it in their scrollable padding so content can
+        // pass behind the transparent system navigation bar without hiding the last line.
         contentWindowInsets = WindowInsets.navigationBars,
         topBar = {
             ScrolledTopAppBar(
@@ -205,7 +210,14 @@ fun ConfigViewerScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding),
+                .padding(
+                    PaddingValues(
+                        start = padding.calculateStartPadding(layoutDirection),
+                        top = padding.calculateTopPadding(),
+                        end = padding.calculateEndPadding(layoutDirection),
+                        bottom = if (editing) padding.calculateBottomPadding() else 0.dp,
+                    ),
+                ),
         ) {
             when (val state = uiState) {
                 // Reading a local row or file is quick enough that a spinner would only ever be a
@@ -218,13 +230,13 @@ fun ConfigViewerScreen(
                         .padding(32.dp),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                is ConfigViewerUiState.JsonDocument -> JsonDocumentContent(state)
+                is ConfigViewerUiState.JsonDocument -> JsonDocumentContent(state, padding.calculateBottomPadding())
                 is ConfigViewerUiState.JsonEditor -> JsonEditorContent(
                     state = state,
                     text = jsonDraft,
                     onTextChange = { jsonDraft = it },
                 )
-                is ConfigViewerUiState.Params -> ParamsList(state)
+                is ConfigViewerUiState.Params -> ParamsList(state, padding.calculateBottomPadding())
                 is ConfigViewerUiState.ParamsEditor -> ParamsEditorList(
                     state = state,
                     sections = paramsDraft,
@@ -259,7 +271,7 @@ private fun ConfigViewerUiState.isEditing(): Boolean = this is ConfigViewerUiSta
 private fun ConfigViewerUiState.isEditable(): Boolean = this is ConfigViewerUiState.JsonDocument || this is ConfigViewerUiState.Params
 
 @Composable
-private fun JsonDocumentContent(state: ConfigViewerUiState.JsonDocument) {
+private fun JsonDocumentContent(state: ConfigViewerUiState.JsonDocument, bottomInset: Dp) {
     val colors = rememberJsonSyntaxColors()
     val codeBackground = MaterialTheme.colorScheme.surfaceContainerLow
 
@@ -270,7 +282,7 @@ private fun JsonDocumentContent(state: ConfigViewerUiState.JsonDocument) {
     SelectionContainer {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(start = 16.dp, top = 14.dp, end = 16.dp, bottom = 24.dp),
+            contentPadding = PaddingValues(start = 16.dp, top = 14.dp, end = 16.dp, bottom = 24.dp + bottomInset),
         ) {
             if (state.showDisclaimer) {
                 item(contentType = "banner") {
@@ -409,10 +421,10 @@ private fun NoticeBanner(
 }
 
 @Composable
-private fun ParamsList(state: ConfigViewerUiState.Params) {
+private fun ParamsList(state: ConfigViewerUiState.Params, bottomInset: Dp) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 16.dp, top = 14.dp, end = 16.dp, bottom = 24.dp),
+        contentPadding = PaddingValues(start = 16.dp, top = 14.dp, end = 16.dp, bottom = 24.dp + bottomInset),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         items(state.sections, contentType = { "section" }) { section ->
