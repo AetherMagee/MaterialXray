@@ -22,7 +22,7 @@
     <string name="root_connection_backend_tproxy_label">Transparent proxy</string>
     <string name="root_connection_backend_tproxy_description">Intercepts traffic without interfaces via routing rules. Experimental and may not work on old devices.</string>
     <string name="xray_outbound_proxy_label">proxy</string>
-    <string name="xray_outbound_proxy_description">Send traffic through the selected proxy server</string>
+    <string name="xray_outbound_proxy_description">Send traffic through the selected proxy server.</string>
     <string name="xray_outbound_direct_label">direct</string>
     <string name="xray_outbound_direct_description">Bypass the proxy and connect directly.</string>
     <string name="xray_outbound_block_label">block</string>
