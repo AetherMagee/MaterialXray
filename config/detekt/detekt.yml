@@ -20,6 +20,7 @@ complexity:
     active: false
   LongParameterList:
     allowedFunctionParameters: 12
+    allowedConstructorParameters: 12
     ignoreDefaultParameters: true
   TooManyFunctions:
     allowedFunctionsPerClass: 35
