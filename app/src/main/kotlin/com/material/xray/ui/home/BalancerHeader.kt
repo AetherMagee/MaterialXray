@@ -9,8 +9,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.ExpandLess
-import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.Hub
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -32,6 +30,7 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.material.xray.R
+import com.material.xray.ui.components.ExpansionArrow
 
 @Composable
 internal fun BalancerHeader(state: ActiveBalancerState) {
@@ -83,8 +82,8 @@ internal fun BalancerHeader(state: ActiveBalancerState) {
                 overflow = TextOverflow.Ellipsis,
             )
             if (hasMultipleServers) {
-                Icon(
-                    imageVector = if (showDetails) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,
+                ExpansionArrow(
+                    expanded = showDetails,
                     contentDescription = null,
                     modifier = Modifier.size(20.dp),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,

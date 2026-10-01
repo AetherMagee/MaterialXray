@@ -66,8 +66,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.DragIndicator
-import androidx.compose.material.icons.filled.ExpandLess
-import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
@@ -187,6 +185,7 @@ import com.material.xray.service.ConnectionEvent
 import com.material.xray.ui.adaptive.SinglePaneMaxWidth
 import com.material.xray.ui.adaptive.TwoPaneMinWidth
 import com.material.xray.ui.components.DropdownOption
+import com.material.xray.ui.components.ExpansionArrow
 import com.material.xray.ui.components.ReadOnlyDropdownField
 import com.material.xray.ui.components.ScrolledTopAppBar
 import com.material.xray.ui.components.SelectableOptionRow
@@ -2217,8 +2216,8 @@ private fun SubscriptionHeader(
                         .indication(arrowInteractionSource, LocalIndication.current),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(
-                        imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    ExpansionArrow(
+                        expanded = expanded,
                         contentDescription = expansionActionDescription,
                         modifier = Modifier.size(24.dp),
                     )
@@ -3198,8 +3197,8 @@ private fun SubscriptionAdvancedOptions(
             modifier = Modifier.weight(1f),
             textAlign = TextAlign.Start,
         )
-        Icon(
-            imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+        ExpansionArrow(
+            expanded = expanded,
             contentDescription = stringResource(
                 if (expanded) R.string.home_collapse_advanced else R.string.home_expand_advanced,
             ),

@@ -49,7 +49,6 @@ import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -94,6 +93,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import com.material.xray.R
 import com.material.xray.model.Protocol
+import com.material.xray.ui.components.ExpansionArrow
 import com.material.xray.ui.components.ScrolledTopAppBar
 import com.material.xray.ui.components.TooltipIconButton
 import org.koin.compose.viewmodel.koinViewModel
@@ -548,7 +548,7 @@ private fun ProtocolDropdown(field: EditField, onValueChange: (String) -> Unit) 
             onValueChange = {},
             readOnly = true,
             label = { Text(field.label.resolve()) },
-            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+            trailingIcon = { ExpansionArrow(expanded = expanded, contentDescription = null) },
             modifier = Modifier
                 .fillMaxWidth()
                 .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
