@@ -757,7 +757,6 @@ class HomeViewModel(
         return sortedOrder
     }
 
-    @Suppress("TooGenericExceptionCaught")
     private suspend fun runLatencyProbe(
         runId: Long,
         server: ServerEntity,

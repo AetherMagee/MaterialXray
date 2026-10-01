@@ -13,7 +13,6 @@ class DatabaseOpenChecker(private val database: AppDatabase) {
     private val mutex = Mutex()
     private var result: Boolean? = null
 
-    @Suppress("TooGenericExceptionCaught") // Room reports schema and SQLite failures with different exception types.
     suspend fun canRead(): Boolean = mutex.withLock {
         result?.takeIf { it } ?: withContext(Dispatchers.IO) {
             try {
@@ -24,6 +23,7 @@ class DatabaseOpenChecker(private val database: AppDatabase) {
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Exception) {
+                // Room reports schema and SQLite failures with different exception types.
                 Log.e(LOG_TAG, "Unable to open app database", error)
                 false
             }

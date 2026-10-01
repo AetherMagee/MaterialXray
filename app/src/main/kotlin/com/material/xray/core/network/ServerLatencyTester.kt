@@ -97,7 +97,6 @@ internal fun mergeDnsServerSettings(
     .distinct()
     .joinToString(",")
 
-@Suppress("TooGenericExceptionCaught")
 private suspend fun executeTimedHttpProbe(
     client: OkHttpClient,
     request: Request,
@@ -278,7 +277,6 @@ class ServerLatencyTester(
         return bestAttempt(TCPING_ATTEMPTS) { socketConnectTime(host, port) }
     }
 
-    @Suppress("TooGenericExceptionCaught")
     private suspend fun socketConnectTime(host: String, port: Int): ProbeAttempt = suspendCancellableCoroutine { continuation ->
         val socket = Socket()
         continuation.invokeOnCancellation {

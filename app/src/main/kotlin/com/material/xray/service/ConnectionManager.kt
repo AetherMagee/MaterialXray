@@ -1669,7 +1669,6 @@ internal class ConnectionManager(
         stateCoordinator.markError(finalMessage, retryable)
     }
 
-    @Suppress("TooGenericExceptionCaught")
     private suspend fun cleanCancelledConnectionAttempt() {
         val cleanupErrors = mutableListOf<Exception>()
         try {

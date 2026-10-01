@@ -27,6 +27,10 @@ complexity:
     ignoreOverridden: true
     ignoreAnnotatedFunctions: ['Preview']
 
+exceptions:
+  TooGenericExceptionCaught:
+    active: false
+
 style:
   MaxLineLength:
     active: false

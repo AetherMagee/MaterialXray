@@ -38,7 +38,6 @@ internal class ConnectionStepExecutor(
     private val onTelemetryStepFailed: (ConnectionTelemetryStep) -> Unit = {},
     private val waitBeforeRetry: suspend (Long) -> Unit = { delay(it) },
 ) {
-    @Suppress("TooGenericExceptionCaught")
     suspend fun <T> execute(step: ConnectionStep<T>): T {
         val progressToken = step.progress?.takeIf { step.reported }?.let(onProgressStarted)
         var retries = 0
@@ -66,7 +65,6 @@ internal class ConnectionStepExecutor(
         }
     }
 
-    @Suppress("TooGenericExceptionCaught")
     private suspend fun <T> executeAttempt(
         step: ConnectionStep<T>,
         attempt: Int,
@@ -115,7 +113,6 @@ internal class ConnectionStepExecutor(
         }
     }
 
-    @Suppress("TooGenericExceptionCaught")
     private suspend fun <T> revertAfterCancellation(step: ConnectionStep<T>, cancellation: CancellationException) {
         val revertAction = step.revertAction ?: return
         try {

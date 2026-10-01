@@ -26,7 +26,6 @@ internal enum class NetworkRetargetRetryOutcome {
     Stopped,
 }
 
-@Suppress("TooGenericExceptionCaught")
 internal class NetworkRetargetWorker(
     scope: CoroutineScope,
     private val settleDelayMs: Long,

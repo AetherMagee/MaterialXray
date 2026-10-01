@@ -80,7 +80,6 @@ internal class XrayHealthWatchdog(
         apiJob = null
     }
 
-    @Suppress("TooGenericExceptionCaught")
     private fun startProcessHealth(session: HealthWatchdogSession) {
         val healthMonitor = healthMonitor()
         processJob = scope.launch(dispatcher) {
@@ -113,7 +112,6 @@ internal class XrayHealthWatchdog(
         }
     }
 
-    @Suppress("TooGenericExceptionCaught")
     private fun startApiHealth(session: HealthWatchdogSession) {
         val healthMonitor = healthMonitor()
         apiJob = scope.launch(dispatcher) {

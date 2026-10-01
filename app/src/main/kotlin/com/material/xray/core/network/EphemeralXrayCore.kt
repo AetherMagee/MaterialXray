@@ -126,7 +126,6 @@ class EphemeralXrayCore(
     private fun resolveBinaryPath(): String = xrayBinary.binaryPath
         ?: throw EphemeralXrayCoreException("Xray binary is not available")
 
-    @Suppress("TooGenericExceptionCaught")
     private fun buildConfigOrThrow(
         buildConfig: (XrayInbound.PrivateHttp) -> String,
         inbound: XrayInbound.PrivateHttp,

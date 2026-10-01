@@ -32,7 +32,6 @@ internal class XrayCliRoutingUpdater(
         replaceOnIoThread(endpoint, routing)
     }
 
-    @Suppress("TooGenericExceptionCaught")
     private fun replaceOnIoThread(endpoint: XrayApiEndpoint, routing: JsonObject): XrayRoutingUpdateResult {
         val server = endpoint.cliServerAddress()
             ?: return XrayRoutingUpdateResult.Failed("the active API endpoint is not CLI-compatible")

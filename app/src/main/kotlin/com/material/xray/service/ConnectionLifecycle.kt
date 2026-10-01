@@ -124,7 +124,6 @@ internal class ConnectionLifecycle(
         if (outstandingCommands.decrementAndGet() == 0) onIdle()
     }
 
-    @Suppress("TooGenericExceptionCaught")
     private suspend fun runCommand(block: suspend () -> Unit) {
         try {
             block()
