@@ -44,6 +44,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.Saver
@@ -56,15 +57,18 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavDestination.Companion.hierarchy
+import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -104,6 +108,15 @@ fun MainNavigation(
     val showTitleBarLogo = loadedSettings.showTitleBarLogo
     val floatingConnectButton = loadedSettings.floatingConnectButton
     val showAdvancedOptions = loadedSettings.showAdvancedOptions
+    val tabRoutes = remember(showAdvancedOptions) { navigationScreens(showAdvancedOptions).map { it.route } }
+    val layoutDirection = if (LocalLayoutDirection.current == LayoutDirection.Rtl) -1 else 1
+    var interruptedDirection by remember { mutableIntStateOf(0) }
+    val selectTab: (String) -> Unit = { route ->
+        if (navController.currentDestination?.route != route) {
+            interruptedDirection = tabTransitionDirection(tabRoutes, navController.currentDestination?.route, route)
+            navController.selectTab(route)
+        }
+    }
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
     val currentRoute = currentDestination?.route
@@ -133,21 +146,13 @@ fun MainNavigation(
 
     LaunchedEffect(showAdvancedOptions, currentRoute) {
         if (!showAdvancedOptions && currentRoute == Screen.Logs.route) {
-            navController.navigate(Screen.Home.route) {
-                popUpTo(navController.graph.startDestinationId) { saveState = true }
-                launchSingleTop = true
-                restoreState = true
-            }
+            selectTab(Screen.Home.route)
         }
     }
 
     LaunchedEffect(pendingSubscriptionLink) {
         if (pendingSubscriptionLink != null && currentRoute != Screen.Home.route) {
-            navController.navigate(Screen.Home.route) {
-                popUpTo(navController.graph.startDestinationId) { saveState = true }
-                launchSingleTop = true
-                restoreState = true
-            }
+            selectTab(Screen.Home.route)
         }
     }
 
@@ -166,11 +171,7 @@ fun MainNavigation(
     val useRail = useNavigationRail()
     val topBarTint = remember { TopBarTint() }
     val navigateTo: (Screen) -> Unit = { screen ->
-        navController.navigate(screen.route) {
-            popUpTo(navController.graph.startDestinationId) { saveState = true }
-            launchSingleTop = true
-            restoreState = true
-        }
+        selectTab(screen.route)
     }
     val isSelected: (Screen) -> Boolean = { screen ->
         currentDestination?.hierarchy?.any { it.route == screen.route } == true
@@ -214,6 +215,27 @@ fun MainNavigation(
                     NavHost(
                         navController = navController,
                         startDestination = Screen.Home.route,
+                        // Pop transitions reuse these handlers, so back follows the visible tab order too.
+                        enterTransition = {
+                            tabEnterTransition(
+                                tabTransitionDirection(tabRoutes, initialState.destination.route, targetState.destination.route, interruptedDirection) * layoutDirection,
+                            )
+                        },
+                        exitTransition = {
+                            tabExitTransition(
+                                tabTransitionDirection(tabRoutes, initialState.destination.route, targetState.destination.route, interruptedDirection) * layoutDirection,
+                            )
+                        },
+                        predictivePopEnterTransition = { _ ->
+                            tabEnterTransition(
+                                tabTransitionDirection(tabRoutes, initialState.destination.route, targetState.destination.route, interruptedDirection) * layoutDirection,
+                            )
+                        },
+                        predictivePopExitTransition = { _ ->
+                            tabExitTransition(
+                                tabTransitionDirection(tabRoutes, initialState.destination.route, targetState.destination.route, interruptedDirection) * layoutDirection,
+                            )
+                        },
                         // Consumed so the screens' own top bars do not add the rail layout's end inset again.
                         modifier = Modifier
                             .padding(innerPadding)
@@ -334,6 +356,20 @@ private val RoutingRuleEditorRequestSaver: Saver<EditableRoutingRule?, String> =
     save = { request -> request?.let { Json.encodeToString(it) } },
     restore = { saved -> runCatching { Json.decodeFromString<EditableRoutingRule>(saved) }.getOrNull() },
 )
+
+private fun NavHostController.selectTab(route: String) {
+    if (currentDestination?.route == route) return
+    if (graph.findNode(graph.startDestinationId)?.route == route) {
+        // Keep the start entry's identity when reversing an unfinished transition. Navigating
+        // with launchSingleTop would replace it and NavHost would lose its animated content.
+        popBackStack(graph.startDestinationId, inclusive = false, saveState = true)
+    } else {
+        navigate(route) {
+            popUpTo(graph.startDestinationId) { saveState = true }
+            restoreState = true
+        }
+    }
+}
 
 private const val RUNNING_CONFIG_TAG = "running"
 private const val SERVER_CONFIG_TAG = "server"
