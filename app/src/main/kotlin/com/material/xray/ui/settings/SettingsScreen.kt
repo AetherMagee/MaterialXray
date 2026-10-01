@@ -59,7 +59,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
@@ -138,12 +137,12 @@ import com.material.xray.model.ipv6DnsServers
 import com.material.xray.model.isInProgress
 import com.material.xray.service.OemAutostartGuidance
 import com.material.xray.ui.components.DropdownOption
+import com.material.xray.ui.components.FadingOutlinedTextField as OutlinedTextField
 import com.material.xray.ui.components.ReadOnlyDropdownField
 import com.material.xray.ui.components.ScrolledTopAppBar
 import com.material.xray.ui.components.SettingsSwitchRow
 import com.material.xray.ui.components.TooltipIconButton
 import com.material.xray.ui.components.rememberSystemState
-import com.material.xray.ui.components.rememberTrailingIconFade
 import com.material.xray.ui.text.descriptionResource
 import com.material.xray.ui.text.labelResource
 import java.util.Date
@@ -747,13 +746,12 @@ private fun SettingsScreenContent(
                     modifier = Modifier.padding(horizontal = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
-                    val trailingFade = rememberTrailingIconFade()
                     OutlinedTextField(
                         value = editingGeoipUrl,
                         onValueChange = { editingGeoipUrl = it },
                         label = { Text(stringResource(R.string.settings_geoip_url_label)) },
                         singleLine = true,
-                        modifier = Modifier.fillMaxWidth().then(trailingFade.fieldModifier),
+                        modifier = Modifier.fillMaxWidth(),
                         supportingText = {
                             if (geoipUpdating) {
                                 GeoDataDownloadStatus(geoDataDownloadProgress[GeoDataAsset.GEOIP])
@@ -767,7 +765,7 @@ private fun SettingsScreenContent(
                             }
                         },
                         trailingIcon = {
-                            Box(modifier = trailingFade.iconModifier) {
+                            Box {
                                 TooltipIconButton(
                                     tooltip = stringResource(R.string.settings_update_geoip),
                                     onClick = { viewModel.updateGeoipAsset(editingGeoipUrl) },
@@ -802,13 +800,12 @@ private fun SettingsScreenContent(
                     modifier = Modifier.padding(horizontal = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
-                    val trailingFade = rememberTrailingIconFade()
                     OutlinedTextField(
                         value = editingGeositeUrl,
                         onValueChange = { editingGeositeUrl = it },
                         label = { Text(stringResource(R.string.settings_geosite_url_label)) },
                         singleLine = true,
-                        modifier = Modifier.fillMaxWidth().then(trailingFade.fieldModifier),
+                        modifier = Modifier.fillMaxWidth(),
                         supportingText = {
                             if (geositeUpdating) {
                                 GeoDataDownloadStatus(geoDataDownloadProgress[GeoDataAsset.GEOSITE])
@@ -822,7 +819,7 @@ private fun SettingsScreenContent(
                             }
                         },
                         trailingIcon = {
-                            Box(modifier = trailingFade.iconModifier) {
+                            Box {
                                 TooltipIconButton(
                                     tooltip = stringResource(R.string.settings_update_geosite),
                                     onClick = { viewModel.updateGeositeAsset(editingGeositeUrl) },

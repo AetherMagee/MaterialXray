@@ -32,7 +32,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -63,6 +62,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.material.xray.R
 import com.material.xray.model.RoutingPolicyControl
 import com.material.xray.ui.components.AnimatedDropdownMenu
+import com.material.xray.ui.components.FadingOutlinedTextField as OutlinedTextField
 import com.material.xray.ui.components.ScrollFadeEdges
 import com.material.xray.ui.components.SelectableOptionRow
 import com.material.xray.ui.components.TooltipIconButton

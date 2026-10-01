@@ -94,6 +94,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import com.material.xray.R
 import com.material.xray.model.Protocol
 import com.material.xray.ui.components.ExpansionArrow
+import com.material.xray.ui.components.FadingOutlinedTextField
 import com.material.xray.ui.components.ScrolledTopAppBar
 import com.material.xray.ui.components.TooltipIconButton
 import org.koin.compose.viewmodel.koinViewModel
@@ -330,7 +331,7 @@ private fun JsonEditorContent(
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         state.errorRes?.let { EditErrorText(it) }
-        OutlinedTextField(
+        FadingOutlinedTextField(
             value = text,
             onValueChange = onTextChange,
             modifier = Modifier.fillMaxSize(),
@@ -504,7 +505,7 @@ private fun EditFieldItem(field: EditField, onValueChange: (String) -> Unit) {
     var revealed by rememberSaveable(field.key) { mutableStateOf(false) }
     val masked = field.isSecret && !revealed
 
-    OutlinedTextField(
+    FadingOutlinedTextField(
         value = field.value,
         onValueChange = onValueChange,
         modifier = Modifier.fillMaxWidth(),

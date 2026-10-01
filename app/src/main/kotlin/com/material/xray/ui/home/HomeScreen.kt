@@ -92,7 +92,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -181,6 +180,7 @@ import com.material.xray.ui.adaptive.TwoPaneMinWidth
 import com.material.xray.ui.components.AnimatedDropdownMenu
 import com.material.xray.ui.components.DropdownOption
 import com.material.xray.ui.components.ExpansionArrow
+import com.material.xray.ui.components.FadingOutlinedTextField as OutlinedTextField
 import com.material.xray.ui.components.ReadOnlyDropdownField
 import com.material.xray.ui.components.ScrolledTopAppBar
 import com.material.xray.ui.components.SelectableOptionRow

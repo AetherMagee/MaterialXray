@@ -22,7 +22,6 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -48,6 +47,7 @@ import com.material.xray.model.RoutingRule
 import com.material.xray.model.RoutingRuleOperator
 import com.material.xray.model.XrayOutbound
 import com.material.xray.ui.components.DropdownOption
+import com.material.xray.ui.components.FadingOutlinedTextField as OutlinedTextField
 import com.material.xray.ui.components.ReadOnlyDropdownField
 import com.material.xray.ui.components.TooltipIconButton
 import com.material.xray.ui.text.catchAllEffectResource
