@@ -121,10 +121,7 @@ internal class ConnectionManager(
         activeGeneratedConfig = null
         rootRoutingKnownCleanForConnect = false
         val connectStartedAt = environment.elapsedRealtime()
-        val fwmark = runtimeSettings.fwmark
         val routeTable = runtimeSettings.routeTable
-        val routeMark = routeTable
-        val bypassTable = routeTable + 1
         log.clear(LogSource.XRAY)
         log.append(LogSource.APP, "Connecting to ${server.name} (${server.address}:${server.port})")
         val strategy = strategyFor(useRootService = runtimeSettings.useRootService)
@@ -187,19 +184,18 @@ internal class ConnectionManager(
                     replaceXrayApiClients(xrayApiEndpoint)
                 },
             )
-            if (
-                !prepareTproxyInterception(
-                    tproxyPlan = tproxyPlan,
-                    tunName = tunName,
-                    serverName = server.name,
-                    runtimeSettings = runtimeSettings,
-                    appRoutingPlan = appRoutingPlan,
-                    physicalRoute = physicalRouteResult.route,
-                    xrayApiEndpoint = xrayApiEndpoint,
-                )
-            ) {
-                return
-            }
+            val setup = ConnectionSetup(
+                serverName = server.name,
+                tunName = tunName,
+                runtimeSettings = runtimeSettings,
+                managesSystemRouting = managesSystemRouting,
+                rootBackend = rootBackend,
+                appRoutingPlan = appRoutingPlan,
+                physicalRoute = physicalRouteResult.route,
+                xrayApiEndpoint = xrayApiEndpoint,
+                tproxyPlan = tproxyPlan,
+            )
+            if (!prepareTproxyInterception(setup)) return
 
             val generatedConfig = writeXrayConfig(
                 xrayServer,
@@ -253,60 +249,13 @@ internal class ConnectionManager(
                 physicalRoute = physicalRouteResult.route,
             )
             log.append(LogSource.APP, "xray running with PID $pid")
-            writeConnectionStateFile(
-                pid = pid,
-                tunName = tunName,
-                serverName = server.name,
-                fwmark = fwmark,
-                routeMark = routeMark,
-                routeTable = routeTable,
-                bypassTable = bypassTable,
-                appRoutingPlan = appRoutingPlan,
-                physicalRoute = physicalRouteResult.route,
-                ipRulesApplied = false,
-                xrayApiEndpoint = xrayApiEndpoint,
-                rootBackend = rootBackend,
-                tproxyPlan = tproxyPlan,
-            )
+            writeConnectionStateFile(setup, pid, ipRulesApplied = false)
 
-            if (
-                !finishRuntimeSetup(
-                    managesSystemRouting,
-                    tunName,
-                    fwmark,
-                    routeTable,
-                    bypassTable,
-                    physicalRouteResult.route,
-                    runtimeSettings.allowIpv6,
-                    runtimeSettings.tunnelTetheredClients,
-                    runtimeSettings.bypassLan,
-                    appRoutingPlan,
-                    pid,
-                    rootBackend,
-                    tproxyPlan,
-                )
-            ) {
-                return
-            }
+            if (!finishRuntimeSetup(setup, pid)) return
 
             activeGeneratedConfig = generatedConfig
 
-            finishSuccessfulConnection(
-                server = server,
-                pid = pid,
-                tunName = tunName,
-                fwmark = fwmark,
-                routeMark = routeMark,
-                routeTable = routeTable,
-                bypassTable = bypassTable,
-                appRoutingPlan = appRoutingPlan,
-                physicalRoute = physicalRouteResult.route,
-                ipRulesApplied = managesSystemRouting,
-                connectStartedAt = connectStartedAt,
-                xrayApiEndpoint = xrayApiEndpoint,
-                rootBackend = rootBackend,
-                tproxyPlan = tproxyPlan,
-            )
+            finishSuccessfulConnection(setup, pid, connectStartedAt)
         } catch (error: CancellationException) {
             withContext(NonCancellable) { cleanCancelledConnectionAttempt() }
             throw error
@@ -434,31 +383,9 @@ internal class ConnectionManager(
         )
     }
 
-    private suspend fun prepareTproxyInterception(
-        tproxyPlan: TproxyTrafficPlan?,
-        tunName: String,
-        serverName: String,
-        runtimeSettings: XrayRuntimeSettings,
-        appRoutingPlan: AppRoutingPlan,
-        physicalRoute: TunManager.PhysicalRoute?,
-        xrayApiEndpoint: XrayApiEndpoint,
-    ): Boolean {
-        if (tproxyPlan == null) return true
-        writeConnectionStateFile(
-            pid = -1,
-            tunName = tunName,
-            serverName = serverName,
-            fwmark = runtimeSettings.fwmark,
-            routeMark = runtimeSettings.routeTable,
-            routeTable = runtimeSettings.routeTable,
-            bypassTable = runtimeSettings.routeTable + 1,
-            appRoutingPlan = appRoutingPlan,
-            physicalRoute = physicalRoute,
-            ipRulesApplied = false,
-            xrayApiEndpoint = xrayApiEndpoint,
-            rootBackend = RootConnectionBackend.Tproxy,
-            tproxyPlan = tproxyPlan,
-        )
+    private suspend fun prepareTproxyInterception(setup: ConnectionSetup): Boolean {
+        val tproxyPlan = setup.tproxyPlan ?: return true
+        writeConnectionStateFile(setup, pid = -1, ipRulesApplied = false)
         val guardResult = executeStep(
             ConnectionStep(
                 "TPROXY startup guard",
@@ -841,21 +768,7 @@ internal class ConnectionManager(
         )
     }
 
-    private suspend fun writeConnectionStateFile(
-        pid: Int,
-        tunName: String,
-        serverName: String,
-        fwmark: Int,
-        routeMark: Int,
-        routeTable: Int,
-        bypassTable: Int,
-        appRoutingPlan: AppRoutingPlan,
-        physicalRoute: TunManager.PhysicalRoute?,
-        ipRulesApplied: Boolean,
-        xrayApiEndpoint: XrayApiEndpoint,
-        rootBackend: RootConnectionBackend,
-        tproxyPlan: TproxyTrafficPlan?,
-    ) {
+    private suspend fun writeConnectionStateFile(setup: ConnectionSetup, pid: Int, ipRulesApplied: Boolean) {
         val transitionGuard = if (transitionGuardInstalled && preserveGuardOnFailure) {
             stateStore.read()?.let { it.tproxy ?: it.transitionGuard }
         } else {
@@ -865,20 +778,20 @@ internal class ConnectionManager(
             XrayState(
                 appInstallTime = environment.appInstallTime,
                 xrayPid = pid,
-                xrayApiPort = (xrayApiEndpoint as? XrayApiEndpoint.LoopbackTcp)?.port,
-                tunName = tunName,
-                serverName = serverName,
+                xrayApiPort = (setup.xrayApiEndpoint as? XrayApiEndpoint.LoopbackTcp)?.port,
+                tunName = setup.tunName,
+                serverName = setup.serverName,
                 ipRulesApplied = ipRulesApplied,
-                fwmark = fwmark,
-                routeMark = routeMark,
-                routeTable = routeTable,
-                bypassTable = bypassTable,
-                appProxyServerIds = appRoutingPlan.proxyServerIds,
-                physicalInterface = physicalRoute?.dev ?: VPN_SERVICE_INTERFACE_LABEL,
-                physicalGateway = physicalRoute?.gateway,
-                physicalTable = physicalRoute?.table,
-                rootConnectionBackend = rootBackend,
-                tproxy = tproxyPlan?.runtimeState,
+                fwmark = setup.fwmark,
+                routeMark = setup.routeMark,
+                routeTable = setup.routeTable,
+                bypassTable = setup.bypassTable,
+                appProxyServerIds = setup.appRoutingPlan.proxyServerIds,
+                physicalInterface = setup.physicalRoute?.dev ?: VPN_SERVICE_INTERFACE_LABEL,
+                physicalGateway = setup.physicalRoute?.gateway,
+                physicalTable = setup.physicalRoute?.table,
+                rootConnectionBackend = setup.rootBackend,
+                tproxy = setup.tproxyPlan?.runtimeState,
                 transitionGuard = transitionGuard,
             ),
         )
@@ -918,22 +831,9 @@ internal class ConnectionManager(
         return true
     }
 
-    private suspend fun finishRuntimeSetup(
-        managesSystemRouting: Boolean,
-        tunName: String,
-        fwmark: Int,
-        routeTable: Int,
-        bypassTable: Int,
-        physicalRoute: TunManager.PhysicalRoute?,
-        allowIpv6: Boolean,
-        tunnelTetheredClients: Boolean,
-        bypassLan: Boolean,
-        appRoutingPlan: AppRoutingPlan,
-        pid: Int,
-        rootBackend: RootConnectionBackend,
-        tproxyPlan: TproxyTrafficPlan?,
-    ): Boolean {
-        if (rootBackend == RootConnectionBackend.Tproxy && tproxyPlan != null) {
+    private suspend fun finishRuntimeSetup(setup: ConnectionSetup, pid: Int): Boolean {
+        val tproxyPlan = setup.tproxyPlan
+        if (setup.rootBackend == RootConnectionBackend.Tproxy && tproxyPlan != null) {
             return coroutineScope {
                 val apiReadiness = async { measureXrayApiReadiness(pid) }
                 val routingResult = executeStep(
@@ -973,27 +873,28 @@ internal class ConnectionManager(
                 finishTransitionGuard()
             }
         }
-        if (!managesSystemRouting) return waitForXrayApiReady(pid) && finishTransitionGuard()
+        if (!setup.managesSystemRouting) return waitForXrayApiReady(pid) && finishTransitionGuard()
+        val settings = setup.runtimeSettings
         return coroutineScope {
             val apiReadiness = async { measureXrayApiReadiness(pid) }
             val routingReady = waitForRootTun(
                 managesSystemRouting = true,
-                tunName = tunName,
-                appRouteCount = appRoutingPlan.tunRoutes.size,
-                allowIpv6 = allowIpv6,
+                tunName = setup.tunName,
+                appRouteCount = setup.appRoutingPlan.tunRoutes.size,
+                allowIpv6 = settings.allowIpv6,
                 pid = pid,
             ) &&
                 applyRootRouting(
                     managesSystemRouting = true,
-                    tunName = tunName,
-                    fwmark = fwmark,
-                    routeTable = routeTable,
-                    bypassTable = bypassTable,
-                    physicalRoute = physicalRoute,
-                    allowIpv6 = allowIpv6,
-                    tunnelTetheredClients = tunnelTetheredClients,
-                    bypassLan = bypassLan,
-                    appRoutingPlan = appRoutingPlan,
+                    tunName = setup.tunName,
+                    fwmark = setup.fwmark,
+                    routeTable = setup.routeTable,
+                    bypassTable = setup.bypassTable,
+                    physicalRoute = setup.physicalRoute,
+                    allowIpv6 = settings.allowIpv6,
+                    tunnelTetheredClients = settings.tunnelTetheredClients,
+                    bypassLan = settings.bypassLan,
+                    appRoutingPlan = setup.appRoutingPlan,
                 )
             if (!routingReady) {
                 apiReadiness.cancel()
@@ -1154,53 +1055,43 @@ internal class ConnectionManager(
         return false
     }
 
-    private suspend fun finishSuccessfulConnection(
-        server: ServerConfig,
-        pid: Int,
-        tunName: String,
-        fwmark: Int,
-        routeMark: Int,
-        routeTable: Int,
-        bypassTable: Int,
-        appRoutingPlan: AppRoutingPlan,
-        physicalRoute: TunManager.PhysicalRoute?,
-        ipRulesApplied: Boolean,
-        connectStartedAt: Long,
-        xrayApiEndpoint: XrayApiEndpoint,
-        rootBackend: RootConnectionBackend,
-        tproxyPlan: TproxyTrafficPlan?,
-    ) {
-        writeConnectionStateFile(
-            pid = pid,
-            tunName = tunName,
-            serverName = server.name,
-            fwmark = fwmark,
-            routeMark = routeMark,
-            routeTable = routeTable,
-            bypassTable = bypassTable,
-            appRoutingPlan = appRoutingPlan,
-            physicalRoute = physicalRoute,
-            ipRulesApplied = ipRulesApplied,
-            xrayApiEndpoint = xrayApiEndpoint,
-            rootBackend = rootBackend,
-            tproxyPlan = tproxyPlan,
-        )
+    private suspend fun finishSuccessfulConnection(setup: ConnectionSetup, pid: Int, connectStartedAt: Long) {
+        writeConnectionStateFile(setup, pid, ipRulesApplied = setup.managesSystemRouting)
 
-        log.append(LogSource.APP, "Connected to ${server.name}")
+        val physicalRoute = setup.physicalRoute
+        log.append(LogSource.APP, "Connected to ${setup.serverName}")
         log.append(
             LogSource.APP,
             "Connection setup finished in ${environment.elapsedRealtime() - connectStartedAt} ms",
         )
         stateCoordinator.markConnected(
             ConnectionState.Connected(
-                serverName = server.name,
+                serverName = setup.serverName,
                 corePid = pid,
-                tunName = tunName,
+                tunName = setup.tunName,
                 physicalInterface = physicalRoute?.dev ?: VPN_SERVICE_INTERFACE_LABEL,
                 physicalGateway = physicalRoute?.gateway,
                 physicalTable = physicalRoute?.table,
             ),
         )
+    }
+
+    /** What a connection attempt has settled on by the time it hands off to the core. */
+    private data class ConnectionSetup(
+        val serverName: String,
+        val tunName: String,
+        val runtimeSettings: XrayRuntimeSettings,
+        val managesSystemRouting: Boolean,
+        val rootBackend: RootConnectionBackend,
+        val appRoutingPlan: AppRoutingPlan,
+        val physicalRoute: TunManager.PhysicalRoute?,
+        val xrayApiEndpoint: XrayApiEndpoint,
+        val tproxyPlan: TproxyTrafficPlan?,
+    ) {
+        val fwmark: Int get() = runtimeSettings.fwmark
+        val routeTable: Int get() = runtimeSettings.routeTable
+        val routeMark: Int get() = routeTable
+        val bypassTable: Int get() = routeTable + 1
     }
 
     private data class PhysicalRouteResult(
