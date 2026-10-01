@@ -54,7 +54,7 @@
             android:enabled="true"
             android:exported="true"
             android:icon="@mipmap/ic_launcher"
-            android:label="@string/app_name"
+            android:label="@string/launcher_name"
             android:roundIcon="@mipmap/ic_launcher_round"
             android:targetActivity=".MainActivity">
             <intent-filter>
@@ -68,7 +68,7 @@
             android:enabled="false"
             android:exported="true"
             android:icon="@mipmap/ic_launcher_material"
-            android:label="@string/app_name"
+            android:label="@string/launcher_name"
             android:roundIcon="@mipmap/ic_launcher_material_round"
             android:targetActivity=".MainActivity">
             <intent-filter>
