@@ -33,7 +33,7 @@
 - `local.properties`, Gradle outputs, `.cxx`, and most local IDE state are gitignored; do not depend on local-only values except SDK path or local signing credentials.
 
 ## CI
-- `.github/workflows/ci.yml` only builds and uploads the debug APK on pushes and pull requests.
+- `.github/workflows/ci.yml` only builds and uploads the debug APK, on pull requests and on pushes to master.
 - `.github/workflows/release.yml` manually builds, signs, uploads, and publishes a release APK.
 
 ## QA

@@ -1,7 +1,9 @@
 name: CI
 
 on:
+  # A pull request already builds its branch, so pushes only build master.
   push:
+    branches: [master]
   pull_request:
 
 permissions:
