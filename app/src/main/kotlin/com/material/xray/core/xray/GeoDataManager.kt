@@ -105,6 +105,7 @@ class GeoDataManager(
     private val geoipUpdatedAtFile get() = File(binaryDir, "geoip-updated-at")
     private val geositeUpdatedAtFile get() = File(binaryDir, "geosite-updated-at")
     private val downloadMutex = Mutex()
+    private val refreshMutexes = GeoDataAsset.entries.associateWith { Mutex() }
     private val cacheGenerations = GeoDataAsset.entries.associateWith { 0L }.toMutableMap()
     private val _downloadProgress = MutableStateFlow<Map<GeoDataAsset, GeoDataDownloadProgress>>(emptyMap())
     private val _lastUpdated = MutableStateFlow<Map<GeoDataAsset, Long?>>(emptyMap())
@@ -157,23 +158,19 @@ class GeoDataManager(
     }
 
     suspend fun refresh(asset: GeoDataAsset) = withContext(ioDispatcher) {
-        downloadMutex.withLock {
-            val state = resolveState(seedBundled = false)
-            trackDownloads(setOf(asset)) {
-                httpClient.use { client ->
-                    when (asset) {
-                        GeoDataAsset.GEOIP -> {
-                            download(asset, client, state.geoipUrl, state.geoipFile)
-                            geoipSourceFile.writeText(state.geoipUrl)
-                            markUpdated(geoipUpdatedAtFile)
-                        }
-                        GeoDataAsset.GEOSITE -> {
-                            download(asset, client, state.geositeUrl, state.geositeFile)
-                            geositeSourceFile.writeText(state.geositeUrl)
-                            markUpdated(geositeUpdatedAtFile)
-                        }
-                    }
-                }
+        val (state, generation) = downloadMutex.withLock { resolveState(seedBundled = false) to cacheGenerations.getValue(asset) }
+        trackDownloads(setOf(asset)) {
+            httpClient.use { client ->
+                val isGeoip = asset == GeoDataAsset.GEOIP
+                refreshAsset(
+                    asset,
+                    client,
+                    if (isGeoip) state.geoipUrl else state.geositeUrl,
+                    if (isGeoip) state.geoipFile else state.geositeFile,
+                    if (isGeoip) geoipSourceFile else geositeSourceFile,
+                    if (isGeoip) geoipUpdatedAtFile else geositeUpdatedAtFile,
+                    generation,
+                )
             }
         }
     }
@@ -248,18 +245,18 @@ class GeoDataManager(
         sourceMarkerFile: File,
         updatedAtFile: File,
         generation: Long,
-    ) {
+    ) = refreshMutexes.getValue(asset).withLock {
         val stagedFile = File.createTempFile("${targetFile.name}-refresh-", ".dat", binaryDir)
         try {
             download(asset, client, url, stagedFile)
-            downloadMutex.withLock {
-                if (generation != cacheGenerations.getValue(asset)) return@withLock
+            downloadMutex.withLock install@{
+                if (generation != cacheGenerations.getValue(asset)) return@install
                 val current = resolveState(seedBundled = false)
                 val currentUrl = when (asset) {
                     GeoDataAsset.GEOIP -> current.geoipUrl
                     GeoDataAsset.GEOSITE -> current.geositeUrl
                 }
-                if (currentUrl != url) return@withLock
+                if (currentUrl != url) return@install
                 if (!stagedFile.renameTo(targetFile)) {
                     throw IOException("Unable to install refreshed ${targetFile.name}")
                 }

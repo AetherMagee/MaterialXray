@@ -41,6 +41,7 @@ class SettingsRuntimeManager(
     private val _xrayCoreVersion = MutableStateFlow<String?>(null)
     private val diagnosticsMutex = Mutex()
     private var diagnosticsLoaded = false
+    private val geoDataUpdateBatch = GeoDataUpdateBatch(::reloadActiveConnectionIfConnected)
 
     val rootAvailable: StateFlow<Boolean?> = _rootAvailable.asStateFlow()
     val xrayCoreVersion: StateFlow<String?> = _xrayCoreVersion.asStateFlow()
@@ -137,13 +138,12 @@ class SettingsRuntimeManager(
         log.append(LogSource.APP, "TPROXY is unsupported on this device; the root backend was switched to TUN")
     }
 
-    suspend fun updateGeoDataAsset(asset: GeoDataAsset, url: String) {
+    suspend fun updateGeoDataAsset(asset: GeoDataAsset, url: String) = geoDataUpdateBatch.run {
         when (asset) {
             GeoDataAsset.GEOIP -> settingsRepository.setGeoipUrl(url)
             GeoDataAsset.GEOSITE -> settingsRepository.setGeositeUrl(url)
         }
         geoDataManager.refresh(asset)
-        reloadActiveConnectionIfConnected()
     }
 
     suspend fun checkRootAvailability(): Boolean {

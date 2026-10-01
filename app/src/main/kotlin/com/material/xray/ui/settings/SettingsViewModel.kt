@@ -537,7 +537,7 @@ class SettingsViewModel(
         updating: MutableStateFlow<Boolean>,
         @StringRes successMessageResId: Int,
     ) {
-        if (isGeoDataOperationInProgress()) return
+        if (updating.value || _geoDataClearing.value) return
         updating.value = true
         viewModelScope.launch {
             try {

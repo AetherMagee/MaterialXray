@@ -764,7 +764,7 @@ private fun SettingsScreenContent(
                                 TooltipIconButton(
                                     tooltip = stringResource(R.string.settings_update_geoip),
                                     onClick = { viewModel.updateGeoipAsset(editingGeoipUrl) },
-                                    enabled = !geoDataOperationInProgress,
+                                    enabled = !geoipUpdating && !geoDataClearing,
                                 ) {
                                     if (geoipUpdating) {
                                         val description = stringResource(R.string.settings_geoip_updating)
@@ -819,7 +819,7 @@ private fun SettingsScreenContent(
                                 TooltipIconButton(
                                     tooltip = stringResource(R.string.settings_update_geosite),
                                     onClick = { viewModel.updateGeositeAsset(editingGeositeUrl) },
-                                    enabled = !geoDataOperationInProgress,
+                                    enabled = !geositeUpdating && !geoDataClearing,
                                 ) {
                                     if (geositeUpdating) {
                                         val description = stringResource(R.string.settings_geosite_updating)
