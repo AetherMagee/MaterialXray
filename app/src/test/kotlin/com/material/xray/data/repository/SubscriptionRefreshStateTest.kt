@@ -34,15 +34,14 @@ class SubscriptionRefreshStateTest {
         val state = SubscriptionRefreshState()
         val failure = IOException("Refresh failed")
 
-        try {
+        val error = runCatching {
             state.withRefreshLock(1) {
                 assertEquals(setOf(1L), state.refreshingIds.value)
                 throw failure
             }
-            fail("Expected refresh failure")
-        } catch (error: IOException) {
-            assertSame(failure, error)
-        }
+        }.exceptionOrNull()
+
+        assertSame(failure, error)
 
         assertEquals(emptySet<Long>(), state.refreshingIds.value)
     }

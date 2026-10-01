@@ -128,7 +128,7 @@ class XrayConfigRoutingTest {
         assertTrue("tag" !in dns)
         assertEquals("localhost", dns.getValue("servers").jsonArray.single().jsonPrimitive.content)
         val inboundTags = routing.getValue("rules").jsonArray.flatMap { rule ->
-            rule.jsonObject["inboundTag"]?.jsonArray?.map { it.jsonPrimitive.content } ?: emptyList()
+            rule.jsonObject["inboundTag"]?.jsonArray?.map { it.jsonPrimitive.content }.orEmpty()
         }
         assertTrue("default-dns" !in inboundTags)
         assertTrue("domestic-dns" !in inboundTags)
@@ -153,7 +153,7 @@ class XrayConfigRoutingTest {
 
         assertEquals("default-dns", dns.getValue("tag").jsonPrimitive.content)
         val inboundTags = routing.getValue("rules").jsonArray.flatMap { rule ->
-            rule.jsonObject["inboundTag"]?.jsonArray?.map { it.jsonPrimitive.content } ?: emptyList()
+            rule.jsonObject["inboundTag"]?.jsonArray?.map { it.jsonPrimitive.content }.orEmpty()
         }
         assertTrue("default-dns" in inboundTags)
         assertTrue("domestic-dns" in inboundTags)

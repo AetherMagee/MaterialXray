@@ -125,8 +125,8 @@ class ServerAddressResolverTest {
         // Each lookup suspends until every other lookup has started, so resolution only
         // completes when all hosts are resolved concurrently.
         val resolver = ServerAddressResolver(hostLookup = {
-            startedLookups.update { it + 1 }
-            startedLookups.first { it == addresses.size }
+            startedLookups.update { started -> started + 1 }
+            startedLookups.first { started -> started == addresses.size }
             listOf("192.0.2.1")
         })
 
