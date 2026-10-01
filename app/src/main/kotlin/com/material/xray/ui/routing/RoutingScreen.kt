@@ -203,36 +203,38 @@ fun RoutingScreen(
             providerName = automaticRoutingProviderName,
             selectionMode = selectionMode,
             selectedRuleIds = selectedRuleIds,
-            onRuleToggled = { rule, enabled -> applyRuleAction(RoutingRuleAction.Toggle(rule, enabled)) },
-            onRuleClick = { rule ->
-                if (selectionMode) {
+            actions = RoutingRuleActions(
+                onRuleToggled = { rule, enabled -> applyRuleAction(RoutingRuleAction.Toggle(rule, enabled)) },
+                onRuleClick = { rule ->
+                    if (selectionMode) {
+                        selectedRuleIds = selectedRuleIds.toggle(rule.id)
+                    } else {
+                        applyRuleAction(RoutingRuleAction.Edit(rule))
+                    }
+                },
+                onRuleLongClick = { rule ->
                     selectedRuleIds = selectedRuleIds.toggle(rule.id)
-                } else {
-                    applyRuleAction(RoutingRuleAction.Edit(rule))
-                }
-            },
-            onRuleLongClick = { rule ->
-                selectedRuleIds = selectedRuleIds.toggle(rule.id)
-            },
-            onSubscriptionRuleClick = { rule -> onViewRule(rule.toViewerRequest()) },
-            onProfileRuleClick = { rule ->
-                if (rule.orphaned || rule.editableRule == null) {
-                    onViewRule(rule.toViewerRequest())
-                } else {
-                    onEditRule(
-                        EditableRoutingRule(
-                            rule = rule.editableRule,
-                            isNew = false,
-                            profileOriginalRuleJson = rule.originalRuleJson,
-                            profileOriginalIndex = rule.originalIndex,
-                            rawJson = rule.rawJson,
-                        ),
-                    )
-                }
-            },
-            onProfileRuleToggled = { rule, enabled ->
-                requestProfileRuleAction(ProfileRoutingRuleAction.Toggle(rule, enabled))
-            },
+                },
+                onSubscriptionRuleClick = { rule -> onViewRule(rule.toViewerRequest()) },
+                onProfileRuleClick = { rule ->
+                    if (rule.orphaned || rule.editableRule == null) {
+                        onViewRule(rule.toViewerRequest())
+                    } else {
+                        onEditRule(
+                            EditableRoutingRule(
+                                rule = rule.editableRule,
+                                isNew = false,
+                                profileOriginalRuleJson = rule.originalRuleJson,
+                                profileOriginalIndex = rule.originalIndex,
+                                rawJson = rule.rawJson,
+                            ),
+                        )
+                    }
+                },
+                onProfileRuleToggled = { rule, enabled ->
+                    requestProfileRuleAction(ProfileRoutingRuleAction.Toggle(rule, enabled))
+                },
+            ),
         )
     }
     val ruleActions: @Composable () -> Unit = {
@@ -497,6 +499,16 @@ private fun RuleActions(
     }
 }
 
+/** What tapping, long-pressing and toggling the listed rules does. */
+private data class RoutingRuleActions(
+    val onRuleToggled: (RoutingRule, Boolean) -> Unit,
+    val onRuleClick: (RoutingRule) -> Unit,
+    val onRuleLongClick: (RoutingRule) -> Unit,
+    val onSubscriptionRuleClick: (RoutingRule) -> Unit,
+    val onProfileRuleClick: (ProfileRoutingRule) -> Unit,
+    val onProfileRuleToggled: (ProfileRoutingRule, Boolean) -> Unit,
+)
+
 @Composable
 private fun RoutingRulesTab(
     customRules: List<RoutingRule>,
@@ -506,12 +518,7 @@ private fun RoutingRulesTab(
     providerName: String?,
     selectionMode: Boolean,
     selectedRuleIds: Set<String>,
-    onRuleToggled: (RoutingRule, Boolean) -> Unit,
-    onRuleClick: (RoutingRule) -> Unit,
-    onRuleLongClick: (RoutingRule) -> Unit,
-    onSubscriptionRuleClick: (RoutingRule) -> Unit,
-    onProfileRuleClick: (ProfileRoutingRule) -> Unit,
-    onProfileRuleToggled: (ProfileRoutingRule, Boolean) -> Unit,
+    actions: RoutingRuleActions,
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
         LazyColumn(
@@ -593,8 +600,8 @@ private fun RoutingRulesTab(
                         .fillMaxWidth()
                         .clip(MaterialTheme.shapes.medium)
                         .combinedClickable(
-                            onClick = { onRuleClick(rule) },
-                            onLongClick = { onRuleLongClick(rule) },
+                            onClick = { actions.onRuleClick(rule) },
+                            onLongClick = { actions.onRuleLongClick(rule) },
                         ),
                 ) {
                     Row(
@@ -645,7 +652,7 @@ private fun RoutingRulesTab(
                         Switch(
                             checked = rule.enabled,
                             enabled = !selectionMode,
-                            onCheckedChange = { enabled -> onRuleToggled(rule, enabled) },
+                            onCheckedChange = { enabled -> actions.onRuleToggled(rule, enabled) },
                         )
                     }
                 }
@@ -659,7 +666,7 @@ private fun RoutingRulesTab(
                     key = { index, rule -> "subscription-$index-${rule.id}" },
                     contentType = { _, _ -> "subscriptionRoutingRule" },
                 ) { _, rule ->
-                    SubscriptionRoutingRuleCard(rule = rule, onClick = { onSubscriptionRuleClick(rule) })
+                    SubscriptionRoutingRuleCard(rule = rule, onClick = { actions.onSubscriptionRuleClick(rule) })
                 }
             }
             if (profileRules.isNotEmpty()) {
@@ -673,8 +680,8 @@ private fun RoutingRulesTab(
                 ) { _, rule ->
                     ProfileRoutingRuleCard(
                         rule = rule,
-                        onClick = { onProfileRuleClick(rule) },
-                        onToggled = { enabled -> onProfileRuleToggled(rule, enabled) },
+                        onClick = { actions.onProfileRuleClick(rule) },
+                        onToggled = { enabled -> actions.onProfileRuleToggled(rule, enabled) },
                     )
                 }
             }

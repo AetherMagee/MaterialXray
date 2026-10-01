@@ -396,12 +396,14 @@ private fun SettingsScreenContent(
                         tproxyCompatibility = tproxyCompatibility,
                         autoConnect = autoConnect,
                         oemAutostartGuidance = oemAutostartGuidance,
-                        onUseRootServiceChange = viewModel::setUseRootService,
-                        onRootConnectionBackendChange = viewModel::setRootConnectionBackend,
-                        onTunnelTetheredClientsChange = viewModel::setTunnelTetheredClients,
-                        onRetryTproxyCompatibility = viewModel::retryTproxyCompatibilityCheck,
-                        onAutoConnectChange = viewModel::setAutoConnect,
-                        onOpenOemAutostartSettings = viewModel::openOemAutostartSettings,
+                        actions = SettingsServiceActions(
+                            onUseRootServiceChange = viewModel::setUseRootService,
+                            onRootConnectionBackendChange = viewModel::setRootConnectionBackend,
+                            onTunnelTetheredClientsChange = viewModel::setTunnelTetheredClients,
+                            onRetryTproxyCompatibility = viewModel::retryTproxyCompatibilityCheck,
+                            onAutoConnectChange = viewModel::setAutoConnect,
+                            onOpenOemAutostartSettings = viewModel::openOemAutostartSettings,
+                        ),
                     )
                 }
             }
@@ -1026,21 +1028,23 @@ private fun SettingsScreenContent(
         backupImportSummary = backupImportSummary,
         backupBusy = backupBusy,
         notificationSettings = notificationSettings,
-        onDismissRootAccessDenied = { showRootAccessDeniedDialog = false },
-        onDismissNotificationFields = { showNotificationFieldsDialog = false },
-        onDismissUpdateFrequency = { showUpdateFrequencyDialog = false },
-        onDismissFieldStyle = { showFieldStyleDialog = false },
-        onDismissResetDatabase = { showResetDatabaseDialog = false },
-        onResetDatabase = {
-            showResetDatabaseDialog = false
-            viewModel.resetInternalDatabase()
-        },
-        onDismissBackupImport = viewModel::dismissBackupImport,
-        onConfirmBackupImport = viewModel::confirmBackupImport,
-        onFieldEnabledChange = viewModel::setNotificationFieldEnabled,
-        onReorderFields = viewModel::setNotificationFieldOrder,
-        onUpdateFrequency = viewModel::setNotificationUpdateIntervalMs,
-        onSelectFieldStyle = viewModel::setNotificationStyle,
+        actions = SettingsDialogActions(
+            onDismissRootAccessDenied = { showRootAccessDeniedDialog = false },
+            onDismissNotificationFields = { showNotificationFieldsDialog = false },
+            onDismissUpdateFrequency = { showUpdateFrequencyDialog = false },
+            onDismissFieldStyle = { showFieldStyleDialog = false },
+            onDismissResetDatabase = { showResetDatabaseDialog = false },
+            onResetDatabase = {
+                showResetDatabaseDialog = false
+                viewModel.resetInternalDatabase()
+            },
+            onDismissBackupImport = viewModel::dismissBackupImport,
+            onConfirmBackupImport = viewModel::confirmBackupImport,
+            onFieldEnabledChange = viewModel::setNotificationFieldEnabled,
+            onReorderFields = viewModel::setNotificationFieldOrder,
+            onUpdateFrequency = viewModel::setNotificationUpdateIntervalMs,
+            onSelectFieldStyle = viewModel::setNotificationStyle,
+        ),
     )
     if (showOpenSourceLicensesDialog) {
         OpenSourceLicensesDialog(onDismiss = { showOpenSourceLicensesDialog = false })
@@ -1088,6 +1092,16 @@ private fun BackupOperationEventEffect(viewModel: SettingsViewModel) {
     }
 }
 
+/** What the service section's controls change. */
+private data class SettingsServiceActions(
+    val onUseRootServiceChange: (Boolean) -> Unit,
+    val onRootConnectionBackendChange: (RootConnectionBackend) -> Unit,
+    val onTunnelTetheredClientsChange: (Boolean) -> Unit,
+    val onRetryTproxyCompatibility: () -> Unit,
+    val onAutoConnectChange: (Boolean) -> Unit,
+    val onOpenOemAutostartSettings: () -> Unit,
+)
+
 @Composable
 private fun SettingsServiceSection(
     rootAvailable: Boolean?,
@@ -1099,12 +1113,7 @@ private fun SettingsServiceSection(
     tproxyCompatibility: TproxyCompatibility,
     autoConnect: Boolean,
     oemAutostartGuidance: OemAutostartGuidance,
-    onUseRootServiceChange: (Boolean) -> Unit,
-    onRootConnectionBackendChange: (RootConnectionBackend) -> Unit,
-    onTunnelTetheredClientsChange: (Boolean) -> Unit,
-    onRetryTproxyCompatibility: () -> Unit,
-    onAutoConnectChange: (Boolean) -> Unit,
-    onOpenOemAutostartSettings: () -> Unit,
+    actions: SettingsServiceActions,
 ) {
     Text(
         text = stringResource(R.string.settings_section_service),
@@ -1117,7 +1126,7 @@ private fun SettingsServiceSection(
             title = stringResource(R.string.settings_use_root_service),
             description = stringResource(R.string.settings_unavailable).takeIf { rootAvailable == false },
             checked = useRootService && rootAvailable != false,
-            onCheckedChange = onUseRootServiceChange,
+            onCheckedChange = actions.onUseRootServiceChange,
             enabled = rootServiceAvailable,
             titleColor = if (rootAvailable == false) {
                 MaterialTheme.colorScheme.onSurfaceVariant
@@ -1140,7 +1149,7 @@ private fun SettingsServiceSection(
                                 selected = backend == rootConnectionBackend,
                                 enabled = enabled,
                                 role = Role.RadioButton,
-                                onClick = { onRootConnectionBackendChange(backend) },
+                                onClick = { actions.onRootConnectionBackendChange(backend) },
                             )
                             .padding(horizontal = 16.dp, vertical = 8.dp),
                         horizontalArrangement = Arrangement.spacedBy(16.dp),
@@ -1180,7 +1189,7 @@ private fun SettingsServiceSection(
             }
             if (tproxyCompatibility is TproxyCompatibility.Unsupported) {
                 TextButton(
-                    onClick = onRetryTproxyCompatibility,
+                    onClick = actions.onRetryTproxyCompatibility,
                     modifier = Modifier.padding(horizontal = 16.dp),
                 ) {
                     Text(stringResource(R.string.settings_retry_compatibility_check))
@@ -1191,20 +1200,20 @@ private fun SettingsServiceSection(
                 title = stringResource(R.string.settings_tunnel_tethered_clients_title),
                 description = stringResource(R.string.settings_tunnel_tethered_clients_description),
                 checked = tunnelTetheredClients,
-                onCheckedChange = onTunnelTetheredClientsChange,
+                onCheckedChange = actions.onTunnelTetheredClientsChange,
             )
         }
 
         SettingsSwitchRow(
             title = stringResource(R.string.settings_auto_connect_on_boot),
             checked = autoConnect,
-            onCheckedChange = onAutoConnectChange,
+            onCheckedChange = actions.onAutoConnectChange,
             enabled = !useRootService || rootServiceActive,
         )
         if (autoConnect && oemAutostartGuidance.required && !oemAutostartGuidance.granted) {
             OemAutostartBanner(
                 directSettingsAvailable = oemAutostartGuidance.directSettingsAvailable,
-                onOpenSettings = onOpenOemAutostartSettings,
+                onOpenSettings = actions.onOpenOemAutostartSettings,
             )
         }
     }
@@ -1459,6 +1468,22 @@ internal enum class NotificationAccess {
 private const val NOTIFICATION_PERMISSION_PREFS = "notification_permission"
 private const val NOTIFICATION_PERMISSION_REQUESTED = "requested"
 
+/** How the settings dialogs report their results. */
+private data class SettingsDialogActions(
+    val onDismissRootAccessDenied: () -> Unit,
+    val onDismissNotificationFields: () -> Unit,
+    val onDismissUpdateFrequency: () -> Unit,
+    val onDismissFieldStyle: () -> Unit,
+    val onDismissResetDatabase: () -> Unit,
+    val onResetDatabase: () -> Unit,
+    val onDismissBackupImport: () -> Unit,
+    val onConfirmBackupImport: () -> Unit,
+    val onFieldEnabledChange: (NotificationField, Boolean) -> Unit,
+    val onReorderFields: (List<NotificationField>) -> Unit,
+    val onUpdateFrequency: (Int) -> Unit,
+    val onSelectFieldStyle: (NotificationStyle) -> Unit,
+)
+
 @Composable
 private fun SettingsDialogs(
     showRootAccessDeniedDialog: Boolean,
@@ -1469,22 +1494,11 @@ private fun SettingsDialogs(
     backupImportSummary: BackupSummary?,
     backupBusy: Boolean,
     notificationSettings: NotificationSettings,
-    onDismissRootAccessDenied: () -> Unit,
-    onDismissNotificationFields: () -> Unit,
-    onDismissUpdateFrequency: () -> Unit,
-    onDismissFieldStyle: () -> Unit,
-    onDismissResetDatabase: () -> Unit,
-    onResetDatabase: () -> Unit,
-    onDismissBackupImport: () -> Unit,
-    onConfirmBackupImport: () -> Unit,
-    onFieldEnabledChange: (NotificationField, Boolean) -> Unit,
-    onReorderFields: (List<NotificationField>) -> Unit,
-    onUpdateFrequency: (Int) -> Unit,
-    onSelectFieldStyle: (NotificationStyle) -> Unit,
+    actions: SettingsDialogActions,
 ) {
     if (backupImportSummary != null) {
         AlertDialog(
-            onDismissRequest = onDismissBackupImport,
+            onDismissRequest = actions.onDismissBackupImport,
             title = { Text(stringResource(R.string.settings_backup_import_title)) },
             text = {
                 Text(
@@ -1511,7 +1525,7 @@ private fun SettingsDialogs(
             confirmButton = {
                 TextButton(
                     enabled = !backupBusy,
-                    onClick = onConfirmBackupImport,
+                    onClick = actions.onConfirmBackupImport,
                 ) {
                     Text(
                         if (backupBusy) {
@@ -1525,7 +1539,7 @@ private fun SettingsDialogs(
             dismissButton = {
                 TextButton(
                     enabled = !backupBusy,
-                    onClick = onDismissBackupImport,
+                    onClick = actions.onDismissBackupImport,
                 ) {
                     Text(stringResource(R.string.settings_cancel))
                 }
@@ -1535,10 +1549,10 @@ private fun SettingsDialogs(
 
     if (showRootAccessDeniedDialog) {
         AlertDialog(
-            onDismissRequest = onDismissRootAccessDenied,
+            onDismissRequest = actions.onDismissRootAccessDenied,
             text = { Text(stringResource(R.string.settings_root_access_denied)) },
             confirmButton = {
-                Button(onClick = onDismissRootAccessDenied) {
+                Button(onClick = actions.onDismissRootAccessDenied) {
                     Text(stringResource(R.string.settings_ok))
                 }
             },
@@ -1548,19 +1562,19 @@ private fun SettingsDialogs(
     if (showNotificationFieldsDialog) {
         NotificationFieldsDialog(
             settings = notificationSettings,
-            onDismiss = onDismissNotificationFields,
-            onFieldEnabledChange = onFieldEnabledChange,
-            onReorder = onReorderFields,
+            onDismiss = actions.onDismissNotificationFields,
+            onFieldEnabledChange = actions.onFieldEnabledChange,
+            onReorder = actions.onReorderFields,
         )
     }
 
     if (showUpdateFrequencyDialog) {
         UpdateFrequencyDialog(
             currentValue = notificationSettings.updateIntervalMs,
-            onDismiss = onDismissUpdateFrequency,
+            onDismiss = actions.onDismissUpdateFrequency,
             onConfirm = {
-                onUpdateFrequency(it)
-                onDismissUpdateFrequency()
+                actions.onUpdateFrequency(it)
+                actions.onDismissUpdateFrequency()
             },
         )
     }
@@ -1568,18 +1582,18 @@ private fun SettingsDialogs(
     if (showFieldStyleDialog) {
         FieldStyleDialog(
             selected = notificationSettings.style,
-            onDismiss = onDismissFieldStyle,
-            onSelect = onSelectFieldStyle,
+            onDismiss = actions.onDismissFieldStyle,
+            onSelect = actions.onSelectFieldStyle,
         )
     }
 
     if (showResetDatabaseDialog) {
         AlertDialog(
-            onDismissRequest = onDismissResetDatabase,
+            onDismissRequest = actions.onDismissResetDatabase,
             title = { Text(stringResource(R.string.settings_reset_internal_database_title)) },
             text = { Text(stringResource(R.string.settings_reset_internal_database_confirmation)) },
             confirmButton = {
-                TextButton(onClick = onResetDatabase) {
+                TextButton(onClick = actions.onResetDatabase) {
                     Text(
                         text = stringResource(R.string.settings_reset),
                         color = MaterialTheme.colorScheme.error,
@@ -1587,7 +1601,7 @@ private fun SettingsDialogs(
                 }
             },
             dismissButton = {
-                TextButton(onClick = onDismissResetDatabase) {
+                TextButton(onClick = actions.onDismissResetDatabase) {
                     Text(stringResource(R.string.settings_cancel))
                 }
             },

@@ -426,48 +426,50 @@ fun HomeScreen(
                         canCollapse = subscriptions.size > 1,
                         expanded = subscription.id !in collapsedSubscriptionIds,
                         canReorder = subscriptions.size > 1,
-                        onDragStart = {
-                            hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                            draggingSubscriptionId = subscription.id
-                            dragOffsetY = 0f
-                        },
-                        onDrag = { delta ->
-                            dragOffsetY = reorderSubscriptionDuringDrag(
-                                subscriptionOrder,
-                                listState,
-                                subscription.id,
-                                delta,
-                                dragOffsetY,
-                                subscriptionSpacingPx,
-                            )
-                        },
-                        onDragFinished = finishSubscriptionDrag,
-                        onExpandedChange = { expanded ->
-                            context.setSubscriptionExpanded(
-                                collapsedSubscriptionIds,
-                                subscription.id,
-                                expanded,
-                            )
-                        },
-                        onDelete = {
-                            if (servers.isEmpty()) {
-                                viewModel.deleteSubscription(subscription)
-                            } else {
-                                removeSubscriptionRequest = subscription to servers.size
-                            }
-                        },
-                        onEdit = { editingSubscriptionId = subscription.id },
-                        onReorder = { showReorderDialog = true },
-                        onRefresh = { viewModel.refreshSubscription(subscription) },
-                        onTestAll = { viewModel.testSubscriptionLatencies(subscription) },
-                        onDefaultPingMethodSelected = { viewModel.setDefaultPingMethod(it) },
-                        onApplyRouting = { viewModel.requestApplySubscriptionRouting(subscription) },
-                        onDescriptionHiddenChange = { hidden ->
-                            viewModel.setSubscriptionDescriptionHidden(subscription.id, hidden)
-                        },
-                        onServerSelected = { viewModel.selectServer(it) },
-                        onTestLatency = { viewModel.testLatency(it) },
-                        onOpenServerConfig = onOpenServerConfig,
+                        actions = SubscriptionCardActions(
+                            onDragStart = {
+                                hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                                draggingSubscriptionId = subscription.id
+                                dragOffsetY = 0f
+                            },
+                            onDrag = { delta ->
+                                dragOffsetY = reorderSubscriptionDuringDrag(
+                                    subscriptionOrder,
+                                    listState,
+                                    subscription.id,
+                                    delta,
+                                    dragOffsetY,
+                                    subscriptionSpacingPx,
+                                )
+                            },
+                            onDragFinished = finishSubscriptionDrag,
+                            onExpandedChange = { expanded ->
+                                context.setSubscriptionExpanded(
+                                    collapsedSubscriptionIds,
+                                    subscription.id,
+                                    expanded,
+                                )
+                            },
+                            onDelete = {
+                                if (servers.isEmpty()) {
+                                    viewModel.deleteSubscription(subscription)
+                                } else {
+                                    removeSubscriptionRequest = subscription to servers.size
+                                }
+                            },
+                            onEdit = { editingSubscriptionId = subscription.id },
+                            onReorder = { showReorderDialog = true },
+                            onRefresh = { viewModel.refreshSubscription(subscription) },
+                            onTestAll = { viewModel.testSubscriptionLatencies(subscription) },
+                            onDefaultPingMethodSelected = { viewModel.setDefaultPingMethod(it) },
+                            onApplyRouting = { viewModel.requestApplySubscriptionRouting(subscription) },
+                            onDescriptionHiddenChange = { hidden ->
+                                viewModel.setSubscriptionDescriptionHidden(subscription.id, hidden)
+                            },
+                            onServerSelected = { viewModel.selectServer(it) },
+                            onTestLatency = { viewModel.testLatency(it) },
+                            onOpenServerConfig = onOpenServerConfig,
+                        ),
                     )
                 }
                 item(contentType = "addSubscription") {
@@ -1930,6 +1932,25 @@ private fun AddSubscriptionActionButton(
     }
 }
 
+/** Everything a subscription card and its header menu can trigger. */
+private data class SubscriptionCardActions(
+    val onDragStart: () -> Unit,
+    val onDrag: (Float) -> Unit,
+    val onDragFinished: () -> Unit,
+    val onExpandedChange: (Boolean) -> Unit,
+    val onDelete: () -> Unit,
+    val onEdit: () -> Unit,
+    val onReorder: () -> Unit,
+    val onRefresh: () -> Unit,
+    val onTestAll: () -> Unit,
+    val onDefaultPingMethodSelected: (PingMethod) -> Unit,
+    val onApplyRouting: () -> Unit,
+    val onDescriptionHiddenChange: (Boolean) -> Unit,
+    val onServerSelected: (Long) -> Unit,
+    val onTestLatency: (ServerEntity) -> Unit,
+    val onOpenServerConfig: (Long, String) -> Unit,
+)
+
 @Composable
 private fun SubscriptionCard(
     modifier: Modifier = Modifier,
@@ -1942,25 +1963,11 @@ private fun SubscriptionCard(
     canCollapse: Boolean,
     expanded: Boolean,
     canReorder: Boolean,
-    onDragStart: () -> Unit,
-    onDrag: (Float) -> Unit,
-    onDragFinished: () -> Unit,
-    onExpandedChange: (Boolean) -> Unit,
-    onDelete: () -> Unit,
-    onEdit: () -> Unit,
-    onReorder: () -> Unit,
-    onRefresh: () -> Unit,
-    onTestAll: () -> Unit,
-    onDefaultPingMethodSelected: (PingMethod) -> Unit,
-    onApplyRouting: () -> Unit,
-    onDescriptionHiddenChange: (Boolean) -> Unit,
-    onServerSelected: (Long) -> Unit,
-    onTestLatency: (ServerEntity) -> Unit,
-    onOpenServerConfig: (Long, String) -> Unit,
+    actions: SubscriptionCardActions,
 ) {
-    val currentOnDragStart by rememberUpdatedState(onDragStart)
-    val currentOnDrag by rememberUpdatedState(onDrag)
-    val currentOnDragFinished by rememberUpdatedState(onDragFinished)
+    val currentOnDragStart by rememberUpdatedState(actions.onDragStart)
+    val currentOnDrag by rememberUpdatedState(actions.onDrag)
+    val currentOnDragFinished by rememberUpdatedState(actions.onDragFinished)
     val resources = LocalResources.current
     val locale = resources.configuration.locales[0]
     val metadata = remember(
@@ -2012,17 +2019,9 @@ private fun SubscriptionCard(
                 canCollapse = canCollapse,
                 expanded = expanded,
                 reorderModifier = reorderModifier,
-                onExpandedChange = onExpandedChange,
-                onRefresh = onRefresh,
-                onTestAll = onTestAll,
-                onDefaultPingMethodSelected = onDefaultPingMethodSelected,
-                onDelete = onDelete,
-                onEdit = onEdit,
                 canReorder = canReorder,
-                onReorder = onReorder,
                 canApplyRouting = canApplyRouting,
-                onApplyRouting = onApplyRouting,
-                onDescriptionHiddenChange = onDescriptionHiddenChange,
+                actions = actions,
             )
             AnimatedVisibility(
                 visible = !canCollapse || expanded,
@@ -2069,10 +2068,10 @@ private fun SubscriptionCard(
                                             ServerRow(
                                                 server = server,
                                                 isSelected = server.entity.id == selectedServerId,
-                                                onClick = { onServerSelected(server.entity.id) },
-                                                onTestLatency = { onTestLatency(server.entity) },
+                                                onClick = { actions.onServerSelected(server.entity.id) },
+                                                onTestLatency = { actions.onTestLatency(server.entity) },
                                                 onOpenConfig = {
-                                                    onOpenServerConfig(server.entity.id, server.entity.name)
+                                                    actions.onOpenServerConfig(server.entity.id, server.entity.name)
                                                 },
                                                 contentPadding = ServerRowDefaults.contentPadding,
                                             )
@@ -2173,17 +2172,9 @@ private fun SubscriptionHeader(
     canCollapse: Boolean,
     expanded: Boolean,
     reorderModifier: Modifier,
-    onExpandedChange: (Boolean) -> Unit,
-    onRefresh: () -> Unit,
-    onTestAll: () -> Unit,
-    onDefaultPingMethodSelected: (PingMethod) -> Unit,
-    onDelete: () -> Unit,
-    onEdit: () -> Unit,
     canReorder: Boolean,
-    onReorder: () -> Unit,
     canApplyRouting: Boolean,
-    onApplyRouting: () -> Unit,
-    onDescriptionHiddenChange: (Boolean) -> Unit,
+    actions: SubscriptionCardActions,
 ) {
     var showMenu by remember { mutableStateOf(false) }
     var showPingMethodDialog by remember { mutableStateOf(false) }
@@ -2219,7 +2210,7 @@ private fun SubscriptionHeader(
                         indication = null,
                         role = Role.Button,
                         onClickLabel = expansionActionDescription,
-                    ) { onExpandedChange(!expanded) },
+                    ) { actions.onExpandedChange(!expanded) },
                 contentAlignment = Alignment.Center,
             ) {
                 Box(
@@ -2250,7 +2241,7 @@ private fun SubscriptionHeader(
                             indication = null,
                             role = Role.Button,
                             onClickLabel = expansionActionDescription,
-                        ) { onExpandedChange(!expanded) }
+                        ) { actions.onExpandedChange(!expanded) }
                     } else {
                         Modifier
                     },
@@ -2276,7 +2267,7 @@ private fun SubscriptionHeader(
                 )
             }
         }
-        TooltipIconButton(tooltip = stringResource(R.string.home_subscription_refresh_content_description, subscription.name), onClick = onRefresh, enabled = !isRefreshing) {
+        TooltipIconButton(tooltip = stringResource(R.string.home_subscription_refresh_content_description, subscription.name), onClick = actions.onRefresh, enabled = !isRefreshing) {
             if (isRefreshing) {
                 val updatingDescription = stringResource(
                     R.string.home_subscription_updating_content_description,
@@ -2304,7 +2295,7 @@ private fun SubscriptionHeader(
                 .clip(CircleShape)
                 .combinedClickable(
                     role = Role.Button,
-                    onClick = onTestAll,
+                    onClick = actions.onTestAll,
                     onLongClick = { showPingMethodDialog = true },
                 ),
             contentAlignment = Alignment.Center,
@@ -2333,7 +2324,7 @@ private fun SubscriptionHeader(
                     },
                     onClick = {
                         showMenu = false
-                        onEdit()
+                        actions.onEdit()
                     },
                 )
                 if (canReorder) {
@@ -2344,7 +2335,7 @@ private fun SubscriptionHeader(
                         },
                         onClick = {
                             showMenu = false
-                            onReorder()
+                            actions.onReorder()
                         },
                     )
                 }
@@ -2387,7 +2378,7 @@ private fun SubscriptionHeader(
                         },
                         onClick = {
                             showMenu = false
-                            onDescriptionHiddenChange(!subscription.descriptionHidden)
+                            actions.onDescriptionHiddenChange(!subscription.descriptionHidden)
                         },
                     )
                 }
@@ -2399,7 +2390,7 @@ private fun SubscriptionHeader(
                         },
                         onClick = {
                             showMenu = false
-                            onApplyRouting()
+                            actions.onApplyRouting()
                         },
                     )
                 }
@@ -2410,7 +2401,7 @@ private fun SubscriptionHeader(
                     },
                     onClick = {
                         showMenu = false
-                        onDelete()
+                        actions.onDelete()
                     },
                 )
             }
@@ -2422,7 +2413,7 @@ private fun SubscriptionHeader(
             selectedMethod = defaultPingMethod,
             onDismiss = { showPingMethodDialog = false },
             onSelected = { method ->
-                onDefaultPingMethodSelected(method)
+                actions.onDefaultPingMethodSelected(method)
                 showPingMethodDialog = false
             },
         )
