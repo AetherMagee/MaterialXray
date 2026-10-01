@@ -17,6 +17,7 @@ import androidx.compose.animation.animateBounds
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
@@ -1990,9 +1991,17 @@ private fun SubscriptionCard(
         Modifier
     }
 
-    ElevatedCard(
+    val subscriptionElevation by animateDpAsState(
+        targetValue = if (!canCollapse || expanded) 1.dp else 0.dp,
+        animationSpec = tween(durationMillis = SUBSCRIPTION_EXPANSION_MS),
+        label = "subscriptionShadow",
+    )
+
+    Surface(
         modifier = modifier.fillMaxWidth(),
-        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+        shape = CardDefaults.elevatedShape,
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        shadowElevation = subscriptionElevation,
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
             SubscriptionHeader(
@@ -2015,7 +2024,11 @@ private fun SubscriptionCard(
                 onApplyRouting = onApplyRouting,
                 onDescriptionHiddenChange = onDescriptionHiddenChange,
             )
-            AnimatedVisibility(visible = !canCollapse || expanded) {
+            AnimatedVisibility(
+                visible = !canCollapse || expanded,
+                enter = fadeIn(tween(SUBSCRIPTION_EXPANSION_MS)) + expandVertically(tween(SUBSCRIPTION_EXPANSION_MS)),
+                exit = fadeOut(tween(SUBSCRIPTION_EXPANSION_MS)) + shrinkVertically(tween(SUBSCRIPTION_EXPANSION_MS)),
+            ) {
                 Column {
                     // The section collapses as a whole when its only content, the description, is hidden;
                     // otherwise its spacer and bottom padding would linger around an empty column.
@@ -2850,6 +2863,7 @@ private val ConnectionPaneMaxWidth = 440.dp
 private val FloatingConnectButtonClearance = 80.dp
 private const val DISABLED_FAB_CONTENT_ALPHA = 0.38f
 private const val QR_SCANNER_TRANSITION_MS = 180
+private const val SUBSCRIPTION_EXPANSION_MS = 180
 private const val CORE_UPTIME_REFRESH_INTERVAL_MS = 1_000L
 private const val CAMERA_PERMISSION_PREFS = "camera_permission"
 private const val CAMERA_PERMISSION_REQUESTED = "requested"
