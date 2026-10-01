@@ -25,7 +25,6 @@
     <string name="home_action_always_on">Always on</string>
     <string name="home_action_restart">Restart</string>
     <string name="home_action_edit">Edit</string>
-    <string name="home_action_reorder">Reorder</string>
     <string name="home_action_support">Support</string>
     <string name="home_action_remove">Remove</string>
     <string name="home_action_open">Open</string>
@@ -131,11 +130,6 @@
     <string name="home_subscription_show_description">Show description</string>
     <string name="home_subscription_hide_description">Hide description</string>
     <string name="home_subscription_apply_routing">Apply routing</string>
-    <string name="home_reorder_subscriptions_title">Reorder subscriptions</string>
-    <string name="home_reorder_subscriptions_instructions">Drag subscriptions into the order you want.</string>
-    <string name="home_drag_to_reorder">Drag to reorder</string>
-    <string name="home_move_up">Move up</string>
-    <string name="home_move_down">Move down</string>
     <string name="home_choose_ping_method_title">Choose method</string>
     <string name="home_test_both_latency_types_title">Test both latency types</string>
     <string name="home_open_link_title">Open link?</string>
@@ -147,7 +141,7 @@
 
     <string name="home_edit_subscription_title">Edit subscription</string>
     <string name="home_field_name">Name</string>
-    <string name="home_name_from_provider_hint">Leave empty to get the name from the subscription provider</string>
+    <string name="home_name_from_provider_hint">Leave empty to get the name from the subscription provider.</string>
     <string name="home_field_url" translatable="false">URL</string>
     <string name="home_auto_update_label">Auto update</string>
     <string name="home_auto_update_manual">Manual update only</string>
@@ -182,15 +176,15 @@
     <string name="home_fetch_type_label">Fetch type</string>
     <string name="home_fetch_type_json_first">JSON first</string>
     <string name="home_fetch_type_compatibility">Compatibility mode</string>
-    <string name="home_fetch_type_json_first_description">Try the /json endpoint first, then fall back to the saved URL</string>
-    <string name="home_fetch_type_compatibility_description">Fetch directly from the saved URL</string>
+    <string name="home_fetch_type_json_first_description">Try the /json endpoint first, then fall back to the saved URL.</string>
+    <string name="home_fetch_type_compatibility_description">Fetch directly from the saved URL.</string>
     <string name="home_allow_insecure_updates">Allow insecure updates</string>
-    <string name="home_allow_insecure_updates_description">Allow plain HTTP and untrusted or mismatched HTTPS certificates.</string>
+    <string name="home_allow_insecure_updates_description">Allow plain HTTP and untrusted or mismatched HTTPS certificates</string>
     <string name="home_field_user_agent" translatable="false">User-Agent</string>
     <string name="home_user_agent_example">For example: %1$s</string>
     <string name="home_user_agent_example_value" translatable="false">Happ/3.23.0</string>
     <string name="home_field_headers">Headers</string>
-    <string name="home_headers_example">One per line, for example: X-Hwid: 0123456789abcdef</string>
+    <string name="home_headers_example">One string per line. For example:\n\nX-Hwid: 0123456789abcdef</string>
 
     <string name="home_subscription_unlimited_traffic">∞ traffic</string>
     <string name="home_subscription_unlimited_traffic_downloaded">∞ traffic, %1$s used</string>
