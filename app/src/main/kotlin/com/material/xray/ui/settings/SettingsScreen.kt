@@ -131,6 +131,7 @@ import com.material.xray.ui.components.ScrolledTopAppBar
 import com.material.xray.ui.components.SettingsSwitchRow
 import com.material.xray.ui.components.TooltipIconButton
 import com.material.xray.ui.components.rememberSystemState
+import com.material.xray.ui.components.rememberTrailingIconFade
 import com.material.xray.ui.text.descriptionResource
 import com.material.xray.ui.text.labelResource
 import java.util.Locale
@@ -732,12 +733,13 @@ private fun SettingsScreenContent(
                     modifier = Modifier.padding(horizontal = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
+                    val trailingFade = rememberTrailingIconFade()
                     OutlinedTextField(
                         value = editingGeoipUrl,
                         onValueChange = { editingGeoipUrl = it },
                         label = { Text(stringResource(R.string.settings_geoip_url_label)) },
                         singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().then(trailingFade.fieldModifier),
                         supportingText = {
                             if (geoipUpdating) {
                                 GeoDataDownloadStatus(geoDataDownloadProgress[GeoDataAsset.GEOIP])
@@ -746,22 +748,24 @@ private fun SettingsScreenContent(
                             }
                         },
                         trailingIcon = {
-                            TooltipIconButton(
-                                tooltip = stringResource(R.string.settings_update_geoip),
-                                onClick = { viewModel.updateGeoipAsset(editingGeoipUrl) },
-                                enabled = !geoDataOperationInProgress,
-                            ) {
-                                if (geoipUpdating) {
-                                    val description = stringResource(R.string.settings_geoip_updating)
-                                    GeoDataCircularProgress(
-                                        progress = geoDataDownloadProgress[GeoDataAsset.GEOIP],
-                                        description = description,
-                                    )
-                                } else {
-                                    Icon(
-                                        Icons.Default.Refresh,
-                                        contentDescription = stringResource(R.string.settings_update_geoip),
-                                    )
+                            Box(modifier = trailingFade.iconModifier) {
+                                TooltipIconButton(
+                                    tooltip = stringResource(R.string.settings_update_geoip),
+                                    onClick = { viewModel.updateGeoipAsset(editingGeoipUrl) },
+                                    enabled = !geoDataOperationInProgress,
+                                ) {
+                                    if (geoipUpdating) {
+                                        val description = stringResource(R.string.settings_geoip_updating)
+                                        GeoDataCircularProgress(
+                                            progress = geoDataDownloadProgress[GeoDataAsset.GEOIP],
+                                            description = description,
+                                        )
+                                    } else {
+                                        Icon(
+                                            Icons.Default.Refresh,
+                                            contentDescription = stringResource(R.string.settings_update_geoip),
+                                        )
+                                    }
                                 }
                             }
                         },
@@ -779,12 +783,13 @@ private fun SettingsScreenContent(
                     modifier = Modifier.padding(horizontal = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
+                    val trailingFade = rememberTrailingIconFade()
                     OutlinedTextField(
                         value = editingGeositeUrl,
                         onValueChange = { editingGeositeUrl = it },
                         label = { Text(stringResource(R.string.settings_geosite_url_label)) },
                         singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().then(trailingFade.fieldModifier),
                         supportingText = {
                             if (geositeUpdating) {
                                 GeoDataDownloadStatus(geoDataDownloadProgress[GeoDataAsset.GEOSITE])
@@ -793,22 +798,24 @@ private fun SettingsScreenContent(
                             }
                         },
                         trailingIcon = {
-                            TooltipIconButton(
-                                tooltip = stringResource(R.string.settings_update_geosite),
-                                onClick = { viewModel.updateGeositeAsset(editingGeositeUrl) },
-                                enabled = !geoDataOperationInProgress,
-                            ) {
-                                if (geositeUpdating) {
-                                    val description = stringResource(R.string.settings_geosite_updating)
-                                    GeoDataCircularProgress(
-                                        progress = geoDataDownloadProgress[GeoDataAsset.GEOSITE],
-                                        description = description,
-                                    )
-                                } else {
-                                    Icon(
-                                        Icons.Default.Refresh,
-                                        contentDescription = stringResource(R.string.settings_update_geosite),
-                                    )
+                            Box(modifier = trailingFade.iconModifier) {
+                                TooltipIconButton(
+                                    tooltip = stringResource(R.string.settings_update_geosite),
+                                    onClick = { viewModel.updateGeositeAsset(editingGeositeUrl) },
+                                    enabled = !geoDataOperationInProgress,
+                                ) {
+                                    if (geositeUpdating) {
+                                        val description = stringResource(R.string.settings_geosite_updating)
+                                        GeoDataCircularProgress(
+                                            progress = geoDataDownloadProgress[GeoDataAsset.GEOSITE],
+                                            description = description,
+                                        )
+                                    } else {
+                                        Icon(
+                                            Icons.Default.Refresh,
+                                            contentDescription = stringResource(R.string.settings_update_geosite),
+                                        )
+                                    }
                                 }
                             }
                         },
