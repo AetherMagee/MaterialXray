@@ -123,13 +123,8 @@ class EphemeralXrayCore(
         }
     }
 
-    private fun resolveBinaryPath(): String {
-        if (!xrayBinary.ensureAndroidBinaryAvailable()) {
-            throw EphemeralXrayCoreException("Xray binary is not available")
-        }
-        return xrayBinary.androidBinaryPath
-            ?: throw EphemeralXrayCoreException("Xray binary path is unknown")
-    }
+    private fun resolveBinaryPath(): String = xrayBinary.binaryPath
+        ?: throw EphemeralXrayCoreException("Xray binary is not available")
 
     @Suppress("TooGenericExceptionCaught")
     private fun buildConfigOrThrow(

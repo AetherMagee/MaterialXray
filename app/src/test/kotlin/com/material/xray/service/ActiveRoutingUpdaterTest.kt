@@ -25,7 +25,7 @@ class ActiveRoutingUpdaterTest {
         val plan = AppRoutingPlan(
             directUids = setOf(DIRECT_UID),
             proxyRoutes = emptyList(),
-            tunRoutes = listOf(TunManager.AppTunRoute("xray-app1", routeTable = 201, uids = setOf(4001))),
+            tunRoutes = listOf(TunManager.AppTunRoute(index = 1, routeTable = 201, uids = setOf(4001))),
             proxyServerIds = listOf(PROXY_SERVER_ID),
             routeProfileIds = setOf(0),
         )
@@ -53,6 +53,7 @@ class ActiveRoutingUpdaterTest {
         assertEquals(plan.routeProfileIds, tunGateway.lastRouteProfileIds)
         assertTrue(tunGateway.lastTunnelTetheredClients)
         assertEquals(1, tunGateway.lastManagedAppRouteCount)
+        assertEquals(plan.tunRoutes.size, tunGateway.lastAppRouteCount)
         assertEquals("wlan0", stateStore.state?.physicalInterface)
         assertEquals("10.0.0.1", stateStore.state?.physicalGateway)
         assertEquals("main", stateStore.state?.physicalTable)
@@ -147,7 +148,6 @@ class ActiveRoutingUpdaterTest {
         private val plan: AppRoutingPlan,
     ) : RoutingPlanBuilder {
         override suspend fun build(
-            baseTunName: String,
             baseRouteTable: Int,
             includeProxyRoutes: Boolean,
             includeTunRoutes: Boolean,
@@ -179,6 +179,7 @@ class ActiveRoutingUpdaterTest {
         var lastManagedAppRouteCount: Int? = null
         var lastRouteProfileIds: Set<Int> = emptySet()
         var lastTunnelTetheredClients = false
+        var lastAppRouteCount: Int? = null
 
         override suspend fun findAvailableWlanName(): String = "wlan0"
 
@@ -186,11 +187,14 @@ class ActiveRoutingUpdaterTest {
 
         override suspend fun configureTun(
             tunName: String,
-            addressCidr: String,
-            ipv6AddressCidr: String?,
+            appRouteCount: Int,
+            allowIpv6: Boolean,
             processId: Int?,
             isProcessAlive: suspend () -> Boolean,
-        ): TunManager.TunSetupResult = TunManager.TunSetupResult(success = isProcessAlive())
+        ): TunManager.TunSetupResult {
+            lastAppRouteCount = appRouteCount
+            return TunManager.TunSetupResult(success = isProcessAlive())
+        }
 
         override suspend fun applyRouting(
             tunName: String,

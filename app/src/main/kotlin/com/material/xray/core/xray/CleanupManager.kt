@@ -102,7 +102,7 @@ internal fun ownedProcessStopCommand(configPath: String, persistedPid: Int?): St
     // Unlike Toybox tr, cat terminates if a procfs read races with process exit.
     append("cmdline=\$(cat -v \"/proc/\$1/cmdline\" 2>/dev/null) || return 1; ")
     append("case \"\$cmdline\" in *\"\$config\"*) return 0;; *) return 1;; esac; }; ")
-    append("for pid in \$(pidof xray 2>/dev/null); do case \" \$candidates \" in *\" \$pid \"*) ;; ")
+    append("for pid in \$(pidof $XRAY_EXECUTABLE_NAME $LEGACY_ROOT_EXECUTABLE_NAME 2>/dev/null); do case \" \$candidates \" in *\" \$pid \"*) ;; ")
     append("*) candidates=\"\$candidates \$pid\";; esac; done; owned=''; ")
     append("for pid in \$candidates; do case \"\$pid\" in ''|*[!0-9]*) continue;; esac; ")
     append("if is_owned \"\$pid\"; then owned=\"\$owned \$pid\"; fi; done; ")
@@ -117,3 +117,8 @@ internal fun ownedProcessStopCommand(configPath: String, persistedPid: Int?): St
     append("[ -z \"\$alive\" ] || sleep 0.05; for pid in \$alive; do if is_owned \"\$pid\"; then exit 1; ")
     append("fi; done; true")
 }
+
+// Releases up to 0.9.2 ran the root core as files/bin/xray. A core one of them left running is
+// still found here when the state file that holds its pid is gone; drop this once those
+// upgrades have passed.
+private const val LEGACY_ROOT_EXECUTABLE_NAME = "xray"

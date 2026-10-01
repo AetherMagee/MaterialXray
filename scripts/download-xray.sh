@@ -73,13 +73,8 @@ download_xray() {
 
 echo "Downloading xray-core ${VERSION}..."
 
-# Root service mode needs the Linux binary: it creates and configures TUN from a root shell.
-download_xray \
-  "Xray-linux-arm64-v8a.zip" \
-  "${WORK_DIR}/xray-linux-arm64-v8a" \
-  "app/src/main/assets/xray_arm64"
-
-# Rootless VpnService mode needs the Android binary: it consumes VpnService's tun fd via xray.tun.fd.
+# Both modes run the Android build. It only adopts a TUN as an open fd via xray.tun.fd: rootless
+# mode hands it VpnService's, root mode creates one with the libxraytun.so launcher.
 download_xray \
   "Xray-android-arm64-v8a.zip" \
   "${WORK_DIR}/xray-android-arm64-v8a" \
@@ -105,8 +100,7 @@ fi
   "${WORK_DIR}/Xray-core-${VERSION}-source.tar.gz" \
   "${XRAY_COMMIT}"
 
-mkdir -p "app/src/main/assets" "app/src/main/jniLibs/arm64-v8a"
-install -m 644 "${WORK_DIR}/xray-linux-arm64-v8a" "app/src/main/assets/xray_arm64"
+mkdir -p "app/src/main/jniLibs/arm64-v8a"
 install -m 755 "${WORK_DIR}/xray-android-arm64-v8a" "app/src/main/jniLibs/arm64-v8a/libxray.so"
 cp "${WORK_DIR}/xray-license" "${LICENSE_FILE}"
 printf '%s\n' "${VERSION}" > "${VERSION_FILE}"
@@ -114,5 +108,5 @@ printf '%s\n' "${XRAY_COMMIT}" > "${COMMIT_FILE}"
 printf '%s\n' "${ARCHIVE_CHECKSUMS[@]}" "${BINARY_CHECKSUMS[@]}" > "${CHECKSUM_FILE}"
 
 echo "Done."
-file app/src/main/assets/xray_arm64 app/src/main/jniLibs/arm64-v8a/libxray.so
-ls -lh app/src/main/assets/xray_arm64 app/src/main/jniLibs/arm64-v8a/libxray.so
+file app/src/main/jniLibs/arm64-v8a/libxray.so
+ls -lh app/src/main/jniLibs/arm64-v8a/libxray.so

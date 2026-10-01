@@ -23,7 +23,6 @@ internal data class AppRoutingPlan(
 
 internal interface RoutingPlanBuilder {
     suspend fun build(
-        baseTunName: String,
         baseRouteTable: Int,
         includeProxyRoutes: Boolean,
         includeTunRoutes: Boolean = true,
@@ -41,7 +40,6 @@ internal class AppRoutingPlanner(
     private val log: LogBuffer,
 ) : RoutingPlanBuilder {
     override suspend fun build(
-        baseTunName: String,
         baseRouteTable: Int,
         includeProxyRoutes: Boolean,
         includeTunRoutes: Boolean,
@@ -88,7 +86,6 @@ internal class AppRoutingPlanner(
         return buildProxyRoutingPlan(
             directUids = directUids,
             routeProfileIds = routeProfileIds,
-            baseTunName = baseTunName,
             baseRouteTable = baseRouteTable,
             includeProxyRoutes = includeProxyRoutes,
             includeDefaultSelectedRoute = includeDefaultSelectedRoute,
@@ -103,7 +100,6 @@ internal class AppRoutingPlanner(
     private suspend fun buildProxyRoutingPlan(
         directUids: Set<Int>,
         routeProfileIds: Set<Int>,
-        baseTunName: String,
         baseRouteTable: Int,
         includeProxyRoutes: Boolean,
         includeDefaultSelectedRoute: Boolean,
@@ -113,7 +109,7 @@ internal class AppRoutingPlanner(
         proxyAssignments: Map<Pair<Long, Boolean>, List<RoutedAppAssignment>>,
         allowIpv6: Boolean,
     ): AppRoutingPlan {
-        val routeBuilder = AppProxyRouteBuilder(baseTunName, baseRouteTable)
+        val routeBuilder = AppProxyRouteBuilder(baseRouteTable)
 
         if (includeDefaultSelectedRoute && defaultProxyUids.isNotEmpty()) {
             addDefaultProxyRoute(routeBuilder, defaultProxyUids, includeProxyRoutes, defaultProxyServer)
@@ -152,7 +148,7 @@ internal class AppRoutingPlanner(
         includeProxyRoutes: Boolean,
         defaultProxyServer: ServerConfig?,
     ) {
-        val routeTunName = routeBuilder.addTunRoute(DEFAULT_SELECTED_CONFIG_ROUTE_ID, defaultProxyUids)
+        val routeIndex = routeBuilder.addTunRoute(DEFAULT_SELECTED_CONFIG_ROUTE_ID, defaultProxyUids)
         if (!includeProxyRoutes) return
 
         val activeServer = defaultProxyServer
@@ -164,7 +160,7 @@ internal class AppRoutingPlanner(
 
         routeBuilder.proxyRoutes += AppProxyRoute(
             inboundTag = DEFAULT_SELECTED_CONFIG_INBOUND_TAG,
-            tunName = routeTunName,
+            routeIndex = routeIndex,
             outboundTag = DEFAULT_SELECTED_CONFIG_OUTBOUND_TAG,
             server = activeServer,
             applyRoutingRules = true,
@@ -177,7 +173,7 @@ internal class AppRoutingPlanner(
         includeProxyRoutes: Boolean,
         defaultProxyServer: ServerConfig?,
     ) {
-        val routeTunName = routeBuilder.addTunRoute(ALWAYS_PROXIED_ROUTE_ID, uids)
+        val routeIndex = routeBuilder.addTunRoute(ALWAYS_PROXIED_ROUTE_ID, uids)
         if (!includeProxyRoutes) return
         val activeServer = defaultProxyServer
         if (activeServer == null) {
@@ -187,7 +183,7 @@ internal class AppRoutingPlanner(
         }
         routeBuilder.proxyRoutes += AppProxyRoute(
             inboundTag = ALWAYS_PROXIED_INBOUND_TAG,
-            tunName = routeTunName,
+            routeIndex = routeIndex,
             outboundTag = DEFAULT_SELECTED_CONFIG_OUTBOUND_TAG,
             server = activeServer,
         )
@@ -203,7 +199,7 @@ internal class AppRoutingPlanner(
     ) {
         val uids = assignments.map { it.uid }.filter { it > 0 }.toSet()
         if (uids.isEmpty()) return
-        val routeTunName = routeBuilder.addTunRoute(if (alwaysProxied) -serverId else serverId, uids)
+        val routeIndex = routeBuilder.addTunRoute(if (alwaysProxied) -serverId else serverId, uids)
 
         if (!includeProxyRoutes) return
 
@@ -227,7 +223,7 @@ internal class AppRoutingPlanner(
         routeBuilder.proxyRoutes += buildServerProxyRoute(
             serverId = serverId,
             alwaysProxied = alwaysProxied,
-            routeTunName = routeTunName,
+            routeIndex = routeIndex,
             parsedServer = parsedServerResult.getOrThrow(),
             allowIpv6 = allowIpv6,
         )
@@ -236,7 +232,7 @@ internal class AppRoutingPlanner(
     private suspend fun buildServerProxyRoute(
         serverId: Long,
         alwaysProxied: Boolean,
-        routeTunName: String,
+        routeIndex: Int,
         parsedServer: ServerConfig,
         allowIpv6: Boolean,
     ): AppProxyRoute {
@@ -249,7 +245,7 @@ internal class AppRoutingPlanner(
 
         return AppProxyRoute(
             inboundTag = if (alwaysProxied) "app-in-forced-$serverId" else "app-in-$serverId",
-            tunName = routeTunName,
+            routeIndex = routeIndex,
             outboundTag = if (alwaysProxied) "app-proxy-forced-$serverId" else "app-proxy-$serverId",
             server = routedServer,
             applyRoutingRules = !alwaysProxied,
@@ -278,7 +274,6 @@ internal class AppRoutingPlanner(
         .toSortedMap(compareBy<Pair<Long, Boolean>> { it.first }.thenBy { it.second })
 
     private class AppProxyRouteBuilder(
-        private val baseTunName: String,
         private val baseRouteTable: Int,
     ) {
         val proxyRoutes = mutableListOf<AppProxyRoute>()
@@ -292,16 +287,15 @@ internal class AppRoutingPlanner(
             tunRoutes.removeLastItem()
         }
 
-        fun addTunRoute(routeKey: Long, uids: Set<Int>): String {
+        fun addTunRoute(routeKey: Long, uids: Set<Int>): Int {
             val routeIndex = tunRoutes.size + 1
-            val routeTunName = TunManager.appTunName(baseTunName, routeIndex)
             proxyServerIds += routeKey
             tunRoutes += TunManager.AppTunRoute(
-                tunName = routeTunName,
+                index = routeIndex,
                 routeTable = TunManager.appRouteTable(baseRouteTable, routeIndex),
                 uids = uids,
             )
-            return routeTunName
+            return routeIndex
         }
 
         private fun <T> MutableList<T>.removeLastItem() {

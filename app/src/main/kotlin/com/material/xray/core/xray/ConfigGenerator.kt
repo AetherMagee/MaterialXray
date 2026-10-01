@@ -40,10 +40,7 @@ class ConfigGenerator {
         tunMtu: Int = XrayRuntimeSettings.DEFAULT_TUN_MTU,
         inbounds: List<XrayInbound>? = null,
     ): String {
-        val effectiveInbounds = inbounds ?: buildList {
-            add(XrayInbound.Tun(tunName, "tun-in", tunMtu))
-            appProxyRoutes.forEach { route -> add(XrayInbound.Tun(route.tunName, route.inboundTag, tunMtu)) }
-        }
+        val effectiveInbounds = inbounds ?: listOf(XrayInbound.Tun(tunName, TUN_INBOUND_TAG, tunMtu))
         val dataInboundTags = effectiveInbounds.map { it.tag }
         val bootstrapDnsHosts = bootstrapDnsHosts(server, appProxyRoutes)
         if (server.rawConfigJson.isNotBlank()) {
@@ -186,7 +183,6 @@ class ConfigGenerator {
     fun applyRuntimeIdentity(
         configJson: String,
         tunName: String,
-        appProxyRoutes: List<AppProxyRoute> = emptyList(),
         xrayApiEndpoint: XrayApiEndpoint = XrayApiEndpoint.UnixSocket(XRAY_API_SOCKET_NAME_PREFIX),
         tunMtu: Int = XrayRuntimeSettings.DEFAULT_TUN_MTU,
         inbounds: List<XrayInbound>? = null,
@@ -194,10 +190,7 @@ class ConfigGenerator {
         clearOutboundInterfaces: Boolean = false,
     ): String? {
         val original = runCatching { json.parseToJsonElement(configJson) as? JsonObject }.getOrNull() ?: return null
-        val effectiveInbounds = inbounds ?: buildList {
-            add(XrayInbound.Tun(tunName, "tun-in", tunMtu))
-            appProxyRoutes.forEach { route -> add(XrayInbound.Tun(route.tunName, route.inboundTag, tunMtu)) }
-        }
+        val effectiveInbounds = inbounds ?: listOf(XrayInbound.Tun(tunName, TUN_INBOUND_TAG, tunMtu))
 
         val patched = original.toMutableMap()
         patched["inbounds"] = buildJsonArray { effectiveInbounds.forEach { add(it.toJson()) } }

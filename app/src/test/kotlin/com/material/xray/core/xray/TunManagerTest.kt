@@ -40,17 +40,39 @@ class TunManagerTest {
     }
 
     @Test
-    fun `managed TUN names include app routing interfaces`() {
-        assertTrue(TunManager.isManagedTunName("wlan1", "wlan1"))
-        assertTrue(TunManager.isManagedTunName("wlan1a1", "wlan1"))
-        assertFalse(TunManager.isManagedTunName("wlan2", "wlan1"))
-    }
-
-    @Test
-    fun `TUN setup assigns IPv6 address when provided`() = runTest {
+    fun `TUN setup assigns an address per family to the main route and every app group`() = runTest {
         val commands = mutableListOf<String>()
         val manager = TunManager { command ->
             commands += command
+            when {
+                command.startsWith("ip link show") -> successfulCommand(output = "wlan1")
+                command.startsWith("ip -6 addr show") -> successfulCommand(
+                    output = """
+                        inet6 fd10:10:14::1/64 scope global nodad
+                        inet6 fd10:10:14:1::1/64 scope global nodad
+                        inet6 fd10:10:14:2::1/64 scope global nodad
+                    """.trimIndent(),
+                )
+                else -> successfulCommand()
+            }
+        }
+
+        val result = manager.configureTun(tunName = "wlan1", appRouteCount = 2, allowIpv6 = true)
+
+        assertTrue(result.success)
+        assertEquals(2, commands.size)
+        listOf("10.0.0.1/30", "10.0.1.1/30", "10.0.2.1/30").forEach { cidr ->
+            assertTrue(commands[0].contains("ip addr replace '$cidr' dev 'wlan1'"))
+        }
+        listOf("fd10:10:14::1/64", "fd10:10:14:1::1/64", "fd10:10:14:2::1/64").forEach { cidr ->
+            assertTrue(commands[0].contains("ip -6 addr replace '$cidr' dev 'wlan1' nodad"))
+        }
+        assertEquals("ip -6 addr show dev 'wlan1'", commands[1])
+    }
+
+    @Test
+    fun `TUN setup rejects a missing app group IPv6 address`() = runTest {
+        val manager = TunManager { command ->
             when {
                 command.startsWith("ip link show") -> successfulCommand(output = "wlan1")
                 command.startsWith("ip -6 addr show") -> successfulCommand(
@@ -60,20 +82,14 @@ class TunManagerTest {
             }
         }
 
-        val result = manager.configureTun(
-            tunName = "wlan1",
-            addressCidr = TunManager.DEFAULT_TUN_ADDRESS_CIDR,
-            ipv6AddressCidr = TunManager.DEFAULT_TUN_IPV6_ADDRESS_CIDR,
-        )
+        val result = manager.configureTun(tunName = "wlan1", appRouteCount = 1, allowIpv6 = true)
 
-        assertTrue(result.success)
-        assertEquals(2, commands.size)
-        assertTrue(commands[0].contains("ip -6 addr replace 'fd10:10:14::1/64' dev 'wlan1' nodad"))
-        assertEquals("ip -6 addr show dev 'wlan1'", commands[1])
+        assertFalse(result.success)
+        assertTrue(result.error.orEmpty().contains("fd10:10:14:1::1/64"))
     }
 
     @Test
-    fun `TUN setup leaves IPv6 untouched when no IPv6 address is provided`() = runTest {
+    fun `TUN setup leaves IPv6 untouched when IPv6 is disabled`() = runTest {
         val commands = mutableListOf<String>()
         val manager = TunManager { command ->
             commands += command
@@ -99,10 +115,7 @@ class TunManagerTest {
             }
         }
 
-        val result = manager.configureTun(
-            tunName = "wlan1",
-            ipv6AddressCidr = TunManager.DEFAULT_TUN_IPV6_ADDRESS_CIDR,
-        )
+        val result = manager.configureTun(tunName = "wlan1", allowIpv6 = true)
 
         assertFalse(result.success)
         assertTrue(result.error.orEmpty().contains(TunManager.DEFAULT_TUN_IPV6_ADDRESS_CIDR))
@@ -136,13 +149,18 @@ class TunManagerTest {
     @Test
     fun `IPv6 route follows the IPv6 setting`() {
         assertEquals(
-            "ip -6 route replace default dev wlan1a1 table 110",
-            TunManager.ipv6TunRouteCommand("wlan1a1", 110, allowIpv6 = true),
+            "ip -6 route replace default dev wlan1 src fd10:10:14:1::1 table 110",
+            TunManager.ipv6TunRouteCommand("wlan1", "fd10:10:14:1::1/64", 110, allowIpv6 = true),
         )
         assertEquals(
             "ip -6 route replace unreachable default table 110",
-            TunManager.ipv6TunRouteCommand("wlan1a1", 110, allowIpv6 = false),
+            TunManager.ipv6TunRouteCommand("wlan1", "fd10:10:14:1::1/64", 110, allowIpv6 = false),
         )
+    }
+
+    @Test
+    fun `app group source addresses are the group's TUN addresses`() {
+        assertEquals(listOf("10.0.3.1", "fd10:10:14:3::1"), TunManager.appRouteSourceAddresses(3))
     }
 
     @Test
@@ -165,7 +183,7 @@ class TunManagerTest {
             physicalRoute = TunManager.PhysicalRoute("wlan0", "192.0.2.1", "main"),
             allowIpv6 = false,
             bypassUids = setOf(10_001),
-            appTunRoutes = listOf(TunManager.AppTunRoute("wlan1a1", 110, setOf(10_002))),
+            appTunRoutes = listOf(TunManager.AppTunRoute(index = 1, routeTable = 110, uids = setOf(10_002))),
         )
 
         assertTrue(result.success)
@@ -180,6 +198,8 @@ class TunManagerTest {
         assertTrue(commands[1].contains("ip -6 route flush table 100"))
         assertTrue(commands[2].contains("route replace unreachable default table 100"))
         assertTrue(commands[2].contains("route replace unreachable default table 110"))
+        assertTrue(commands[2].contains("route replace default dev wlan1 src 10.0.0.1 table 100"))
+        assertTrue(commands[2].contains("route replace default dev wlan1 src 10.0.1.1 table 110"))
         assertTrue(commands[2].contains("rule add iif lo uidrange 10000-10000 table 100 prio 12010"))
         assertTrue(commands[2].contains("rule add iif lo uidrange 10002-10002 table 110 prio 12000"))
         assertTrue(commands[3].contains("rule del iif lo uidrange 10000-10000 table 102 prio 11999"))

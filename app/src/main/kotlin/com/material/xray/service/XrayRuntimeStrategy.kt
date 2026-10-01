@@ -47,7 +47,7 @@ internal interface XrayRuntimeStrategy : XrayRuntimeProcess {
      * Reports the path the core is launched from, or null when it is not available.
      *
      * [verifyAvailable] is false for a reconnect that reuses an already-prepared runtime, where
-     * the executable was checked moments ago and re-checking it means re-reading the asset.
+     * the executable was checked moments ago.
      */
     suspend fun prepareBinary(verifyAvailable: Boolean): String?
 
@@ -55,9 +55,16 @@ internal interface XrayRuntimeStrategy : XrayRuntimeProcess {
 
     /**
      * Launches the core. [vpnInterface] stays owned by the caller, so an implementation that needs
-     * it must not suspend before the descriptor has been handed to the child.
+     * it must not suspend before the descriptor has been handed to the child. [tun] is the TUN
+     * interface a root-managed core creates for itself; the rootless core is handed its interface
+     * instead.
      */
-    suspend fun startProcess(binDir: String, vpnInterface: ParcelFileDescriptor?, primaryGid: Int? = null): Int
+    suspend fun startProcess(
+        binDir: String,
+        vpnInterface: ParcelFileDescriptor?,
+        primaryGid: Int? = null,
+        tun: RootTunDevice? = null,
+    ): Int
 
     /** Picks an address for the core's API that this runtime can actually reach. */
     fun nextApiEndpoint(environment: ConnectionEnvironment): XrayApiEndpoint
@@ -84,8 +91,8 @@ internal class RootXrayRuntimeStrategy(
     override val managesSystemRouting = true
 
     override suspend fun prepareBinary(verifyAvailable: Boolean): String? {
-        if (verifyAvailable && !xrayBinary.ensureRootBinaryExtracted()) return null
-        return xrayBinary.rootBinaryPath
+        if (verifyAvailable && !xrayBinary.ensureAvailable()) return null
+        return xrayBinary.binaryPath
     }
 
     override suspend fun prepareLogFile() = processSupervisor.prepareLogFile()
@@ -94,7 +101,8 @@ internal class RootXrayRuntimeStrategy(
         binDir: String,
         vpnInterface: ParcelFileDescriptor?,
         primaryGid: Int?,
-    ): Int = processSupervisor.start(binDir, primaryGid)
+        tun: RootTunDevice?,
+    ): Int = processSupervisor.start(binDir, primaryGid, tun)
 
     // The root shell reaches the core over the loopback interface, which is then firewalled to
     // this app's uid.
@@ -133,8 +141,8 @@ internal class VpnServiceXrayRuntimeStrategy(
     override val managesSystemRouting = false
 
     override suspend fun prepareBinary(verifyAvailable: Boolean): String? {
-        if (verifyAvailable && !xrayBinary.ensureAndroidBinaryAvailable()) return null
-        return xrayBinary.androidBinaryPath
+        if (verifyAvailable && !xrayBinary.ensureAvailable()) return null
+        return xrayBinary.binaryPath
     }
 
     override suspend fun prepareLogFile() = processSupervisor.prepareLogFile()
@@ -144,8 +152,10 @@ internal class VpnServiceXrayRuntimeStrategy(
         binDir: String,
         vpnInterface: ParcelFileDescriptor?,
         primaryGid: Int?,
+        tun: RootTunDevice?,
     ): Int {
         require(primaryGid == null) { "A rootless runtime cannot change its process group" }
+        require(tun == null) { "A rootless runtime cannot create its own TUN interface" }
         return processSupervisor.start(
             binDir = binDir,
             tunFd = requireNotNull(vpnInterface) { "A rootless runtime cannot start without a tunnel" }.fd,

@@ -1,6 +1,6 @@
 # Xray-core Corresponding Source
 
-Material Xray distributes unmodified official Linux and Android arm64 Xray-core executables.
+Material Xray distributes the unmodified official Android arm64 Xray-core executable.
 
 - Version: `VERSION`
 - Exact source commit: `COMMIT`

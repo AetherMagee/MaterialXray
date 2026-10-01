@@ -29,6 +29,13 @@ class CleanupManagerTest {
     }
 
     @Test
+    fun `cleanup also finds a core started by a release that ran the extracted binary`() {
+        val command = ownedProcessStopCommand("/data/user/0/app/files/config.json", persistedPid = null)
+
+        assertTrue(command.contains("pidof libxray.so xray "))
+    }
+
+    @Test
     fun `cleanup never signals the persisted pid directly`() {
         val command = ownedProcessStopCommand("/data/user/0/app/files/config.json", persistedPid = 42)
 

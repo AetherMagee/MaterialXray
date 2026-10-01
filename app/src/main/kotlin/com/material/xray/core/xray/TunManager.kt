@@ -36,8 +36,12 @@ class TunManager internal constructor(
         val error: String? = null,
     )
 
+    /**
+     * An app group sharing the one TUN interface. Its table routes into that interface with the
+     * group's own source address, which is how Xray tells the groups apart.
+     */
     data class AppTunRoute(
-        val tunName: String,
+        val index: Int,
         val routeTable: Int,
         val uids: Set<Int>,
     )
@@ -50,23 +54,29 @@ class TunManager internal constructor(
         return nextAvailableWlanName(interfaceNames)
     }
 
+    /**
+     * Waits for the core's TUN interface and gives it one address per family for the main route
+     * plus one for each of [appRouteCount] app groups.
+     */
     suspend fun configureTun(
         tunName: String,
-        addressCidr: String = DEFAULT_TUN_ADDRESS_CIDR,
-        ipv6AddressCidr: String? = null,
+        appRouteCount: Int = 0,
+        allowIpv6: Boolean = false,
         processId: Int? = null,
         isProcessAlive: suspend () -> Boolean = { true },
     ): TunSetupResult {
         val quotedTunName = shellQuote(tunName)
+        val addressCidrs = tunAddressCidrs(appRouteCount)
+        val ipv6AddressCidrs = if (allowIpv6) tunIpv6AddressCidrs(appRouteCount) else emptyList()
         val upCommand = buildList {
-            ipv6AddressCidr?.let {
+            if (ipv6AddressCidrs.isNotEmpty()) {
                 val disableIpv6Path = shellQuote("/proc/sys/net/ipv6/conf/$tunName/disable_ipv6")
                 add("{ [ ! -e $disableIpv6Path ] || echo 0 > $disableIpv6Path; } 2>/dev/null || true")
             }
-            add("ip addr replace ${shellQuote(addressCidr)} dev $quotedTunName")
-            ipv6AddressCidr?.let {
-                add("ip -6 addr replace ${shellQuote(it)} dev $quotedTunName nodad")
-            }
+            addressCidrs.forEach { add("ip addr replace ${shellQuote(it)} dev $quotedTunName") }
+            // Without nodad an address stays tentative for a while, and a route cannot use a
+            // tentative address as its source.
+            ipv6AddressCidrs.forEach { add("ip -6 addr replace ${shellQuote(it)} dev $quotedTunName nodad") }
             add("ip link set $quotedTunName up")
         }.shellAnd()
         if (processId != null) {
@@ -93,20 +103,22 @@ class TunManager internal constructor(
             if (waitResult != null) return waitResult
         }
 
-        if (ipv6AddressCidr != null) {
+        if (ipv6AddressCidrs.isNotEmpty()) {
             val inspectCommand = "ip -6 addr show dev $quotedTunName"
             val inspectResult = executeCommand(inspectCommand)
-            val configured = inspectResult.output.lineSequence().any { line ->
-                val normalized = line.trim()
-                normalized.startsWith("inet6 $ipv6AddressCidr ") &&
-                    "tentative" !in normalized &&
-                    "dadfailed" !in normalized
+            val missing = ipv6AddressCidrs.firstOrNull { cidr ->
+                inspectResult.output.lineSequence().none { line ->
+                    val normalized = line.trim()
+                    normalized.startsWith("inet6 $cidr ") &&
+                        "tentative" !in normalized &&
+                        "dadfailed" !in normalized
+                }
             }
-            if (!inspectResult.isSuccess || !configured) {
+            if (!inspectResult.isSuccess || missing != null) {
                 val detail = inspectResult.toCommandError(inspectCommand)
                 return TunSetupResult(
                     success = false,
-                    error = "IPv6 address $ipv6AddressCidr was not configured on $tunName: $detail",
+                    error = "IPv6 address ${missing ?: ipv6AddressCidrs.first()} was not configured on $tunName: $detail",
                 )
             }
         }
@@ -151,7 +163,7 @@ class TunManager internal constructor(
             .mapNotNull { parseDefaultRoute(it) }
             .sortedWith(compareByDescending<PhysicalRoute> { it.gateway != null }.thenBy { it.dev })
             .firstOrNull { route ->
-                !isManagedTunName(route.dev, tunName) &&
+                route.dev != tunName &&
                     !route.dev.startsWith("tun") &&
                     !route.dev.startsWith("xray") &&
                     route.dev != "dummy0"
@@ -166,7 +178,7 @@ class TunManager internal constructor(
             .lineSequence()
             .mapNotNull { parseDefaultRoute(it) }
             .firstOrNull { route ->
-                !isManagedTunName(route.dev, tunName) &&
+                route.dev != tunName &&
                     !route.dev.startsWith("tun") &&
                     !route.dev.startsWith("xray") &&
                     route.dev != "dummy0"
@@ -252,14 +264,19 @@ class TunManager internal constructor(
         val ipv4Setup = buildList {
             add(bypassRoute.removePrefix("ip "))
             add("rule add fwmark $fwmark table $bypassTable prio 10")
-            add("route replace default dev $tunName table $routeTable")
-            appTunRoutes.forEach { route -> add("route replace default dev ${route.tunName} table ${route.routeTable}") }
+            add("route replace default dev $tunName src ${DEFAULT_TUN_ADDRESS_CIDR.address()} table $routeTable")
+            appTunRoutes.forEach { route ->
+                add("route replace default dev $tunName src ${appTunAddressCidr(route.index).address()} table ${route.routeTable}")
+            }
             addAll(uidRoutingCommands.map { it.removePrefix("ip ") })
         }
         val ipv6Setup = buildList {
-            add(ipv6TunRouteCommand(tunName, routeTable, allowIpv6).removePrefix("ip -6 "))
+            add(ipv6TunRouteCommand(tunName, DEFAULT_TUN_IPV6_ADDRESS_CIDR, routeTable, allowIpv6).removePrefix("ip -6 "))
             appTunRoutes.forEach { route ->
-                add(ipv6TunRouteCommand(route.tunName, route.routeTable, allowIpv6).removePrefix("ip -6 "))
+                add(
+                    ipv6TunRouteCommand(tunName, appTunIpv6AddressCidr(route.index), route.routeTable, allowIpv6)
+                        .removePrefix("ip -6 "),
+                )
             }
             addAll(ipv6UidRoutingCommands.map { it.removePrefix("ip -6 ") })
         }
@@ -308,12 +325,6 @@ class TunManager internal constructor(
         val updateGuardTable = routeTable + UPDATE_GUARD_ROUTE_TABLE_OFFSET
         val appTables = appRouteTables(routeTable, managedAppRouteCount)
         val routeTables = listOf(bypassTable, routeTable, updateGuardTable) + appTables
-        val interfaceNames = buildList {
-            add(tunName)
-            for (index in 1..managedAppRouteCount.coerceIn(0, MAX_APP_TUN_ROUTES)) {
-                add(appTunName(tunName, index))
-            }
-        }
         val commands = listOf(
             tetherCleanupCommand(),
             "ip rule del fwmark $fwmark table main prio 10 2>/dev/null || true",
@@ -323,7 +334,7 @@ class TunManager internal constructor(
             removeManagedRoutingTablesCommand(routeTables, "ip -6 rule"),
             flushRouteTablesCommand(routeTables, "ip route"),
             flushRouteTablesCommand(routeTables, "ip -6 route"),
-            managedLinkRemovalCommand(interfaceNames),
+            managedLinkRemovalCommand(listOf(tunName)),
         )
         return "status=0; " +
             commands.joinToString("; ") { command -> "( $command ) || status=1" } +
@@ -770,17 +781,25 @@ class TunManager internal constructor(
         private const val TUN_WAIT_CHUNK_ATTEMPTS = 5
         private const val TUN_WAIT_POLL_INTERVAL_MS = 50L
 
-        fun appTunName(baseTunName: String, index: Int): String {
-            val suffix = "a$index"
-            val prefixLength = (15 - suffix.length).coerceAtLeast(1)
-            return baseTunName.take(prefixLength) + suffix
-        }
-
         fun appRouteTable(baseRouteTable: Int, index: Int): Int = baseRouteTable + APP_ROUTE_TABLE_OFFSET + index - 1
 
         fun appTunAddressCidr(index: Int): String = "10.0.${index.coerceIn(1, 254)}.1/30"
 
         fun appTunIpv6AddressCidr(index: Int): String = "fd10:10:14:${index.coerceIn(1, 254).toString(16)}::1/64"
+
+        /** The source addresses an app group's traffic carries into the TUN, one per family. */
+        fun appRouteSourceAddresses(index: Int): List<String> = listOf(
+            appTunAddressCidr(index).address(),
+            appTunIpv6AddressCidr(index).address(),
+        )
+
+        internal fun tunAddressCidrs(appRouteCount: Int): List<String> = listOf(DEFAULT_TUN_ADDRESS_CIDR) +
+            (1..appRouteCount.coerceIn(0, MAX_APP_TUN_ROUTES)).map(::appTunAddressCidr)
+
+        internal fun tunIpv6AddressCidrs(appRouteCount: Int): List<String> = listOf(DEFAULT_TUN_IPV6_ADDRESS_CIDR) +
+            (1..appRouteCount.coerceIn(0, MAX_APP_TUN_ROUTES)).map(::appTunIpv6AddressCidr)
+
+        private fun String.address(): String = substringBefore('/')
 
         internal fun nextAvailableWlanName(interfaceNames: Sequence<String>): String {
             val occupiedNames = interfaceNames.toSet()
@@ -797,14 +816,16 @@ class TunManager internal constructor(
             .trim()
             .takeIf { it.isNotEmpty() }
 
-        internal fun ipv6TunRouteCommand(tunName: String, routeTable: Int, allowIpv6: Boolean): String = if (allowIpv6) {
-            "ip -6 route replace default dev $tunName table $routeTable"
+        internal fun ipv6TunRouteCommand(
+            tunName: String,
+            sourceAddressCidr: String,
+            routeTable: Int,
+            allowIpv6: Boolean,
+        ): String = if (allowIpv6) {
+            "ip -6 route replace default dev $tunName src ${sourceAddressCidr.address()} table $routeTable"
         } else {
             "ip -6 route replace unreachable default table $routeTable"
         }
-
-        internal fun isManagedTunName(interfaceName: String, baseTunName: String): Boolean = interfaceName == baseTunName ||
-            (1..MAX_APP_TUN_ROUTES).any { index -> interfaceName == appTunName(baseTunName, index) }
 
         private fun appRouteTables(baseRouteTable: Int, count: Int): List<Int> = (1..count.coerceIn(0, MAX_APP_TUN_ROUTES)).map { appRouteTable(baseRouteTable, it) }
     }

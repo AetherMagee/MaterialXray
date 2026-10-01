@@ -7,6 +7,7 @@ import android.system.Os
 import android.system.OsConstants
 import com.material.xray.core.root.RootShell
 import com.material.xray.core.root.shellQuote
+import com.material.xray.core.xray.XRAY_EXECUTABLE_NAME
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
@@ -18,9 +19,17 @@ internal interface XrayProcessProbe {
     suspend fun isAlive(pid: Int): Boolean
 }
 
+/** A TUN interface the root core owns. The Android build cannot create one, nor size it. */
+internal data class RootTunDevice(val name: String, val mtu: Int)
+
 internal interface RootXrayProcessController : XrayProcessProbe {
     suspend fun prepareLogFile()
-    suspend fun start(binDir: String, primaryGid: Int? = null): Int
+
+    /**
+     * Starts the core as root. A non-null [tun] is created by the TUN launcher and handed to the
+     * core as an open descriptor, so the interface lives exactly as long as the core does.
+     */
+    suspend fun start(binDir: String, primaryGid: Int? = null, tun: RootTunDevice? = null): Int
     suspend fun kill(pid: Int, signal: Int = 15): Boolean
     suspend fun readResidentMemoryMb(pid: Int): Long?
     suspend fun readCrashReason(lines: Int = 80): String
@@ -55,8 +64,8 @@ internal class RootShellCommandRunner(
 }
 
 internal interface XrayProcessBinary {
-    val rootBinaryPath: String
-    val androidBinaryPath: String?
+    val binaryPath: String?
+    val tunLauncherPath: String?
     fun configPath(): String
 }
 
@@ -117,15 +126,24 @@ internal class XrayProcessSupervisor(
         }
     }
 
-    override suspend fun start(binDir: String, primaryGid: Int?): Int {
+    override suspend fun start(binDir: String, primaryGid: Int?, tun: RootTunDevice?): Int {
         require(primaryGid == null || primaryGid > 0)
+        val binaryPath = requireNotNull(xrayBinary.binaryPath) { "xray binary is unavailable" }
         val certificateBundleFile = environment.filesDir.resolve(XRAY_CERTIFICATE_BUNDLE_FILE)
         val xrayCommand = buildString {
-            append("cd ${shellQuote(binDir)} && exec env ")
-            rootXrayEnvironment(binDir, certificateBundleFile.absolutePath).forEach { (key, value) ->
-                append("${shellQuote("$key=$value")} ")
+            // Not env: the installer's library path contains '=', which env would take for another
+            // assignment. Xray falls back from every xray.* name to its XRAY_* spelling, so the
+            // names a shell can export carry the whole environment.
+            append("cd ${shellQuote(binDir)} && export")
+            xrayEnvironment(binDir, certificateBundleFile.absolutePath)
+                .filterKeys { SHELL_VARIABLE_NAME.matches(it) }
+                .forEach { (key, value) -> append(" $key=${shellQuote(value)}") }
+            append(" && exec ")
+            if (tun != null) {
+                val launcherPath = requireNotNull(xrayBinary.tunLauncherPath) { "TUN launcher is unavailable" }
+                append("${shellQuote(launcherPath)} ${shellQuote(tun.name)} ${tun.mtu} ")
             }
-            append("${shellQuote(xrayBinary.rootBinaryPath)} run -c ${shellQuote(xrayBinary.configPath())}")
+            append("${shellQuote(binaryPath)} run -c ${shellQuote(xrayBinary.configPath())}")
         }
         val command = buildString {
             append("config=${shellQuote(xrayBinary.configPath())}; ")
@@ -145,7 +163,7 @@ internal class XrayProcessSupervisor(
             append("return 0; }; ")
             append("i=0; ")
             append("while [ \$i -lt 20 ]; do ")
-            append("for pid in \$(pidof xray 2>/dev/null); do ")
+            append("for pid in \$(pidof $XRAY_EXECUTABLE_NAME 2>/dev/null); do ")
             append("if is_owned \"\$pid\"; then found=\"\$pid\"; break; fi; ")
             append("done; ")
             append("[ -n \"\$found\" ] && break; ")
@@ -280,7 +298,7 @@ internal class UserXrayProcessSupervisor(
     // the caller can reach a suspension point and let a teardown close it underneath us. fork and
     // execve do not wait on IO, so there is nothing to move off the caller's thread anyway.
     override fun start(binDir: String, tunFd: Int): Int {
-        val binaryPath = requireNotNull(xrayBinary.androidBinaryPath) { "Android xray binary is unavailable" }
+        val binaryPath = requireNotNull(xrayBinary.binaryPath) { "xray binary is unavailable" }
         pid = processLauncher.start(
             binaryPath = binaryPath,
             configPath = xrayBinary.configPath(),
@@ -464,15 +482,12 @@ private fun xrayAssetEnvironment(assetDir: String): Map<String, String> = mapOf(
     "XRAY_LOCATION_ASSET" to assetDir,
 )
 
-private fun rootXrayEnvironment(assetDir: String, certificateBundlePath: String): Map<String, String> = xrayEnvironment(
-    assetDir,
-    certificateBundlePath,
-)
-
 private fun xrayEnvironment(assetDir: String, certificateBundlePath: String): Map<String, String> = xrayAssetEnvironment(assetDir) + mapOf(
     // Go does not reliably discover Android's CA store, especially in the rootless process.
     "SSL_CERT_FILE" to certificateBundlePath,
 )
+
+private val SHELL_VARIABLE_NAME = Regex("[A-Za-z_][A-Za-z0-9_]*")
 
 internal fun shellQuote(value: String): String = "'${value.replace("'", "'\\''")}'"
 

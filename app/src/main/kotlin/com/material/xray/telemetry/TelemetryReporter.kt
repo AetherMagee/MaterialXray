@@ -53,7 +53,6 @@ enum class ConnectionFailureReason(val value: String) {
     ApiReadinessFailed("api_readiness_failed"),
     TproxyVerificationFailed("tproxy_verification_failed"),
     TproxyGuardRemovalFailed("tproxy_guard_removal_failed"),
-    AppTunSetupFailed("app_tun_setup_failed"),
     RootRoutingFailed("root_routing_failed"),
     Unknown("unknown"),
 }
@@ -131,7 +130,6 @@ enum class ConnectionTelemetryStep(
         ConnectionFailureStage.Cleanup,
         ConnectionFailureReason.TproxyGuardRemovalFailed,
     ),
-    ConfigureAppTun("tun.app.configure", ConnectionFailureStage.Tunnel, ConnectionFailureReason.AppTunSetupFailed),
     ApplyRootRouting("routing.root.apply", ConnectionFailureStage.Routing, ConnectionFailureReason.RootRoutingFailed),
 }
 

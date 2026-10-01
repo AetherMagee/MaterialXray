@@ -3,6 +3,7 @@ package com.material.xray.service
 import android.os.ParcelFileDescriptor
 import com.material.xray.R
 import com.material.xray.core.xray.ConfigGenerator
+import com.material.xray.core.xray.TUN_INBOUND_TAG
 import com.material.xray.core.xray.TetherIngressState
 import com.material.xray.core.xray.TproxyTrafficPlan
 import com.material.xray.core.xray.TunManager
@@ -153,7 +154,6 @@ internal class ConnectionManager(
                     telemetryStep = ConnectionTelemetryStep.BuildAppRouting,
                 ) {
                     appRoutingPlanner.build(
-                        baseTunName = tunName,
                         baseRouteTable = routeTable,
                         includeProxyRoutes = managesSystemRouting,
                         includeTunRoutes = managesSystemRouting,
@@ -235,6 +235,9 @@ internal class ConnectionManager(
                 strategy = strategy,
                 vpnInterface = vpnInterface,
                 primaryGid = environment.appUid.takeIf { rootBackend == RootConnectionBackend.Tproxy },
+                // Matches writeXrayConfig, which gives the core a TUN inbound exactly when there is
+                // no TPROXY plan to give it TPROXY inbounds instead.
+                tun = RootTunDevice(tunName, runtimeSettings.tunMtu).takeIf { managesSystemRouting && tproxyPlan == null },
             )
 
             if (pid <= 0) {
@@ -540,9 +543,9 @@ internal class ConnectionManager(
     private suspend fun prepareXrayBinary(strategy: XrayRuntimeStrategy, preparation: ConnectionPreparation): String? {
         val verifyAvailable = !preparation.reusesStaticRuntime
         if (verifyAvailable) {
-            log.append(LogSource.APP, "Extracting xray binary...")
+            log.append(LogSource.APP, "Checking xray binary...")
         } else {
-            log.append(LogSource.APP, "xray binary extraction skipped for fast reconnect")
+            log.append(LogSource.APP, "xray binary check skipped for fast reconnect")
         }
         val activeBinaryPath = if (verifyAvailable) {
             executeStep(
@@ -677,12 +680,8 @@ internal class ConnectionManager(
             )
         }
         val effectiveInbounds = if (runtimeSettings.routeMxrayTrafficThroughXray) {
-            val trafficInbounds: List<XrayInbound> = tproxyInbounds ?: buildList {
-                add(XrayInbound.Tun(runtimeSettings.tunName, "tun-in", runtimeSettings.tunMtu))
-                appRoutingPlan.proxyRoutes.forEach { route ->
-                    add(XrayInbound.Tun(route.tunName, route.inboundTag, runtimeSettings.tunMtu))
-                }
-            }
+            val trafficInbounds: List<XrayInbound> = tproxyInbounds
+                ?: listOf(XrayInbound.Tun(runtimeSettings.tunName, TUN_INBOUND_TAG, runtimeSettings.tunMtu))
             trafficInbounds + XrayInbound.PrivateHttp(
                 path = "${environment.binDir}/mxray-http-${java.util.UUID.randomUUID().toString().take(12)}.sock",
             )
@@ -699,7 +698,6 @@ internal class ConnectionManager(
         if (
             writeOverriddenXrayConfig(
                 runtimeSettings,
-                appRoutingPlan,
                 xrayApiEndpoint,
                 effectiveInbounds,
                 clearOutboundMarks = tproxyPlan != null,
@@ -776,7 +774,6 @@ internal class ConnectionManager(
      */
     private suspend fun writeOverriddenXrayConfig(
         runtimeSettings: XrayRuntimeSettings,
-        appRoutingPlan: AppRoutingPlan,
         xrayApiEndpoint: XrayApiEndpoint,
         inbounds: List<XrayInbound>?,
         clearOutboundMarks: Boolean,
@@ -787,7 +784,6 @@ internal class ConnectionManager(
             configGenerator.applyRuntimeIdentity(
                 configJson = override,
                 tunName = runtimeSettings.tunName,
-                appProxyRoutes = appRoutingPlan.proxyRoutes,
                 xrayApiEndpoint = xrayApiEndpoint,
                 tunMtu = runtimeSettings.tunMtu,
                 inbounds = inbounds,
@@ -816,7 +812,7 @@ internal class ConnectionManager(
         log.append(
             LogSource.APP,
             "App routing: ${appRoutingPlan.proxyRoutes.sumOf { route ->
-                appRoutingPlan.tunRoutes.firstOrNull { it.tunName == route.tunName }?.uids?.size ?: 0
+                appRoutingPlan.tunRoutes.firstOrNull { it.index == route.routeIndex }?.uids?.size ?: 0
             }} apps assigned to ${appRoutingPlan.proxyRoutes.size} proxy route(s), ${appRoutingPlan.directUids.size} apps direct",
         )
     }
@@ -825,6 +821,7 @@ internal class ConnectionManager(
         strategy: XrayRuntimeStrategy,
         vpnInterface: ParcelFileDescriptor?,
         primaryGid: Int? = null,
+        tun: RootTunDevice? = null,
     ): Int {
         log.append(LogSource.APP, "Starting xray process...")
         return executeStep(
@@ -838,6 +835,7 @@ internal class ConnectionManager(
                         binDir = environment.binDir,
                         vpnInterface = vpnInterface,
                         primaryGid = primaryGid,
+                        tun = tun,
                     )
                 },
             ),
@@ -887,7 +885,13 @@ internal class ConnectionManager(
         )
     }
 
-    private suspend fun waitForRootTun(managesSystemRouting: Boolean, tunName: String, allowIpv6: Boolean, pid: Int): Boolean {
+    private suspend fun waitForRootTun(
+        managesSystemRouting: Boolean,
+        tunName: String,
+        appRouteCount: Int,
+        allowIpv6: Boolean,
+        pid: Int,
+    ): Boolean {
         if (!managesSystemRouting) return true
 
         log.append(LogSource.APP, "Waiting for TUN interface '$tunName'...")
@@ -900,8 +904,8 @@ internal class ConnectionManager(
                 action = {
                     tunGateway.configureTun(
                         tunName = tunName,
-                        addressCidr = TunManager.DEFAULT_TUN_ADDRESS_CIDR,
-                        ipv6AddressCidr = TunManager.DEFAULT_TUN_IPV6_ADDRESS_CIDR.takeIf { allowIpv6 },
+                        appRouteCount = appRouteCount,
+                        allowIpv6 = allowIpv6,
                         processId = pid,
                     ) { isProcessAlive(pid) }
                 },
@@ -976,14 +980,10 @@ internal class ConnectionManager(
             val routingReady = waitForRootTun(
                 managesSystemRouting = true,
                 tunName = tunName,
+                appRouteCount = appRoutingPlan.tunRoutes.size,
                 allowIpv6 = allowIpv6,
                 pid = pid,
             ) &&
-                waitForAppTuns(
-                    appRoutingPlan = appRoutingPlan,
-                    allowIpv6 = allowIpv6,
-                    pid = pid,
-                ) &&
                 applyRootRouting(
                     managesSystemRouting = true,
                     tunName = tunName,
@@ -1036,34 +1036,6 @@ internal class ConnectionManager(
                 result.error ?: environment.localizedString(R.string.error_unknown),
             ),
         )
-    }
-
-    private suspend fun waitForAppTuns(appRoutingPlan: AppRoutingPlan, allowIpv6: Boolean, pid: Int): Boolean {
-        appRoutingPlan.tunRoutes.forEachIndexed { index, route ->
-            log.append(LogSource.APP, "Waiting for app TUN interface '${route.tunName}'...")
-            val appTunSetup = executeStep(
-                ConnectionStep(
-                    "App TUN setup ${index + 1}",
-                    ConnectionProgress.ConfiguringTunnel,
-                    telemetryStep = ConnectionTelemetryStep.ConfigureAppTun,
-                    isSuccessful = { it.success },
-                    action = {
-                        tunGateway.configureTun(
-                            tunName = route.tunName,
-                            addressCidr = TunManager.appTunAddressCidr(index + 1),
-                            ipv6AddressCidr = TunManager.appTunIpv6AddressCidr(index + 1).takeIf { allowIpv6 },
-                            processId = pid,
-                        ) { isProcessAlive(pid) }
-                    },
-                ),
-            )
-            if (!appTunSetup.success) {
-                handleTunSetupFailure(appTunSetup, route.tunName, pid, diagnosticsStage = "app-tun")
-                return false
-            }
-            log.append(LogSource.APP, "App TUN interface ${route.tunName} is up")
-        }
-        return true
     }
 
     private suspend fun handleTunSetupFailure(
@@ -1364,7 +1336,6 @@ internal class ConnectionManager(
         if (persistedState.appProxyServerIds.isEmpty() && tproxyState.groups.size > 1) return false
         if (!isProcessAlive(connectedState.corePid)) return false
         val appRoutingPlan = appRoutingPlanner.build(
-            baseTunName = TPROXY_INTERFACE_LABEL,
             baseRouteTable = runtimeSettings.routeTable,
             includeProxyRoutes = false,
             includeTunRoutes = true,
@@ -1436,7 +1407,6 @@ internal class ConnectionManager(
                     tetherChainSlot = tproxyState.nextTetherChainSlot(),
                 )
                 val appPlan = appRoutingPlanner.build(
-                    baseTunName = TPROXY_INTERFACE_LABEL,
                     baseRouteTable = runtimeSettings.routeTable,
                     includeProxyRoutes = false,
                     includeTunRoutes = true,
@@ -1608,7 +1578,6 @@ internal class ConnectionManager(
         val tproxyState = state.tproxy ?: state.transitionGuard ?: return true
         val appRoutingPlan = try {
             appRoutingPlanner.build(
-                baseTunName = TPROXY_INTERFACE_LABEL,
                 baseRouteTable = state.routeTable,
                 includeProxyRoutes = false,
                 includeTunRoutes = true,

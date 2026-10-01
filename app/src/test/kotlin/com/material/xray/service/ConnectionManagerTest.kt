@@ -39,7 +39,7 @@ class ConnectionManagerTest {
 
     @Test
     fun `binary setup failure cleans runtime and publishes error`() = runTest {
-        val harness = Harness().apply { binary.rootReady = false }
+        val harness = Harness().apply { binary.ready = false }
 
         harness.manager.connect(server(), runtimeSettings(), preparation = ConnectionPreparation.ReusePreparedRuntime)
 
@@ -919,7 +919,18 @@ class ConnectionManagerTest {
         )
 
         assertTrue(harness.tunGateway.lastAllowIpv6)
-        assertTrue(TunManager.DEFAULT_TUN_IPV6_ADDRESS_CIDR in harness.tunGateway.configuredIpv6Addresses)
+        assertEquals(true, harness.tunGateway.lastConfiguredAllowIpv6)
+    }
+
+    @Test
+    fun `root TUN connection has the core launched with its own TUN interface`() = runTest {
+        val harness = Harness()
+        val settings = runtimeSettings().copy(tunMtu = 1400)
+
+        harness.manager.connect(server(), settings, preparation = ConnectionPreparation.ReusePreparedRuntime)
+
+        val tunName = requireNotNull(harness.stateStore.state?.tunName)
+        assertEquals(RootTunDevice(tunName, 1400), harness.rootProcess.lastTun)
     }
 
     @Test
@@ -1087,15 +1098,14 @@ class ConnectionManagerTest {
     }
 
     private class FakeXrayBinary : ConnectionXrayBinary {
-        override val rootBinaryPath = "/tmp/xray/bin/xray"
-        override val androidBinaryPath = "/tmp/xray/libxray.so"
-        var rootReady = true
+        override val binaryPath = "/tmp/xray/libxray.so"
+        override val tunLauncherPath = "/tmp/xray/libxraytun.so"
+        var ready = true
         var configJson: String? = null
         var overrideConfigJson: String? = null
 
         override fun configPath(): String = "/tmp/xray/config.json"
-        override suspend fun ensureRootBinaryExtracted(): Boolean = rootReady
-        override suspend fun ensureAndroidBinaryAvailable(): Boolean = true
+        override suspend fun ensureAvailable(): Boolean = ready
         override suspend fun readConfig(): String? = configJson
         override suspend fun readOverrideConfig(): String? = overrideConfigJson
         override suspend fun writeConfig(configJson: String) {
@@ -1143,7 +1153,7 @@ class ConnectionManagerTest {
         var nameDetectionCalls = 0
         var lastAllowIpv6 = false
         var configureCalls = 0
-        val configuredIpv6Addresses = mutableListOf<String>()
+        var lastConfiguredAllowIpv6: Boolean? = null
         val detectedRouteTunNames = mutableListOf<String>()
         val physicalRoutes = mutableListOf<TunManager.PhysicalRoute?>()
 
@@ -1164,13 +1174,13 @@ class ConnectionManagerTest {
 
         override suspend fun configureTun(
             tunName: String,
-            addressCidr: String,
-            ipv6AddressCidr: String?,
+            appRouteCount: Int,
+            allowIpv6: Boolean,
             processId: Int?,
             isProcessAlive: suspend () -> Boolean,
         ): TunManager.TunSetupResult {
             configureCalls += 1
-            ipv6AddressCidr?.let(configuredIpv6Addresses::add)
+            lastConfiguredAllowIpv6 = allowIpv6
             return configureResult
         }
 
@@ -1318,11 +1328,13 @@ class ConnectionManagerTest {
         var startCalls = 0
         var crashReason = "process failed"
         var alive = true
+        var lastTun: RootTunDevice? = null
 
         override suspend fun prepareLogFile() = Unit
 
-        override suspend fun start(binDir: String, primaryGid: Int?): Int {
+        override suspend fun start(binDir: String, primaryGid: Int?, tun: RootTunDevice?): Int {
             startCalls += 1
+            lastTun = tun
             return 42
         }
 
@@ -1367,7 +1379,6 @@ class ConnectionManagerTest {
 
     private class EmptyRoutingPlanBuilder : RoutingPlanBuilder {
         override suspend fun build(
-            baseTunName: String,
             baseRouteTable: Int,
             includeProxyRoutes: Boolean,
             includeTunRoutes: Boolean,
@@ -1387,7 +1398,6 @@ class ConnectionManagerTest {
         val includeDefaultSelectedRouteCalls = mutableListOf<Boolean>()
 
         override suspend fun build(
-            baseTunName: String,
             baseRouteTable: Int,
             includeProxyRoutes: Boolean,
             includeTunRoutes: Boolean,

@@ -162,7 +162,7 @@ class RawConfigTunInjectorTest {
             appProxyRoutes = listOf(
                 AppProxyRoute(
                     inboundTag = "app-in-7",
-                    tunName = "xray0a1",
+                    routeIndex = 1,
                     outboundTag = "app-proxy-7",
                     server = server("App route"),
                 ),
@@ -180,13 +180,13 @@ class RawConfigTunInjectorTest {
         )
         assertEquals("127.0.0.1:48123", root.getValue("api").jsonObject.getValue("listen").jsonPrimitive.content)
         val inbounds = root.getValue("inbounds").jsonArray
-        assertEquals(listOf("tun-in", "app-in-7"), inbounds.map { it.jsonObject["tag"]!!.jsonPrimitive.content })
-        assertTrue(inbounds.all { it.jsonObject["protocol"]!!.jsonPrimitive.content == "tun" })
-        assertTrue(inbounds.none { "listen" in it.jsonObject })
-        assertTrue(inbounds.all { it.jsonObject["port"]!!.jsonPrimitive.content == "0" })
-        assertTrue(inbounds.all { it.jsonObject["settings"]!!.jsonObject["MTU"]!!.jsonPrimitive.content == "1400" })
-        assertEquals("xray0", inbounds.first().jsonObject["settings"]!!.jsonObject["name"]!!.jsonPrimitive.content)
-        assertEquals("xray0a1", inbounds.last().jsonObject["settings"]!!.jsonObject["name"]!!.jsonPrimitive.content)
+        val inbound = inbounds.single().jsonObject
+        assertEquals("tun-in", inbound["tag"]!!.jsonPrimitive.content)
+        assertEquals("tun", inbound["protocol"]!!.jsonPrimitive.content)
+        assertTrue("listen" !in inbound)
+        assertEquals("0", inbound["port"]!!.jsonPrimitive.content)
+        assertEquals("1400", inbound["settings"]!!.jsonObject["MTU"]!!.jsonPrimitive.content)
+        assertEquals("xray0", inbound["settings"]!!.jsonObject["name"]!!.jsonPrimitive.content)
         assertEquals(
             1024,
             root.getValue("policy").jsonObject
@@ -301,14 +301,14 @@ class RawConfigTunInjectorTest {
             appProxyRoutes = listOf(
                 AppProxyRoute(
                     inboundTag = "app-in-default-selected",
-                    tunName = "xray0a1",
+                    routeIndex = 1,
                     outboundTag = "proxy",
                     server = server("Default selected"),
                     applyRoutingRules = true,
                 ),
                 AppProxyRoute(
                     inboundTag = "app-in-always-proxied",
-                    tunName = "xray0a2",
+                    routeIndex = 2,
                     outboundTag = "proxy",
                     server = server("Default selected"),
                 ),
@@ -323,11 +323,11 @@ class RawConfigTunInjectorTest {
 
         val rules = root.getValue("routing").jsonObject.getValue("rules").jsonArray.map { it.jsonObject }
         val appFallback = rules.first {
-            it["inboundTag"]?.jsonArray?.singleOrNull()?.jsonPrimitive?.content == "app-in-default-selected"
+            it.sourceAddresses() == TunManager.appRouteSourceAddresses(1)
         }
         assertEquals(providerTag, appFallback.getValue("outboundTag").jsonPrimitive.content)
         val forcedRule = rules.first {
-            it["inboundTag"]?.jsonArray?.singleOrNull()?.jsonPrimitive?.content == "app-in-always-proxied"
+            it.sourceAddresses() == TunManager.appRouteSourceAddresses(2)
         }
         assertEquals(providerTag, forcedRule.getValue("outboundTag").jsonPrimitive.content)
         assertTrue(rules.any { it["network"]?.jsonPrimitive?.content == "tcp,udp" && it["outboundTag"]?.jsonPrimitive?.content == providerTag })
@@ -517,7 +517,7 @@ class RawConfigTunInjectorTest {
             appProxyRoutes = listOf(
                 AppProxyRoute(
                     inboundTag = "app-in-default-selected",
-                    tunName = "xray0a1",
+                    routeIndex = 1,
                     outboundTag = "proxy",
                     server = server("Default selected"),
                     applyRoutingRules = true,
@@ -530,7 +530,7 @@ class RawConfigTunInjectorTest {
             .getValue("routing").jsonObject
             .getValue("rules").jsonArray
             .map { it.jsonObject }
-            .first { it["inboundTag"]?.jsonArray?.singleOrNull()?.jsonPrimitive?.content == "app-in-default-selected" }
+            .first { it.sourceAddresses() == TunManager.appRouteSourceAddresses(1) }
         assertEquals("balance", appFallback.getValue("balancerTag").jsonPrimitive.content)
         assertTrue("outboundTag" !in appFallback)
     }
@@ -588,7 +588,7 @@ class RawConfigTunInjectorTest {
             appProxyRoutes = listOf(
                 AppProxyRoute(
                     inboundTag = "app-in-7",
-                    tunName = "xray0a1",
+                    routeIndex = 1,
                     outboundTag = "app-proxy-7",
                     server = server("Specific"),
                     applyRoutingRules = true,
@@ -603,14 +603,51 @@ class RawConfigTunInjectorTest {
         }
         val scopedProxyIndex = rules.indexOfFirst {
             it["domain"]?.jsonArray?.singleOrNull()?.jsonPrimitive?.content == "domain:proxy.example" &&
-                it["inboundTag"]?.jsonArray?.singleOrNull()?.jsonPrimitive?.content == "app-in-7"
+                it.sourceAddresses() == TunManager.appRouteSourceAddresses(1)
         }
         val fallbackIndex = rules.indexOfLast {
-            it["inboundTag"]?.jsonArray?.singleOrNull()?.jsonPrimitive?.content == "app-in-7" && it["domain"] == null
+            it.sourceAddresses() == TunManager.appRouteSourceAddresses(1) && it["domain"] == null
         }
         assertTrue(directIndex in 0 until scopedProxyIndex)
         assertTrue(scopedProxyIndex in 0 until fallbackIndex)
         assertEquals("app-proxy-7", rules[scopedProxyIndex].getValue("outboundTag").jsonPrimitive.content)
+    }
+
+    @Test
+    fun `raw proxy rule with its own source is not scoped to a source matched app group`() {
+        val result = injector.inject(
+            rawJson = """
+                {
+                  "outbounds": [{"tag":"proxy","protocol":"vless","settings":{}}],
+                  "routing": {"rules": [
+                    {"source":["192.0.2.0/24"],"domain":["domain:proxy.example"],"outboundTag":"proxy"}
+                  ]}
+                }
+            """.trimIndent(),
+            tunName = "xray0",
+            fwmark = 1,
+            dnsServers = "",
+            domesticDnsServers = "",
+            logLevel = XrayLogLevel.Error,
+            defaultOutbound = XrayOutbound.Proxy,
+            bypassLan = false,
+            routingRules = emptyList(),
+            appProxyRoutes = listOf(
+                AppProxyRoute(
+                    inboundTag = "app-in-7",
+                    routeIndex = 1,
+                    outboundTag = "app-proxy-7",
+                    server = server("Specific"),
+                    applyRoutingRules = true,
+                ),
+            ),
+            physicalInterface = null,
+        )
+        val rules = json.parseToJsonElement(result).jsonObject.getValue("routing").jsonObject
+            .getValue("rules").jsonArray.map { it.jsonObject }
+
+        val proxyRules = rules.filter { it["domain"]?.jsonArray?.singleOrNull()?.jsonPrimitive?.content == "domain:proxy.example" }
+        assertEquals(listOf("192.0.2.0/24"), proxyRules.single().sourceAddresses())
     }
 
     private fun server(name: String) = ServerConfig(
@@ -622,4 +659,6 @@ class RawConfigTunInjectorTest {
         transport = ServerConfig.Transport(type = "tcp"),
         security = ServerConfig.Security(type = "none"),
     )
+
+    private fun JsonObject.sourceAddresses(): List<String> = this["source"]?.jsonArray?.map { it.jsonPrimitive.content }.orEmpty()
 }

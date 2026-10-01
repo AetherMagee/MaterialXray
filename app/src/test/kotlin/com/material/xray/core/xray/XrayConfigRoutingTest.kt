@@ -196,41 +196,79 @@ class XrayConfigRoutingTest {
     }
 
     @Test
-    fun `buildRouting adds dns app lan custom and apply-rules routes in order`() {
+    fun `buildRouting adds forced dns lan custom and apply-rules routes in order`() {
+        val appRoutes = listOf(
+            appProxyRoute(inboundTag = "app-in-direct", outboundTag = "app-proxy-direct", applyRoutingRules = false),
+            appProxyRoute(inboundTag = "app-in-rules", outboundTag = "proxy", applyRoutingRules = true),
+        )
         val routing = buildRouting(
             routingRules = listOf(orRule()),
-            appProxyRoutes = listOf(
-                appProxyRoute(inboundTag = "app-in-direct", outboundTag = "app-proxy-direct", applyRoutingRules = false),
-                appProxyRoute(inboundTag = "app-in-rules", outboundTag = "proxy", applyRoutingRules = true),
-            ),
+            appProxyRoutes = appRoutes,
             bypassLan = true,
             dnsServers = "1.1.1.1",
             domesticDnsServers = "77.88.8.8",
             syntheticDnsAddress = "10.10.14.2",
+            dataInboundTags = tproxyInboundTags(appRoutes),
         )
 
         val rules = routing.getValue("rules").jsonArray.map { it.jsonObject }
         assertEquals("IPOnDemand", routing.getValue("domainStrategy").jsonPrimitive.content)
-        assertEquals(listOf("tun-in", "app-in-rules"), rules[0].array("inboundTag"))
-        assertEquals("dns-out", rules[0].getValue("outboundTag").jsonPrimitive.content)
-        assertEquals(listOf("tun-in", "app-in-direct", "app-in-rules"), rules[1].array("inboundTag"))
-        assertEquals(listOf("10.10.14.2"), rules[1].array("ip"))
-        assertEquals("block", rules[1].getValue("outboundTag").jsonPrimitive.content)
+        assertEquals(listOf("app-in-direct"), rules[0].array("inboundTag"))
+        assertEquals(listOf("10.10.14.2"), rules[0].array("ip"))
+        assertEquals("block", rules[0].getValue("outboundTag").jsonPrimitive.content)
+        assertEquals(listOf("app-in-direct"), rules[1].array("inboundTag"))
+        assertEquals("app-proxy-direct", rules[1].getValue("outboundTag").jsonPrimitive.content)
         assertEquals(listOf("tun-in", "app-in-rules"), rules[2].array("inboundTag"))
-        assertEquals("853", rules[2].getValue("port").jsonPrimitive.content)
-        assertEquals("tcp", rules[2].getValue("network").jsonPrimitive.content)
-        assertEquals("direct", rules[2].getValue("outboundTag").jsonPrimitive.content)
-        assertEquals("default-dns", rules[3].array("inboundTag").single())
-        assertEquals("proxy", rules[3].getValue("outboundTag").jsonPrimitive.content)
-        assertEquals("domestic-dns", rules[4].array("inboundTag").single())
-        assertEquals("app-in-direct", rules[5].array("inboundTag").single())
-        assertEquals("geoip:private", rules[6].array("ip").single())
-        assertEquals("geosite:private", rules[7].array("domain").single())
-        assertEquals(listOf("domain:one", "domain:two"), rules[8].array("domain"))
-        assertEquals(listOf("geoip:one"), rules[9].array("ip"))
-        assertEquals("443", rules[10].getValue("port").jsonPrimitive.content)
-        assertEquals(listOf("tcp", "udp"), rules[11].array("protocol"))
+        assertEquals("dns-out", rules[2].getValue("outboundTag").jsonPrimitive.content)
+        assertEquals(listOf("tun-in", "app-in-rules"), rules[3].array("inboundTag"))
+        assertEquals(listOf("10.10.14.2"), rules[3].array("ip"))
+        assertEquals("block", rules[3].getValue("outboundTag").jsonPrimitive.content)
+        assertEquals(listOf("tun-in", "app-in-rules"), rules[4].array("inboundTag"))
+        assertEquals("853", rules[4].getValue("port").jsonPrimitive.content)
+        assertEquals("tcp", rules[4].getValue("network").jsonPrimitive.content)
+        assertEquals("direct", rules[4].getValue("outboundTag").jsonPrimitive.content)
+        assertEquals("default-dns", rules[5].array("inboundTag").single())
+        assertEquals("proxy", rules[5].getValue("outboundTag").jsonPrimitive.content)
+        assertEquals("domestic-dns", rules[6].array("inboundTag").single())
+        assertEquals("geoip:private", rules[7].array("ip").single())
+        assertEquals("geosite:private", rules[8].array("domain").single())
+        assertEquals(listOf("domain:one", "domain:two"), rules[9].array("domain"))
+        assertEquals(listOf("geoip:one"), rules[10].array("ip"))
+        assertEquals("443", rules[11].getValue("port").jsonPrimitive.content)
+        assertEquals(listOf("tcp", "udp"), rules[12].array("protocol"))
         assertEquals("app-in-rules", rules.last().array("inboundTag").single())
+    }
+
+    @Test
+    fun `TUN app groups are matched by their source addresses`() {
+        val routing = buildRouting(
+            routingRules = listOf(RoutingRule(id = "proxy-site", name = "Proxy site", outboundTag = "proxy", domains = listOf("domain:example.com"))),
+            appProxyRoutes = listOf(
+                appProxyRoute(inboundTag = "app-in-forced-3", outboundTag = "app-proxy-forced-3", applyRoutingRules = false, routeIndex = 1),
+                appProxyRoute(inboundTag = "app-in-7", outboundTag = "app-proxy-7", applyRoutingRules = true, routeIndex = 2),
+            ),
+            syntheticDnsAddress = "10.10.14.2",
+        )
+
+        val rules = routing.getValue("rules").jsonArray.map { it.jsonObject }
+        assertTrue(rules.none { rule -> rule.array("inboundTag").any { it.startsWith("app-in") } })
+        assertEquals(listOf("tun-in"), rules[0].array("inboundTag"))
+        assertEquals(listOf("10.0.1.1", "fd10:10:14:1::1"), rules[0].array("source"))
+        assertEquals("block", rules[0].getValue("outboundTag").jsonPrimitive.content)
+        assertEquals(listOf("10.0.1.1", "fd10:10:14:1::1"), rules[1].array("source"))
+        assertEquals("app-proxy-forced-3", rules[1].getValue("outboundTag").jsonPrimitive.content)
+        // The forced group shares the TUN inbound but already left above, so DNS stays shared.
+        assertEquals(listOf("tun-in"), rules[2].array("inboundTag"))
+        assertEquals("dns-out", rules[2].getValue("outboundTag").jsonPrimitive.content)
+        assertTrue("source" !in rules[2])
+
+        val scoped = rules.single {
+            it["source"] != null && it["domain"]?.jsonArray?.singleOrNull()?.jsonPrimitive?.content == "domain:example.com"
+        }
+        assertEquals(listOf("10.0.2.1", "fd10:10:14:2::1"), scoped.array("source"))
+        assertEquals("app-proxy-7", scoped.getValue("outboundTag").jsonPrimitive.content)
+        assertEquals(listOf("10.0.2.1", "fd10:10:14:2::1"), rules.last().array("source"))
+        assertEquals("app-proxy-7", rules.last().getValue("outboundTag").jsonPrimitive.content)
     }
 
     @Test
@@ -240,6 +278,7 @@ class XrayConfigRoutingTest {
             appProxyRoutes = listOf(
                 appProxyRoute(inboundTag = "app-in-7", outboundTag = "app-proxy-7", applyRoutingRules = true),
             ),
+            dataInboundTags = listOf("tun-in", "app-in-7"),
         )
         val rules = routing.getValue("rules").jsonArray.map { it.jsonObject }
         val scopedIndex = rules.indexOfFirst {
@@ -262,6 +301,7 @@ class XrayConfigRoutingTest {
             appProxyRoutes = listOf(
                 appProxyRoute(inboundTag = "app-in-forced-7", outboundTag = "app-proxy-forced-7", applyRoutingRules = false),
             ),
+            dataInboundTags = listOf("tun-in", "app-in-forced-7"),
         )
         val rules = routing.getValue("rules").jsonArray.map { it.jsonObject }
         val dotRule = rules.first { it["port"]?.jsonPrimitive?.content == "853" }
@@ -270,7 +310,7 @@ class XrayConfigRoutingTest {
             it["inboundTag"]?.jsonArray?.singleOrNull()?.jsonPrimitive?.content == "app-in-forced-7"
         }
         val dotIndex = rules.indexOf(dotRule)
-        assertTrue(dotIndex < forcedIndex)
+        assertTrue(forcedIndex in 0 until dotIndex)
     }
 
     @Test
@@ -315,6 +355,7 @@ class XrayConfigRoutingTest {
                 appProxyRoute(inboundTag = "app-in-default-selected", outboundTag = "proxy", applyRoutingRules = true),
             ),
             defaultRouteTarget = XrayRouteTarget.Balancer("balance"),
+            dataInboundTags = listOf("tun-in", "app-in-default-selected"),
         )
 
         val appFallback = routing.getValue("rules").jsonArray
@@ -338,7 +379,7 @@ class XrayConfigRoutingTest {
         assertTrue("domestic-dns" !in inboundTags)
     }
 
-    private fun JsonObject.array(key: String): List<String> = getValue(key).jsonArray.map { it.jsonPrimitive.content }
+    private fun JsonObject.array(key: String): List<String> = this[key]?.jsonArray?.map { it.jsonPrimitive.content }.orEmpty()
 
     private fun directRule() = RoutingRule(
         id = "direct",
@@ -358,13 +399,16 @@ class XrayConfigRoutingTest {
         operator = RoutingRuleOperator.OR,
     )
 
+    private fun tproxyInboundTags(routes: List<AppProxyRoute>) = listOf("tun-in") + routes.map { it.inboundTag }
+
     private fun appProxyRoute(
         inboundTag: String,
         outboundTag: String,
         applyRoutingRules: Boolean,
+        routeIndex: Int = 1,
     ) = AppProxyRoute(
         inboundTag = inboundTag,
-        tunName = "$inboundTag-tun",
+        routeIndex = routeIndex,
         outboundTag = outboundTag,
         server = ServerConfig(
             protocol = Protocol.VLESS,

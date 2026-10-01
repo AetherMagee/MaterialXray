@@ -1,20 +1,14 @@
 package com.material.xray.core.xray
 
 import android.content.Context
-import android.os.Build
 import com.material.xray.core.process.destroyForciblyCompat
 import com.material.xray.core.process.waitForCompat
 import java.io.File
-import java.io.InputStream
 import java.util.concurrent.TimeUnit
 
 internal interface XrayBinaryEnvironment {
     val filesDir: File
     val nativeLibraryDir: File?
-    fun openAsset(name: String): InputStream
-
-    /** Changes on every APK install, including ones that replace bundled binaries without a version bump. */
-    fun installStamp(): String
 }
 
 internal class AndroidXrayBinaryEnvironment(
@@ -25,62 +19,30 @@ internal class AndroidXrayBinaryEnvironment(
 
     override val nativeLibraryDir: File?
         get() = context.applicationInfo.nativeLibraryDir?.let(::File)
-
-    override fun openAsset(name: String): InputStream = context.assets.open(name)
-
-    override fun installStamp(): String = runCatching {
-        context.packageManager.getPackageInfo(context.packageName, 0).lastUpdateTime.toString()
-    }.getOrDefault("unknown")
 }
 
+/**
+ * The Android Xray build, which both runtimes launch from the installer-extracted native library
+ * directory, plus the helper that hands it a TUN interface in root mode.
+ */
 class XrayBinary internal constructor(
     private val environment: XrayBinaryEnvironment,
-    private val supportedAbis: () -> Array<String>,
 ) {
-    constructor(context: Context) : this(
-        environment = AndroidXrayBinaryEnvironment(context),
-        supportedAbis = { Build.SUPPORTED_ABIS },
-    )
+    constructor(context: Context) : this(AndroidXrayBinaryEnvironment(context))
 
     private val binaryDir = File(environment.filesDir, "bin")
-    val rootBinaryPath: String get() = File(binaryDir, "xray").absolutePath
-    val androidBinaryPath: String?
-        get() = environment.nativeLibraryDir
-            ?.resolve("libxray.so")
-            ?.takeIf { it.isFile && it.canExecute() }
-            ?.absolutePath
+    val binaryPath: String? get() = nativeExecutablePath(XRAY_EXECUTABLE_NAME)
+    val tunLauncherPath: String? get() = nativeExecutablePath(TUN_LAUNCHER_LIBRARY_NAME)
 
-    fun ensureRootBinaryExtracted(): Boolean {
+    fun ensureAvailable(): Boolean {
         binaryDir.mkdirs()
-
-        val assetName = when {
-            supportedAbis().any { it == "arm64-v8a" } -> "xray_arm64"
-            supportedAbis().any { it == "x86_64" } -> "xray_x86_64"
-            else -> return false
-        }
-
-        val versionFile = File(binaryDir, "version")
-        val currentStamp = environment.installStamp()
-        val needsExtract = !File(binaryDir, "xray").exists() ||
-            !versionFile.exists() ||
-            versionFile.readText() != currentStamp
-
-        if (needsExtract) {
-            if (!extractAsset(assetName, "xray", executable = true)) return false
-            versionFile.writeText(currentStamp)
-        }
-
-        return File(binaryDir, "xray").let { it.exists() && it.canExecute() }
-    }
-
-    fun ensureAndroidBinaryAvailable(): Boolean {
-        binaryDir.mkdirs()
-        return androidBinaryPath != null
+        removeLegacyRootBinary()
+        return binaryPath != null && tunLauncherPath != null
     }
 
     fun readVersion(): String? {
         binaryDir.mkdirs()
-        val binaryPath = androidBinaryPath ?: rootBinaryPath.takeIf { ensureRootBinaryExtracted() } ?: return null
+        val binaryPath = binaryPath ?: return null
 
         return runCatching {
             val process = ProcessBuilder(binaryPath, "version")
@@ -121,23 +83,28 @@ class XrayBinary internal constructor(
         ?.let { override -> runCatching { override.readText() }.getOrNull() }
         ?.takeIf { it.isNotBlank() }
 
-    private fun extractAsset(assetName: String, targetName: String, executable: Boolean): Boolean = runCatching {
-        // Writing in place fails with ETXTBSY while a core still runs the old binary; a rename
-        // swaps the file and leaves that core on the old inode until it is restarted.
-        val staged = File(binaryDir, "$targetName.tmp")
-        environment.openAsset(assetName).use { input ->
-            staged.outputStream().use { output -> input.copyTo(output) }
-        }
-        if (executable) staged.setExecutable(true, false)
-        staged.renameTo(File(binaryDir, targetName))
-    }.getOrDefault(false)
+    private fun nativeExecutablePath(name: String): String? = environment.nativeLibraryDir
+        ?.resolve(name)
+        ?.takeIf { it.isFile && it.canExecute() }
+        ?.absolutePath
+
+    // Versions that ran root mode on a separate Linux build extracted it here, along with the
+    // install stamp that versioned it. Nothing reads either any more.
+    private fun removeLegacyRootBinary() {
+        File(binaryDir, "xray").delete()
+        File(binaryDir, "version").delete()
+    }
 
     private companion object {
         private const val VERSION_TIMEOUT_SECONDS = 2L
+        private const val TUN_LAUNCHER_LIBRARY_NAME = "libxraytun.so"
     }
 }
 
 private val XRAY_VERSION_REGEX = Regex("^Xray\\s+v?([^\\s]+)")
+
+/** The core's file name, which is also the process name `pidof` finds it by. */
+internal const val XRAY_EXECUTABLE_NAME = "libxray.so"
 
 internal const val ACTIVE_CONFIG_FILE = "config.json"
 

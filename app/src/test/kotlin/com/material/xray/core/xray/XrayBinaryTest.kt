@@ -1,8 +1,6 @@
 package com.material.xray.core.xray
 
-import java.io.ByteArrayInputStream
 import java.io.File
-import java.io.InputStream
 import java.nio.file.Files
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -13,90 +11,52 @@ import org.junit.Test
 class XrayBinaryTest {
 
     @Test
-    fun `ensureExtracted extracts arm64 binary and records install stamp`() = withTempDir { dir ->
-        val environment = FakeEnvironment(
-            filesDir = dir,
-            assets = mapOf("xray_arm64" to "binary-v1"),
-            stamp = "1.0",
-        )
-        val xrayBinary = XrayBinary(environment, supportedAbis = { arrayOf("arm64-v8a") })
-
-        assertTrue(xrayBinary.ensureRootBinaryExtracted())
-
-        assertEquals("binary-v1", File(dir, "bin/xray").readText())
-        assertEquals("1.0", File(dir, "bin/version").readText())
-        assertTrue(File(xrayBinary.rootBinaryPath).canExecute())
-    }
-
-    @Test
-    fun `ensureExtracted skips extraction when binary and version are current`() = withTempDir { dir ->
-        val binDir = File(dir, "bin").apply { mkdirs() }
-        File(binDir, "xray").writeText("existing")
-        File(binDir, "xray").setExecutable(true, false)
-        File(binDir, "version").writeText("1.0")
-        val environment = FakeEnvironment(
-            filesDir = dir,
-            assets = mapOf("xray_arm64" to "replacement"),
-            stamp = "1.0",
-        )
-
-        assertTrue(XrayBinary(environment, supportedAbis = { arrayOf("arm64-v8a") }).ensureRootBinaryExtracted())
-
-        assertEquals("existing", File(binDir, "xray").readText())
-        assertFalse(environment.openedAssets.contains("xray_arm64"))
-    }
-
-    @Test
-    fun `ensureExtracted replaces binary when install stamp changes`() = withTempDir { dir ->
-        val binDir = File(dir, "bin").apply { mkdirs() }
-        File(binDir, "xray").writeText("existing")
-        File(binDir, "version").writeText("1000")
-        val environment = FakeEnvironment(
-            filesDir = dir,
-            assets = mapOf("xray_arm64" to "replacement"),
-            stamp = "2000",
-        )
-
-        assertTrue(XrayBinary(environment, supportedAbis = { arrayOf("arm64-v8a") }).ensureRootBinaryExtracted())
-
-        assertEquals("replacement", File(binDir, "xray").readText())
-        assertEquals("2000", File(binDir, "version").readText())
-    }
-
-    @Test
-    fun `ensureAndroidBinaryAvailable uses native library executable when available`() = withTempDir { dir ->
+    fun `ensureAvailable finds the core and TUN launcher in the native library directory`() = withTempDir { dir ->
         val nativeDir = File(dir, "lib").apply { mkdirs() }
-        val nativeBinary = File(nativeDir, "libxray.so").apply {
-            writeText("native")
-            setExecutable(true, false)
-        }
-        val environment = FakeEnvironment(
-            filesDir = dir,
-            nativeLibraryDir = nativeDir,
-            assets = mapOf("xray_arm64" to "asset"),
-            stamp = "1.0",
-        )
-        val xrayBinary = XrayBinary(environment, supportedAbis = { arrayOf("arm64-v8a") })
+        val core = nativeExecutable(nativeDir, "libxray.so")
+        val launcher = nativeExecutable(nativeDir, "libxraytun.so")
+        val xrayBinary = XrayBinary(FakeEnvironment(filesDir = dir, nativeLibraryDir = nativeDir))
 
-        assertTrue(xrayBinary.ensureAndroidBinaryAvailable())
+        assertTrue(xrayBinary.ensureAvailable())
 
-        assertEquals(nativeBinary.absolutePath, xrayBinary.androidBinaryPath)
+        assertEquals(core.absolutePath, xrayBinary.binaryPath)
+        assertEquals(launcher.absolutePath, xrayBinary.tunLauncherPath)
         assertTrue(File(dir, "bin").isDirectory)
-        assertFalse(File(dir, "bin/xray").exists())
-        assertFalse(environment.openedAssets.contains("xray_arm64"))
     }
 
     @Test
-    fun `ensureExtracted returns false for unsupported abi`() = withTempDir { dir ->
-        val environment = FakeEnvironment(filesDir = dir)
+    fun `ensureAvailable fails without the TUN launcher`() = withTempDir { dir ->
+        val nativeDir = File(dir, "lib").apply { mkdirs() }
+        nativeExecutable(nativeDir, "libxray.so")
 
-        assertFalse(XrayBinary(environment, supportedAbis = { arrayOf("armeabi-v7a") }).ensureRootBinaryExtracted())
-        assertFalse(File(dir, "bin/xray").exists())
+        assertFalse(XrayBinary(FakeEnvironment(filesDir = dir, nativeLibraryDir = nativeDir)).ensureAvailable())
+    }
+
+    @Test
+    fun `ensureAvailable fails without a native library directory`() = withTempDir { dir ->
+        val xrayBinary = XrayBinary(FakeEnvironment(filesDir = dir))
+
+        assertFalse(xrayBinary.ensureAvailable())
+        assertNull(xrayBinary.binaryPath)
+    }
+
+    @Test
+    fun `ensureAvailable removes the binary older versions extracted for root mode`() = withTempDir { dir ->
+        val binDir = File(dir, "bin").apply { mkdirs() }
+        File(binDir, "xray").writeText("linux build")
+        File(binDir, "version").writeText("1000")
+        val geoip = File(binDir, "geoip.dat").apply { writeText("geo") }
+
+        XrayBinary(FakeEnvironment(filesDir = dir)).ensureAvailable()
+
+        assertFalse(File(binDir, "xray").exists())
+        assertFalse(File(binDir, "version").exists())
+        assertTrue(geoip.exists())
     }
 
     @Test
     fun `writeConfig writes config to files dir`() = withTempDir { dir ->
-        val xrayBinary = XrayBinary(FakeEnvironment(filesDir = dir), supportedAbis = { arrayOf("arm64-v8a") })
+        val xrayBinary = XrayBinary(FakeEnvironment(filesDir = dir))
 
         xrayBinary.writeConfig("""{"log":{}}""")
 
@@ -117,7 +77,7 @@ class XrayBinaryTest {
             nativeLibraryDir = nativeDir,
         )
 
-        assertEquals("26.6.7", XrayBinary(environment, supportedAbis = { arrayOf("arm64-v8a") }).readVersion())
+        assertEquals("26.6.7", XrayBinary(environment).readVersion())
     }
 
     @Test
@@ -128,17 +88,11 @@ class XrayBinaryTest {
     private class FakeEnvironment(
         override val filesDir: File,
         override val nativeLibraryDir: File? = null,
-        private val assets: Map<String, String> = emptyMap(),
-        private val stamp: String = "test",
-    ) : XrayBinaryEnvironment {
-        val openedAssets = mutableListOf<String>()
+    ) : XrayBinaryEnvironment
 
-        override fun openAsset(name: String): InputStream {
-            openedAssets += name
-            return ByteArrayInputStream(assets.getValue(name).toByteArray())
-        }
-
-        override fun installStamp(): String = stamp
+    private fun nativeExecutable(dir: File, name: String) = File(dir, name).apply {
+        writeText("native")
+        setExecutable(true, false)
     }
 
     private fun withTempDir(block: (File) -> Unit) {

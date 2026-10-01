@@ -52,8 +52,8 @@ internal interface TunRoutingGateway {
 
     suspend fun configureTun(
         tunName: String,
-        addressCidr: String,
-        ipv6AddressCidr: String?,
+        appRouteCount: Int,
+        allowIpv6: Boolean,
         processId: Int? = null,
         isProcessAlive: suspend () -> Boolean,
     ): TunManager.TunSetupResult
@@ -105,14 +105,14 @@ internal class TunManagerRoutingGateway(
 
     override suspend fun configureTun(
         tunName: String,
-        addressCidr: String,
-        ipv6AddressCidr: String?,
+        appRouteCount: Int,
+        allowIpv6: Boolean,
         processId: Int?,
         isProcessAlive: suspend () -> Boolean,
     ): TunManager.TunSetupResult = tunManager.configureTun(
         tunName = tunName,
-        addressCidr = addressCidr,
-        ipv6AddressCidr = ipv6AddressCidr,
+        appRouteCount = appRouteCount,
+        allowIpv6 = allowIpv6,
         processId = processId,
         isProcessAlive = isProcessAlive,
     )
@@ -196,7 +196,6 @@ internal class ActiveRoutingUpdater(
         }
 
         val appRoutingPlan = buildAppRoutingPlan(
-            tunName = tunName,
             routeTable = routeTable,
             failurePrefix = "Fast app routing update skipped",
         ) ?: return false
@@ -224,46 +223,24 @@ internal class ActiveRoutingUpdater(
             return false
         }
 
-        val mainTunSetup = stepExecutor.execute(
+        val tunSetup = stepExecutor.execute(
             ConnectionStep(
-                "Main TUN check",
+                "TUN check",
                 ConnectionProgress.ConfiguringTunnel,
                 isSuccessful = { it.success },
                 action = {
                     tunGateway.configureTun(
                         tunName = tunName,
-                        addressCidr = TunManager.DEFAULT_TUN_ADDRESS_CIDR,
-                        ipv6AddressCidr = TunManager.DEFAULT_TUN_IPV6_ADDRESS_CIDR.takeIf { allowIpv6 },
+                        appRouteCount = appRoutingPlan.tunRoutes.size,
+                        allowIpv6 = allowIpv6,
                         processId = connectedState.corePid,
                     ) { processProbe.isAlive(connectedState.corePid) }
                 },
             ),
         )
-        if (!mainTunSetup.success) {
-            log.append(LogSource.APP, "Fast app routing update skipped: ${mainTunSetup.error ?: "main TUN $tunName is unavailable"}")
+        if (!tunSetup.success) {
+            log.append(LogSource.APP, "Fast app routing update skipped: ${tunSetup.error ?: "TUN $tunName is unavailable"}")
             return false
-        }
-
-        appRoutingPlan.tunRoutes.forEachIndexed { index, route ->
-            val appTunSetup = stepExecutor.execute(
-                ConnectionStep(
-                    "App TUN check ${index + 1}",
-                    ConnectionProgress.ConfiguringTunnel,
-                    isSuccessful = { it.success },
-                    action = {
-                        tunGateway.configureTun(
-                            tunName = route.tunName,
-                            addressCidr = TunManager.appTunAddressCidr(index + 1),
-                            ipv6AddressCidr = TunManager.appTunIpv6AddressCidr(index + 1).takeIf { allowIpv6 },
-                            processId = connectedState.corePid,
-                        ) { processProbe.isAlive(connectedState.corePid) }
-                    },
-                ),
-            )
-            if (!appTunSetup.success) {
-                log.append(LogSource.APP, "Fast app routing update skipped: ${appTunSetup.error ?: "app TUN ${route.tunName} is unavailable"}")
-                return false
-            }
         }
 
         val bypassTable = routeTable + 1
@@ -368,11 +345,10 @@ internal class ActiveRoutingUpdater(
     }
 
     private suspend fun buildAppRoutingPlan(
-        tunName: String,
         routeTable: Int,
         failurePrefix: String,
     ): AppRoutingPlan? = try {
-        routingPlanBuilder.build(tunName, routeTable, includeProxyRoutes = false)
+        routingPlanBuilder.build(routeTable, includeProxyRoutes = false)
     } catch (error: IllegalArgumentException) {
         logRoutingPlanFailure(failurePrefix, error)
         null

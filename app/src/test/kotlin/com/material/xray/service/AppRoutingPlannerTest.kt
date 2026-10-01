@@ -56,7 +56,6 @@ class AppRoutingPlannerTest {
         )
 
         val plan = planner.build(
-            baseTunName = BASE_TUN,
             baseRouteTable = BASE_TABLE,
             includeProxyRoutes = true,
             defaultProxyServer = defaultServer,
@@ -66,21 +65,21 @@ class AppRoutingPlannerTest {
         assertEquals(listOf(Long.MIN_VALUE, SERVER_ID), plan.proxyServerIds)
         assertEquals(
             listOf(
-                TunManager.AppTunRoute(TunManager.appTunName(BASE_TUN, 1), routeTable = 110, uids = setOf(2002, 2005)),
-                TunManager.AppTunRoute(TunManager.appTunName(BASE_TUN, 2), routeTable = 111, uids = setOf(2003)),
+                TunManager.AppTunRoute(index = 1, routeTable = 110, uids = setOf(2002, 2005)),
+                TunManager.AppTunRoute(index = 2, routeTable = 111, uids = setOf(2003)),
             ),
             plan.tunRoutes,
         )
         assertEquals(setOf(0), plan.routeProfileIds)
 
         val defaultRoute = plan.proxyRoutes.single { it.inboundTag == "app-in-default-selected" }
-        assertEquals(TunManager.appTunName(BASE_TUN, 1), defaultRoute.tunName)
+        assertEquals(1, defaultRoute.routeIndex)
         assertEquals("proxy", defaultRoute.outboundTag)
         assertEquals(defaultServer, defaultRoute.server)
         assertTrue(defaultRoute.applyRoutingRules)
 
         val serverRoute = plan.proxyRoutes.single { it.inboundTag == "app-in-$SERVER_ID" }
-        assertEquals(TunManager.appTunName(BASE_TUN, 2), serverRoute.tunName)
+        assertEquals(2, serverRoute.routeIndex)
         assertEquals("app-proxy-$SERVER_ID", serverRoute.outboundTag)
         assertEquals(serverSpecificConfig, serverRoute.server)
         assertTrue(serverRoute.applyRoutingRules)
@@ -111,7 +110,6 @@ class AppRoutingPlannerTest {
         )
 
         val plan = planner.build(
-            baseTunName = BASE_TUN,
             baseRouteTable = BASE_TABLE,
             includeProxyRoutes = true,
             includeDefaultSelectedRoute = false,
@@ -119,7 +117,7 @@ class AppRoutingPlannerTest {
 
         assertEquals(listOf(SERVER_ID), plan.proxyServerIds)
         assertEquals(
-            listOf(TunManager.AppTunRoute(TunManager.appTunName(BASE_TUN, 1), routeTable = 110, uids = setOf(2002))),
+            listOf(TunManager.AppTunRoute(index = 1, routeTable = 110, uids = setOf(2002))),
             plan.tunRoutes,
         )
         assertEquals(listOf("app-in-$SERVER_ID"), plan.proxyRoutes.map { it.inboundTag })
@@ -139,7 +137,6 @@ class AppRoutingPlannerTest {
         )
 
         val plan = planner.build(
-            baseTunName = BASE_TUN,
             baseRouteTable = BASE_TABLE,
             includeProxyRoutes = true,
             includeDefaultSelectedRoute = false,
@@ -170,7 +167,7 @@ class AppRoutingPlannerTest {
             log = LogBuffer(),
         )
 
-        val plan = planner.build(BASE_TUN, BASE_TABLE, includeProxyRoutes = true, defaultProxyServer = serverConfig)
+        val plan = planner.build(BASE_TABLE, includeProxyRoutes = true, defaultProxyServer = serverConfig)
 
         assertEquals(listOf(SERVER_ID, -SERVER_ID), plan.proxyServerIds)
         assertEquals(setOf(2001), plan.tunRoutes[0].uids)
@@ -195,14 +192,13 @@ class AppRoutingPlannerTest {
         )
 
         val plan = planner.build(
-            baseTunName = BASE_TUN,
             baseRouteTable = BASE_TABLE,
             includeProxyRoutes = false,
         )
 
         assertEquals(listOf(SERVER_ID), plan.proxyServerIds)
         assertEquals(
-            listOf(TunManager.AppTunRoute(TunManager.appTunName(BASE_TUN, 1), routeTable = 110, uids = setOf(2003))),
+            listOf(TunManager.AppTunRoute(index = 1, routeTable = 110, uids = setOf(2003))),
             plan.tunRoutes,
         )
         assertTrue(plan.proxyRoutes.isEmpty())
@@ -232,7 +228,6 @@ class AppRoutingPlannerTest {
         )
 
         val plan = planner.build(
-            baseTunName = BASE_TUN,
             baseRouteTable = BASE_TABLE,
             includeProxyRoutes = true,
         )
@@ -267,7 +262,6 @@ class AppRoutingPlannerTest {
         )
 
         val plan = planner.build(
-            baseTunName = BASE_TUN,
             baseRouteTable = BASE_TABLE,
             includeProxyRoutes = true,
             defaultProxyServer = defaultServer,
@@ -322,7 +316,6 @@ class AppRoutingPlannerTest {
     }
 
     private companion object {
-        const val BASE_TUN = "xray"
         const val BASE_TABLE = 100
         const val SERVER_ID = 7L
 

@@ -131,33 +131,26 @@ internal fun parseProcessMetrics(output: String): ProcessMetrics? {
 private const val KILOBYTES_PER_MEBIBYTE = 1024L
 
 internal interface ConnectionXrayBinary : XrayProcessBinary {
-    suspend fun ensureRootBinaryExtracted(): Boolean
-    suspend fun ensureAndroidBinaryAvailable(): Boolean
+    suspend fun ensureAvailable(): Boolean
     suspend fun readConfig(): String?
     suspend fun readOverrideConfig(): String?
     suspend fun writeConfig(configJson: String)
 }
 
-// Extracting the bundled core, and reading or writing config.json, are file operations that must
-// not run on whichever thread the caller happens to be on; the service issues connection commands
-// on the main thread.
+// Checking the bundled core, and reading or writing config.json, are file operations that must not
+// run on whichever thread the caller happens to be on; the service issues connection commands on
+// the main thread.
 internal class XrayBinaryConnectionAdapter(
     private val binary: XrayBinary,
 ) : ConnectionXrayBinary {
-    override val rootBinaryPath: String
-        get() = binary.rootBinaryPath
-    override val androidBinaryPath: String?
-        get() = binary.androidBinaryPath
+    override val binaryPath: String?
+        get() = binary.binaryPath
+    override val tunLauncherPath: String?
+        get() = binary.tunLauncherPath
 
     override fun configPath(): String = binary.configPath()
 
-    override suspend fun ensureRootBinaryExtracted(): Boolean = withContext(Dispatchers.IO) {
-        binary.ensureRootBinaryExtracted()
-    }
-
-    override suspend fun ensureAndroidBinaryAvailable(): Boolean = withContext(Dispatchers.IO) {
-        binary.ensureAndroidBinaryAvailable()
-    }
+    override suspend fun ensureAvailable(): Boolean = withContext(Dispatchers.IO) { binary.ensureAvailable() }
 
     override suspend fun readConfig(): String? = withContext(Dispatchers.IO) { binary.readConfig() }
 
@@ -471,7 +464,7 @@ class ConnectionManagerFactory(
             ),
             apiClientFactory = AndroidConnectionApiClientFactory(),
             xrayRoutingUpdater = XrayCliRoutingUpdater(
-                binaryPath = { xrayBinary.androidBinaryPath },
+                binaryPath = { xrayBinary.binaryPath },
                 binDir = environment.binDir,
             ),
             prepareCertificateBundle = {

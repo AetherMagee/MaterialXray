@@ -381,7 +381,7 @@ class ConfigGeneratorTest {
         )
         val appRoute = AppProxyRoute(
             inboundTag = "app-in-1",
-            tunName = "xray1",
+            routeIndex = 1,
             outboundTag = "app-proxy-1",
             server = vlessReality.copy(
                 bootstrapDnsHosts = mapOf(
@@ -556,7 +556,7 @@ class ConfigGeneratorTest {
     }
 
     @Test
-    fun `adds app specific tun inbound outbound and route`() {
+    fun `adds app specific outbound and source matched route on the shared TUN inbound`() {
         val appServer = vlessReality.copy(name = "Apps", address = "5.6.7.8")
         val config = generator.generate(
             vlessReality,
@@ -564,23 +564,16 @@ class ConfigGeneratorTest {
             appProxyRoutes = listOf(
                 AppProxyRoute(
                     inboundTag = "app-in-42",
-                    tunName = "xray0a1",
+                    routeIndex = 1,
                     outboundTag = "app-proxy-42",
                     server = appServer,
                 ),
             ),
         )
         val json = Json.parseToJsonElement(config).jsonObject
-        assertTrue(
-            json["inbounds"]!!.jsonArray.all { inbound ->
-                inbound.jsonObject["settings"]!!.jsonObject["MTU"]!!.jsonPrimitive.int == 1400
-            },
-        )
-
-        val appInbound = json["inbounds"]!!.jsonArray.first {
-            it.jsonObject["tag"]?.jsonPrimitive?.content == "app-in-42"
-        }.jsonObject
-        assertEquals("xray0a1", appInbound["settings"]!!.jsonObject["name"]!!.jsonPrimitive.content)
+        val inbound = json["inbounds"]!!.jsonArray.single().jsonObject
+        assertEquals("tun-in", inbound["tag"]!!.jsonPrimitive.content)
+        assertEquals(1400, inbound["settings"]!!.jsonObject["MTU"]!!.jsonPrimitive.int)
 
         val appOutbound = json["outbounds"]!!.jsonArray.first {
             it.jsonObject["tag"]?.jsonPrimitive?.content == "app-proxy-42"
@@ -590,7 +583,8 @@ class ConfigGeneratorTest {
         val appRoute = json["routing"]!!.jsonObject["rules"]!!.jsonArray.first {
             it.jsonObject["outboundTag"]?.jsonPrimitive?.content == "app-proxy-42"
         }.jsonObject
-        assertEquals("app-in-42", appRoute["inboundTag"]!!.jsonArray.single().jsonPrimitive.content)
+        assertEquals("tun-in", appRoute["inboundTag"]!!.jsonArray.single().jsonPrimitive.content)
+        assertEquals(TunManager.appRouteSourceAddresses(1), appRoute.sourceAddresses())
     }
 
     @Test
@@ -603,7 +597,7 @@ class ConfigGeneratorTest {
             appProxyRoutes = listOf(
                 AppProxyRoute(
                     inboundTag = "app-in-default-selected",
-                    tunName = "xray0a1",
+                    routeIndex = 1,
                     outboundTag = "proxy",
                     server = appServer,
                     applyRoutingRules = true,
@@ -623,7 +617,7 @@ class ConfigGeneratorTest {
             it["domain"]?.jsonArray?.any { domain -> domain.jsonPrimitive.content == "domain:ru" } == true
         }
         val fallbackIndex = rules.indexOfFirst {
-            it["inboundTag"]?.jsonArray?.singleOrNull()?.jsonPrimitive?.content == "app-in-default-selected" &&
+            it.sourceAddresses() == TunManager.appRouteSourceAddresses(1) &&
                 it["outboundTag"]?.jsonPrimitive?.content == "proxy"
         }
 
@@ -638,7 +632,7 @@ class ConfigGeneratorTest {
             appProxyRoutes = listOf(
                 AppProxyRoute(
                     inboundTag = "app-in-always-proxied",
-                    tunName = "xray0a1",
+                    routeIndex = 1,
                     outboundTag = "proxy",
                     server = vlessReality,
                 ),
@@ -646,7 +640,7 @@ class ConfigGeneratorTest {
         )
         val rules = Json.parseToJsonElement(config).jsonObject["routing"]!!.jsonObject["rules"]!!.jsonArray.map { it.jsonObject }
         val forcedIndex = rules.indexOfFirst {
-            it["inboundTag"]?.jsonArray?.singleOrNull()?.jsonPrimitive?.content == "app-in-always-proxied" &&
+            it.sourceAddresses() == TunManager.appRouteSourceAddresses(1) &&
                 it["outboundTag"]?.jsonPrimitive?.content == "proxy"
         }
         val regularIndex = rules.indexOfFirst {
@@ -670,7 +664,7 @@ class ConfigGeneratorTest {
             appProxyRoutes = listOf(
                 AppProxyRoute(
                     inboundTag = "app-in-42",
-                    tunName = "xray0a1",
+                    routeIndex = 1,
                     outboundTag = "app-proxy-42",
                     server = appServer,
                     applyRoutingRules = true,
@@ -683,7 +677,7 @@ class ConfigGeneratorTest {
             it["domain"]?.jsonArray?.any { domain -> domain.jsonPrimitive.content == "domain:ru" } == true
         }
         val fallbackIndex = rules.indexOfFirst {
-            it["inboundTag"]?.jsonArray?.singleOrNull()?.jsonPrimitive?.content == "app-in-42" &&
+            it.sourceAddresses() == TunManager.appRouteSourceAddresses(1) &&
                 it["outboundTag"]?.jsonPrimitive?.content == "app-proxy-42"
         }
         assertTrue(regularIndex in 0 until fallbackIndex)
@@ -693,4 +687,6 @@ class ConfigGeneratorTest {
             },
         )
     }
+
+    private fun JsonObject.sourceAddresses(): List<String> = this["source"]?.jsonArray?.map { it.jsonPrimitive.content }.orEmpty()
 }

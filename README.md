@@ -118,26 +118,26 @@ Releases before `v0.5.0` do not have attestations.
 
 ### Runtime and native assets
 
-Only `arm64-v8a` is currently packaged. Root mode uses `app/src/main/assets/xray_arm64`. Rootless mode uses `app/src/main/jniLibs/arm64-v8a/libxray.so`, launched through the JNI shim in `app/src/main/cpp/xray_launcher.c`.
+Only `arm64-v8a` is currently packaged. Both modes run the official Android Xray build from `app/src/main/jniLibs/arm64-v8a/libxray.so`. Rootless mode launches it through the JNI shim in `app/src/main/cpp/xray_launcher.c`; root TUN mode launches it through `app/src/main/cpp/xray_tun_exec.c`, which creates the TUN interface and hands Xray its descriptor.
 
 Each APK build downloads the latest `geoip.dat` and `geosite.dat` from `v2fly/geoip` and `v2fly/domain-list-community` and bundles them as assets. On first use, the app copies the bundled files into Xray's data directory, so a new installation can connect without downloading geodata. The app also queues a one-time background sync on first launch; its download does not delay tunnel startup. Later updates and custom download URLs remain available in Settings. APK builds require access to those release assets.
 
-In rootful TUN mode, the service manages the tunnel interface and routing. Rootful mode binds outbound connections to the physical network interface to avoid routing loops, watches Wi-Fi and cellular changes, and retargets the connection when needed. Rootless mode passes Android's VPN TUN file descriptor to Xray and excludes Material Xray itself from the VPN to prevent routing loops, relying on Android's network routing rather than the rootful retargeting logic.
+In rootful TUN mode, the service manages the tunnel interface and routing. Every per-app proxy group shares that one interface: each group's routing table gives its traffic a distinct source address, and Xray routes on that address. Rootful mode binds outbound connections to the physical network interface to avoid routing loops, watches Wi-Fi and cellular changes, and retargets the connection when needed. Rootless mode passes Android's VPN TUN file descriptor to Xray and excludes Material Xray itself from the VPN to prevent routing loops, relying on Android's network routing rather than the rootful retargeting logic.
 
-Update the bundled Xray binaries with:
+Update the bundled Xray binary with:
 
 ```sh
 ./scripts/download-xray.sh
 ```
 
-The script uses the version recorded in `third_party/xray/VERSION`, or accepts an Xray release tag as an argument. It downloads both arm64 builds, verifies the published SHA-256 digests, preserves Xray's license, and records hashes under `third_party/xray/`.
+The script uses the version recorded in `third_party/xray/VERSION`, or accepts an Xray release tag as an argument. It downloads the arm64 Android build, verifies the published SHA-256 digests, preserves Xray's license, and records hashes under `third_party/xray/`.
 
 ### Project layout
 
 ```text
 app/src/main/kotlin/com/material/xray/
   core/root/      Root shell execution
-  core/xray/      Xray binaries, configuration, TUN, and routing
+  core/xray/      Xray binary, configuration, TUN, and routing
   data/           Database, repositories, and subscription parsing
   model/          Server and connection state models
   service/        Connection service, logs, and boot receiver
