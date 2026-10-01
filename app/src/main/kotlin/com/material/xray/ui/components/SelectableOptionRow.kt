@@ -14,6 +14,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
@@ -32,13 +33,16 @@ fun SelectableOptionRow(
     selected: Boolean,
     onSelected: () -> Unit,
     modifier: Modifier = Modifier,
+    enabled: Boolean = true,
 ) {
     Row(
         modifier = modifier
+            .alpha(if (enabled) 1f else 0.38f)
             .fillMaxWidth()
             .heightIn(min = 48.dp)
             .selectable(
                 selected = selected,
+                enabled = enabled,
                 interactionSource = null,
                 indication = null,
                 onClick = onSelected,

@@ -232,7 +232,6 @@ private fun SettingsScreenContent(
     val geoDataUpdateIntervalHours = settings.geoDataUpdateIntervalHours
     val latencyCheckUrl = settings.latencyCheckUrl
     val sortOutboundsByLatency = settings.sortOutboundsByLatency
-    val showBothLatencyResults = settings.showBothLatencyResults
     val appUpdateChecksEnabled = settings.appUpdateChecksEnabled
     val diagnosticsEnabled = settings.diagnosticsEnabled
     val context = LocalContext.current
@@ -439,13 +438,6 @@ private fun SettingsScreenContent(
                         description = stringResource(R.string.settings_sort_outbounds_by_latency_description),
                         checked = sortOutboundsByLatency,
                         onCheckedChange = viewModel::setSortOutboundsByLatency,
-                    )
-
-                    SettingsSwitchRow(
-                        title = stringResource(R.string.settings_show_both_latency_results_title),
-                        description = stringResource(R.string.settings_show_both_latency_results_description),
-                        checked = showBothLatencyResults,
-                        onCheckedChange = viewModel::setShowBothLatencyResults,
                     )
 
                     NotificationSettingsSection(

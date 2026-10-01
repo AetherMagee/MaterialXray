@@ -27,8 +27,6 @@
     <string name="settings_dns_custom_supporting_text">Через запятую, в порядке приоритета. IP-адрес или URL, например https://dns.quad9.net/dns-query.</string>
     <string name="settings_sort_outbounds_by_latency_title">Сортировать серверы по задержке</string>
     <string name="settings_sort_outbounds_by_latency_description">Показывать доступные серверы от быстрых к медленным, а недоступные — в конце</string>
-    <string name="settings_show_both_latency_results_title">Показывать оба типа задержки</string>
-    <string name="settings_show_both_latency_results_description">Показывать задержку прямого соединения и реальную сквозную задержку</string>
     <string name="settings_xray_log_level_label">Уровень журналирования Xray</string>
     <string name="settings_xray_buffer_size_label">Размер буфера Xray</string>
     <string name="settings_xray_buffer_size_supporting_text">Буфер пользовательского пространства для каждого запроса. Диапазон: %1$d–%2$d КиБ. По умолчанию: %3$d КиБ.</string>

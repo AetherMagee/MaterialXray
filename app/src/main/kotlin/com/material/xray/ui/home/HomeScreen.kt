@@ -59,6 +59,7 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.TextAutoSize
@@ -84,6 +85,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ElevatedCard
@@ -422,6 +424,7 @@ fun HomeScreen(
                         servers = servers,
                         selectedServerId = uiState.selectedServerId,
                         defaultPingMethod = uiState.defaultPingMethod,
+                        showBothLatencyResults = uiState.showBothLatencyResults,
                         canApplyRouting = manualRouting.appRouting != null || manualRouting.routing != null,
                         canCollapse = subscriptions.size > 1,
                         expanded = subscription.id !in collapsedSubscriptionIds,
@@ -462,6 +465,7 @@ fun HomeScreen(
                             onRefresh = { viewModel.refreshSubscription(subscription) },
                             onTestAll = { viewModel.testSubscriptionLatencies(subscription) },
                             onDefaultPingMethodSelected = { viewModel.setDefaultPingMethod(it) },
+                            onShowBothLatencyResultsChange = viewModel::setShowBothLatencyResults,
                             onApplyRouting = { viewModel.requestApplySubscriptionRouting(subscription) },
                             onDescriptionHiddenChange = { hidden ->
                                 viewModel.setSubscriptionDescriptionHidden(subscription.id, hidden)
@@ -1180,6 +1184,7 @@ private fun collectHomeUiState(viewModel: HomeViewModel): HomeUiState {
     val serversBySubscription by viewModel.serversBySubscription.collectAsStateWithLifecycle()
     val refreshingSubscriptionIds by viewModel.refreshingSubscriptionIds.collectAsStateWithLifecycle()
     val defaultPingMethod by viewModel.defaultPingMethod.collectAsStateWithLifecycle()
+    val showBothLatencyResults by viewModel.showBothLatencyResults.collectAsStateWithLifecycle()
     val routingPolicyControl by viewModel.routingPolicyControl.collectAsStateWithLifecycle()
     val providerRoutingAvailability by viewModel.providerRoutingAvailability.collectAsStateWithLifecycle()
     val pendingSubscriptionRouting by viewModel.pendingSubscriptionRouting.collectAsStateWithLifecycle()
@@ -1203,6 +1208,7 @@ private fun collectHomeUiState(viewModel: HomeViewModel): HomeUiState {
         serversBySubscription = serversBySubscription,
         refreshingSubscriptionIds = refreshingSubscriptionIds,
         defaultPingMethod = defaultPingMethod,
+        showBothLatencyResults = showBothLatencyResults,
         routingPolicyControl = routingPolicyControl,
         providerRoutingAvailability = providerRoutingAvailability,
         pendingSubscriptionRouting = pendingSubscriptionRouting,
@@ -1267,6 +1273,7 @@ private data class HomeUiState(
     val serversBySubscription: Map<Long, List<ServerListItem>>,
     val refreshingSubscriptionIds: Set<Long>,
     val defaultPingMethod: PingMethod,
+    val showBothLatencyResults: Boolean,
     val routingPolicyControl: RoutingPolicyControl,
     val providerRoutingAvailability: ProviderRoutingAvailability?,
     val pendingSubscriptionRouting: SubscriptionRoutingData?,
@@ -1944,6 +1951,7 @@ private data class SubscriptionCardActions(
     val onRefresh: () -> Unit,
     val onTestAll: () -> Unit,
     val onDefaultPingMethodSelected: (PingMethod) -> Unit,
+    val onShowBothLatencyResultsChange: (Boolean) -> Unit,
     val onApplyRouting: () -> Unit,
     val onDescriptionHiddenChange: (Boolean) -> Unit,
     val onServerSelected: (Long) -> Unit,
@@ -1959,6 +1967,7 @@ private fun SubscriptionCard(
     servers: List<ServerListItem>,
     selectedServerId: Long,
     defaultPingMethod: PingMethod,
+    showBothLatencyResults: Boolean,
     canApplyRouting: Boolean,
     canCollapse: Boolean,
     expanded: Boolean,
@@ -2016,6 +2025,7 @@ private fun SubscriptionCard(
                 isRefreshing = isRefreshing,
                 metadata = metadata,
                 defaultPingMethod = defaultPingMethod,
+                showBothLatencyResults = showBothLatencyResults,
                 canCollapse = canCollapse,
                 expanded = expanded,
                 reorderModifier = reorderModifier,
@@ -2169,6 +2179,7 @@ private fun SubscriptionHeader(
     isRefreshing: Boolean,
     metadata: SubscriptionMetadataUiState,
     defaultPingMethod: PingMethod,
+    showBothLatencyResults: Boolean,
     canCollapse: Boolean,
     expanded: Boolean,
     reorderModifier: Modifier,
@@ -2411,6 +2422,8 @@ private fun SubscriptionHeader(
     if (showPingMethodDialog) {
         PingMethodDialog(
             selectedMethod = defaultPingMethod,
+            testBoth = showBothLatencyResults,
+            onTestBothChange = actions.onShowBothLatencyResultsChange,
             onDismiss = { showPingMethodDialog = false },
             onSelected = { method ->
                 actions.onDefaultPingMethodSelected(method)
@@ -2423,6 +2436,8 @@ private fun SubscriptionHeader(
 @Composable
 private fun PingMethodDialog(
     selectedMethod: PingMethod,
+    testBoth: Boolean,
+    onTestBothChange: (Boolean) -> Unit,
     onDismiss: () -> Unit,
     onSelected: (PingMethod) -> Unit,
 ) {
@@ -2441,8 +2456,29 @@ private fun PingMethodDialog(
                         title = stringResource(method.labelResource),
                         description = stringResource(method.descriptionResource),
                         selected = method == selectedMethod,
+                        enabled = !testBoth,
                         onSelected = { onSelected(method) },
                     )
+                }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 48.dp)
+                        .toggleable(
+                            value = testBoth,
+                            role = Role.Checkbox,
+                            onValueChange = onTestBothChange,
+                        )
+                        .padding(vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Checkbox(
+                        checked = testBoth,
+                        onCheckedChange = null,
+                        modifier = Modifier.size(20.dp),
+                    )
+                    Text(stringResource(R.string.home_test_both_latency_types_title))
                 }
             }
         },

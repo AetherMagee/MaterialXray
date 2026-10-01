@@ -137,6 +137,7 @@
     <string name="home_move_up">Move up</string>
     <string name="home_move_down">Move down</string>
     <string name="home_choose_ping_method_title">Choose method</string>
+    <string name="home_test_both_latency_types_title">Test both latency types</string>
     <string name="home_open_link_title">Open link?</string>
 
     <string name="home_latency_testing">Testing&#8230;</string>

@@ -200,7 +200,7 @@ class HomeViewModel(
 
     val defaultPingMethod: StateFlow<PingMethod> = settingsRepo.defaultPingMethod
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), PingMethod.default)
-    private val showBothLatencyResults: StateFlow<Boolean> = settingsRepo.showBothLatencyResults
+    val showBothLatencyResults: StateFlow<Boolean> = settingsRepo.showBothLatencyResults
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     val routingPolicyControl: StateFlow<RoutingPolicyControl> = settingsRepo.routingPolicyControl
@@ -504,6 +504,12 @@ class HomeViewModel(
     fun setDefaultPingMethod(method: PingMethod) {
         viewModelScope.launch {
             settingsRepo.setDefaultPingMethod(method)
+        }
+    }
+
+    fun setShowBothLatencyResults(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsRepo.setShowBothLatencyResults(enabled)
         }
     }
 

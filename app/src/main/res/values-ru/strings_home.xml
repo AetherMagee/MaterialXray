@@ -142,6 +142,7 @@
     <string name="home_move_up">Переместить вверх</string>
     <string name="home_move_down">Переместить вниз</string>
     <string name="home_choose_ping_method_title">Выберите способ</string>
+    <string name="home_test_both_latency_types_title">Проверять оба типа задержки</string>
     <string name="home_open_link_title">Открыть ссылку?</string>
 
     <string name="home_latency_testing">Проверка&#8230;</string>

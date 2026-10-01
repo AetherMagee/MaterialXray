@@ -368,9 +368,6 @@ class SettingsViewModel(
     fun setSortOutboundsByLatency(enabled: Boolean) = viewModelScope.launch {
         settingsRepo.setSortOutboundsByLatency(enabled)
     }
-    fun setShowBothLatencyResults(enabled: Boolean) = viewModelScope.launch {
-        settingsRepo.setShowBothLatencyResults(enabled)
-    }
 
     fun resetInternalDatabase() {
         if (_databaseResetting.value) return
