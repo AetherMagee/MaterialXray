@@ -16,6 +16,7 @@ import com.material.xray.data.repository.PreparedBackupImport
 import com.material.xray.data.repository.ProviderRoutingCoordinator
 import com.material.xray.data.repository.SettingsRepository
 import com.material.xray.model.AppUpdateCheckStatus
+import com.material.xray.model.AppUpdateInterval
 import com.material.xray.model.ConnectionState
 import com.material.xray.model.GeoDataUpdateInterval
 import com.material.xray.model.LauncherIcon
@@ -328,6 +329,9 @@ class SettingsViewModel(
     fun setAppUpdateChecksEnabled(enabled: Boolean) = viewModelScope.launch {
         if (enabled == currentSettings().appUpdateChecksEnabled) return@launch
         settingsRuntimeManager.setAppUpdateChecksEnabled(enabled)
+    }
+    fun setAppUpdateInterval(interval: AppUpdateInterval) = viewModelScope.launch {
+        settingsRuntimeManager.setAppUpdateInterval(interval)
     }
     fun checkForAppUpdate() {
         if (_appUpdateCheckStatus.value?.isInProgress == true) return

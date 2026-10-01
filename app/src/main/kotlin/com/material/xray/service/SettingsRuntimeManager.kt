@@ -10,6 +10,7 @@ import com.material.xray.core.xray.TproxyCompatibilityDetector
 import com.material.xray.core.xray.XrayBinary
 import com.material.xray.core.xray.isConclusive
 import com.material.xray.data.repository.SettingsRepository
+import com.material.xray.model.AppUpdateInterval
 import com.material.xray.model.ConnectionState
 import com.material.xray.model.LauncherIcon
 import com.material.xray.model.RootConnectionBackend
@@ -53,7 +54,12 @@ class SettingsRuntimeManager(
 
     suspend fun setAppUpdateChecksEnabled(enabled: Boolean) {
         settingsRepository.setAppUpdateChecksEnabled(enabled)
-        appUpdateScheduler.setEnabled(enabled)
+        appUpdateScheduler.setEnabled(enabled, settingsRepository.appUpdateInterval.first())
+    }
+
+    suspend fun setAppUpdateInterval(interval: AppUpdateInterval) {
+        settingsRepository.setAppUpdateInterval(interval)
+        appUpdateScheduler.setEnabled(true, interval)
     }
 
     suspend fun setUseRootService(enabled: Boolean): Boolean {

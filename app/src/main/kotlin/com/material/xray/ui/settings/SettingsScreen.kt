@@ -28,9 +28,11 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -64,6 +66,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -120,6 +123,7 @@ import com.material.xray.core.xray.TproxyCompatibility
 import com.material.xray.data.repository.BackupSummary
 import com.material.xray.data.repository.SettingsSnapshot
 import com.material.xray.model.AppUpdateCheckStatus
+import com.material.xray.model.AppUpdateInterval
 import com.material.xray.model.GeoDataUpdateInterval
 import com.material.xray.model.LauncherIcon
 import com.material.xray.model.NotificationField
@@ -257,6 +261,7 @@ private fun SettingsScreenContent(
     var showUpdateFrequencyDialog by rememberSaveable { mutableStateOf(false) }
     var showResetDatabaseDialog by rememberSaveable { mutableStateOf(false) }
     var showOpenSourceLicensesDialog by rememberSaveable { mutableStateOf(false) }
+    var showAppUpdateIntervalDialog by rememberSaveable { mutableStateOf(false) }
     var geoDataToDelete by rememberSaveable { mutableStateOf<GeoDataAsset?>(null) }
     var showClearGeoDataDialog by rememberSaveable { mutableStateOf(false) }
     val rootServiceAvailable = rootAvailable != false
@@ -984,10 +989,10 @@ private fun SettingsScreenContent(
                 }
             }
             item(key = "update_checks") {
-                SettingsSwitchRow(
-                    title = stringResource(R.string.settings_app_update_checks_title),
-                    description = stringResource(R.string.settings_app_update_checks_description),
+                AppUpdateSetting(
                     checked = appUpdateChecksEnabled,
+                    interval = settings.appUpdateInterval,
+                    onClick = { showAppUpdateIntervalDialog = true },
                     onCheckedChange = viewModel::setAppUpdateChecksEnabled,
                 )
             }
@@ -1064,6 +1069,16 @@ private fun SettingsScreenContent(
     )
     if (showOpenSourceLicensesDialog) {
         OpenSourceLicensesDialog(onDismiss = { showOpenSourceLicensesDialog = false })
+    }
+    if (showAppUpdateIntervalDialog) {
+        AppUpdateIntervalDialog(
+            current = settings.appUpdateInterval,
+            onDismiss = { showAppUpdateIntervalDialog = false },
+            onConfirm = {
+                viewModel.setAppUpdateInterval(it)
+                showAppUpdateIntervalDialog = false
+            },
+        )
     }
     geoDataToDelete?.let { asset ->
         DeleteGeoDataDialog(
@@ -1796,6 +1811,78 @@ private fun AdvancedIntegerSetting(
             Text(stringResource(R.string.settings_save))
         }
     }
+}
+
+@Composable
+private fun AppUpdateSetting(
+    checked: Boolean,
+    interval: AppUpdateInterval,
+    onClick: () -> Unit,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min).padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(
+            modifier = Modifier.weight(1f).clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 12.dp),
+        ) {
+            Text(stringResource(R.string.settings_app_update_checks_title), style = MaterialTheme.typography.bodyLarge)
+            if (checked) {
+                Text(
+                    stringResource(interval.descriptionResource),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        VerticalDivider(modifier = Modifier.fillMaxHeight().padding(vertical = 12.dp))
+        Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+            Switch(checked = checked, onCheckedChange = onCheckedChange)
+        }
+    }
+}
+
+@Composable
+private fun AppUpdateIntervalDialog(
+    current: AppUpdateInterval,
+    onDismiss: () -> Unit,
+    onConfirm: (AppUpdateInterval) -> Unit,
+) {
+    var selectedHours by rememberSaveable { mutableStateOf(current.hours) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.settings_app_update_interval_title)) },
+        text = {
+            Column {
+                AppUpdateInterval.entries.forEach { interval ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .selectable(
+                                selected = interval.hours == selectedHours,
+                                role = Role.RadioButton,
+                                onClick = { selectedHours = interval.hours },
+                            )
+                            .padding(vertical = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(selected = interval.hours == selectedHours, onClick = null)
+                        Text(stringResource(interval.labelResource))
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(AppUpdateInterval.fromHours(selectedHours)) }) {
+                Text(stringResource(R.string.settings_ok))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.settings_cancel)) }
+        },
+    )
 }
 
 @Composable

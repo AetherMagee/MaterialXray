@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.material.xray.model.AppUpdateInterval
 import com.material.xray.model.DnsPreset
 import com.material.xray.model.GeoDataUpdateInterval
 import com.material.xray.model.LauncherIcon
@@ -65,6 +66,7 @@ data class SettingsSnapshot(
     val sortOutboundsByLatency: Boolean,
     val showBothLatencyResults: Boolean,
     val appUpdateChecksEnabled: Boolean,
+    val appUpdateInterval: AppUpdateInterval,
     val diagnosticsNoticeShown: Boolean,
     val diagnosticsEnabled: Boolean,
 )
@@ -141,6 +143,7 @@ class SettingsRepository(
         val SUBSCRIPTION_SEND_HWID = booleanPreferencesKey("subscription_send_hwid")
         val SUBSCRIPTION_PREFER_JSON = booleanPreferencesKey("subscription_prefer_json")
         val APP_UPDATE_CHECKS_ENABLED = booleanPreferencesKey("app_update_checks_enabled")
+        val APP_UPDATE_INTERVAL_HOURS = intPreferencesKey("app_update_interval_hours")
         val DIAGNOSTICS_NOTICE_SHOWN = booleanPreferencesKey("diagnostics_notice_shown")
         val DIAGNOSTICS_ENABLED = booleanPreferencesKey("diagnostics_enabled")
         private val LEGACY_GEO_DATA_BASE_URL = stringPreferencesKey("geo_data_base_url")
@@ -320,6 +323,9 @@ class SettingsRepository(
     val appUpdateChecksEnabled: Flow<Boolean> = store.data.map { prefs ->
         prefs[APP_UPDATE_CHECKS_ENABLED] ?: true
     }
+    val appUpdateInterval: Flow<AppUpdateInterval> = store.data.map { prefs ->
+        AppUpdateInterval.fromHours(prefs[APP_UPDATE_INTERVAL_HOURS])
+    }
     val diagnosticsEnabled: Flow<Boolean> = store.data.map { prefs ->
         prefs[DIAGNOSTICS_ENABLED] ?: true
     }
@@ -376,6 +382,7 @@ class SettingsRepository(
             sortOutboundsByLatency = prefs[SORT_OUTBOUNDS_BY_LATENCY] ?: false,
             showBothLatencyResults = prefs[SHOW_BOTH_LATENCY_RESULTS] ?: false,
             appUpdateChecksEnabled = prefs[APP_UPDATE_CHECKS_ENABLED] ?: true,
+            appUpdateInterval = AppUpdateInterval.fromHours(prefs[APP_UPDATE_INTERVAL_HOURS]),
             diagnosticsNoticeShown = prefs[DIAGNOSTICS_NOTICE_SHOWN] ?: false,
             diagnosticsEnabled = prefs[DIAGNOSTICS_ENABLED] ?: true,
         )
@@ -507,6 +514,11 @@ class SettingsRepository(
     }
     suspend fun setAppUpdateChecksEnabled(enabled: Boolean) = store.edit { prefs ->
         prefs[APP_UPDATE_CHECKS_ENABLED] = enabled
+    }
+
+    suspend fun setAppUpdateInterval(interval: AppUpdateInterval) = store.edit { prefs ->
+        prefs[APP_UPDATE_INTERVAL_HOURS] = interval.hours
+        prefs[APP_UPDATE_CHECKS_ENABLED] = true
     }
     suspend fun setDiagnosticsEnabled(enabled: Boolean) {
         if (!enabled) diagnosticsConsentMirror.setEnabled(false)
@@ -675,6 +687,9 @@ class SettingsRepository(
             map["subscription_send_hwid"]?.toBooleanStrictOrNull()?.let { prefs[SUBSCRIPTION_SEND_HWID] = it }
             map["subscription_prefer_json"]?.toBooleanStrictOrNull()?.let { prefs[SUBSCRIPTION_PREFER_JSON] = it }
             map["app_update_checks_enabled"]?.toBooleanStrictOrNull()?.let { prefs[APP_UPDATE_CHECKS_ENABLED] = it }
+            map["app_update_interval_hours"]?.toIntOrNull()?.let {
+                prefs[APP_UPDATE_INTERVAL_HOURS] = AppUpdateInterval.fromHours(it).hours
+            }
             map["geoip_url"]?.takeIf { it.isNotBlank() }?.let { prefs[GEOIP_URL] = it }
             map["geosite_url"]?.takeIf { it.isNotBlank() }?.let { prefs[GEOSITE_URL] = it }
             map["geo_data_update_interval_hours"]

@@ -6,6 +6,7 @@ import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
+import com.material.xray.model.AppUpdateInterval
 import java.util.concurrent.TimeUnit
 import org.koin.core.annotation.Singleton
 
@@ -13,18 +14,18 @@ import org.koin.core.annotation.Singleton
 class AppUpdateScheduler(
     private val context: Context,
 ) {
-    fun setEnabled(enabled: Boolean) {
+    fun setEnabled(enabled: Boolean, interval: AppUpdateInterval) {
         val workManager = WorkManager.getInstance(context)
         workManager.cancelUniqueWork(LEGACY_IMMEDIATE_WORK_NAME)
         if (enabled) {
-            schedule()
+            schedule(interval)
         } else {
             workManager.cancelUniqueWork(PERIODIC_WORK_NAME)
         }
     }
 
-    private fun schedule() {
-        val request = PeriodicWorkRequestBuilder<AppUpdateWorker>(REPEAT_INTERVAL_HOURS, TimeUnit.HOURS)
+    private fun schedule(interval: AppUpdateInterval) {
+        val request = PeriodicWorkRequestBuilder<AppUpdateWorker>(interval.hours.toLong(), TimeUnit.HOURS)
             .setConstraints(networkConstraints())
             .build()
 
@@ -42,6 +43,5 @@ class AppUpdateScheduler(
     private companion object {
         const val PERIODIC_WORK_NAME = "app_update_check"
         const val LEGACY_IMMEDIATE_WORK_NAME = "app_update_check_now"
-        const val REPEAT_INTERVAL_HOURS = 8L
     }
 }

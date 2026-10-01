@@ -2,6 +2,7 @@ package com.material.xray.ui.text
 
 import androidx.annotation.StringRes
 import com.material.xray.R
+import com.material.xray.model.AppUpdateInterval
 import com.material.xray.model.LauncherIcon
 import com.material.xray.model.NotificationField
 import com.material.xray.model.NotificationStyle
@@ -11,6 +12,24 @@ import com.material.xray.model.RoutingPolicyControl
 import com.material.xray.model.SubscriptionUserAgentMode
 import com.material.xray.model.XrayLogLevel
 import com.material.xray.model.XrayOutbound
+
+@get:StringRes
+val AppUpdateInterval.labelResource: Int
+    get() = when (this) {
+        AppUpdateInterval.TwelveHours -> R.string.settings_update_interval_twelve_hours
+        AppUpdateInterval.OneDay -> R.string.settings_update_interval_one_day
+        AppUpdateInterval.ThreeDays -> R.string.settings_update_interval_three_days
+        AppUpdateInterval.OneWeek -> R.string.settings_update_interval_one_week
+    }
+
+@get:StringRes
+val AppUpdateInterval.descriptionResource: Int
+    get() = when (this) {
+        AppUpdateInterval.TwelveHours -> R.string.settings_update_interval_twelve_hours_description
+        AppUpdateInterval.OneDay -> R.string.settings_update_interval_one_day_description
+        AppUpdateInterval.ThreeDays -> R.string.settings_update_interval_three_days_description
+        AppUpdateInterval.OneWeek -> R.string.settings_update_interval_one_week_description
+    }
 
 @get:StringRes
 val PingMethod.labelResource: Int

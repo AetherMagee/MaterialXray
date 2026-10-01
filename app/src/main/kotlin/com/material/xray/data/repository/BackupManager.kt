@@ -235,7 +235,10 @@ class BackupManager(
 
     private suspend fun applyExternalSettings() {
         launcherIconManager.apply(settingsRepository.launcherIcon.first())
-        appUpdateScheduler.setEnabled(settingsRepository.appUpdateChecksEnabled.first())
+        appUpdateScheduler.setEnabled(
+            settingsRepository.appUpdateChecksEnabled.first(),
+            settingsRepository.appUpdateInterval.first(),
+        )
     }
 
     private suspend fun rollbackAfterFailure(previous: BackupData, original: Throwable) {

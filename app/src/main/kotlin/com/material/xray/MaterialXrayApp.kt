@@ -100,7 +100,10 @@ class MaterialXrayApp : Application() {
             runCatching { startupDiagnosticsLogger.logIfMissing() }
                 .onFailure { error -> Log.e(LOG_TAG, "Unable to record startup diagnostics", error) }
             launcherIconManager.apply(settingsRepository.launcherIcon.first())
-            appUpdateScheduler.setEnabled(settingsRepository.appUpdateChecksEnabled.first())
+            appUpdateScheduler.setEnabled(
+                settingsRepository.appUpdateChecksEnabled.first(),
+                settingsRepository.appUpdateInterval.first(),
+            )
             subscriptionUpdateScheduler.schedulePeriodicUpdates()
             subscriptionUpdateScheduler.enqueueDueCheckNow(STARTUP_BACKGROUND_WORK_DELAY_SECONDS)
         }

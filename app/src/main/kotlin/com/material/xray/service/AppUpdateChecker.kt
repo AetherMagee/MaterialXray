@@ -35,7 +35,7 @@ class AppUpdateChecker(
         onStatus: suspend (AppUpdateCheckStatus) -> Unit = {},
     ): AppUpdate? = checkMutex.withLock {
         if (!manual && !settingsRepository.appUpdateChecksEnabled.first()) return@withLock null
-        val minimumIntervalMillis = if (manual) 0L else MINIMUM_AUTOMATIC_CHECK_INTERVAL_MILLIS
+        val minimumIntervalMillis = if (manual) 0L else settingsRepository.appUpdateInterval.first().hours * 60 * 60 * 1000L
         if (!repository.claimUpdateCheck(System.currentTimeMillis(), minimumIntervalMillis)) return@withLock null
         val update = repository.checkForUpdate(onStatus)
         if (!manual && !settingsRepository.appUpdateChecksEnabled.first()) {
@@ -48,10 +48,6 @@ class AppUpdateChecker(
             repository.markNotified(update.tagName)
         }
         update
-    }
-
-    private companion object {
-        const val MINIMUM_AUTOMATIC_CHECK_INTERVAL_MILLIS = 60 * 60 * 1000L
     }
 }
 

@@ -132,7 +132,15 @@
     <string name="settings_internal_database_reset_failed">Не удалось сбросить внутреннюю базу данных</string>
     <string name="settings_section_about">О приложении</string>
     <string name="settings_app_update_checks_title">Автоматически проверять обновления</string>
-    <string name="settings_app_update_checks_description">Проверять новые выпуски на GitHub каждые 8 часов</string>
+    <string name="settings_app_update_interval_title">Проверять обновления каждые...</string>
+    <string name="settings_update_interval_twelve_hours">12 часов (по умолчанию)</string>
+    <string name="settings_update_interval_one_day">1 день</string>
+    <string name="settings_update_interval_three_days">3 дня</string>
+    <string name="settings_update_interval_one_week">1 неделю</string>
+    <string name="settings_update_interval_twelve_hours_description">Проверять новые версии на GitHub каждые 12 часов</string>
+    <string name="settings_update_interval_one_day_description">Проверять новые версии на GitHub каждый день</string>
+    <string name="settings_update_interval_three_days_description">Проверять новые версии на GitHub каждые 3 дня</string>
+    <string name="settings_update_interval_one_week_description">Проверять новые версии на GitHub каждую неделю</string>
     <string name="settings_check_for_updates">Проверить обновления</string>
     <string name="settings_open_source_licenses">Лицензии открытого ПО</string>
     <string name="settings_open_source_licenses_description">Авторские права, условия лицензий и информация об исходном коде</string>
