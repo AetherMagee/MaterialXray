@@ -172,6 +172,15 @@ internal fun buildDnsOutbound(fwmark: Int, physicalInterface: String?, allowIpv6
     put("streamSettings", buildJsonObject { put("sockopt", buildSockopt(fwmark, physicalInterface, allowIpv6)) })
 }
 
+internal const val OTHER_VPN_OUTBOUND_TAG = "other-vpn"
+
+/** Reaches resolvers inside another app's VPN, which the protected outbounds above skip. */
+internal fun buildOtherVpnOutbound(otherVpnDns: OtherVpnDns, allowIpv6: Boolean = false) = buildJsonObject {
+    put("tag", OTHER_VPN_OUTBOUND_TAG)
+    put("protocol", "freedom")
+    put("streamSettings", buildJsonObject { put("sockopt", buildSockopt(otherVpnDns.socketMark, null, allowIpv6)) })
+}
+
 internal fun buildBlockOutbound() = buildJsonObject {
     put("tag", "block")
     put("protocol", "blackhole")

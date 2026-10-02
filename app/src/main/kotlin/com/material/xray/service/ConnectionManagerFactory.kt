@@ -1,6 +1,8 @@
 package com.material.xray.service
 
 import android.content.Context
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.os.SystemClock
 import androidx.annotation.StringRes
 import com.material.xray.R
@@ -12,6 +14,7 @@ import com.material.xray.core.xray.CleanupManager
 import com.material.xray.core.xray.ConfigGenerator
 import com.material.xray.core.xray.GeoDataManager
 import com.material.xray.core.xray.GeoDataStatus
+import com.material.xray.core.xray.OtherVpnDns
 import com.material.xray.core.xray.ProviderGeoDataManager
 import com.material.xray.core.xray.ProviderGeoDataResolution
 import com.material.xray.core.xray.ServerAddressResolver
@@ -56,6 +59,9 @@ internal interface ConnectionEnvironment {
     fun allocateLoopbackApiPort(): Int
     fun elapsedRealtime(): Long
     fun localizedString(@StringRes resourceId: Int, vararg arguments: Any): String
+
+    /** The private DNS zone of a VPN another app runs; root mode never owns a VPN itself. */
+    fun otherVpnDns(): OtherVpnDns?
 }
 
 internal class AndroidConnectionEnvironment(
@@ -79,6 +85,26 @@ internal class AndroidConnectionEnvironment(
     override fun elapsedRealtime(): Long = SystemClock.elapsedRealtime()
 
     override fun localizedString(resourceId: Int, vararg arguments: Any): String = context.localizedString(resourceId, *arguments)
+
+    // Android runs one VPN per user. While it is being re-established the old network can linger
+    // briefly, so the newest netId wins.
+    @Suppress("DEPRECATION") // allNetworks is the only listing of every network, VPNs included.
+    override fun otherVpnDns(): OtherVpnDns? {
+        val connectivityManager = context.getSystemService(ConnectivityManager::class.java) ?: return null
+        return connectivityManager.allNetworks.mapNotNull { network ->
+            val capabilities = connectivityManager.getNetworkCapabilities(network)
+            val linkProperties = connectivityManager.getLinkProperties(network)
+            if (capabilities?.hasTransport(NetworkCapabilities.TRANSPORT_VPN) != true || linkProperties == null) {
+                return@mapNotNull null
+            }
+            OtherVpnDns.of(
+                // Network's string form is its netId, which Android's socket marks carry.
+                netId = network.toString().toIntOrNull() ?: return@mapNotNull null,
+                servers = linkProperties.dnsServers.mapNotNull { it.hostAddress },
+                searchDomains = linkProperties.domains,
+            )
+        }.maxByOrNull { it.netId }
+    }
 }
 
 internal interface ConnectionRootRuntime {

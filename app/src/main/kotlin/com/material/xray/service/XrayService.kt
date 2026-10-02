@@ -1572,6 +1572,18 @@ class XrayService(
                 connectivityManager.registerNetworkCallback(physicalNetworkRequest, callback)
             }
         }
+        // Another app's VPN may not be this app's default network, yet its DNS still has to be followed.
+        val vpnNetworkRequest = NetworkRequest.Builder()
+            .addTransportType(NetworkCapabilities.TRANSPORT_VPN)
+            .removeCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
+            .build()
+        registerNetworkWatcher("VPN") { callback ->
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                connectivityManager.registerNetworkCallback(vpnNetworkRequest, callback, callbackHandler)
+            } else {
+                connectivityManager.registerNetworkCallback(vpnNetworkRequest, callback)
+            }
+        }
         networkCallbacksAvailable = defaultRegistered || physicalRegistered
     }
 
@@ -1702,6 +1714,13 @@ class XrayService(
         val latestConfig = activeConfig ?: return@runConnectionCommand NetworkRetargetResult.Done
         val latestState = connectionStateCoordinator.state.value as? ConnectionState.Connected
             ?: return@runConnectionCommand NetworkRetargetResult.Done
+        if (connectionManager.otherVpnDnsChanged()) {
+            logBuffer.append(LogSource.APP, "Network changed ($reason), reconnecting to follow the other VPN's DNS")
+            stopProcessWatchdog()
+            connectionStateCoordinator.startConnection(ConnectionState.Connecting)
+            restartRuntime(latestConfig)
+            return@runConnectionCommand NetworkRetargetResult.Done
+        }
         val previousNetwork = activePhysicalNetwork
         val currentNetwork = currentPhysicalNetworkSnapshot()
         val currentRoute = withContext(ioDispatcher) {

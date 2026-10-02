@@ -38,10 +38,13 @@ internal class RawConfigTunInjector(
         xrayBufferSizeKiB: Int = XrayRuntimeSettings.DEFAULT_XRAY_BUFFER_SIZE_KIB,
         tunMtu: Int = XrayRuntimeSettings.DEFAULT_TUN_MTU,
         inbounds: List<XrayInbound>? = null,
+        otherVpnDns: OtherVpnDns? = null,
     ): String {
         val original = Json.parseToJsonElement(rawJson).jsonObject.toMutableMap()
         val profileDns = (original["dns"] as? JsonObject)?.takeIf { preferProfileDns }
             ?.withBootstrapDnsHosts(bootstrapDnsHosts)
+        // The profile's own resolvers are left as written.
+        val managedOtherVpnDns = otherVpnDns.takeIf { profileDns == null }
         val effectiveInbounds = inbounds ?: listOf(XrayInbound.Tun(tunName, TUN_INBOUND_TAG, tunMtu))
         original["inbounds"] = JsonArray(effectiveInbounds.map(XrayInbound::toJson))
 
@@ -79,7 +82,7 @@ internal class RawConfigTunInjector(
                 } ?: buildDnsOutbound(fwmark, physicalInterface, allowIpv6),
                 blockOutbound = buildBlockOutbound(),
                 appProxyOutbounds = appProxyOutbounds,
-            ) + unmanagedOutbounds,
+            ) + listOfNotNull(managedOtherVpnDns?.let { buildOtherVpnOutbound(it, allowIpv6) }) + unmanagedOutbounds,
         )
         original["log"] = buildLogConfig(logLevel)
         original["dns"] = profileDns ?: buildDns(
@@ -89,6 +92,7 @@ internal class RawConfigTunInjector(
             routingRules,
             bypassLan,
             allowIpv6,
+            managedOtherVpnDns,
         )
         original["api"] = buildStatsApi(
             endpoint = xrayApiEndpoint,
@@ -116,6 +120,7 @@ internal class RawConfigTunInjector(
                 allowIpv6 = allowIpv6,
                 dataInboundTags = effectiveInbounds.map { it.tag },
                 manageDns = profileDns == null,
+                otherVpnDns = managedOtherVpnDns,
             ),
             raw = rawRouting,
             dataInboundTags = effectiveInbounds.map { it.tag },
@@ -225,6 +230,7 @@ internal class RawConfigTunInjector(
         add("direct")
         add("dns-out")
         add("block")
+        add(OTHER_VPN_OUTBOUND_TAG)
         appProxyRoutes.filter { it.outboundTag != "proxy" }.forEach { add(it.outboundTag) }
     }
 

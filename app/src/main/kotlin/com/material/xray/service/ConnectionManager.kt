@@ -3,6 +3,7 @@ package com.material.xray.service
 import android.os.ParcelFileDescriptor
 import com.material.xray.R
 import com.material.xray.core.xray.ConfigGenerator
+import com.material.xray.core.xray.OtherVpnDns
 import com.material.xray.core.xray.PROTECTED_FROM_VPN_MARK
 import com.material.xray.core.xray.TUN_INBOUND_TAG
 import com.material.xray.core.xray.TetherIngressState
@@ -668,12 +669,16 @@ internal class ConnectionManager(
             return null
         }
 
+        val followsOtherVpnDns = tproxyPlan != null &&
+            !configGenerator.usesProfileDns(xrayServer, runtimeSettings.preferProfileDns)
         val generatedConfig = GeneratedXrayConfig(
             server = xrayServer,
             runtimeSettings = runtimeSettings,
             managesSystemRouting = managesSystemRouting,
             rootBackend = rootBackend,
             fwmark = outboundMark,
+            followsOtherVpnDns = followsOtherVpnDns,
+            otherVpnDns = if (followsOtherVpnDns) environment.otherVpnDns()?.forIpv6(runtimeSettings.allowIpv6) else null,
             appRoutingPlan = appRoutingPlan,
             physicalRoute = physicalRoute.takeUnless { unboundTproxy },
             xrayApiEndpoint = xrayApiEndpoint,
@@ -698,6 +703,7 @@ internal class ConnectionManager(
             ),
         )
         log.append(LogSource.APP, "Config written to ${xrayBinary.configPath()} (${configJson.length} chars)")
+        generatedConfig.otherVpnDns?.let { log.append(LogSource.APP, "Other VPN DNS: ${it.describe()}") }
         return generatedConfig
     }
 
@@ -725,7 +731,20 @@ internal class ConnectionManager(
             xrayBufferSizeKiB = settings.xrayBufferSizeKiB,
             tunMtu = settings.tunMtu,
             inbounds = config.inbounds,
+            otherVpnDns = config.otherVpnDns,
         )
+    }
+
+    /**
+     * Whether another app's VPN changed the private DNS zone the running config routes to it. Xray
+     * cannot reload DNS settings, so the caller has to reconnect to pick the change up.
+     */
+    fun otherVpnDnsChanged(): Boolean {
+        val config = activeGeneratedConfig?.takeIf { it.followsOtherVpnDns } ?: return false
+        val current = environment.otherVpnDns()?.forIpv6(config.runtimeSettings.allowIpv6)
+        if (current == config.otherVpnDns) return false
+        log.append(LogSource.APP, "Other VPN DNS changed: ${config.otherVpnDns.describe()} -> ${current.describe()}")
+        return true
     }
 
     /**
@@ -1775,12 +1794,16 @@ private data class GeneratedXrayConfig(
     val managesSystemRouting: Boolean,
     val rootBackend: RootConnectionBackend,
     val fwmark: Int,
+    val followsOtherVpnDns: Boolean,
+    val otherVpnDns: OtherVpnDns?,
     val appRoutingPlan: AppRoutingPlan,
     val physicalRoute: TunManager.PhysicalRoute?,
     val xrayApiEndpoint: XrayApiEndpoint,
     val syntheticDnsAddress: String?,
     val inbounds: List<XrayInbound>?,
 )
+
+private fun OtherVpnDns?.describe(): String = this?.let { "${it.domains.joinToString()} via ${it.servers.joinToString()} (net ${it.netId})" } ?: "none"
 
 private fun String.toJsonObjectOrNull(): JsonObject? = runCatching {
     Json.parseToJsonElement(this) as? JsonObject

@@ -13,6 +13,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
 
 class ConfigGenerator {
@@ -40,6 +41,7 @@ class ConfigGenerator {
         xrayBufferSizeKiB: Int = XrayRuntimeSettings.DEFAULT_XRAY_BUFFER_SIZE_KIB,
         tunMtu: Int = XrayRuntimeSettings.DEFAULT_TUN_MTU,
         inbounds: List<XrayInbound>? = null,
+        otherVpnDns: OtherVpnDns? = null,
     ): String {
         val effectiveInbounds = inbounds ?: listOf(XrayInbound.Tun(tunName, TUN_INBOUND_TAG, tunMtu))
         val dataInboundTags = effectiveInbounds.map { it.tag }
@@ -71,12 +73,13 @@ class ConfigGenerator {
                 xrayBufferSizeKiB = xrayBufferSizeKiB,
                 tunMtu = tunMtu,
                 inbounds = effectiveInbounds,
+                otherVpnDns = otherVpnDns,
             )
         }
 
         val config = buildJsonObject {
             put("log", buildLogConfig(logLevel))
-            put("dns", buildDns(dnsServers, domesticDnsServers, bootstrapDnsHosts, routingRules, bypassLan, allowIpv6))
+            put("dns", buildDns(dnsServers, domesticDnsServers, bootstrapDnsHosts, routingRules, bypassLan, allowIpv6, otherVpnDns))
             put(
                 "inbounds",
                 buildJsonArray {
@@ -96,6 +99,7 @@ class ConfigGenerator {
                             buildProxyOutbound(route.server, fwmark, physicalInterface, tag = route.outboundTag, allowIpv6 = allowIpv6)
                         },
                     ).forEach { add(it) }
+                    otherVpnDns?.let { add(buildOtherVpnOutbound(it, allowIpv6)) }
                 },
             )
             put("api", buildStatsApi(xrayApiEndpoint))
@@ -114,6 +118,7 @@ class ConfigGenerator {
                     domainMatcher = routingDomainMatcher,
                     allowIpv6 = allowIpv6,
                     dataInboundTags = dataInboundTags,
+                    otherVpnDns = otherVpnDns,
                 ),
             )
         }
@@ -143,6 +148,7 @@ class ConfigGenerator {
         xrayBufferSizeKiB: Int = XrayRuntimeSettings.DEFAULT_XRAY_BUFFER_SIZE_KIB,
         tunMtu: Int = XrayRuntimeSettings.DEFAULT_TUN_MTU,
         inbounds: List<XrayInbound>? = null,
+        otherVpnDns: OtherVpnDns? = null,
     ): String = RawConfigTunInjector(json).inject(
         rawJson = rawJson,
         tunName = tunName,
@@ -165,6 +171,7 @@ class ConfigGenerator {
         xrayBufferSizeKiB = xrayBufferSizeKiB,
         tunMtu = tunMtu,
         inbounds = inbounds,
+        otherVpnDns = otherVpnDns,
     )
 
     /**
@@ -236,6 +243,11 @@ class ConfigGenerator {
             }
         }
     }
+
+    /** Whether a raw profile's own DNS replaces the generated one, which leaves another VPN's zone out. */
+    fun usesProfileDns(server: ServerConfig, preferProfileDns: Boolean): Boolean = preferProfileDns &&
+        server.rawConfigJson.isNotBlank() &&
+        runCatching { json.parseToJsonElement(server.rawConfigJson).jsonObject["dns"] is JsonObject }.getOrDefault(false)
 
     private fun bootstrapDnsHosts(
         server: ServerConfig,

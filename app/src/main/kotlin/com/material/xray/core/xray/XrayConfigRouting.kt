@@ -17,6 +17,7 @@ import kotlinx.serialization.json.put
 internal const val TUN_INBOUND_TAG = "tun-in"
 private const val DEFAULT_DNS_TAG = "default-dns"
 private const val DOMESTIC_DNS_TAG = "domestic-dns"
+private const val OTHER_VPN_DNS_TAG = "other-vpn-dns"
 private const val SYSTEM_DNS_SERVER = "localhost"
 
 internal sealed interface XrayRouteTarget {
@@ -32,6 +33,7 @@ internal fun buildDns(
     routingRules: List<RoutingRule> = emptyList(),
     bypassLan: Boolean = false,
     allowIpv6: Boolean = false,
+    otherVpnDns: OtherVpnDns? = null,
 ) = buildJsonObject {
     val domesticDomains = directDomains(routingRules, bypassLan)
     val defaultServers = resolveDnsServersForIpv6(servers, allowIpv6).map(String::toReliableXrayDnsAddress)
@@ -54,6 +56,17 @@ internal fun buildDns(
     put(
         "servers",
         buildJsonArray {
+            // Listed first so the VPN's own zone wins over any other server matching the same names.
+            otherVpnDns?.serversFor(allowIpv6)?.forEach { server ->
+                add(
+                    buildJsonObject {
+                        put("address", server)
+                        put("domains", buildJsonArray { otherVpnDns.domains.forEach { add("domain:$it") } })
+                        put("skipFallback", true)
+                        put("tag", OTHER_VPN_DNS_TAG)
+                    },
+                )
+            }
             if (defaultServers.isEmpty()) {
                 add(SYSTEM_DNS_SERVER)
             } else {
@@ -90,6 +103,7 @@ internal fun buildRouting(
     allowIpv6: Boolean = false,
     dataInboundTags: List<String> = listOf(TUN_INBOUND_TAG),
     manageDns: Boolean = true,
+    otherVpnDns: OtherVpnDns? = null,
 ) = buildJsonObject {
     val hasDomesticDomains = directDomains(routingRules, bypassLan).isNotEmpty()
     val forcedRoutes = appProxyRoutes.filterNot { it.applyRoutingRules }
@@ -117,6 +131,9 @@ internal fun buildRouting(
                 add(syntheticDnsPeerBlockRule(inboundTagMatcher(interceptedDnsInboundTags), syntheticDnsAddress))
             }
             if (manageDns && interceptedDnsInboundTags.isNotEmpty()) add(dnsOverTlsRoutingRule(interceptedDnsInboundTags))
+            if (manageDns && otherVpnDns?.serversFor(allowIpv6)?.isNotEmpty() == true) {
+                add(otherVpnDnsRoutingRule())
+            }
             // These two rules address the tags buildDns emits, so they have to be decided from the
             // same resolved lists. A stored list that IPv6 filtering empties leaves no tag to route.
             if (manageDns && resolveDnsServersForIpv6(dnsServers, allowIpv6).isNotEmpty()) {
@@ -206,6 +223,12 @@ private fun defaultDnsRoutingRule(target: XrayRouteTarget) = buildJsonObject {
         is XrayRouteTarget.Outbound -> put("outboundTag", target.tag)
         is XrayRouteTarget.Balancer -> put("balancerTag", target.tag)
     }
+}
+
+private fun otherVpnDnsRoutingRule() = buildJsonObject {
+    put("type", "field")
+    put("inboundTag", buildJsonArray { add(OTHER_VPN_DNS_TAG) })
+    put("outboundTag", OTHER_VPN_OUTBOUND_TAG)
 }
 
 private fun domesticDnsRoutingRule() = buildJsonObject {

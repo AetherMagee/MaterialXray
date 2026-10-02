@@ -3,6 +3,7 @@ package com.material.xray.service
 import com.material.xray.R
 import com.material.xray.core.xray.ConfigGenerator
 import com.material.xray.core.xray.GeoDataStatus
+import com.material.xray.core.xray.OtherVpnDns
 import com.material.xray.core.xray.PROTECTED_FROM_VPN_MARK
 import com.material.xray.core.xray.ProviderGeoDataResolution
 import com.material.xray.core.xray.TproxyManager
@@ -500,6 +501,60 @@ class ConnectionManagerTest {
             assertEquals(PROTECTED_FROM_VPN_MARK, sockopt["mark"]?.jsonPrimitive?.int)
             assertFalse(sockopt.containsKey("interface"))
         }
+    }
+
+    @Test
+    fun `TPROXY routes another VPN's DNS zone and notices when it changes`() = runTest {
+        val harness = Harness()
+        val tailscale = OtherVpnDns(netId = 161, servers = listOf("100.100.100.100"), domains = listOf("van-morpho.ts.net"))
+        harness.environment.vpnDns = tailscale
+
+        harness.manager.connect(
+            server(),
+            runtimeSettings().copy(rootConnectionBackend = RootConnectionBackend.Tproxy),
+            preparation = ConnectionPreparation.ReusePreparedRuntime,
+        )
+
+        val config = Json.parseToJsonElement(requireNotNull(harness.binary.configJson)).jsonObject
+        val firstDnsServer = config.getValue("dns").jsonObject.getValue("servers").jsonArray.first().jsonObject
+        assertEquals("100.100.100.100", firstDnsServer.getValue("address").jsonPrimitive.content)
+        assertFalse(harness.manager.otherVpnDnsChanged())
+
+        harness.environment.vpnDns = tailscale.copy(netId = 162)
+        assertTrue(harness.manager.otherVpnDnsChanged())
+        harness.environment.vpnDns = null
+        assertTrue(harness.manager.otherVpnDnsChanged())
+    }
+
+    @Test
+    fun `profile DNS does not follow another VPN's DNS`() = runTest {
+        val harness = Harness()
+        harness.environment.vpnDns = OtherVpnDns(netId = 161, servers = listOf("100.100.100.100"), domains = listOf("van-morpho.ts.net"))
+        val rawServer = server().copy(
+            rawConfigJson = """{"dns":{"servers":["9.9.9.9"]},"outbounds":[{"tag":"proxy","protocol":"vless","settings":{}}]}""",
+        )
+
+        harness.manager.connect(
+            rawServer,
+            runtimeSettings().copy(rootConnectionBackend = RootConnectionBackend.Tproxy, preferProfileDns = true),
+            preparation = ConnectionPreparation.ReusePreparedRuntime,
+        )
+
+        assertFalse(requireNotNull(harness.binary.configJson).contains("100.100.100.100"))
+        harness.environment.vpnDns = null
+        assertFalse(harness.manager.otherVpnDnsChanged())
+    }
+
+    @Test
+    fun `root TUN leaves another VPN's DNS alone`() = runTest {
+        val harness = Harness()
+        harness.environment.vpnDns = OtherVpnDns(netId = 161, servers = listOf("100.100.100.100"), domains = listOf("van-morpho.ts.net"))
+
+        harness.manager.connect(server(), runtimeSettings(), preparation = ConnectionPreparation.ReusePreparedRuntime)
+
+        assertFalse(requireNotNull(harness.binary.configJson).contains("100.100.100.100"))
+        harness.environment.vpnDns = null
+        assertFalse(harness.manager.otherVpnDnsChanged())
     }
 
     @Test
@@ -1108,6 +1163,9 @@ class ConnectionManagerTest {
         override fun localizedString(resourceId: Int, vararg arguments: Any): String = message(resourceId)
 
         fun message(resourceId: Int): String = "message:$resourceId"
+
+        var vpnDns: OtherVpnDns? = null
+        override fun otherVpnDns(): OtherVpnDns? = vpnDns
     }
 
     private class FakeRootRuntime : ConnectionRootRuntime {
