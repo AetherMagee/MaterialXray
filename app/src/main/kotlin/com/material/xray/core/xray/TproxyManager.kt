@@ -6,6 +6,7 @@ import com.material.xray.core.root.RootShell
 import com.material.xray.core.root.shellQuote
 import com.material.xray.core.xray.FirewallCommands.IPV4
 import com.material.xray.core.xray.FirewallCommands.IPV6
+import com.material.xray.model.OtherVpnMode
 
 data class TproxyTrafficGroup(
     val state: TproxyGroupState,
@@ -81,7 +82,7 @@ class TproxyManager internal constructor(
         }
         if (
             overlappingFwmarkRules(sections[0], state.markPrefix, state.markMask).any {
-                it.priority <= state.rulePriority
+                it.priority <= state.rulePriority && !isOtherVpnMirrorRule(it)
             }
         ) {
             return TunManager.RoutingResult(success = false, error = "TPROXY packet-mark namespace conflicts with an existing rule")
@@ -139,6 +140,27 @@ class TproxyManager internal constructor(
     suspend fun update(plan: TproxyTrafficPlan, currentSlot: String): TunManager.RoutingResult {
         val nextSlot = if (currentSlot == SLOT_A) SLOT_B else SLOT_A
         return execute(updateCommand(plan, appUid, currentSlot, nextSlot), "TPROXY app routing update")
+    }
+
+    /**
+     * Mirrors other VPNs' uid-range rules ahead of the core's, so that for the apps such a VPN
+     * covers, whatever it routes goes into it. Sockets VPN apps protect keep going to the core,
+     * which carries the VPN's own traffic, and destinations it does not route fall through.
+     */
+    suspend fun syncOtherVpnRules(state: TproxyRuntimeState): TunManager.RoutingResult {
+        val families = if (state.ipv6Enabled) listOf("ip", "ip -6") else listOf("ip")
+        val selector = otherVpnMarkSelector(state.markPrefix, state.markMask)
+        val commands = families.flatMap { ipCommand ->
+            val listing = executeCommand("$ipCommand rule show")
+            if (!listing.isSuccess) return listing.toRoutingResult("Other VPN rule listing")
+            val wanted = MirroredVpnRule.vpnRules(listing.output)
+            val installed = MirroredVpnRule.mirroredRules(listing.output, selector)
+            // Adding first leaves no moment where a covered app's open connection lands on the core.
+            (wanted - installed).map { "$ipCommand rule add ${it.selector(selector)}" } +
+                (installed - wanted).map { "$ipCommand rule del ${it.selector(selector)}" }
+        }
+        if (commands.isEmpty()) return TunManager.RoutingResult(success = true)
+        return execute(commands.shellAnd(), "Other VPN rule sync")
     }
 
     suspend fun updateTetherAddresses(plan: TproxyTrafficPlan): TunManager.RoutingResult {
@@ -364,6 +386,9 @@ class TproxyManager internal constructor(
         // Run before Android's first fwmark rule (normally priority 10000). Group marking preserves
         // Android's low fwmark fields, so those rules must not consume intercepted packets first.
         const val RULE_PRIORITY = 9_990
+
+        // Tunnel-in-tunnel copies of other VPNs' rules, consulted just before the core's.
+        const val OTHER_VPN_RULE_PRIORITY = 9_980
         private const val ACTIVATION_INSPECTION_SEPARATOR = "__MXRAY_TPROXY_ROUTES__"
         private const val COMMAND_NOT_FOUND_EXIT_CODE = 127
 
@@ -376,6 +401,8 @@ class TproxyManager internal constructor(
             bypassLan: Boolean = true,
             localAddresses: List<String> = emptyList(),
             dynamicLocalAddresses: Boolean = false,
+            otherVpnMode: OtherVpnMode = OtherVpnMode.default,
+            otherVpnRoutes: List<String> = emptyList(),
         ): TproxyRuntimeState {
             require(groups.isNotEmpty())
             require(groups.size == ports.size)
@@ -402,8 +429,18 @@ class TproxyManager internal constructor(
                 bypassLan = bypassLan,
                 localAddresses = localAddresses,
                 dynamicLocalAddresses = dynamicLocalAddresses,
+                otherVpnMode = otherVpnMode,
+                otherVpnRoutes = if (otherVpnMode == OtherVpnMode.AutoRouting) {
+                    otherVpnBypassRoutes(otherVpnRoutes, bypassLan, allowIpv6)
+                } else {
+                    emptyList()
+                },
             )
         }
+
+        /** What the output chain returns for every app, and what it adds with LAN bypass on. */
+        internal val alwaysReturnedCidrs get() = outputReturnedCidrs(IPV4) + outputReturnedCidrs(IPV6)
+        internal val lanReturnedCidrs get() = localLanCidrs(IPV4) + localLanCidrs(IPV6)
 
         fun activationCommand(plan: TproxyTrafficPlan, appUid: Int): String {
             validatePlan(plan, appUid)
@@ -702,6 +739,10 @@ class TproxyManager internal constructor(
             val priority = state?.rulePriority ?: RULE_PRIORITY
             val prefix = hex(state?.markPrefix ?: TproxyCompatibilityDetector.MARK_PREFIX)
             val mask = hex(state?.markMask ?: TproxyCompatibilityDetector.MARK_MASK)
+            val mirrorSelector = otherVpnMarkSelector(
+                state?.markPrefix ?: TproxyCompatibilityDetector.MARK_PREFIX,
+                state?.markMask ?: TproxyCompatibilityDetector.MARK_MASK,
+            )
             val commands = mutableListOf<String>()
             for (tool in FirewallCommands.tools) {
                 commands += "$tool -t mangle -D PREROUTING -j ${names.guard}P 2>/dev/null || true"
@@ -749,6 +790,8 @@ class TproxyManager internal constructor(
             commands += discoveredRouteTableCleanupCommand("ip -6", prefix, mask, priority)
             commands += "while ip rule del fwmark $prefix/$mask pref $priority 2>/dev/null; do :; done"
             commands += "while ip -6 rule del fwmark $prefix/$mask pref $priority 2>/dev/null; do :; done"
+            commands += "while ip rule del fwmark $mirrorSelector pref $OTHER_VPN_RULE_PRIORITY 2>/dev/null; do :; done"
+            commands += "while ip -6 rule del fwmark $mirrorSelector pref $OTHER_VPN_RULE_PRIORITY 2>/dev/null; do :; done"
             table?.let {
                 commands += "ip route del local 0.0.0.0/0 dev lo table $it 2>/dev/null || true"
                 commands += "ip -6 route del local ::/0 dev lo table $it 2>/dev/null || true"
@@ -765,6 +808,7 @@ class TproxyManager internal constructor(
                 for (ipCommand in listOf("ip", "ip -6")) {
                     add("rules=\$($ipCommand rule show) || false")
                     add("! printf '%s\\n' \"\$rules\" | grep -Fq 'fwmark $prefix/$mask'")
+                    add("! printf '%s\\n' \"\$rules\" | grep -Fq 'fwmark $mirrorSelector'")
                     table?.let { routeTable ->
                         add("routes=\$($ipCommand route show table $routeTable) || false")
                         add("[ -z \"\$routes\" ]")
@@ -1244,11 +1288,9 @@ class TproxyManager internal constructor(
                     )
                 }
             }
-            val loopback = if (tool == IPV6) "::1/128" else "127.0.0.0/8"
-            val multicast = if (tool == IPV6) "ff00::/8" else "224.0.0.0/4"
-            add("$tool -t mangle -A $chain -d $loopback -j RETURN")
-            add("$tool -t mangle -A $chain -d $multicast -j RETURN")
-            if (tool == IPV4) add("$tool -t mangle -A $chain -d 255.255.255.255/32 -j RETURN")
+            outputReturnedCidrs(tool).forEach { cidr ->
+                add("$tool -t mangle -A $chain -d $cidr -j RETURN")
+            }
             uidRanges(plan.bypassUids - appUid).forEach { range ->
                 add("$tool -t mangle -A $chain -m owner --uid-owner ${range.asArgument()} -j RETURN")
             }
@@ -1277,6 +1319,10 @@ class TproxyManager internal constructor(
                 localLanCidrs(tool).forEach { cidr ->
                     add("$tool -t mangle -A $chain -d $cidr -m mark ! --mark $prefix/$mask -j RETURN")
                 }
+            }
+            // Auto-routing leaves another VPN's own networks to it, the same way as the LAN.
+            state.otherVpnRoutes.filter { (':' in it) == (tool == IPV6) }.forEach { cidr ->
+                add("$tool -t mangle -A $chain -d $cidr -m mark ! --mark $prefix/$mask -j RETURN")
             }
             ruleGroups.forEach { group ->
                 uidRanges(group.uids).forEach { range ->
@@ -1326,6 +1372,12 @@ class TproxyManager internal constructor(
             IPV6_ALWAYS_BYPASS_CIDRS + IPV6_LAN_CIDRS.takeIf { bypassLan }.orEmpty()
         } else {
             IPV4_ALWAYS_BYPASS_CIDRS + IPV4_LAN_CIDRS.takeIf { bypassLan }.orEmpty()
+        }
+
+        private fun outputReturnedCidrs(tool: String): List<String> = if (tool == IPV6) {
+            listOf("::1/128", "ff00::/8")
+        } else {
+            listOf("127.0.0.0/8", "224.0.0.0/4", "255.255.255.255/32")
         }
 
         private fun localLanCidrs(tool: String): List<String> = if (tool == IPV6) {

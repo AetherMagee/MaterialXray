@@ -22,6 +22,7 @@ import com.material.xray.model.GeoDataUpdateInterval
 import com.material.xray.model.LauncherIcon
 import com.material.xray.model.NotificationField
 import com.material.xray.model.NotificationStyle
+import com.material.xray.model.OtherVpnMode
 import com.material.xray.model.RootConnectionBackend
 import com.material.xray.model.RoutingPolicyControl
 import com.material.xray.model.XrayLogLevel
@@ -215,6 +216,11 @@ class SettingsViewModel(
     fun setTunnelTetheredClients(enabled: Boolean) = viewModelScope.launch {
         if (enabled == currentSettings().tunnelTetheredClients) return@launch
         settingsRepo.setTunnelTetheredClients(enabled)
+        reloadActiveConnectionIfConnected()
+    }
+    fun setOtherVpnMode(mode: OtherVpnMode) = viewModelScope.launch {
+        if (mode == currentSettings().otherVpnMode) return@launch
+        settingsRepo.setOtherVpnMode(mode)
         reloadActiveConnectionIfConnected()
     }
     fun setAllowIpv6(enabled: Boolean) = viewModelScope.launch {

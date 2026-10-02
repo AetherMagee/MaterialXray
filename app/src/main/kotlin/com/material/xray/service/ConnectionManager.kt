@@ -7,15 +7,18 @@ import com.material.xray.core.xray.OtherVpnDns
 import com.material.xray.core.xray.PROTECTED_FROM_VPN_MARK
 import com.material.xray.core.xray.TUN_INBOUND_TAG
 import com.material.xray.core.xray.TetherIngressState
+import com.material.xray.core.xray.TproxyRuntimeState
 import com.material.xray.core.xray.TproxyTrafficPlan
 import com.material.xray.core.xray.TunManager
 import com.material.xray.core.xray.XrayApiEndpoint
 import com.material.xray.core.xray.XrayInbound
 import com.material.xray.core.xray.XrayState
 import com.material.xray.core.xray.XraySysStats
+import com.material.xray.core.xray.otherVpnBypassRoutes
 import com.material.xray.core.xray.parseXrayApiEndpoint
 import com.material.xray.model.ConnectionProgress
 import com.material.xray.model.ConnectionState
+import com.material.xray.model.OtherVpnMode
 import com.material.xray.model.RootConnectionBackend
 import com.material.xray.model.RoutingRule
 import com.material.xray.model.ServerConfig
@@ -385,6 +388,8 @@ internal class ConnectionManager(
                 allowIpv6 = runtimeSettings.allowIpv6,
                 tetherUpstreamInterface = physicalRoute?.dev?.takeIf { runtimeSettings.tunnelTetheredClients },
                 bypassLan = runtimeSettings.bypassLan,
+                otherVpnMode = runtimeSettings.otherVpnMode,
+                otherVpnRoutes = environment.otherVpnRoutes(),
             ),
         )
     }
@@ -933,7 +938,13 @@ internal class ConnectionManager(
                     return@coroutineScope false
                 }
                 lastTproxyAuditAt = environment.elapsedRealtime()
+                if (tproxyPlan.runtimeState.otherVpnMode == OtherVpnMode.TunnelInTunnel) {
+                    syncOtherVpnRules(tproxyPlan.runtimeState)
+                }
                 if (!ensureProcessAliveAfterSetup(pid)) return@coroutineScope false
+                tproxyPlan.runtimeState.otherVpnRoutes.takeIf { it.isNotEmpty() }?.let { routes ->
+                    log.append(LogSource.APP, "Left to the other VPN: ${routes.joinToString()}")
+                }
                 log.append(LogSource.APP, "TPROXY routing applied")
                 finishTransitionGuard()
             }
@@ -1285,6 +1296,47 @@ internal class ConnectionManager(
 
         val persistedState = stateStore.read() ?: return false
         val tproxyState = persistedState.tproxy ?: return false
+        return updateTproxyOutput(connectedState, runtimeSettings, persistedState, tproxyState)
+    }
+
+    /**
+     * Keeps the running TPROXY firewall in step with another app's VPN as it comes, goes or
+     * changes its routes. Neither mode needs the core restarted for that. The mode is the one the
+     * firewall was built with; a changed setting arrives with the reconnect it triggers.
+     */
+    suspend fun followOtherVpnRouting(connectedState: ConnectionState.Connected, runtimeSettings: XrayRuntimeSettings) {
+        val persistedState = stateStore.read() ?: return
+        if (persistedState.rootConnectionBackend != RootConnectionBackend.Tproxy) return
+        val tproxyState = persistedState.tproxy ?: return
+        when (tproxyState.otherVpnMode) {
+            OtherVpnMode.AutoRouting -> {
+                val routes = otherVpnBypassRoutes(
+                    environment.otherVpnRoutes(),
+                    tproxyState.bypassLan,
+                    tproxyState.ipv6Enabled,
+                )
+                if (routes == tproxyState.otherVpnRoutes) return
+                log.append(LogSource.APP, "Other VPN routes changed: ${routes.joinToString().ifEmpty { "none" }}")
+                if (!updateTproxyOutput(connectedState, runtimeSettings, persistedState, tproxyState.copy(otherVpnRoutes = routes))) {
+                    log.append(LogSource.APP, "Could not follow the other VPN's routes")
+                }
+            }
+            OtherVpnMode.TunnelInTunnel -> syncOtherVpnRules(tproxyState)
+        }
+    }
+
+    private suspend fun syncOtherVpnRules(state: TproxyRuntimeState) {
+        val result = tproxyGateway.syncOtherVpnRules(state)
+        if (!result.success) log.append(LogSource.APP, "Could not mirror other VPN rules: ${result.error ?: "unknown error"}")
+    }
+
+    /** Rebuilds the inactive output chain from [tproxyState] and swaps it in. */
+    private suspend fun updateTproxyOutput(
+        connectedState: ConnectionState.Connected,
+        runtimeSettings: XrayRuntimeSettings,
+        persistedState: XrayState,
+        tproxyState: TproxyRuntimeState,
+    ): Boolean {
         if (persistedState.appProxyServerIds.isEmpty() && tproxyState.groups.size > 1) return false
         if (!isProcessAlive(connectedState.corePid)) return false
         val appRoutingPlan = appRoutingPlanner.build(

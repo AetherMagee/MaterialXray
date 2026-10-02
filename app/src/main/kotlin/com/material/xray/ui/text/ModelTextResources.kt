@@ -6,6 +6,7 @@ import com.material.xray.model.AppUpdateInterval
 import com.material.xray.model.LauncherIcon
 import com.material.xray.model.NotificationField
 import com.material.xray.model.NotificationStyle
+import com.material.xray.model.OtherVpnMode
 import com.material.xray.model.PingMethod
 import com.material.xray.model.RootConnectionBackend
 import com.material.xray.model.RoutingPolicyControl
@@ -73,6 +74,20 @@ val RoutingPolicyControl.descriptionResource: Int
     get() = when (this) {
         RoutingPolicyControl.User -> R.string.routing_policy_user_description
         RoutingPolicyControl.SubscriptionProvider -> R.string.routing_policy_subscription_provider_description
+    }
+
+@get:StringRes
+val OtherVpnMode.labelResource: Int
+    get() = when (this) {
+        OtherVpnMode.AutoRouting -> R.string.other_vpn_mode_auto_routing_label
+        OtherVpnMode.TunnelInTunnel -> R.string.other_vpn_mode_tunnel_in_tunnel_label
+    }
+
+@get:StringRes
+val OtherVpnMode.descriptionResource: Int
+    get() = when (this) {
+        OtherVpnMode.AutoRouting -> R.string.other_vpn_mode_auto_routing_description
+        OtherVpnMode.TunnelInTunnel -> R.string.other_vpn_mode_tunnel_in_tunnel_description
     }
 
 @get:StringRes

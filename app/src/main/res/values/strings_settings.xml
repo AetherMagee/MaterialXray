@@ -160,6 +160,7 @@
     <string name="settings_section_service">Service</string>
     <string name="settings_use_root_service">Use root service</string>
     <string name="settings_root_connection_backend">Core connection backend</string>
+    <string name="settings_other_vpn_mode">When another VPN is active</string>
     <string name="settings_tunnel_tethered_clients_title">Tunnel tethered clients</string>
     <string name="settings_tunnel_tethered_clients_description">Route Wi-Fi hotspot and USB tethering traffic through Xray.</string>
     <string name="settings_tproxy_unsupported">TPROXY is unsupported on this device</string>

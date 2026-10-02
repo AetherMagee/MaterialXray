@@ -17,6 +17,7 @@ import com.material.xray.core.xray.XraySysStats
 import com.material.xray.model.ActiveBalancerSelection
 import com.material.xray.model.BalancerOutbound
 import com.material.xray.model.ConnectionState
+import com.material.xray.model.OtherVpnMode
 import com.material.xray.model.Protocol
 import com.material.xray.model.RootConnectionBackend
 import com.material.xray.model.RoutingRule
@@ -555,6 +556,45 @@ class ConnectionManagerTest {
         assertFalse(requireNotNull(harness.binary.configJson).contains("100.100.100.100"))
         harness.environment.vpnDns = null
         assertFalse(harness.manager.otherVpnDnsChanged())
+    }
+
+    @Test
+    fun `auto-routing leaves another VPN's networks to it and follows their changes`() = runTest {
+        val harness = Harness()
+        harness.environment.vpnRoutes = listOf("0.0.0.0/0", "203.0.113.0/24")
+        val settings = runtimeSettings().copy(rootConnectionBackend = RootConnectionBackend.Tproxy)
+
+        harness.manager.connect(server(), settings, preparation = ConnectionPreparation.ReusePreparedRuntime)
+        val connected = harness.stateCoordinator.state.value as ConnectionState.Connected
+        assertEquals(listOf("203.0.113.0/24"), harness.stateStore.state?.tproxy?.otherVpnRoutes)
+
+        harness.manager.followOtherVpnRouting(connected, settings)
+        assertTrue(harness.tproxyGateway.updatedStates.isEmpty())
+
+        harness.environment.vpnRoutes = emptyList()
+        harness.manager.followOtherVpnRouting(connected, settings)
+        assertEquals(listOf(emptyList<String>()), harness.tproxyGateway.updatedStates.map { it.otherVpnRoutes })
+        assertEquals(emptyList<String>(), harness.stateStore.state?.tproxy?.otherVpnRoutes)
+        assertEquals(0, harness.tproxyGateway.otherVpnRuleSyncs)
+    }
+
+    @Test
+    fun `tunnel-in-tunnel mirrors VPN rules instead of returning its routes`() = runTest {
+        val harness = Harness()
+        harness.environment.vpnRoutes = listOf("203.0.113.0/24")
+        val settings = runtimeSettings().copy(
+            rootConnectionBackend = RootConnectionBackend.Tproxy,
+            otherVpnMode = OtherVpnMode.TunnelInTunnel,
+        )
+
+        harness.manager.connect(server(), settings, preparation = ConnectionPreparation.ReusePreparedRuntime)
+        val connected = harness.stateCoordinator.state.value as ConnectionState.Connected
+        assertEquals(emptyList<String>(), harness.stateStore.state?.tproxy?.otherVpnRoutes)
+        assertEquals(1, harness.tproxyGateway.otherVpnRuleSyncs)
+
+        harness.manager.followOtherVpnRouting(connected, settings)
+        assertEquals(2, harness.tproxyGateway.otherVpnRuleSyncs)
+        assertTrue(harness.tproxyGateway.updatedStates.isEmpty())
     }
 
     @Test
@@ -1180,6 +1220,9 @@ class ConnectionManagerTest {
 
         var vpnDns: OtherVpnDns? = null
         override fun otherVpnDns(): OtherVpnDns? = vpnDns
+
+        var vpnRoutes: List<String> = emptyList()
+        override fun otherVpnRoutes(): List<String> = vpnRoutes
     }
 
     private class FakeRootRuntime : ConnectionRootRuntime {
@@ -1326,6 +1369,8 @@ class ConnectionManagerTest {
         var verificationCalls = 0
         var healthCalls = 0
         var healthResult = true
+        val updatedStates = mutableListOf<TproxyRuntimeState>()
+        var otherVpnRuleSyncs = 0
 
         override suspend fun createPlan(
             appRoutingPlan: AppRoutingPlan,
@@ -1334,6 +1379,8 @@ class ConnectionManagerTest {
             existingState: TproxyRuntimeState?,
             tetherUpstreamInterface: String?,
             bypassLan: Boolean,
+            otherVpnMode: OtherVpnMode,
+            otherVpnRoutes: List<String>,
         ): TproxyTrafficPlan {
             val state = existingState ?: TproxyManager.createRuntimeState(
                 routeTable = routeTable + 200,
@@ -1342,6 +1389,8 @@ class ConnectionManagerTest {
                 allowIpv6 = allowIpv6,
                 tetherUpstreamInterface = tetherUpstreamInterface,
                 bypassLan = bypassLan,
+                otherVpnMode = otherVpnMode,
+                otherVpnRoutes = otherVpnRoutes,
             )
             return TproxyTrafficPlan(
                 runtimeState = state,
@@ -1359,7 +1408,14 @@ class ConnectionManagerTest {
             activateCalls += 1
             return activationResult
         }
-        override suspend fun update(plan: TproxyTrafficPlan, currentSlot: String) = TunManager.RoutingResult(success = true)
+        override suspend fun update(plan: TproxyTrafficPlan, currentSlot: String): TunManager.RoutingResult {
+            updatedStates += plan.runtimeState
+            return TunManager.RoutingResult(success = true)
+        }
+        override suspend fun syncOtherVpnRules(state: TproxyRuntimeState): TunManager.RoutingResult {
+            otherVpnRuleSyncs++
+            return TunManager.RoutingResult(success = true)
+        }
         override suspend fun readLocalAddresses(includeIpv6: Boolean): List<String> = listOf("127.0.0.1/32")
         override suspend fun updateTetherAddresses(plan: TproxyTrafficPlan): TunManager.RoutingResult {
             tetherAddressUpdateCalls++

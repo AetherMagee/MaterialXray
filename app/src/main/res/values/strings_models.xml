@@ -20,6 +20,10 @@
     <string name="root_connection_backend_tun_label">TUN interface</string>
     <string name="root_connection_backend_tun_description">Creates a virtual network interface and routes app traffic through it into the core.</string>
     <string name="root_connection_backend_tproxy_label">Transparent proxy</string>
+    <string name="other_vpn_mode_auto_routing_label">Auto-routing</string>
+    <string name="other_vpn_mode_auto_routing_description">Proxied apps stay on MXray, except for the other VPN\'s own networks. Other apps use the other VPN.</string>
+    <string name="other_vpn_mode_tunnel_in_tunnel_label">Tunnel-in-tunnel</string>
+    <string name="other_vpn_mode_tunnel_in_tunnel_description">Apps the other VPN covers use it for everything it routes. The other VPN\'s own traffic goes through MXray if that app is proxied.</string>
     <string name="root_connection_backend_tproxy_description">Intercepts traffic without interfaces via routing rules. Experimental and may not work on old devices.</string>
     <string name="xray_outbound_proxy_label">proxy</string>
     <string name="xray_outbound_proxy_description">Send traffic through the selected proxy server.</string>

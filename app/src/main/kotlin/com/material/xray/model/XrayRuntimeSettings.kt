@@ -13,6 +13,7 @@ data class XrayRuntimeSettings(
     val defaultOutbound: XrayOutbound,
     val bypassLan: Boolean,
     val tunnelTetheredClients: Boolean = false,
+    val otherVpnMode: OtherVpnMode = OtherVpnMode.default,
     val allowIpv6: Boolean,
     val routingRules: List<RoutingRule>,
     val xrayBufferSizeKiB: Int = DEFAULT_XRAY_BUFFER_SIZE_KIB,

@@ -2,7 +2,10 @@ package com.material.xray.service
 
 import android.content.Context
 import android.net.ConnectivityManager
+import android.net.LinkProperties
 import android.net.NetworkCapabilities
+import android.net.RouteInfo
+import android.os.Build
 import android.os.SystemClock
 import androidx.annotation.StringRes
 import com.material.xray.R
@@ -36,6 +39,7 @@ import com.material.xray.data.db.dao.AppBypassDao
 import com.material.xray.data.repository.ServerRepository
 import com.material.xray.model.ActiveBalancerSelection
 import com.material.xray.model.ConnectionProgress
+import com.material.xray.model.OtherVpnMode
 import com.material.xray.model.RoutingRule
 import com.material.xray.model.ServerConfig
 import com.material.xray.telemetry.ConnectionTelemetryStep
@@ -62,6 +66,9 @@ internal interface ConnectionEnvironment {
 
     /** The private DNS zone of a VPN another app runs; root mode never owns a VPN itself. */
     fun otherVpnDns(): OtherVpnDns?
+
+    /** The destinations that VPN routes, default routes included, as "address/length". */
+    fun otherVpnRoutes(): List<String> = emptyList()
 }
 
 internal class AndroidConnectionEnvironment(
@@ -86,10 +93,24 @@ internal class AndroidConnectionEnvironment(
 
     override fun localizedString(resourceId: Int, vararg arguments: Any): String = context.localizedString(resourceId, *arguments)
 
+    override fun otherVpnDns(): OtherVpnDns? {
+        val (netId, linkProperties) = newestVpn() ?: return null
+        return OtherVpnDns.of(
+            netId = netId,
+            servers = linkProperties.dnsServers.mapNotNull { it.hostAddress },
+            searchDomains = linkProperties.domains,
+        )
+    }
+
+    override fun otherVpnRoutes(): List<String> = newestVpn()?.second?.routes.orEmpty()
+        // Before Android 13 the route type is hidden, and a VPN cannot exclude routes anyway.
+        .filter { Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU || it.type == RouteInfo.RTN_UNICAST }
+        .mapNotNull { route -> route.destination.address.hostAddress?.let { "$it/${route.destination.prefixLength}" } }
+
     // Android runs one VPN per user. While it is being re-established the old network can linger
     // briefly, so the newest netId wins.
     @Suppress("DEPRECATION") // allNetworks is the only listing of every network, VPNs included.
-    override fun otherVpnDns(): OtherVpnDns? {
+    private fun newestVpn(): Pair<Int, LinkProperties>? {
         val connectivityManager = context.getSystemService(ConnectivityManager::class.java) ?: return null
         return connectivityManager.allNetworks.mapNotNull { network ->
             val capabilities = connectivityManager.getNetworkCapabilities(network)
@@ -97,13 +118,10 @@ internal class AndroidConnectionEnvironment(
             if (capabilities?.hasTransport(NetworkCapabilities.TRANSPORT_VPN) != true || linkProperties == null) {
                 return@mapNotNull null
             }
-            OtherVpnDns.of(
-                // Network's string form is its netId, which Android's socket marks carry.
-                netId = network.toString().toIntOrNull() ?: return@mapNotNull null,
-                servers = linkProperties.dnsServers.mapNotNull { it.hostAddress },
-                searchDomains = linkProperties.domains,
-            )
-        }.maxByOrNull { it.netId }
+            // Network's string form is its netId, which Android's socket marks carry.
+            val netId = network.toString().toIntOrNull() ?: return@mapNotNull null
+            netId to linkProperties
+        }.maxByOrNull { it.first }
     }
 }
 
@@ -254,6 +272,7 @@ internal class GeoDataConnectionRoutingData(
     override suspend fun resolveProviderRules(rules: List<RoutingRule>): ProviderGeoDataResolution = providerGeoDataManager.resolve(rules)
 }
 
+@Suppress("TooManyFunctions") // A routing surface; each root operation is one method.
 internal interface TproxyRoutingGateway {
     suspend fun createPlan(
         appRoutingPlan: AppRoutingPlan,
@@ -262,6 +281,8 @@ internal interface TproxyRoutingGateway {
         existingState: TproxyRuntimeState? = null,
         tetherUpstreamInterface: String? = null,
         bypassLan: Boolean = true,
+        otherVpnMode: OtherVpnMode = OtherVpnMode.default,
+        otherVpnRoutes: List<String> = emptyList(),
     ): TproxyTrafficPlan
 
     suspend fun localAddressesChanged(): Boolean = false
@@ -274,6 +295,7 @@ internal interface TproxyRoutingGateway {
     suspend fun verify(state: TproxyRuntimeState): TunManager.RoutingResult
     suspend fun checkHealth(state: TproxyRuntimeState): Boolean
     suspend fun removeGuard(): Boolean
+    suspend fun syncOtherVpnRules(state: TproxyRuntimeState): TunManager.RoutingResult = TunManager.RoutingResult(success = true)
 }
 
 internal class TproxyManagerRoutingGateway(
@@ -288,6 +310,8 @@ internal class TproxyManagerRoutingGateway(
         existingState: TproxyRuntimeState?,
         tetherUpstreamInterface: String?,
         bypassLan: Boolean,
+        otherVpnMode: OtherVpnMode,
+        otherVpnRoutes: List<String>,
     ): TproxyTrafficPlan {
         val inboundTags = if (appRoutingPlan.proxyRoutes.isEmpty()) {
             appRoutingPlan.proxyServerIds.mapIndexed { index, routeKey ->
@@ -318,6 +342,8 @@ internal class TproxyManagerRoutingGateway(
             bypassLan = bypassLan,
             localAddresses = if (tetherUpstreamInterface != null && !dynamicLocalAddresses) manager.readLocalAddresses(allowIpv6) else emptyList(),
             dynamicLocalAddresses = dynamicLocalAddresses,
+            otherVpnMode = otherVpnMode,
+            otherVpnRoutes = otherVpnRoutes,
         )
         require(state.groups.map { it.routeKey } == routeIdentities.map { it.first }) {
             "TPROXY traffic group topology changed"
@@ -347,6 +373,7 @@ internal class TproxyManagerRoutingGateway(
     override suspend fun verify(state: TproxyRuntimeState): TunManager.RoutingResult = manager.verify(state)
     override suspend fun checkHealth(state: TproxyRuntimeState): Boolean = manager.checkHealth(state)
     override suspend fun removeGuard(): Boolean = manager.removeGuard()
+    override suspend fun syncOtherVpnRules(state: TproxyRuntimeState): TunManager.RoutingResult = manager.syncOtherVpnRules(state)
 
     private companion object {
         const val TPROXY_ROUTE_TABLE_OFFSET = 200

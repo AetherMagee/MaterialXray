@@ -163,6 +163,7 @@ class TproxyCompatibilityDetector(
         }
         val unownedOverlap = overlappingFwmarkRules(rules.output, MARK_PREFIX, MARK_MASK).any { rule ->
             rule.priority <= TproxyManager.RULE_PRIORITY &&
+                !isOtherVpnMirrorRule(rule) &&
                 (
                     rule.priority != TproxyManager.RULE_PRIORITY ||
                         rule.value != MARK_PREFIX.toUInt() ||

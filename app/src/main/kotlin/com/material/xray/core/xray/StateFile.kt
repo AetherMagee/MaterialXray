@@ -3,6 +3,7 @@ package com.material.xray.core.xray
 import android.content.Context
 import android.util.AtomicFile
 import android.util.Log
+import com.material.xray.model.OtherVpnMode
 import com.material.xray.model.RootConnectionBackend
 import java.io.File
 import kotlinx.serialization.SerialName
@@ -26,6 +27,9 @@ data class TproxyRuntimeState(
     val bypassLan: Boolean = true,
     val localAddresses: List<String> = emptyList(),
     val dynamicLocalAddresses: Boolean = false,
+    val otherVpnMode: OtherVpnMode = OtherVpnMode.default,
+    /** Another VPN's own networks, which local apps reach through that VPN rather than the core. */
+    val otherVpnRoutes: List<String> = emptyList(),
 ) {
     val tetherIngress: TetherIngressState
         get() = tetherUpstreamInterface?.let { TetherIngressState.Active(it, dynamicLocalAddresses) }

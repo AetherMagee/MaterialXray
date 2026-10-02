@@ -1722,6 +1722,7 @@ class XrayService(
             restartRuntime(latestConfig)
             return@runConnectionCommand NetworkRetargetResult.Done
         }
+        connectionManager.followOtherVpnRouting(latestState, settingsRepo.runtimeSettingsSnapshot())
         val previousNetwork = activePhysicalNetwork
         val currentNetwork = currentPhysicalNetworkSnapshot()
         val currentRoute = withContext(ioDispatcher) {

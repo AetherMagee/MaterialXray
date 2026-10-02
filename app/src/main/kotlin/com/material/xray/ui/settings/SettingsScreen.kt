@@ -128,6 +128,7 @@ import com.material.xray.model.LauncherIcon
 import com.material.xray.model.NotificationField
 import com.material.xray.model.NotificationSettings
 import com.material.xray.model.NotificationStyle
+import com.material.xray.model.OtherVpnMode
 import com.material.xray.model.RootConnectionBackend
 import com.material.xray.model.RoutingPolicyControl
 import com.material.xray.model.XrayLogLevel
@@ -225,6 +226,7 @@ private fun SettingsScreenContent(
     val rootConnectionBackend = settings.rootConnectionBackend
     val bypassLan = settings.bypassLan
     val tunnelTetheredClients = settings.tunnelTetheredClients
+    val otherVpnMode = settings.otherVpnMode
     val allowIpv6 = settings.allowIpv6
     val xrayBufferSizeKiB = settings.xrayBufferSizeKiB
     val tunMtu = settings.tunMtu
@@ -410,6 +412,7 @@ private fun SettingsScreenContent(
                         useRootService = useRootService,
                         rootConnectionBackend = rootConnectionBackend,
                         tunnelTetheredClients = tunnelTetheredClients,
+                        otherVpnMode = otherVpnMode,
                         tproxyCompatibility = tproxyCompatibility,
                         autoConnect = autoConnect,
                         oemAutostartGuidance = oemAutostartGuidance,
@@ -417,6 +420,7 @@ private fun SettingsScreenContent(
                             onUseRootServiceChange = viewModel::setUseRootService,
                             onRootConnectionBackendChange = viewModel::setRootConnectionBackend,
                             onTunnelTetheredClientsChange = viewModel::setTunnelTetheredClients,
+                            onOtherVpnModeChange = viewModel::setOtherVpnMode,
                             onRetryTproxyCompatibility = viewModel::retryTproxyCompatibilityCheck,
                             onAutoConnectChange = viewModel::setAutoConnect,
                             onOpenOemAutostartSettings = viewModel::openOemAutostartSettings,
@@ -1150,6 +1154,7 @@ private data class SettingsServiceActions(
     val onUseRootServiceChange: (Boolean) -> Unit,
     val onRootConnectionBackendChange: (RootConnectionBackend) -> Unit,
     val onTunnelTetheredClientsChange: (Boolean) -> Unit,
+    val onOtherVpnModeChange: (OtherVpnMode) -> Unit,
     val onRetryTproxyCompatibility: () -> Unit,
     val onAutoConnectChange: (Boolean) -> Unit,
     val onOpenOemAutostartSettings: () -> Unit,
@@ -1163,6 +1168,7 @@ private fun SettingsServiceSection(
     useRootService: Boolean,
     rootConnectionBackend: RootConnectionBackend,
     tunnelTetheredClients: Boolean,
+    otherVpnMode: OtherVpnMode,
     tproxyCompatibility: TproxyCompatibility,
     autoConnect: Boolean,
     oemAutostartGuidance: OemAutostartGuidance,
@@ -1193,43 +1199,13 @@ private fun SettingsServiceSection(
             val supportingText = tproxyCompatibilitySupportingText(tproxyCompatibility)
             SettingsNestedSection(title = stringResource(R.string.settings_root_connection_backend)) {
                 RootConnectionBackend.entries.forEach { backend ->
-                    val enabled = backend == RootConnectionBackend.Tun || tproxySelectable
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 4.dp)
-                            .selectable(
-                                selected = backend == rootConnectionBackend,
-                                enabled = enabled,
-                                role = Role.RadioButton,
-                                onClick = { actions.onRootConnectionBackendChange(backend) },
-                            )
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                stringResource(backend.labelResource),
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = if (enabled) {
-                                    MaterialTheme.colorScheme.onSurface
-                                } else {
-                                    MaterialTheme.colorScheme.onSurfaceVariant
-                                },
-                            )
-                            Text(
-                                stringResource(backend.descriptionResource),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        RadioButton(
-                            selected = backend == rootConnectionBackend,
-                            onClick = null,
-                            enabled = enabled,
-                        )
-                    }
+                    SettingsRadioRow(
+                        title = stringResource(backend.labelResource),
+                        description = stringResource(backend.descriptionResource),
+                        selected = backend == rootConnectionBackend,
+                        enabled = backend == RootConnectionBackend.Tun || tproxySelectable,
+                        onClick = { actions.onRootConnectionBackendChange(backend) },
+                    )
                 }
                 supportingText?.let { text ->
                     Text(
@@ -1255,6 +1231,19 @@ private fun SettingsServiceSection(
                 checked = tunnelTetheredClients,
                 onCheckedChange = actions.onTunnelTetheredClientsChange,
             )
+
+            if (rootConnectionBackend == RootConnectionBackend.Tproxy) {
+                SettingsNestedSection(title = stringResource(R.string.settings_other_vpn_mode)) {
+                    OtherVpnMode.entries.forEach { mode ->
+                        SettingsRadioRow(
+                            title = stringResource(mode.labelResource),
+                            description = stringResource(mode.descriptionResource),
+                            selected = mode == otherVpnMode,
+                            onClick = { actions.onOtherVpnModeChange(mode) },
+                        )
+                    }
+                }
+            }
         }
 
         SettingsSwitchRow(
@@ -1269,6 +1258,52 @@ private fun SettingsServiceSection(
                 onOpenSettings = actions.onOpenOemAutostartSettings,
             )
         }
+    }
+}
+
+@Composable
+private fun SettingsRadioRow(
+    title: String,
+    description: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    enabled: Boolean = true,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
+            .selectable(
+                selected = selected,
+                enabled = enabled,
+                role = Role.RadioButton,
+                onClick = onClick,
+            )
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                title,
+                style = MaterialTheme.typography.bodyLarge,
+                color = if (enabled) {
+                    MaterialTheme.colorScheme.onSurface
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+            )
+            Text(
+                description,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        RadioButton(
+            selected = selected,
+            onClick = null,
+            enabled = enabled,
+        )
     }
 }
 
