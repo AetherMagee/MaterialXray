@@ -3,6 +3,7 @@ package com.material.xray.service
 import com.material.xray.R
 import com.material.xray.core.xray.ConfigGenerator
 import com.material.xray.core.xray.GeoDataStatus
+import com.material.xray.core.xray.PROTECTED_FROM_VPN_MARK
 import com.material.xray.core.xray.ProviderGeoDataResolution
 import com.material.xray.core.xray.TproxyManager
 import com.material.xray.core.xray.TproxyRuntimeState
@@ -27,6 +28,7 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -462,6 +464,7 @@ class ConnectionManagerTest {
         config.getValue("outbounds").jsonArray.forEach { outbound ->
             val sockopt = outbound.jsonObject["streamSettings"]?.jsonObject?.get("sockopt")?.jsonObject
             assertFalse(sockopt?.containsKey("interface") == true)
+            sockopt?.let { assertEquals(PROTECTED_FROM_VPN_MARK, it["mark"]?.jsonPrimitive?.int) }
         }
 
         val route = TunManager.PhysicalRoute(dev = "rmnet0", gateway = null, table = "main")
@@ -470,6 +473,33 @@ class ConnectionManagerTest {
             harness.manager.updatePhysicalBypassRoute(connected, route, settings),
         )
         assertEquals("rmnet0", harness.stateStore.state?.physicalInterface)
+    }
+
+    @Test
+    fun `edited TPROXY config protects every outbound from other VPNs`() = runTest {
+        val harness = Harness()
+        harness.binary.overrideConfigJson = """
+            {
+              "inbounds": [],
+              "outbounds": [
+                {"tag":"proxy","protocol":"vless","streamSettings":{"sockopt":{"mark":255,"interface":"wlan0"}}},
+                {"tag":"direct","protocol":"freedom"}
+              ]
+            }
+        """.trimIndent()
+
+        harness.manager.connect(
+            server(),
+            runtimeSettings().copy(rootConnectionBackend = RootConnectionBackend.Tproxy),
+            preparation = ConnectionPreparation.ReusePreparedRuntime,
+        )
+
+        val config = Json.parseToJsonElement(requireNotNull(harness.binary.configJson)).jsonObject
+        config.getValue("outbounds").jsonArray.forEach { outbound ->
+            val sockopt = outbound.jsonObject.getValue("streamSettings").jsonObject.getValue("sockopt").jsonObject
+            assertEquals(PROTECTED_FROM_VPN_MARK, sockopt["mark"]?.jsonPrimitive?.int)
+            assertFalse(sockopt.containsKey("interface"))
+        }
     }
 
     @Test

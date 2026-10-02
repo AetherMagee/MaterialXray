@@ -200,6 +200,10 @@ internal fun buildCoreOutbounds(
     }
 }
 
+// Android's protectedFromVpn fwmark bit, the one VpnService.protect() sets: these sockets skip
+// other apps' VPNs and follow the underlying default network.
+internal const val PROTECTED_FROM_VPN_MARK = 0x20000
+
 internal fun buildSockopt(
     fwmark: Int,
     physicalInterface: String?,

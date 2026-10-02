@@ -112,7 +112,7 @@ class ActiveConfigRuntimeIdentityTest {
     }
 
     @Test
-    fun `TPROXY runtime identity removes obsolete outbound routing constraints`() {
+    fun `TPROXY runtime identity protects outbounds and drops interface binding`() {
         val edited = """
             {
               "inbounds": [],
@@ -124,7 +124,8 @@ class ActiveConfigRuntimeIdentityTest {
                     "network":"tcp",
                     "sockopt":{"mark":255,"interface":"wlan0","tcpFastOpen":true}
                   }
-                }
+                },
+                { "tag": "direct", "protocol": "freedom" }
               ]
             }
         """.trimIndent()
@@ -133,16 +134,18 @@ class ActiveConfigRuntimeIdentityTest {
             generator.applyRuntimeIdentity(
                 configJson = edited,
                 tunName = "xray0",
-                clearOutboundMarks = true,
+                outboundMark = PROTECTED_FROM_VPN_MARK,
                 clearOutboundInterfaces = true,
             ),
         ).parse()
 
-        val outbound = patched["outbounds"]!!.jsonArray.single().jsonObject
+        val (outbound, direct) = patched["outbounds"]!!.jsonArray.map { it.jsonObject }
         val streamSettings = outbound["streamSettings"]!!.jsonObject
         val sockopt = streamSettings["sockopt"]!!.jsonObject
-        assertTrue("mark" !in sockopt)
+        assertEquals(PROTECTED_FROM_VPN_MARK, sockopt["mark"]!!.jsonPrimitive.content.toInt())
         assertTrue("interface" !in sockopt)
+        val directSockopt = direct["streamSettings"]!!.jsonObject["sockopt"]!!.jsonObject
+        assertEquals(PROTECTED_FROM_VPN_MARK, directSockopt["mark"]!!.jsonPrimitive.content.toInt())
         assertEquals("true", sockopt["tcpFastOpen"]!!.jsonPrimitive.content)
         assertEquals("tcp", streamSettings["network"]!!.jsonPrimitive.content)
     }

@@ -3,6 +3,7 @@ package com.material.xray.service
 import android.os.ParcelFileDescriptor
 import com.material.xray.R
 import com.material.xray.core.xray.ConfigGenerator
+import com.material.xray.core.xray.PROTECTED_FROM_VPN_MARK
 import com.material.xray.core.xray.TUN_INBOUND_TAG
 import com.material.xray.core.xray.TetherIngressState
 import com.material.xray.core.xray.TproxyTrafficPlan
@@ -644,6 +645,13 @@ internal class ConnectionManager(
         // Xray's GID-exempt sockets follow Android's current default route in both local and
         // tethered TPROXY. The tether firewall still tracks the upstream separately.
         val unboundTproxy = tproxyPlan != null
+        // Root sits inside other VPNs' uid ranges, so without protection a full-tunnel VPN would
+        // capture the core's own connections and loop them back into it.
+        val outboundMark = when {
+            tproxyPlan != null -> PROTECTED_FROM_VPN_MARK
+            managesSystemRouting -> runtimeSettings.fwmark
+            else -> 0
+        }
 
         // A hand-edited config replaces generation wholesale, but not the identifiers this connect
         // just allocated: the API endpoint and the inbounds have to be the current ones or the
@@ -653,7 +661,7 @@ internal class ConnectionManager(
                 runtimeSettings,
                 xrayApiEndpoint,
                 effectiveInbounds,
-                clearOutboundMarks = tproxyPlan != null,
+                outboundMark = PROTECTED_FROM_VPN_MARK.takeIf { tproxyPlan != null },
                 clearOutboundInterfaces = unboundTproxy,
             )
         ) {
@@ -665,7 +673,7 @@ internal class ConnectionManager(
             runtimeSettings = runtimeSettings,
             managesSystemRouting = managesSystemRouting,
             rootBackend = rootBackend,
-            fwmark = runtimeSettings.fwmark.takeIf { managesSystemRouting && tproxyPlan == null } ?: 0,
+            fwmark = outboundMark,
             appRoutingPlan = appRoutingPlan,
             physicalRoute = physicalRoute.takeUnless { unboundTproxy },
             xrayApiEndpoint = xrayApiEndpoint,
@@ -729,7 +737,7 @@ internal class ConnectionManager(
         runtimeSettings: XrayRuntimeSettings,
         xrayApiEndpoint: XrayApiEndpoint,
         inbounds: List<XrayInbound>?,
-        clearOutboundMarks: Boolean,
+        outboundMark: Int?,
         clearOutboundInterfaces: Boolean,
     ): Boolean {
         val override = xrayBinary.readOverrideConfig() ?: return false
@@ -740,7 +748,7 @@ internal class ConnectionManager(
                 xrayApiEndpoint = xrayApiEndpoint,
                 tunMtu = runtimeSettings.tunMtu,
                 inbounds = inbounds,
-                clearOutboundMarks = clearOutboundMarks,
+                outboundMark = outboundMark,
                 clearOutboundInterfaces = clearOutboundInterfaces,
             )
         }

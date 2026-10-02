@@ -10,6 +10,7 @@ import com.material.xray.model.XrayRuntimeSettings
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -186,7 +187,7 @@ class ConfigGenerator {
         xrayApiEndpoint: XrayApiEndpoint = XrayApiEndpoint.UnixSocket(XRAY_API_SOCKET_NAME_PREFIX),
         tunMtu: Int = XrayRuntimeSettings.DEFAULT_TUN_MTU,
         inbounds: List<XrayInbound>? = null,
-        clearOutboundMarks: Boolean = false,
+        outboundMark: Int? = null,
         clearOutboundInterfaces: Boolean = false,
     ): String? {
         val original = runCatching { json.parseToJsonElement(configJson) as? JsonObject }.getOrNull() ?: return null
@@ -194,11 +195,11 @@ class ConfigGenerator {
 
         val patched = original.toMutableMap()
         patched["inbounds"] = buildJsonArray { effectiveInbounds.forEach { add(it.toJson()) } }
-        if (clearOutboundMarks || clearOutboundInterfaces) {
+        if (outboundMark != null || clearOutboundInterfaces) {
             (original["outbounds"] as? JsonArray)?.let { outbounds ->
-                patched["outbounds"] = clearSockoptRouting(
+                patched["outbounds"] = patchSockoptRouting(
                     outbounds = outbounds,
-                    clearMarks = clearOutboundMarks,
+                    mark = outboundMark,
                     clearInterfaces = clearOutboundInterfaces,
                 )
             }
@@ -210,26 +211,26 @@ class ConfigGenerator {
         return json.encodeToString(JsonObject.serializer(), JsonObject(patched))
     }
 
-    private fun clearSockoptRouting(
+    // A mark is set on every outbound, even ones without sockopt, since any of them may dial out.
+    private fun patchSockoptRouting(
         outbounds: JsonArray,
-        clearMarks: Boolean,
+        mark: Int?,
         clearInterfaces: Boolean,
     ): JsonArray = buildJsonArray {
-        val removedKeys = buildSet {
-            if (clearMarks) add("mark")
-            if (clearInterfaces) add("interface")
-        }
         outbounds.forEach { outbound ->
             val outboundObject = outbound as? JsonObject
             val streamSettings = outboundObject?.get("streamSettings") as? JsonObject
             val sockopt = streamSettings?.get("sockopt") as? JsonObject
-            if (outboundObject == null || streamSettings == null || sockopt == null) {
-                add(outbound)
-            } else if (sockopt.keys.none(removedKeys::contains)) {
+            val needsPatch = mark != null || (clearInterfaces && sockopt?.containsKey("interface") == true)
+            if (outboundObject == null || !needsPatch) {
                 add(outbound)
             } else {
-                val patchedStream = streamSettings.toMutableMap().apply {
-                    put("sockopt", JsonObject(sockopt - removedKeys))
+                val patchedSockopt = sockopt.orEmpty().toMutableMap().apply {
+                    if (mark != null) put("mark", JsonPrimitive(mark))
+                    if (clearInterfaces) remove("interface")
+                }
+                val patchedStream = streamSettings.orEmpty().toMutableMap().apply {
+                    put("sockopt", JsonObject(patchedSockopt))
                 }
                 add(JsonObject(outboundObject.toMutableMap().apply { put("streamSettings", JsonObject(patchedStream)) }))
             }
