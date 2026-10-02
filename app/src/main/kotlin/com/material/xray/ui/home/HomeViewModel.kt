@@ -42,11 +42,10 @@ import java.net.UnknownHostException
 import javax.net.ssl.SSLException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -59,12 +58,12 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.isActive
+import kotlinx.coroutines.job
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
+import kotlinx.coroutines.withTimeoutOrNull
 import org.koin.core.annotation.KoinViewModel
 
 data class ServerListItem(
@@ -133,9 +132,10 @@ class HomeViewModel(
     private val defaultDispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) : ViewModel() {
     private var serverSelectionJob: Job? = null
-    private var latencyJob: Job? = null
-    private var latencyRunId = 0L
-    private var activeLatencyServerIds = emptySet<Long>()
+
+    // Keyed by server and subscription id; like the rest of the latency state, only touched on the main thread.
+    private val latencyProbeJobs = mutableMapOf<Long, Job>()
+    private val latencySortJobs = mutableMapOf<Long, Job>()
     private val latencySemaphore = Semaphore(MAX_CONCURRENT_LATENCY_TESTS)
 
     val connectionState: StateFlow<ConnectionState> = connectionStateCoordinator.state
@@ -514,124 +514,80 @@ class HomeViewModel(
     }
 
     fun testLatency(server: ServerEntity) {
-        restartLatencyTests(listOf(server))
+        startLatencyTests(listOf(server))
     }
 
     fun testSubscriptionLatencies(sub: SubscriptionEntity) {
-        restartLatencyTests(
+        startLatencyTests(
             servers = allServers.value.filter { it.subscriptionId == sub.id },
-            sortDuringTest = true,
+            sortSubscriptionId = sub.id,
         )
     }
 
     fun testAllLatencies() {
-        restartLatencyTests(allServers.value)
+        startLatencyTests(allServers.value)
     }
 
-    fun onHidden() {
-        latencyRunId++
-        val canceledServerIds = activeLatencyServerIds
-        activeLatencyServerIds = emptySet()
-        latencyJob?.cancel()
-        latencyJob = null
-        latencyByServerId.update { current -> current - canceledServerIds }
-    }
-
-    private fun restartLatencyTests(servers: List<ServerEntity>, sortDuringTest: Boolean = false) {
-        val runId = ++latencyRunId
-        val previouslyActiveServerIds = activeLatencyServerIds
-        latencyJob?.cancel()
+    /** Restarts the probes of [servers] only; probes of every other server keep running. */
+    private fun startLatencyTests(servers: List<ServerEntity>, sortSubscriptionId: Long? = null) {
+        val targetServers = servers.distinctBy { it.id }
+        if (targetServers.isEmpty()) return
         val pingMethod = defaultPingMethod.value
         val pingMethods = if (showBothLatencyResults.value) {
             listOf(PingMethod.Tcping, PingMethod.Httping)
         } else {
             listOf(pingMethod)
         }
-        val targetServers = servers.distinctBy { it.id }
-        val targetServerIds = targetServers.map { it.id }.toSet()
-        val canceledOnlyServerIds = previouslyActiveServerIds - targetServerIds
-        activeLatencyServerIds = targetServerIds
 
         latencyByServerId.update { current ->
-            (current - canceledOnlyServerIds) + targetServers.associate { server ->
+            current + targetServers.associate { server ->
                 server.id to latencyState(
                     primaryMethod = pingMethod,
                     latencyByMethod = pingMethods.associateWith { LATENCY_TESTING },
                 )
             }
         }
+        targetServers.forEach { server -> startLatencyProbe(server, pingMethod, pingMethods) }
 
-        if (targetServers.isEmpty()) {
-            latencyJob = null
-            return
-        }
-
-        latencyJob = viewModelScope.launch {
-            runLatencyProbes(
-                runId = runId,
-                servers = targetServers,
-                primaryMethod = pingMethod,
-                methods = pingMethods,
-                sortDuringTest = sortDuringTest && settingsRepo.sortOutboundsByLatency.first(),
-            )
-        }
-    }
-
-    private suspend fun runLatencyProbes(
-        runId: Long,
-        servers: List<ServerEntity>,
-        primaryMethod: PingMethod,
-        methods: List<PingMethod>,
-        sortDuringTest: Boolean,
-    ) = supervisorScope {
-        var persistedOrder = servers.sortedBy { it.sortOrder }.map { it.id }
-        val probeJobs = servers.map { server ->
-            launch { runLatencyProbe(runId, server, primaryMethod, methods) }
-        }
-        val sortingJob = if (sortDuringTest) {
-            launch {
-                while (isActive) {
-                    delay(LATENCY_SORT_INTERVAL_MILLIS)
-                    persistedOrder = updateServerSortOrder(runId, servers, persistedOrder)
-                }
+        if (sortSubscriptionId != null) {
+            latencySortJobs.remove(sortSubscriptionId)?.cancel()
+            latencySortJobs[sortSubscriptionId] = viewModelScope.launch {
+                if (settingsRepo.sortOutboundsByLatency.first()) sortWhileProbing(targetServers)
             }
-        } else {
-            null
         }
-
-        probeJobs.joinAll()
-        sortingJob?.cancelAndJoin()
-        if (sortDuringTest) updateServerSortOrder(runId, servers, persistedOrder)
     }
 
-    private suspend fun updateServerSortOrder(
-        runId: Long,
-        servers: List<ServerEntity>,
-        persistedOrder: List<Long>,
-    ): List<Long> {
-        if (latencyRunId != runId) return persistedOrder
-        val sortedOrder = sortedServerIdsByLatency(servers.map { it.id }, latencyByServerId.value)
+    private fun startLatencyProbe(server: ServerEntity, primaryMethod: PingMethod, methods: List<PingMethod>) {
+        latencyProbeJobs.remove(server.id)?.cancel()
+        // Started only once registered, so a probe that finishes without suspending still unregisters itself.
+        val job = viewModelScope.launch(start = CoroutineStart.LAZY) {
+            try {
+                val latency = latencySemaphore.withPermit { latencyMeasurer.measure(server, primaryMethod, methods) }
+                latencyByServerId.update { it + (server.id to latency) }
+            } finally {
+                if (latencyProbeJobs[server.id] === coroutineContext.job) latencyProbeJobs.remove(server.id)
+            }
+        }
+        latencyProbeJobs[server.id] = job
+        job.start()
+    }
+
+    /** Re-sorts [servers] until none of them is being probed, whichever request started the probe. */
+    private suspend fun sortWhileProbing(servers: List<ServerEntity>) {
+        var persistedOrder = servers.sortedBy { it.sortOrder }.map { it.id }
+        do {
+            val probes = servers.mapNotNull { latencyProbeJobs[it.id] }
+            withTimeoutOrNull(LATENCY_SORT_INTERVAL_MILLIS) { probes.joinAll() }
+            persistedOrder = updateServerSortOrder(persistedOrder)
+        } while (probes.isNotEmpty())
+    }
+
+    /** Sorting the last persisted order keeps servers that are being probed again where they were. */
+    private suspend fun updateServerSortOrder(persistedOrder: List<Long>): List<Long> {
+        val sortedOrder = sortedServerIdsByLatency(persistedOrder, latencyByServerId.value)
         val changes = changedServerSortOrders(persistedOrder, sortedOrder)
         if (changes.isNotEmpty()) serverRepo.updateSortOrders(changes)
         return sortedOrder
-    }
-
-    private suspend fun runLatencyProbe(
-        runId: Long,
-        server: ServerEntity,
-        primaryMethod: PingMethod,
-        methods: List<PingMethod>,
-    ) {
-        try {
-            val latency = latencySemaphore.withPermit { latencyMeasurer.measure(server, primaryMethod, methods) }
-            if (latencyRunId == runId) {
-                latencyByServerId.update { it + (server.id to latency) }
-            }
-        } finally {
-            if (latencyRunId == runId) {
-                activeLatencyServerIds = activeLatencyServerIds - server.id
-            }
-        }
     }
 
     private suspend fun runSubscriptionOperation(block: suspend () -> Unit) {

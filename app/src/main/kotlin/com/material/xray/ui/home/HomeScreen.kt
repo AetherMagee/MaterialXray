@@ -336,7 +336,6 @@ fun HomeScreen(
                 Lifecycle.Event.ON_STOP -> {
                     showQrScanner = false
                     keepQrScannerDialog = false
-                    viewModel.onHidden()
                 }
                 else -> Unit
             }
@@ -344,7 +343,6 @@ fun HomeScreen(
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
-            viewModel.onHidden()
         }
     }
 
