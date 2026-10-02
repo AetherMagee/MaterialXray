@@ -16,6 +16,14 @@ enum class RoutingRuleOperator {
 }
 
 @Serializable
+data class RoutingGeoData(
+    val geoipUrl: String? = null,
+    val geositeUrl: String? = null,
+) {
+    fun urls(): List<String> = listOfNotNull(geoipUrl, geositeUrl)
+}
+
+@Serializable
 data class RoutingRule(
     val id: String,
     val name: String,
@@ -26,6 +34,8 @@ data class RoutingRule(
     val protocols: List<String> = emptyList(),
     val operator: RoutingRuleOperator = RoutingRuleOperator.AND,
     val enabled: Boolean = true,
+    /** Provider geodata this rule's `geoip:` and `geosite:` entries refer to instead of the app's own. */
+    val geoData: RoutingGeoData? = null,
 ) {
     fun toXrayRule(): JsonObject = buildJsonObject {
         val cleanDomains = domains.cleanEntries()

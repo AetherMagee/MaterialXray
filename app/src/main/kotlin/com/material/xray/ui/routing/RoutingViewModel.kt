@@ -2,6 +2,10 @@ package com.material.xray.ui.routing
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.material.xray.core.xray.ProviderGeoDataManager
+import com.material.xray.core.xray.ProviderGeoDataNotice
+import com.material.xray.core.xray.providerGeoDataNotice
+import com.material.xray.core.xray.providerGeoDataUrls
 import com.material.xray.data.db.dao.SubscriptionDao
 import com.material.xray.data.parser.ProfileRouting
 import com.material.xray.data.parser.ProfileRoutingInspector
@@ -10,11 +14,14 @@ import com.material.xray.data.repository.ProviderRoutingAvailability
 import com.material.xray.data.repository.ServerRepository
 import com.material.xray.data.repository.SettingsRepository
 import com.material.xray.data.repository.selectedProviderRoutingAvailability
+import com.material.xray.model.ConnectionState
 import com.material.xray.model.ProfileRoutingOverrideEngine
 import com.material.xray.model.RoutingPolicyControl
 import com.material.xray.model.RoutingRule
 import com.material.xray.model.RoutingRuleCatalog
 import com.material.xray.model.SubscriptionRouting
+import com.material.xray.service.ConnectionStateCoordinator
+import com.material.xray.service.PendingRoutingChange
 import com.material.xray.service.RoutingChangeManager
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -34,6 +41,8 @@ class RoutingViewModel(
     private val routingChangeManager: RoutingChangeManager,
     private val serverRepository: ServerRepository,
     private val subscriptionDao: SubscriptionDao,
+    private val providerGeoDataManager: ProviderGeoDataManager,
+    connectionStateCoordinator: ConnectionStateCoordinator,
     private val defaultDispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) : ViewModel() {
     val rules: StateFlow<List<RoutingRule>> = settingsRepository.customRoutingRules
@@ -78,6 +87,26 @@ class RoutingViewModel(
     ) { rules, policy ->
         rules.takeIf { policy == RoutingPolicyControl.SubscriptionProvider }.orEmpty()
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val providerGeoDataNotice: StateFlow<ProviderGeoDataNotice?> = combine(
+        subscriptionRules,
+        providerGeoDataManager.state,
+        connectionStateCoordinator.state,
+    ) { rules, geoDataState, connectionState ->
+        providerGeoDataNotice(
+            urls = rules.providerGeoDataUrls(),
+            state = geoDataState,
+            connected = connectionState is ConnectionState.Connected,
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    fun onProviderGeoDataNoticeClick() {
+        when (providerGeoDataNotice.value) {
+            ProviderGeoDataNotice.CompatibilityMode -> providerGeoDataManager.refreshInBackground(force = true)
+            ProviderGeoDataNotice.ReadyToApply ->
+                routingChangeManager.requestActiveConnectionUpdate(PendingRoutingChange.XRAY_ROUTING)
+            ProviderGeoDataNotice.Downloading, null -> Unit
+        }
+    }
 
     fun updateRule(rule: RoutingRule) {
         viewModelScope.launch {

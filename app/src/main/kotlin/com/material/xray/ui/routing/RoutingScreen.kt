@@ -11,6 +11,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -39,9 +40,12 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -76,6 +80,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.material.xray.R
+import com.material.xray.core.xray.ProviderGeoDataNotice
 import com.material.xray.data.parser.ProfileRoutingRule
 import com.material.xray.data.parser.ProfileRoutingTarget
 import com.material.xray.model.RoutingPolicyControl
@@ -127,6 +132,7 @@ fun RoutingScreen(
     val routingPolicyControl by viewModel.routingPolicyControl.collectAsStateWithLifecycle()
     val automaticRoutingProviderName by viewModel.automaticRoutingProviderName.collectAsStateWithLifecycle()
     val profileRouting by viewModel.profileRouting.collectAsStateWithLifecycle()
+    val providerGeoDataNotice by viewModel.providerGeoDataNotice.collectAsStateWithLifecycle()
     val pagerState = rememberPagerState(pageCount = { RoutingTab.entries.size })
     val coroutineScope = rememberCoroutineScope()
     var previousTab by remember { mutableIntStateOf(pagerState.currentPage) }
@@ -201,6 +207,8 @@ fun RoutingScreen(
             profileRules = profileRouting?.rules.orEmpty(),
             providerManaged = routingPolicyControl == RoutingPolicyControl.SubscriptionProvider,
             providerName = automaticRoutingProviderName,
+            providerGeoDataNotice = providerGeoDataNotice,
+            onProviderGeoDataNoticeClick = viewModel::onProviderGeoDataNoticeClick,
             selectionMode = selectionMode,
             selectedRuleIds = selectedRuleIds,
             actions = RoutingRuleActions(
@@ -499,6 +507,70 @@ private fun RuleActions(
     }
 }
 
+@Composable
+private fun ProviderGeoDataBanner(
+    notice: ProviderGeoDataNotice,
+    onClick: () -> Unit,
+) {
+    val colors = MaterialTheme.colorScheme
+    val (containerColor, contentColor) = when (notice) {
+        ProviderGeoDataNotice.CompatibilityMode -> colors.errorContainer to colors.onErrorContainer
+        ProviderGeoDataNotice.ReadyToApply -> colors.tertiaryContainer to colors.onTertiaryContainer
+        ProviderGeoDataNotice.Downloading -> colors.secondaryContainer to colors.onSecondaryContainer
+    }
+    val (message, action) = when (notice) {
+        ProviderGeoDataNotice.Downloading -> R.string.routing_provider_geodata_downloading to null
+        ProviderGeoDataNotice.CompatibilityMode ->
+            R.string.routing_provider_geodata_compatibility to R.string.routing_provider_geodata_retry
+        ProviderGeoDataNotice.ReadyToApply ->
+            R.string.routing_provider_geodata_ready to R.string.routing_provider_geodata_apply
+    }
+    Surface(
+        color = containerColor,
+        contentColor = contentColor,
+        shape = MaterialTheme.shapes.small,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 4.dp)
+            .clip(MaterialTheme.shapes.small)
+            .clickable(enabled = action != null, onClick = onClick),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            when (notice) {
+                ProviderGeoDataNotice.Downloading -> CircularProgressIndicator(
+                    modifier = Modifier.size(20.dp),
+                    strokeWidth = 2.dp,
+                    color = contentColor,
+                )
+                ProviderGeoDataNotice.CompatibilityMode -> Icon(
+                    imageVector = Icons.Default.Warning,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp),
+                )
+                ProviderGeoDataNotice.ReadyToApply -> Icon(
+                    imageVector = Icons.Default.Refresh,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(text = stringResource(message), style = MaterialTheme.typography.bodySmall)
+                action?.let {
+                    Text(
+                        text = stringResource(it),
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+            }
+        }
+    }
+}
+
 /** What tapping, long-pressing and toggling the listed rules does. */
 private data class RoutingRuleActions(
     val onRuleToggled: (RoutingRule, Boolean) -> Unit,
@@ -516,6 +588,8 @@ private fun RoutingRulesTab(
     profileRules: List<ProfileRoutingRule>,
     providerManaged: Boolean,
     providerName: String?,
+    providerGeoDataNotice: ProviderGeoDataNotice?,
+    onProviderGeoDataNoticeClick: () -> Unit,
     selectionMode: Boolean,
     selectedRuleIds: Set<String>,
     actions: RoutingRuleActions,
@@ -565,6 +639,11 @@ private fun RoutingRulesTab(
                             )
                         }
                     }
+                }
+            }
+            if (providerManaged && providerGeoDataNotice != null) {
+                item(contentType = "providerGeoDataBanner") {
+                    ProviderGeoDataBanner(providerGeoDataNotice, onProviderGeoDataNoticeClick)
                 }
             }
             if (customRules.isNotEmpty()) {

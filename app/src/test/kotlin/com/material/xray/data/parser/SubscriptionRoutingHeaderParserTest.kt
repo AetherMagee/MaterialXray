@@ -1,5 +1,6 @@
 package com.material.xray.data.parser
 
+import com.material.xray.model.RoutingGeoData
 import com.material.xray.model.RoutingRuleOperator
 import java.util.Base64
 import okhttp3.Headers
@@ -61,6 +62,43 @@ class SubscriptionRoutingHeaderParserTest {
         assertEquals(listOf("geoip:block"), routing.rules[2].ips)
         assertEquals("IPIfNonMatch", routing.domainStrategy)
         assertEquals("proxy", routing.fallbackOutboundTag)
+    }
+
+    @Test
+    fun `happ routing header attaches provider geodata urls to its rules`() {
+        val payload = """
+            {
+              "Geoipurl": "https://cdn.example/geoip.dat",
+              "Geositeurl": "https://cdn.example/geosite.dat",
+              "BlockSites": ["geosite:win-spy"],
+              "DirectIp": ["geoip:direct"]
+            }
+        """.trimIndent()
+        val headers = Headers.headersOf("routing", happRoutingLink(payload))
+
+        val routing = requireNotNull(SubscriptionRoutingHeaderParser.parse(headers))
+
+        val expected = RoutingGeoData(
+            geoipUrl = "https://cdn.example/geoip.dat",
+            geositeUrl = "https://cdn.example/geosite.dat",
+        )
+        assertEquals(listOf(expected, expected), routing.rules.map { it.geoData })
+    }
+
+    @Test
+    fun `happ routing header ignores geodata urls that are not http`() {
+        val payload = """
+            {
+              "Geoipurl": "file:///sdcard/geoip.dat",
+              "Geositeurl": " ",
+              "BlockSites": ["geosite:win-spy"]
+            }
+        """.trimIndent()
+        val headers = Headers.headersOf("routing", happRoutingLink(payload))
+
+        val routing = requireNotNull(SubscriptionRoutingHeaderParser.parse(headers))
+
+        assertNull(routing.rules.single().geoData)
     }
 
     @Test

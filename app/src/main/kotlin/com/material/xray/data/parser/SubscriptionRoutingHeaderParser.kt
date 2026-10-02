@@ -1,5 +1,6 @@
 package com.material.xray.data.parser
 
+import com.material.xray.model.RoutingGeoData
 import com.material.xray.model.RoutingRule
 import com.material.xray.model.RoutingRuleOperator
 import com.material.xray.model.SubscriptionRouting
@@ -11,6 +12,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 import okhttp3.Headers
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 
 object SubscriptionRoutingHeaderParser {
     private const val BASE64_PREFIX = "base64:"
@@ -71,6 +73,10 @@ object SubscriptionRoutingHeaderParser {
         val payload = SubscriptionStandardHeaders.decodeBase64ToUtf8(header.substring(prefix.length)) ?: return null
         val root = runCatching { json.parseToJsonElement(payload) as? JsonObject }.getOrNull() ?: return null
         val profileName = root.string("Name")
+        val geoData = RoutingGeoData(
+            geoipUrl = root.httpUrl("Geoipurl"),
+            geositeUrl = root.httpUrl("Geositeurl"),
+        ).takeIf { it.geoipUrl != null || it.geositeUrl != null }
         val rules = root.happRouteOrder().mapNotNull { group ->
             val domains = root.stringList(group.domainKey)
             val ips = root.stringList(group.ipKey)
@@ -83,6 +89,7 @@ object SubscriptionRoutingHeaderParser {
                 domains = domains,
                 ips = ips,
                 operator = RoutingRuleOperator.OR,
+                geoData = geoData,
             )
         }
 
@@ -139,6 +146,9 @@ object SubscriptionRoutingHeaderParser {
         ?.contentOrNull
         ?.trim()
         ?.takeIf { it.isNotEmpty() }
+
+    private fun JsonObject.httpUrl(key: String): String? = string(key)
+        ?.takeIf { it.toHttpUrlOrNull() != null }
 
     private fun JsonObject.stringList(key: String): List<String> = when (val value = this[key]) {
         is JsonArray -> value.mapNotNull { (it as? JsonPrimitive)?.contentOrNull?.trim()?.takeIf(String::isNotEmpty) }

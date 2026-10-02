@@ -4,6 +4,7 @@ import android.app.Application
 import android.util.Log
 import com.material.xray.core.launcher.LauncherIconManager
 import com.material.xray.core.locale.initializeAppLocales
+import com.material.xray.core.xray.ProviderGeoDataManager
 import com.material.xray.data.db.DatabaseOpenChecker
 import com.material.xray.data.repository.BackupManager
 import com.material.xray.data.repository.SettingsRepository
@@ -53,6 +54,8 @@ class MaterialXrayApp : Application() {
 
     private val telemetryReporter: TelemetryReporter by inject()
 
+    private val providerGeoDataManager: ProviderGeoDataManager by inject()
+
     private val appScope: CoroutineScope by inject(named<ApplicationScope>())
 
     override fun onCreate() {
@@ -87,6 +90,7 @@ class MaterialXrayApp : Application() {
             }
                 .onFailure { error -> Log.e(LOG_TAG, "Unable to schedule initial geodata refresh", error) }
         }
+        appScope.launch { providerGeoDataManager.keepUpToDate() }
         appScope.launch {
             if (settingsRepository.autoConnect.first()) {
                 delay(STARTUP_BACKGROUND_WORK_DELAY_SECONDS * 1_000)

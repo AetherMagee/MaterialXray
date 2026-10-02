@@ -25,6 +25,11 @@
     <string name="routing_rules_managed_by_selected_subscription">Routing rules are managed by the selected subscription</string>
     <string name="routing_some_rules_managed_by_provider">Some routing rules are managed by %1$s</string>
     <string name="routing_some_rules_managed_by_selected_subscription">Some routing rules are managed by the selected subscription</string>
+    <string name="routing_provider_geodata_downloading">Downloading the provider\'s routing data…</string>
+    <string name="routing_provider_geodata_compatibility">Compatibility mode: the provider\'s routing data isn\'t available, so some of its rules are skipped.</string>
+    <string name="routing_provider_geodata_retry">Tap to retry</string>
+    <string name="routing_provider_geodata_ready">The provider\'s routing data has been downloaded.</string>
+    <string name="routing_provider_geodata_apply">Tap to apply. The connection will briefly restart.</string>
     <string name="routing_profile_rule_orphaned">The provider no longer supplies the original rule. This local change is inactive.</string>
     <string name="routing_scope_custom">Custom</string>
     <string name="routing_scope_subscription_wide">Subscription-wide</string>

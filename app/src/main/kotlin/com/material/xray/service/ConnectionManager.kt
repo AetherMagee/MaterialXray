@@ -15,6 +15,7 @@ import com.material.xray.core.xray.parseXrayApiEndpoint
 import com.material.xray.model.ConnectionProgress
 import com.material.xray.model.ConnectionState
 import com.material.xray.model.RootConnectionBackend
+import com.material.xray.model.RoutingRule
 import com.material.xray.model.ServerConfig
 import com.material.xray.model.XrayOutbound
 import com.material.xray.model.XrayRuntimeSettings
@@ -136,9 +137,12 @@ internal class ConnectionManager(
                 configuredTunName = runtimeSettings.tunName,
                 rootBackend = rootBackend,
             ) ?: return
-            val effectiveRuntimeSettings = runtimeSettings.copy(tunName = tunName)
             if (prepareXrayBinary(strategy, preparation) == null) return
             prepareRoutingData(preparation, transitionState)
+            val effectiveRuntimeSettings = runtimeSettings.copy(
+                tunName = tunName,
+                routingRules = resolveProviderRoutingRules(runtimeSettings.routingRules),
+            )
 
             val physicalRouteResult = detectPhysicalRoute(managesSystemRouting, tunName)
             if (!physicalRouteResult.success) return
@@ -522,6 +526,29 @@ internal class ConnectionManager(
         } else {
             log.append(LogSource.APP, "Routing data already up to date")
         }
+    }
+
+    /** Points provider rules at the provider's geodata, leaving out what no available file defines. */
+    private suspend fun resolveProviderRoutingRules(rules: List<RoutingRule>): List<RoutingRule> {
+        val resolution = routingData.resolveProviderRules(rules)
+        if (resolution.usedUrls.isNotEmpty()) {
+            log.append(LogSource.APP, "Using provider routing data: ${resolution.usedUrls.joinToString()}")
+        }
+        if (resolution.unavailableUrls.isNotEmpty()) {
+            log.append(
+                LogSource.APP,
+                "Provider routing data not downloaded yet, using compatibility mode: " +
+                    resolution.unavailableUrls.joinToString(),
+            )
+        }
+        if (resolution.droppedEntries.isNotEmpty()) {
+            log.append(
+                LogSource.APP,
+                "Left out provider routing entries missing from routing data: " +
+                    resolution.droppedEntries.joinToString(),
+            )
+        }
+        return resolution.rules
     }
 
     private suspend fun detectPhysicalRoute(managesSystemRouting: Boolean, tunName: String): PhysicalRouteResult {
@@ -1152,7 +1179,7 @@ internal class ConnectionManager(
             return false
         }
         val nextRuntimeSettings = currentInputs.runtimeSettings.copy(
-            routingRules = runtimeSettings.routingRules,
+            routingRules = resolveProviderRoutingRules(runtimeSettings.routingRules),
             routingDomainMatcher = runtimeSettings.routingDomainMatcher,
             routingFallbackOutbound = runtimeSettings.routingFallbackOutbound,
         )

@@ -12,6 +12,8 @@ import com.material.xray.core.xray.CleanupManager
 import com.material.xray.core.xray.ConfigGenerator
 import com.material.xray.core.xray.GeoDataManager
 import com.material.xray.core.xray.GeoDataStatus
+import com.material.xray.core.xray.ProviderGeoDataManager
+import com.material.xray.core.xray.ProviderGeoDataResolution
 import com.material.xray.core.xray.ServerAddressResolver
 import com.material.xray.core.xray.StateFile
 import com.material.xray.core.xray.TproxyManager
@@ -31,6 +33,7 @@ import com.material.xray.data.db.dao.AppBypassDao
 import com.material.xray.data.repository.ServerRepository
 import com.material.xray.model.ActiveBalancerSelection
 import com.material.xray.model.ConnectionProgress
+import com.material.xray.model.RoutingRule
 import com.material.xray.model.ServerConfig
 import com.material.xray.telemetry.ConnectionTelemetryStep
 import com.material.xray.telemetry.TelemetryReporter
@@ -213,13 +216,16 @@ internal class ServerAddressConnectionResolver(
 internal interface ConnectionRoutingData {
     suspend fun needsRefresh(): Boolean
     suspend fun ensureReady(): GeoDataStatus
+    suspend fun resolveProviderRules(rules: List<RoutingRule>): ProviderGeoDataResolution
 }
 
 internal class GeoDataConnectionRoutingData(
     private val geoDataManager: GeoDataManager,
+    private val providerGeoDataManager: ProviderGeoDataManager,
 ) : ConnectionRoutingData {
     override suspend fun needsRefresh(): Boolean = geoDataManager.needsRefresh()
     override suspend fun ensureReady(): GeoDataStatus = geoDataManager.ensureReady()
+    override suspend fun resolveProviderRules(rules: List<RoutingRule>): ProviderGeoDataResolution = providerGeoDataManager.resolve(rules)
 }
 
 internal interface TproxyRoutingGateway {
@@ -390,6 +396,7 @@ class ConnectionManagerFactory(
     private val context: Context,
     private val shell: RootShell,
     private val geoDataManager: GeoDataManager,
+    private val providerGeoDataManager: ProviderGeoDataManager,
     private val appBypassDao: AppBypassDao,
     private val serverRepository: ServerRepository,
     private val appInventory: AppInventory,
@@ -442,7 +449,7 @@ class ConnectionManagerFactory(
             environment = environment,
             rootRuntime = RootShellConnectionRuntime(shell),
             xrayBinary = xrayBinary,
-            routingData = GeoDataConnectionRoutingData(geoDataManager),
+            routingData = GeoDataConnectionRoutingData(geoDataManager, providerGeoDataManager),
             serverResolver = ServerAddressConnectionResolver(serverAddressResolver),
             tunGateway = tunGateway,
             tproxyGateway = tproxyGateway,

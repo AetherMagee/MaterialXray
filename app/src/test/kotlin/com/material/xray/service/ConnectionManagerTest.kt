@@ -3,6 +3,7 @@ package com.material.xray.service
 import com.material.xray.R
 import com.material.xray.core.xray.ConfigGenerator
 import com.material.xray.core.xray.GeoDataStatus
+import com.material.xray.core.xray.ProviderGeoDataResolution
 import com.material.xray.core.xray.TproxyManager
 import com.material.xray.core.xray.TproxyRuntimeState
 import com.material.xray.core.xray.TproxyTrafficGroup
@@ -1126,6 +1127,8 @@ class ConnectionManagerTest {
                 downloaded = false,
             )
         }
+
+        override suspend fun resolveProviderRules(rules: List<RoutingRule>) = ProviderGeoDataResolution(rules)
     }
 
     private class FakeServerResolver : ConnectionServerResolver {
