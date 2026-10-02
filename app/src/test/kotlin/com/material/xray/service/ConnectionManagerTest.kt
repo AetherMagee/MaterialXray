@@ -773,6 +773,20 @@ class ConnectionManagerTest {
     }
 
     @Test
+    fun `server addresses are warmed only while a root runtime can carry the lookup`() = runTest {
+        val harness = Harness()
+        val nextServer = server().copy(address = "next.example.com")
+
+        harness.manager.warmServerAddresses(nextServer)
+        assertTrue(harness.serverResolver.servers.isEmpty())
+
+        harness.manager.connect(server(), runtimeSettings(), preparation = ConnectionPreparation.ReusePreparedRuntime)
+        harness.manager.warmServerAddresses(nextServer)
+
+        assertEquals(nextServer, harness.serverResolver.servers.last())
+    }
+
+    @Test
     fun `physical route detection retries without rerunning earlier setup`() = runTest {
         val route = TunManager.PhysicalRoute(dev = "wlan0", gateway = "192.0.2.1", table = "main")
         val harness = Harness().apply {

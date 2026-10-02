@@ -582,6 +582,17 @@ internal class ConnectionManager(
         return PhysicalRouteResult(success = true, route = route)
     }
 
+    /**
+     * Looks [server] up while the running core can still carry the lookup. When another app's VPN
+     * covers this app, Android hands the lookup to that VPN's resolver, whose traffic the reconnect
+     * guard drops, so the reconnect relies on the resolver caching this answer.
+     */
+    suspend fun warmServerAddresses(server: ServerConfig) {
+        if (!isUsingRootRuntime) return
+        // Caching happens before the IPv6 filter, so allowing it here warms every address family.
+        serverResolver.resolve(server, allowIpv6 = true)
+    }
+
     private suspend fun resolveServer(server: ServerConfig, allowIpv6: Boolean): ServerConfig? {
         val resolvedServer = executeStep(
             ConnectionStep(

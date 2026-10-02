@@ -656,6 +656,7 @@ class XrayService(
         preparation: ConnectionPreparation,
         reconnectDelayMs: Long,
     ): Boolean {
+        connectionManager.warmServerAddresses(config)
         if (!connectionManager.prepareSeamlessReconnect()) return false
         if (
             !connectionManager.disconnect(
