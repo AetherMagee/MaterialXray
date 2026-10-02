@@ -1239,7 +1239,7 @@ class ConnectionManagerTest {
                 ports = listOf(48_321),
                 allowIpv6 = allowIpv6,
                 tetherUpstreamInterface = tetherUpstreamInterface,
-                tetherBypassLan = bypassLan,
+                bypassLan = bypassLan,
             )
             return TproxyTrafficPlan(
                 runtimeState = state,

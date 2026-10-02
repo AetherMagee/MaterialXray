@@ -1263,7 +1263,7 @@ internal class ConnectionManager(
             allowIpv6 = runtimeSettings.allowIpv6,
             existingState = tproxyState,
             tetherUpstreamInterface = tproxyState.tetherUpstreamInterface,
-            bypassLan = tproxyState.tetherBypassLan,
+            bypassLan = tproxyState.bypassLan,
         )
         val result = executeStep(
             ConnectionStep(

@@ -39,7 +39,30 @@ class XrayStateTest {
         )
 
         assertNull(state.tproxy?.tetherUpstreamInterface)
-        assertTrue(state.tproxy?.tetherBypassLan == true)
+        assertTrue(state.tproxy?.bypassLan == true)
         assertFalse(state.tproxy?.ipv6Enabled == true)
+    }
+
+    @Test
+    fun `TPROXY LAN bypass keeps its stored field name`() {
+        val state = Json.decodeFromString<XrayState>(
+            """
+            {
+              "tproxy": {
+                "markPrefix": 167772160,
+                "markMask": 251658240,
+                "routeTable": 300,
+                "rulePriority": 11990,
+                "outputChainSlot": "a",
+                "groups": [{"routeKey": 1,"mark": 167772161,"port": 48321,"inboundTag": "tproxy-in-default"}],
+                "ipv6Enabled": false,
+                "tetherBypassLan": false
+              }
+            }
+            """.trimIndent(),
+        )
+
+        assertFalse(state.tproxy?.bypassLan == true)
+        assertTrue(Json.encodeToString(XrayState.serializer(), state).contains("\"tetherBypassLan\":false"))
     }
 }

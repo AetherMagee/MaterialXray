@@ -5,6 +5,7 @@ import android.util.AtomicFile
 import android.util.Log
 import com.material.xray.model.RootConnectionBackend
 import java.io.File
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -20,7 +21,9 @@ data class TproxyRuntimeState(
     val groups: List<TproxyGroupState>,
     val ipv6Enabled: Boolean,
     val tetherUpstreamInterface: String? = null,
-    val tetherBypassLan: Boolean = true,
+    // Covers local apps too; the stored name predates that.
+    @SerialName("tetherBypassLan")
+    val bypassLan: Boolean = true,
     val localAddresses: List<String> = emptyList(),
     val dynamicLocalAddresses: Boolean = false,
 ) {

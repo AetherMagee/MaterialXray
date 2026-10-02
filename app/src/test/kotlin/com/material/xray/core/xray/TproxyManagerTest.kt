@@ -68,7 +68,7 @@ class TproxyManagerTest {
 
     @Test
     fun `INPUT guard preserves device services and blocks intercepted traffic until activation`() {
-        val command = TproxyManager.guardInstallCommand(plan(tetherUpstreamInterface = "wlan0", tetherBypassLan = false), APP_UID)
+        val command = TproxyManager.guardInstallCommand(plan(tetherUpstreamInterface = "wlan0", bypassLan = false), APP_UID)
         val inputRules = command.substringAfter("iptables -w 2 -t filter -N MXG278bI")
             .substringBefore("iptables -w 2 -t filter -I INPUT")
 
@@ -81,7 +81,7 @@ class TproxyManagerTest {
 
     @Test
     fun `local listener ports are protected without blocking the same port on remote hosts`() {
-        val command = TproxyManager.activationCommand(plan(tetherUpstreamInterface = "wlan0", tetherBypassLan = false), APP_UID)
+        val command = TproxyManager.activationCommand(plan(tetherUpstreamInterface = "wlan0", bypassLan = false), APP_UID)
         assertTrue(command.contains("-A MXP278bA -d 192.168.43.1/32 -j RETURN"))
         assertFalse(command.contains("-A MXP278bA -d 192.168.43.1/32 -p tcp --dport 48322 -j DROP"))
         assertTrue(command.contains("-A MXP278bA -d 127.0.0.0/8 -j RETURN"))
@@ -546,6 +546,97 @@ class TproxyManagerTest {
     }
 
     @Test
+    fun `LAN destinations skip the core after DNS is captured`() {
+        val command = TproxyManager.activationCommand(plan(), APP_UID)
+        val dnsMark = command.indexOf("-p udp --dport 53 -j MARK --set-xmark 0x10200000/0x1fe00000")
+        val lanReturn = command.indexOf("-A MXOA278b -d 192.168.0.0/16 -m mark ! --mark 0x10000000/0x10000000 -j RETURN")
+        val groupMark = command.indexOf("--uid-owner 10030 -p tcp -j MARK")
+        val profileMark = command.indexOf("--uid-owner 10000-99999 -p tcp -j MARK")
+
+        assertTrue(dnsMark in 0..<lanReturn)
+        assertTrue(lanReturn < groupMark)
+        assertTrue(groupMark < profileMark)
+        listOf("10.0.0.0/8", "100.64.0.0/10", "172.16.0.0/12", "169.254.0.0/16").forEach { cidr ->
+            assertTrue(command.contains("-A MXOA278b -d $cidr -m mark ! --mark 0x10000000/0x10000000 -j RETURN"))
+        }
+    }
+
+    @Test
+    fun `LAN destinations stay intercepted when LAN bypass is disabled`() {
+        val command = TproxyManager.activationCommand(plan(allowIpv6 = true, bypassLan = false), APP_UID)
+
+        assertFalse(command.contains("-A MXOA278b -d 192.168.0.0/16"))
+        assertFalse(command.contains("-A MXOA278b -d fc00::/7"))
+    }
+
+    @Test
+    fun `forced apps keep sending LAN traffic to their server`() {
+        val original = plan()
+        val forcedState = original.runtimeState.groups[1].copy(routeKey = -7L)
+        val forcedPlan = original.copy(
+            runtimeState = original.runtimeState.copy(groups = listOf(original.runtimeState.groups[0], forcedState)),
+            groups = listOf(original.groups[0], original.groups[1].copy(state = forcedState)),
+        )
+        val command = TproxyManager.activationCommand(forcedPlan, APP_UID)
+        val forcedMark = command.indexOf("--uid-owner 10030 -p tcp -j MARK --set-xmark 0x10400000/0x1fe00000")
+        val lanReturn = command.indexOf("-A MXOA278b -d 192.168.0.0/16")
+        val forcedReject = command.indexOf("-A MXOA278b -m owner --uid-owner 10030 -j REJECT --reject-with icmp6-no-route")
+        val ipv6LanReturn = command.indexOf("-A MXOA278b -d fc00::/7 -j RETURN")
+
+        assertTrue(forcedMark in 0..<lanReturn)
+        assertTrue(forcedReject in 0..<ipv6LanReturn)
+    }
+
+    @Test
+    fun `default selected apps follow routing rules and skip the core for LAN`() {
+        val original = plan()
+        val defaultState = original.runtimeState.groups[1].copy(routeKey = Long.MIN_VALUE)
+        val defaultPlan = original.copy(
+            runtimeState = original.runtimeState.copy(groups = listOf(original.runtimeState.groups[0], defaultState)),
+            groups = listOf(original.groups[0], original.groups[1].copy(state = defaultState)),
+        )
+        val command = TproxyManager.activationCommand(defaultPlan, APP_UID)
+        val lanReturn = command.indexOf("-A MXOA278b -d 192.168.0.0/16")
+        val groupMark = command.indexOf("--uid-owner 10030 -p tcp -j MARK")
+
+        assertTrue(lanReturn in 0..<groupMark)
+        assertFalse(command.contains("--uid-owner 10030 -j REJECT"))
+    }
+
+    @Test
+    fun `disabled IPv6 still allows LAN addresses without leaking DNS`() {
+        val command = TproxyManager.activationCommand(plan(), APP_UID)
+        val bypassExempt = command.indexOf("ip6tables -w 2 -t filter -A MXOA278b -m owner --uid-owner 10020 -j RETURN")
+        val dnsReject = command.indexOf(
+            "ip6tables -w 2 -t filter -A MXOA278b -m owner --uid-owner 10000-99999 -p udp --dport 53 " +
+                "-j REJECT --reject-with icmp6-no-route",
+        )
+        val ulaReturn = command.indexOf("ip6tables -w 2 -t filter -A MXOA278b -d fc00::/7 -j RETURN")
+        val linkLocalReturn = command.indexOf("ip6tables -w 2 -t filter -A MXOA278b -d fe80::/10 -j RETURN")
+        val profileReject = command.indexOf(
+            "ip6tables -w 2 -t filter -A MXOA278b -m owner --uid-owner 10000-99999 -j REJECT --reject-with icmp6-no-route",
+        )
+
+        assertTrue(bypassExempt in 0..<dnsReject)
+        assertTrue(dnsReject < ulaReturn)
+        assertTrue(ulaReturn < linkLocalReturn)
+        assertTrue(linkLocalReturn < profileReject)
+        assertFalse(
+            TproxyManager.activationCommand(plan(bypassLan = false), APP_UID)
+                .contains("ip6tables -w 2 -t filter -A MXOA278b -d fc00::/7"),
+        )
+    }
+
+    @Test
+    fun `enabled IPv6 skips the core for IPv6 LAN destinations`() {
+        val command = TproxyManager.activationCommand(plan(allowIpv6 = true), APP_UID)
+
+        assertTrue(command.contains("ip6tables -w 2 -t mangle -A MXOA278b -d fc00::/7 -m mark ! --mark 0x10000000/0x10000000 -j RETURN"))
+        assertTrue(command.contains("ip6tables -w 2 -t mangle -A MXOA278b -d fe80::/10 -m mark ! --mark 0x10000000/0x10000000 -j RETURN"))
+        assertFalse(command.contains("ip6tables -w 2 -t mangle -A MXOA278b -d 192.168.0.0/16"))
+    }
+
+    @Test
     fun `disabled IPv6 rejects managed apps instead of blackholing them`() {
         val command = TproxyManager.activationCommand(plan(), APP_UID)
 
@@ -869,7 +960,7 @@ class TproxyManagerTest {
     @Test
     fun `tether traffic does not bypass private destinations when LAN bypass is disabled`() {
         val command = TproxyManager.activationCommand(
-            plan(tetherUpstreamInterface = "wlan0", tetherBypassLan = false),
+            plan(tetherUpstreamInterface = "wlan0", bypassLan = false),
             APP_UID,
         )
 
@@ -987,7 +1078,7 @@ class TproxyManagerTest {
     private fun plan(
         allowIpv6: Boolean = false,
         tetherUpstreamInterface: String? = null,
-        tetherBypassLan: Boolean = true,
+        bypassLan: Boolean = true,
     ): TproxyTrafficPlan {
         val state = TproxyManager.createRuntimeState(
             routeTable = 300,
@@ -995,7 +1086,7 @@ class TproxyManagerTest {
             ports = listOf(48_321, 48_322),
             allowIpv6 = allowIpv6,
             tetherUpstreamInterface = tetherUpstreamInterface,
-            tetherBypassLan = tetherBypassLan,
+            bypassLan = bypassLan,
             localAddresses = listOf("127.0.0.1/32", "192.168.43.1/32", "2001:db8:0:0:0:0:0:1/128"),
         )
         return TproxyTrafficPlan(

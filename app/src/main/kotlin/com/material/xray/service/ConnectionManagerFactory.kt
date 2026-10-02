@@ -289,7 +289,7 @@ internal class TproxyManagerRoutingGateway(
             ports = portAllocator.allocate(routeIdentities.size, allowIpv6),
             allowIpv6 = allowIpv6,
             tetherUpstreamInterface = tetherUpstreamInterface,
-            tetherBypassLan = bypassLan,
+            bypassLan = bypassLan,
             localAddresses = if (tetherUpstreamInterface != null && !dynamicLocalAddresses) manager.readLocalAddresses(allowIpv6) else emptyList(),
             dynamicLocalAddresses = dynamicLocalAddresses,
         )

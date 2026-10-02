@@ -373,7 +373,7 @@ class TproxyManager internal constructor(
             ports: List<Int>,
             allowIpv6: Boolean,
             tetherUpstreamInterface: String? = null,
-            tetherBypassLan: Boolean = true,
+            bypassLan: Boolean = true,
             localAddresses: List<String> = emptyList(),
             dynamicLocalAddresses: Boolean = false,
         ): TproxyRuntimeState {
@@ -399,7 +399,7 @@ class TproxyManager internal constructor(
                 },
                 ipv6Enabled = allowIpv6,
                 tetherUpstreamInterface = tetherUpstreamInterface,
-                tetherBypassLan = tetherBypassLan,
+                bypassLan = bypassLan,
                 localAddresses = localAddresses,
                 dynamicLocalAddresses = dynamicLocalAddresses,
             )
@@ -905,7 +905,7 @@ class TproxyManager internal constructor(
             for (protocol in listOf("tcp", "udp")) {
                 add("$tool -t filter -A $chain -p $protocol -m $protocol --dport 53 -j DROP")
             }
-            tetherBypassCidrs(tool, plan.runtimeState.tetherBypassLan).forEach { cidr ->
+            tetherBypassCidrs(tool, plan.runtimeState.bypassLan).forEach { cidr ->
                 add("$tool -t filter -A $chain -d $cidr -j RETURN")
             }
             add("$tool -t filter -A $chain -j DROP")
@@ -1053,7 +1053,7 @@ class TproxyManager internal constructor(
                         add("$tool -t mangle -A $chain -d $address -j RETURN")
                     }
                 }
-                tetherBypassCidrs(tool, plan.runtimeState.tetherBypassLan).forEach { cidr ->
+                tetherBypassCidrs(tool, plan.runtimeState.bypassLan).forEach { cidr ->
                     add("$tool -t mangle -A $chain -d $cidr -j RETURN")
                 }
                 for (protocol in listOf("tcp", "udp")) {
@@ -1178,6 +1178,23 @@ class TproxyManager internal constructor(
             uidRanges(plan.bypassUids - appUid).forEach { range ->
                 add("$IPV6 -t filter -A $chain -m owner --uid-owner ${range.asArgument()} -j RETURN")
             }
+            if (plan.runtimeState.bypassLan) {
+                val reject = "REJECT --reject-with icmp6-no-route"
+                plan.routeProfileIds.toSortedSet().forEach { profileId ->
+                    val profile = appUidRangeForProfile(profileId).asArgument()
+                    for (protocol in listOf("tcp", "udp")) {
+                        add("$IPV6 -t filter -A $chain -m owner --uid-owner $profile -p $protocol --dport 53 -j $reject")
+                    }
+                }
+                plan.groups.filter { it.isForced }.forEach { group ->
+                    uidRanges(group.uids).forEach { range ->
+                        add("$IPV6 -t filter -A $chain -m owner --uid-owner ${range.asArgument()} -j $reject")
+                    }
+                }
+                localLanCidrs(IPV6).forEach { cidr ->
+                    add("$IPV6 -t filter -A $chain -d $cidr -j RETURN")
+                }
+            }
             plan.routeProfileIds.toSortedSet().forEach { profileId ->
                 add(
                     "$IPV6 -t filter -A $chain -m owner --uid-owner ${appUidRangeForProfile(profileId).asArgument()} " +
@@ -1193,7 +1210,7 @@ class TproxyManager internal constructor(
                 add("$IPV6 -t filter -A $chain -p $protocol --dport 53 -j REJECT --reject-with icmp6-no-route")
             }
 
-            tetherBypassCidrs(IPV6, plan.runtimeState.tetherBypassLan).forEach { cidr ->
+            tetherBypassCidrs(IPV6, plan.runtimeState.bypassLan).forEach { cidr ->
                 add("$IPV6 -t filter -A $chain -d $cidr -j RETURN")
             }
             add("$IPV6 -t filter -A $chain -j REJECT --reject-with icmp6-no-route")
@@ -1235,7 +1252,8 @@ class TproxyManager internal constructor(
             uidRanges(plan.bypassUids - appUid).forEach { range ->
                 add("$tool -t mangle -A $chain -m owner --uid-owner ${range.asArgument()} -j RETURN")
             }
-            plan.groups.filter { !it.isBase && it.state.routeKey < 0 && it.state.routeKey != Long.MIN_VALUE }.forEach { group ->
+            val (forcedGroups, ruleGroups) = plan.groups.filterNot { it.isBase }.partition { it.isForced }
+            forcedGroups.forEach { group ->
                 uidRanges(group.uids).forEach { range ->
                     for (protocol in listOf("tcp", "udp")) {
                         val match = "-m owner --uid-owner ${range.asArgument()} -p $protocol --dport 53"
@@ -1248,7 +1266,19 @@ class TproxyManager internal constructor(
             for (protocol in listOf("tcp", "udp")) {
                 add("$tool -t mangle -A $chain -p $protocol --dport 53 -j MARK --set-xmark $baseMark/$groupMask")
             }
-            plan.groups.filterNot { it.isBase }.forEach { group ->
+            // Forced groups ignore routing rules, LAN bypass included, so they are marked before it.
+            // DNS is already marked by now and keeps going to the core.
+            forcedGroups.forEach { group ->
+                uidRanges(group.uids).forEach { range ->
+                    addMarkRules(tool, chain, range, group.state.mark, groupMask)
+                }
+            }
+            if (state.bypassLan) {
+                localLanCidrs(tool).forEach { cidr ->
+                    add("$tool -t mangle -A $chain -d $cidr -m mark ! --mark $prefix/$mask -j RETURN")
+                }
+            }
+            ruleGroups.forEach { group ->
                 uidRanges(group.uids).forEach { range ->
                     addMarkRules(tool, chain, range, group.state.mark, groupMask)
                 }
@@ -1297,6 +1327,16 @@ class TproxyManager internal constructor(
         } else {
             IPV4_ALWAYS_BYPASS_CIDRS + IPV4_LAN_CIDRS.takeIf { bypassLan }.orEmpty()
         }
+
+        private fun localLanCidrs(tool: String): List<String> = if (tool == IPV6) {
+            IPV6_LAN_CIDRS + "fe80::/10"
+        } else {
+            IPV4_LAN_CIDRS + "169.254.0.0/16"
+        }
+
+        // Groups that skip routing rules: always-proxied apps and apps forced through a server.
+        private val TproxyTrafficGroup.isForced: Boolean
+            get() = !isBase && state.routeKey < 0 && state.routeKey != Long.MIN_VALUE
 
         private fun uidRanges(uids: Set<Int>): List<IntRange> {
             val sorted = uids.filter(::isApplicationUid).toSortedSet()
