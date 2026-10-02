@@ -81,12 +81,8 @@ class RoutingViewModel(
     val automaticRoutingProviderName: StateFlow<String?> = selectedProviderRouting
         .map { it?.providerName }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
-    val subscriptionRules: StateFlow<List<RoutingRule>> = combine(
-        settingsRepository.subscriptionRoutingRules,
-        routingPolicyControl,
-    ) { rules, policy ->
-        rules.takeIf { policy == RoutingPolicyControl.SubscriptionProvider }.orEmpty()
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val subscriptionRules: StateFlow<List<RoutingRule>> = settingsRepository.subscriptionRoutingRules
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val providerGeoDataNotice: StateFlow<ProviderGeoDataNotice?> = combine(
         subscriptionRules,
         providerGeoDataManager.state,
@@ -142,6 +138,13 @@ class RoutingViewModel(
     fun resetRulesToDefaults() {
         viewModelScope.launch {
             settingsRepository.setCustomRouting(SubscriptionRouting(RoutingRuleCatalog.defaults()))
+            routingChangeManager.markPendingChanges()
+        }
+    }
+
+    fun updateSubscriptionRule(rule: RoutingRule) {
+        viewModelScope.launch {
+            settingsRepository.setSubscriptionRoutingRule(rule)
             routingChangeManager.markPendingChanges()
         }
     }

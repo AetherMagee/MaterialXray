@@ -254,12 +254,10 @@ class SettingsRepository(
     val subscriptionRoutingRules: Flow<List<RoutingRule>> = store.data.map { prefs ->
         decodeProviderRoutingRules(prefs[PROVIDER_ROUTING_RULES], prefs[PROVIDER_ROUTING_RULES_VERSION])
     }
-    val routingRules: Flow<List<RoutingRule>> = combine(
-        customRoutingRules,
-        subscriptionRoutingRules,
-        routingPolicyControl,
-    ) { custom, provider, policy ->
-        custom + provider.takeIf { policy == RoutingPolicyControl.SubscriptionProvider }.orEmpty()
+
+    // Subscription rules apply in both modes; manual mode only stops refreshes from replacing them.
+    val routingRules: Flow<List<RoutingRule>> = combine(customRoutingRules, subscriptionRoutingRules) { custom, provider ->
+        custom + provider
     }
     val customRoutingDomainStrategy: Flow<String> = store.data.map { prefs ->
         SubscriptionRouting.normalizeDomainStrategy(prefs[ROUTING_DOMAIN_STRATEGY])
@@ -602,6 +600,15 @@ class SettingsRepository(
             ?: prefs.remove(PROVIDER_ROUTING_DOMAIN_MATCHER)
         normalized?.fallbackOutboundTag?.let { prefs[PROVIDER_ROUTING_FALLBACK_OUTBOUND] = it }
             ?: prefs.remove(PROVIDER_ROUTING_FALLBACK_OUTBOUND)
+    }
+
+    /** Edits a subscription-wide rule and takes routing manual in the same write, so no refresh can undo it. */
+    suspend fun setSubscriptionRoutingRule(rule: RoutingRule) = store.edit { prefs ->
+        prefs[ROUTING_POLICY_CONTROL] = RoutingPolicyControl.User.value
+        val updatedRules = decodeProviderRoutingRules(prefs[PROVIDER_ROUTING_RULES], prefs[PROVIDER_ROUTING_RULES_VERSION])
+            .map { existing -> if (existing.id == rule.id) rule else existing }
+        prefs[PROVIDER_ROUTING_RULES] = encodeRoutingRules(updatedRules)
+        prefs[PROVIDER_ROUTING_RULES_VERSION] = CURRENT_ROUTING_RULES_VERSION
     }
 
     suspend fun getAllAsMap(): Map<String, String> {

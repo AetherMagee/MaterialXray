@@ -18,9 +18,11 @@ class SubscriptionRoutingRepository(
             domainMatcher = settingsRepository.customRoutingDomainMatcher.first(),
             fallbackOutboundTag = settingsRepository.customRoutingFallbackOutbound.first()?.tag,
         ).normalized()
-        if (current == target) return false
-        settingsRepository.setCustomRouting(target)
-        return true
+        val customChanged = current != target
+        if (customChanged) settingsRepository.setCustomRouting(target)
+        // The copy replaces kept subscription-wide rules instead of applying alongside them twice.
+        val subscriptionCleared = clear()
+        return customChanged || subscriptionCleared
     }
 
     suspend fun applyForSubscription(subscriptionId: Long): Boolean {

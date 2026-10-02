@@ -103,7 +103,7 @@ private fun validateSettingsDefaultsRevision(
     }
 }
 
-internal const val CURRENT_SETTINGS_DEFAULTS_REVISION = 8
+internal const val CURRENT_SETTINGS_DEFAULTS_REVISION = 9
 private const val PREVIOUS_XRAY_BUFFER_SIZE_KIB = 512
 private const val PREVIOUS_TUN_NAME = "xray0"
 private const val PREVIOUS_DNS_SERVERS = "1.1.1.1,1.0.0.1"
@@ -140,6 +140,7 @@ private val SETTINGS_DEFAULT_CHANGES = listOf(
     dnsPresetCanonicalisationChange(revision = 6),
     providerRoutingSeparationChange(revision = 7),
     missingCustomRoutingRepair(revision = 8),
+    staleProviderRoutingCleanup(revision = 9),
 )
 
 private fun providerRoutingSeparationChange(revision: Int): SettingDefaultChange = object : SettingDefaultChange {
@@ -175,6 +176,29 @@ private fun missingCustomRoutingRepair(revision: Int): SettingDefaultChange = ob
         if (providerControlled && customRoutingAbsent) {
             preferences[SettingsRepository.DELETED_DEFAULT_ROUTING_RULE_IDS] = RoutingRuleCatalog.defaultIds()
         }
+    }
+}
+
+/**
+ * Provider routing used to apply only while the subscription controlled routing, so manual mode kept
+ * whatever it last stored without using it. It now applies in both modes, so a manual install's
+ * leftover copy is dropped rather than suddenly taking effect.
+ */
+private fun staleProviderRoutingCleanup(revision: Int): SettingDefaultChange = object : SettingDefaultChange {
+    override val revision = revision
+
+    override fun apply(preferences: MutablePreferences) {
+        if (
+            RoutingPolicyControl.fromValue(preferences[SettingsRepository.ROUTING_POLICY_CONTROL]) ==
+            RoutingPolicyControl.SubscriptionProvider
+        ) {
+            return
+        }
+        preferences.remove(SettingsRepository.PROVIDER_ROUTING_RULES)
+        preferences.remove(SettingsRepository.PROVIDER_ROUTING_RULES_VERSION)
+        preferences.remove(SettingsRepository.PROVIDER_ROUTING_DOMAIN_STRATEGY)
+        preferences.remove(SettingsRepository.PROVIDER_ROUTING_DOMAIN_MATCHER)
+        preferences.remove(SettingsRepository.PROVIDER_ROUTING_FALLBACK_OUTBOUND)
     }
 }
 

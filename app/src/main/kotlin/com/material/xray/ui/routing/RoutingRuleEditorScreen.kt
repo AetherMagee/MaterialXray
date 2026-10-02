@@ -106,7 +106,9 @@ internal fun RoutingRuleEditorScreen(
     val canSave = editableRule.profileOriginalRuleJson == null || profileRule != null
 
     fun saveRule(updatedRule: RoutingRule) {
-        if (editableRule.profileOriginalRuleJson != null) {
+        if (editableRule.subscriptionWide) {
+            viewModel.updateSubscriptionRule(updatedRule)
+        } else if (editableRule.profileOriginalRuleJson != null) {
             viewModel.updateProfileRule(profileRule ?: return, updatedRule)
         } else if (editableRule.isNew) {
             viewModel.addRule(updatedRule)
@@ -187,7 +189,7 @@ internal fun RoutingRuleEditorScreen(
                     val edited = editedRule()
                     if (edited.matchesAllTraffic()) {
                         pendingCatchAllRule = edited
-                    } else if (editableRule.profileOriginalRuleJson != null &&
+                    } else if (editableRule.providerSourced &&
                         routingPolicyControl == RoutingPolicyControl.SubscriptionProvider
                     ) {
                         pendingProviderRule = edited
@@ -325,7 +327,7 @@ internal fun RoutingRuleEditorScreen(
             onKeepEditing = { pendingCatchAllRule = null },
             onSaveAnyway = {
                 pendingCatchAllRule = null
-                if (editableRule.profileOriginalRuleJson != null &&
+                if (editableRule.providerSourced &&
                     routingPolicyControl == RoutingPolicyControl.SubscriptionProvider
                 ) {
                     pendingProviderRule = candidate

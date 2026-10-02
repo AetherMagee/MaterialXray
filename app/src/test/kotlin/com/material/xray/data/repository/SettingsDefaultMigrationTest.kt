@@ -303,6 +303,38 @@ class SettingsDefaultMigrationTest {
     }
 
     @Test
+    fun `manual routing drops the provider rules it left unused`() = runTest {
+        val preferences = mutablePreferencesOf(
+            SETTINGS_DEFAULTS_REVISION to 8,
+            SettingsRepository.ROUTING_POLICY_CONTROL to RoutingPolicyControl.User.value,
+            SettingsRepository.ROUTING_RULES to "custom-rules",
+            SettingsRepository.PROVIDER_ROUTING_RULES to "provider-rules",
+            SettingsRepository.PROVIDER_ROUTING_RULES_VERSION to 2,
+            SettingsRepository.PROVIDER_ROUTING_DOMAIN_STRATEGY to "IPIfNonMatch",
+        )
+
+        val migrated = SettingsDefaultMigration().migrate(preferences)
+
+        assertEquals("custom-rules", migrated[SettingsRepository.ROUTING_RULES])
+        assertNull(migrated[SettingsRepository.PROVIDER_ROUTING_RULES])
+        assertNull(migrated[SettingsRepository.PROVIDER_ROUTING_RULES_VERSION])
+        assertNull(migrated[SettingsRepository.PROVIDER_ROUTING_DOMAIN_STRATEGY])
+    }
+
+    @Test
+    fun `automatic routing keeps its provider rules`() = runTest {
+        val preferences = mutablePreferencesOf(
+            SETTINGS_DEFAULTS_REVISION to 8,
+            SettingsRepository.ROUTING_POLICY_CONTROL to RoutingPolicyControl.SubscriptionProvider.value,
+            SettingsRepository.PROVIDER_ROUTING_RULES to "provider-rules",
+        )
+
+        val migrated = SettingsDefaultMigration().migrate(preferences)
+
+        assertEquals("provider-rules", migrated[SettingsRepository.PROVIDER_ROUTING_RULES])
+    }
+
+    @Test
     fun `current revision does not rerun migrations`() = runTest {
         val preferences = mutablePreferencesOf(SETTINGS_DEFAULTS_REVISION to CURRENT_SETTINGS_DEFAULTS_REVISION)
 
@@ -322,7 +354,7 @@ class SettingsDefaultMigrationTest {
     @Test(expected = IllegalArgumentException::class)
     fun `DataStore lifecycle rejects newer settings revision`() = runTest {
         SettingsDefaultMigration().shouldMigrate(
-            mutablePreferencesOf(SETTINGS_DEFAULTS_REVISION to 9),
+            mutablePreferencesOf(SETTINGS_DEFAULTS_REVISION to CURRENT_SETTINGS_DEFAULTS_REVISION + 1),
         )
     }
 

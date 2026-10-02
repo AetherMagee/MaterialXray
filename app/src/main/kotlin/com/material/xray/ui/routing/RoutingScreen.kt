@@ -113,8 +113,10 @@ private sealed interface RoutingRuleAction {
     data class Delete(val ruleIds: Set<String>) : RoutingRuleAction
 }
 
-private sealed interface ProfileRoutingRuleAction {
-    data class Toggle(val rule: ProfileRoutingRule, val enabled: Boolean) : ProfileRoutingRuleAction
+/** Changes to rules the subscription supplied, which take routing manual while it is automatic. */
+private sealed interface ProviderRoutingRuleAction {
+    data class ToggleProfile(val rule: ProfileRoutingRule, val enabled: Boolean) : ProviderRoutingRuleAction
+    data class ToggleSubscription(val rule: RoutingRule, val enabled: Boolean) : ProviderRoutingRuleAction
 }
 
 private val defaultRoutingRulesById = RoutingRuleCatalog.defaults().associateBy(RoutingRule::id)
@@ -137,7 +139,7 @@ fun RoutingScreen(
     val coroutineScope = rememberCoroutineScope()
     var previousTab by remember { mutableIntStateOf(pagerState.currentPage) }
     var selectedRuleIds by remember { mutableStateOf(emptySet<String>()) }
-    var pendingProfileAction by remember { mutableStateOf<ProfileRoutingRuleAction?>(null) }
+    var pendingProviderAction by remember { mutableStateOf<ProviderRoutingRuleAction?>(null) }
     var confirmResetToDefault by remember { mutableStateOf(false) }
     val selectionMode by remember { derivedStateOf { selectedRuleIds.isNotEmpty() } }
     val selectedTab = pagerState.currentPage
@@ -169,24 +171,26 @@ fun RoutingScreen(
         }
     }
 
-    fun applyProfileRuleAction(action: ProfileRoutingRuleAction) {
+    fun applyProviderRuleAction(action: ProviderRoutingRuleAction) {
         when (action) {
-            is ProfileRoutingRuleAction.Toggle -> viewModel.setProfileRuleEnabled(action.rule, action.enabled)
+            is ProviderRoutingRuleAction.ToggleProfile -> viewModel.setProfileRuleEnabled(action.rule, action.enabled)
+            is ProviderRoutingRuleAction.ToggleSubscription ->
+                viewModel.updateSubscriptionRule(action.rule.copy(enabled = action.enabled))
         }
     }
 
-    fun requestProfileRuleAction(action: ProfileRoutingRuleAction) {
+    fun requestProviderRuleAction(action: ProviderRoutingRuleAction) {
         if (routingPolicyControl == RoutingPolicyControl.SubscriptionProvider) {
-            pendingProfileAction = action
+            pendingProviderAction = action
         } else {
-            applyProfileRuleAction(action)
+            applyProviderRuleAction(action)
         }
     }
 
     LaunchedEffect(routingPolicyControl) {
         if (routingPolicyControl == RoutingPolicyControl.User) {
-            pendingProfileAction?.let(::applyProfileRuleAction)
-            pendingProfileAction = null
+            pendingProviderAction?.let(::applyProviderRuleAction)
+            pendingProviderAction = null
         }
     }
 
@@ -223,7 +227,12 @@ fun RoutingScreen(
                 onRuleLongClick = { rule ->
                     selectedRuleIds = selectedRuleIds.toggle(rule.id)
                 },
-                onSubscriptionRuleClick = { rule -> onViewRule(rule.toViewerRequest()) },
+                onSubscriptionRuleClick = { rule ->
+                    onEditRule(EditableRoutingRule(rule = rule, isNew = false, subscriptionWide = true))
+                },
+                onSubscriptionRuleToggled = { rule, enabled ->
+                    requestProviderRuleAction(ProviderRoutingRuleAction.ToggleSubscription(rule, enabled))
+                },
                 onProfileRuleClick = { rule ->
                     if (rule.orphaned || rule.editableRule == null) {
                         onViewRule(rule.toViewerRequest())
@@ -240,7 +249,7 @@ fun RoutingScreen(
                     }
                 },
                 onProfileRuleToggled = { rule, enabled ->
-                    requestProfileRuleAction(ProfileRoutingRuleAction.Toggle(rule, enabled))
+                    requestProviderRuleAction(ProviderRoutingRuleAction.ToggleProfile(rule, enabled))
                 },
             ),
         )
@@ -264,10 +273,10 @@ fun RoutingScreen(
         rulesTab = rulesTab,
     )
 
-    if (pendingProfileAction != null) {
+    if (pendingProviderAction != null) {
         AutomaticRuleRoutingDialog(
             providerName = automaticRoutingProviderName,
-            onDismiss = { pendingProfileAction = null },
+            onDismiss = { pendingProviderAction = null },
             onSwitchToManual = viewModel::switchToManualRouting,
         )
     }
@@ -577,6 +586,7 @@ private data class RoutingRuleActions(
     val onRuleClick: (RoutingRule) -> Unit,
     val onRuleLongClick: (RoutingRule) -> Unit,
     val onSubscriptionRuleClick: (RoutingRule) -> Unit,
+    val onSubscriptionRuleToggled: (RoutingRule, Boolean) -> Unit,
     val onProfileRuleClick: (ProfileRoutingRule) -> Unit,
     val onProfileRuleToggled: (ProfileRoutingRule, Boolean) -> Unit,
 )
@@ -641,7 +651,7 @@ private fun RoutingRulesTab(
                     }
                 }
             }
-            if (providerManaged && providerGeoDataNotice != null) {
+            if (providerGeoDataNotice != null) {
                 item(contentType = "providerGeoDataBanner") {
                     ProviderGeoDataBanner(providerGeoDataNotice, onProviderGeoDataNoticeClick)
                 }
@@ -745,7 +755,11 @@ private fun RoutingRulesTab(
                     key = { index, rule -> "subscription-$index-${rule.id}" },
                     contentType = { _, _ -> "subscriptionRoutingRule" },
                 ) { _, rule ->
-                    SubscriptionRoutingRuleCard(rule = rule, onClick = { actions.onSubscriptionRuleClick(rule) })
+                    SubscriptionRoutingRuleCard(
+                        rule = rule,
+                        onClick = { actions.onSubscriptionRuleClick(rule) },
+                        onToggled = { enabled -> actions.onSubscriptionRuleToggled(rule, enabled) },
+                    )
                 }
             }
             if (profileRules.isNotEmpty()) {
@@ -771,7 +785,11 @@ private fun RoutingRulesTab(
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun SubscriptionRoutingRuleCard(rule: RoutingRule, onClick: () -> Unit) {
+private fun SubscriptionRoutingRuleCard(
+    rule: RoutingRule,
+    onClick: () -> Unit,
+    onToggled: (Boolean) -> Unit,
+) {
     Surface(
         color = MaterialTheme.colorScheme.surfaceContainer,
         shape = MaterialTheme.shapes.medium,
@@ -781,22 +799,30 @@ private fun SubscriptionRoutingRuleCard(rule: RoutingRule, onClick: () -> Unit) 
             .clip(MaterialTheme.shapes.medium)
             .combinedClickable(onClick = onClick),
     ) {
-        Column(
+        Row(
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                text = routingRuleDisplayName(rule),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                text = routingRuleContentText(rule),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(end = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Text(
+                    text = routingRuleDisplayName(rule),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = routingRuleContentText(rule),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Switch(checked = rule.enabled, onCheckedChange = onToggled)
         }
     }
 }
@@ -992,16 +1018,6 @@ private fun compactListText(
     }
     return pluralStringResource(labelResource, values.size, valueList)
 }
-
-private fun RoutingRule.toViewerRequest(): RoutingRuleViewerRequest = RoutingRuleViewerRequest(
-    name = name,
-    domains = domains,
-    ips = ips,
-    port = port,
-    protocols = protocols,
-    targetKind = RoutingRuleViewerTargetKind.Outbound,
-    targetTag = outboundTag,
-)
 
 private fun ProfileRoutingRule.toViewerRequest(): RoutingRuleViewerRequest = RoutingRuleViewerRequest(
     name = name,
