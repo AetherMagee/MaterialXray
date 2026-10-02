@@ -36,6 +36,7 @@ class ServerAddressResolver(
     private val context: Context? = null,
     private val hostLookup: (suspend (String) -> List<String>)? = null,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val nanoTime: () -> Long = System::nanoTime,
 ) {
     data class Result(
         val server: ServerConfig,
@@ -47,6 +48,7 @@ class ServerAddressResolver(
 
     private val directExecutor = Executor { it.run() }
     private val successfulLookups = ConcurrentHashMap<String, CachedLookup>()
+    private val lastKnownAddresses = ConcurrentHashMap<String, List<String>>()
 
     suspend fun resolve(server: ServerConfig, allowIpv6: Boolean = false): Result = withContext(ioDispatcher) {
         if (server.rawConfigJson.isNotBlank()) {
@@ -130,11 +132,19 @@ class ServerAddressResolver(
     }
 
     private suspend fun resolveHost(host: String, allowIpv6: Boolean): List<String> {
-        val now = System.nanoTime()
+        val now = nanoTime()
         val cacheKey = "${context?.getSystemService(ConnectivityManager::class.java)?.activeNetwork?.networkHandle ?: 0}:$host"
         val cached = successfulLookups[cacheKey]?.takeIf { now - it.createdAtNanos < CACHE_TTL_NANOS }
         val candidates = cached?.addresses ?: (hostLookup?.invoke(host) ?: systemLookup(host)).also { addresses ->
-            if (addresses.isNotEmpty()) successfulLookups[cacheKey] = CachedLookup(addresses, now)
+            if (addresses.isNotEmpty()) {
+                successfulLookups[cacheKey] = CachedLookup(addresses, now)
+                lastKnownAddresses[host] = addresses
+            }
+        }.ifEmpty {
+            // When another app's VPN covers this app, Android sends its lookups to that VPN's
+            // resolver, and the TPROXY guard holds the VPN's own traffic while MXray reconnects. A
+            // reconnect always follows a successful lookup, so the answer it got is reused.
+            lastKnownAddresses[host].orEmpty()
         }
         return candidates.distinct().filter { allowIpv6 || !isIpv6Address(it) }
     }

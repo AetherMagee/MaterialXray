@@ -69,6 +69,24 @@ class ServerAddressResolverTest {
     }
 
     @Test
+    fun `a failed lookup reuses the addresses the host last resolved to`() = runTest {
+        var answer = listOf("192.0.2.1")
+        var now = 0L
+        val resolver = ServerAddressResolver(hostLookup = { answer }, nanoTime = { now })
+        val server = rawServer("one.example")
+        resolver.resolve(server)
+
+        answer = emptyList()
+        // Outlive the short-lived cache so the lookup really runs again.
+        now += 10 * 60_000_000_000L
+        val result = resolver.resolve(server)
+
+        assertEquals(listOf("192.0.2.1"), result.candidates)
+        assertTrue(result.unresolvedHosts.isEmpty())
+        assertTrue(ServerAddressResolver(hostLookup = { emptyList() }).resolve(server).unresolvedHosts.isNotEmpty())
+    }
+
+    @Test
     fun `raw config resolution fails closed when any endpoint is unresolved`() = runTest {
         val resolver = ServerAddressResolver(hostLookup = { host ->
             if (host == "one.example") listOf("192.0.2.1") else emptyList()
