@@ -1,6 +1,9 @@
 package com.material.xray.service
 
 import android.content.Context
+import com.material.xray.core.common.connection.ConnectionStateCoordinator
+import com.material.xray.core.common.log.LogBuffer
+import com.material.xray.core.common.log.LogSource
 import com.material.xray.core.launcher.LauncherIconManager
 import com.material.xray.core.root.RootShell
 import com.material.xray.core.xray.GeoDataAsset

@@ -1,7 +1,7 @@
 package com.material.xray.ui.logs
 
-import com.material.xray.service.LogEntry
-import com.material.xray.service.LogSource
+import com.material.xray.core.common.log.LogEntry
+import com.material.xray.core.common.log.LogSource
 import org.junit.Assert.assertEquals
 import org.junit.Test
 

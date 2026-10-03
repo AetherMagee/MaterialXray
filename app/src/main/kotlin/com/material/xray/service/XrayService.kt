@@ -25,8 +25,12 @@ import android.os.SystemClock
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.material.xray.R
+import com.material.xray.core.common.connection.ConnectionEvent
+import com.material.xray.core.common.connection.ConnectionStateCoordinator
+import com.material.xray.core.common.format.scaleBytes
+import com.material.xray.core.common.log.LogBuffer
+import com.material.xray.core.common.log.LogSource
 import com.material.xray.core.format.rateUnit
-import com.material.xray.core.format.scaleBytes
 import com.material.xray.core.format.sizeUnit
 import com.material.xray.core.locale.appLocaleChanges
 import com.material.xray.core.locale.forAppLanguage

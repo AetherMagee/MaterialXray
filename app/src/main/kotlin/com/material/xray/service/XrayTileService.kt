@@ -7,6 +7,7 @@ import android.os.Build
 import android.service.quicksettings.Tile
 import android.service.quicksettings.TileService
 import com.material.xray.R
+import com.material.xray.core.common.connection.ConnectionStateCoordinator
 import com.material.xray.core.locale.localizedString
 import com.material.xray.data.repository.ServerRepository
 import com.material.xray.data.repository.SettingsRepository

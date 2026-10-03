@@ -1,4 +1,4 @@
-package com.material.xray.service
+package com.material.xray.core.common.log
 
 import org.junit.Assert.assertEquals
 import org.junit.Test

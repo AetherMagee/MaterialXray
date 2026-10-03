@@ -1,4 +1,4 @@
-package com.material.xray.di
+package com.material.xray.core.common.di
 
 import org.koin.core.annotation.Qualifier
 

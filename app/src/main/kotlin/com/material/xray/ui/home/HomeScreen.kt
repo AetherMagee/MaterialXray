@@ -172,6 +172,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import com.material.xray.R
+import com.material.xray.core.common.connection.ConnectionEvent
 import com.material.xray.data.db.entity.ServerEntity
 import com.material.xray.data.db.entity.SubscriptionEntity
 import com.material.xray.data.repository.ProviderRoutingAvailability
@@ -185,7 +186,6 @@ import com.material.xray.model.SessionTrafficMetrics
 import com.material.xray.model.SubscriptionUserAgentMode
 import com.material.xray.service.AppUpdateInstallProgress
 import com.material.xray.service.AppUpdateInstallStage
-import com.material.xray.service.ConnectionEvent
 import com.material.xray.ui.adaptive.SinglePaneMaxWidth
 import com.material.xray.ui.adaptive.TwoPaneMinWidth
 import com.material.xray.ui.components.AnimatedDropdownMenu

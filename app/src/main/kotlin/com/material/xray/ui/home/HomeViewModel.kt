@@ -4,6 +4,8 @@ import android.app.Application
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.material.xray.R
+import com.material.xray.core.common.connection.ConnectionEvent
+import com.material.xray.core.common.connection.ConnectionStateCoordinator
 import com.material.xray.core.locale.forAppLanguage
 import com.material.xray.core.locale.localizedString
 import com.material.xray.core.xray.GeoDataManager
@@ -31,9 +33,7 @@ import com.material.xray.model.matchesBalancerOutbound
 import com.material.xray.model.primaryBalancerTag
 import com.material.xray.service.AlwaysOnVpnState
 import com.material.xray.service.AppUpdateInstallProgress
-import com.material.xray.service.ConnectionEvent
 import com.material.xray.service.ConnectionRuntimeManager
-import com.material.xray.service.ConnectionStateCoordinator
 import com.material.xray.service.XrayService
 import java.io.IOException
 import java.net.ConnectException

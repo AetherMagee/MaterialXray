@@ -6,10 +6,10 @@ import android.net.Uri
 import androidx.core.content.FileProvider
 import androidx.lifecycle.ViewModel
 import com.material.xray.R
+import com.material.xray.core.common.log.LogBuffer
+import com.material.xray.core.common.log.LogEntry
+import com.material.xray.core.common.log.displayMessage
 import com.material.xray.core.locale.localizedString
-import com.material.xray.service.LogBuffer
-import com.material.xray.service.LogEntry
-import com.material.xray.service.displayMessage
 import java.io.File
 import java.io.IOException
 import kotlinx.coroutines.CoroutineDispatcher

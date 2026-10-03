@@ -1,5 +1,8 @@
 package com.material.xray.service
 
+import com.material.xray.core.common.connection.ConnectionStateCoordinator
+import com.material.xray.core.common.log.LogBuffer
+import com.material.xray.core.common.log.LogSource
 import com.material.xray.core.xray.XraySysStats
 import com.material.xray.model.ConnectionState
 import com.material.xray.model.XrayRuntimeSettings

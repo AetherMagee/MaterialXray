@@ -1,6 +1,6 @@
 package com.material.xray.data.repository
 
-import com.material.xray.service.PendingRoutingChange
+import com.material.xray.core.common.connection.PendingRoutingChange
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.delay

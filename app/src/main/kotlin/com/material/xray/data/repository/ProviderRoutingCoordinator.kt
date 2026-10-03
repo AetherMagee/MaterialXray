@@ -1,8 +1,8 @@
 package com.material.xray.data.repository
 
+import com.material.xray.core.common.connection.PendingRoutingChange
 import com.material.xray.data.db.dao.SubscriptionDao
 import com.material.xray.model.RoutingPolicyControl
-import com.material.xray.service.PendingRoutingChange
 import com.material.xray.service.RoutingChangeManager
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex

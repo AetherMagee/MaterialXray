@@ -1,6 +1,5 @@
-package com.material.xray.service
+package com.material.xray.core.common.log
 
-import android.util.Log
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import org.koin.core.annotation.Singleton
@@ -14,15 +13,31 @@ data class LogEntry(
 
 enum class LogSource { APP, XRAY }
 
-internal val xrayTimestampPrefix = Regex(
+val xrayTimestampPrefix = Regex(
     "^\\d{4}/\\d{2}/\\d{2} \\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?\\s+",
 )
 
 val LogEntry.displayMessage: String
     get() = if (source == LogSource.XRAY) message.replaceFirst(xrayTimestampPrefix, "") else message
 
+/**
+ * Mirrors every entry [LogBuffer] records to a platform log, such as logcat on Android, so the
+ * entries can also be read from outside the app.
+ */
+fun interface LogEcho {
+    fun echo(source: LogSource, message: String)
+
+    companion object {
+        /** Echoes nothing. */
+        val None = LogEcho { _, _ -> }
+    }
+}
+
 @Singleton
-class LogBuffer {
+class LogBuffer(private val echo: LogEcho) {
+    /** A buffer that echoes nowhere, for tests and hosts without a platform log. */
+    constructor() : this(LogEcho.None)
+
     private val _entries = MutableStateFlow<List<LogEntry>>(emptyList())
     val entries: StateFlow<List<LogEntry>> = _entries
     private val buffer = ArrayDeque<LogEntry>(MAX_SIZE)
@@ -35,14 +50,7 @@ class LogBuffer {
 
     fun appendAll(source: LogSource, messages: List<String>) {
         if (messages.isEmpty()) return
-        messages.forEach { message ->
-            runCatching {
-                when (source) {
-                    LogSource.APP -> Log.d("MXray", message)
-                    LogSource.XRAY -> Log.d("MXray.xray", message)
-                }
-            }
-        }
+        messages.forEach { message -> runCatching { echo.echo(source, message) } }
 
         synchronized(this) {
             messages.forEach { message ->
@@ -89,9 +97,9 @@ class LogBuffer {
         "$time [${entry.source.name}] ${entry.displayMessage}"
     }
 
-    internal companion object {
+    companion object {
         private const val MAX_SIZE = 2000
         private const val MIN_RETAINED_APP_ENTRIES = 256
-        internal const val XRAY_TAIL_SIZE = MAX_SIZE - MIN_RETAINED_APP_ENTRIES
+        const val XRAY_TAIL_SIZE = MAX_SIZE - MIN_RETAINED_APP_ENTRIES
     }
 }

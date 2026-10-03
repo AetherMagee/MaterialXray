@@ -1,6 +1,7 @@
 package com.material.xray.service
 
 import android.content.Context
+import com.material.xray.core.common.connection.ConnectionStateCoordinator
 import com.material.xray.core.xray.ActiveConfigOverrideStore
 import com.material.xray.data.db.AppDatabase
 import com.material.xray.data.repository.SettingsRepository

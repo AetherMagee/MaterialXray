@@ -3,6 +3,7 @@ package com.material.xray.service
 import com.material.xray.core.app.AppInventorySnapshot
 import com.material.xray.core.app.AppInventorySource
 import com.material.xray.core.app.InstalledApp
+import com.material.xray.core.common.log.LogBuffer
 import com.material.xray.core.xray.ServerAddressResolver
 import com.material.xray.core.xray.TunManager
 import com.material.xray.data.db.dao.AppBypassDao

@@ -1,6 +1,7 @@
 package com.material.xray.service
 
 import android.content.Context
+import com.material.xray.core.common.connection.ConnectionStateCoordinator
 import com.material.xray.core.root.RootShell
 import com.material.xray.core.xray.CleanupManager
 import com.material.xray.core.xray.StateFile

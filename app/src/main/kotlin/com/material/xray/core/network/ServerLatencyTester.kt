@@ -2,6 +2,7 @@ package com.material.xray.core.network
 
 import android.content.Context
 import android.os.SystemClock
+import com.material.xray.core.common.log.xrayTimestampPrefix
 import com.material.xray.core.xray.ServerAddressResolver
 import com.material.xray.core.xray.XrayInbound
 import com.material.xray.core.xray.buildDns
@@ -9,7 +10,6 @@ import com.material.xray.core.xray.buildProxyOutbound
 import com.material.xray.core.xray.toJson
 import com.material.xray.model.PingMethod
 import com.material.xray.model.ServerConfig
-import com.material.xray.service.xrayTimestampPrefix
 import java.io.File
 import java.net.InetSocketAddress
 import java.net.Socket

@@ -1,12 +1,12 @@
 package com.material.xray.ui.home
 
+import com.material.xray.core.common.connection.PendingRoutingChange
 import com.material.xray.data.db.entity.SubscriptionEntity
 import com.material.xray.data.repository.SubscriptionAppRoutingRepository
 import com.material.xray.data.repository.SubscriptionRefreshCoordinator
 import com.material.xray.data.repository.SubscriptionRepository
 import com.material.xray.data.repository.SubscriptionRoutingRepository
 import com.material.xray.model.SubscriptionUserAgentMode
-import com.material.xray.service.PendingRoutingChange
 import com.material.xray.service.RoutingChangeManager
 import com.material.xray.service.SubscriptionUpdateScheduler
 import java.io.IOException

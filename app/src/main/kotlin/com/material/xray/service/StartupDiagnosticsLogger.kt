@@ -6,6 +6,8 @@ import android.content.pm.ApplicationInfo
 import android.os.Build
 import android.os.PowerManager
 import androidx.core.content.pm.PackageInfoCompat
+import com.material.xray.core.common.log.LogBuffer
+import com.material.xray.core.common.log.LogSource
 import com.material.xray.data.repository.SettingsRepository
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex

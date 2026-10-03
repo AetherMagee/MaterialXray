@@ -10,6 +10,9 @@ import android.os.SystemClock
 import androidx.annotation.StringRes
 import com.material.xray.R
 import com.material.xray.core.app.AppInventory
+import com.material.xray.core.common.connection.ConnectionStateCoordinator
+import com.material.xray.core.common.log.LogBuffer
+import com.material.xray.core.common.log.LogSource
 import com.material.xray.core.locale.localizedString
 import com.material.xray.core.network.loadX509Certificates
 import com.material.xray.core.root.RootShell

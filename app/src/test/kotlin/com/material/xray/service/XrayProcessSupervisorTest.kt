@@ -1,5 +1,6 @@
 package com.material.xray.service
 
+import com.material.xray.core.common.log.LogBuffer
 import com.material.xray.core.root.RootShell
 import java.io.File
 import java.nio.file.Files

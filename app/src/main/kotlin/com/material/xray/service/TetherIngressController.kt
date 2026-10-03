@@ -1,5 +1,7 @@
 package com.material.xray.service
 
+import com.material.xray.core.common.log.LogBuffer
+import com.material.xray.core.common.log.LogSource
 import com.material.xray.core.xray.TetherIngressState
 import com.material.xray.core.xray.TproxyRuntimeState
 import com.material.xray.core.xray.TproxyTrafficGroup

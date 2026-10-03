@@ -30,8 +30,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.material.xray.R
+import com.material.xray.core.common.format.scaleBytes
 import com.material.xray.core.format.rateUnit
-import com.material.xray.core.format.scaleBytes
 import com.material.xray.core.format.sizeUnit
 import com.material.xray.model.SessionTrafficMetrics
 import java.util.Locale

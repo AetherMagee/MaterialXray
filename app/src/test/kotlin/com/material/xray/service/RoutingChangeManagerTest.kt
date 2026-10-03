@@ -1,5 +1,6 @@
 package com.material.xray.service
 
+import com.material.xray.core.common.connection.PendingRoutingChange
 import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
 import org.junit.Assert.assertEquals

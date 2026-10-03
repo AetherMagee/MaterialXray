@@ -2,6 +2,8 @@ package com.material.xray.ui.routing
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.material.xray.core.common.connection.ConnectionStateCoordinator
+import com.material.xray.core.common.connection.PendingRoutingChange
 import com.material.xray.core.xray.ProviderGeoDataManager
 import com.material.xray.core.xray.ProviderGeoDataNotice
 import com.material.xray.core.xray.providerGeoDataNotice
@@ -20,8 +22,6 @@ import com.material.xray.model.RoutingPolicyControl
 import com.material.xray.model.RoutingRule
 import com.material.xray.model.RoutingRuleCatalog
 import com.material.xray.model.SubscriptionRouting
-import com.material.xray.service.ConnectionStateCoordinator
-import com.material.xray.service.PendingRoutingChange
 import com.material.xray.service.RoutingChangeManager
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers

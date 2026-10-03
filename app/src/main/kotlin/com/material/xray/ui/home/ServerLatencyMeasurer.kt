@@ -1,5 +1,7 @@
 package com.material.xray.ui.home
 
+import com.material.xray.core.common.log.LogBuffer
+import com.material.xray.core.common.log.LogSource
 import com.material.xray.core.network.Ipv6Detector
 import com.material.xray.core.network.ServerLatencyTester
 import com.material.xray.core.network.describeFailure
@@ -8,8 +10,6 @@ import com.material.xray.data.repository.ServerRepository
 import com.material.xray.data.repository.SettingsRepository
 import com.material.xray.model.Ipv6Mode
 import com.material.xray.model.PingMethod
-import com.material.xray.service.LogBuffer
-import com.material.xray.service.LogSource
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import org.koin.core.annotation.Singleton

@@ -9,6 +9,7 @@ import androidx.lifecycle.viewModelScope
 import com.material.xray.R
 import com.material.xray.core.app.AppInventory
 import com.material.xray.core.app.appKey
+import com.material.xray.core.common.connection.PendingRoutingChange
 import com.material.xray.core.locale.localizedString
 import com.material.xray.data.db.dao.AppBypassDao
 import com.material.xray.data.db.dao.SubscriptionDao
@@ -31,7 +32,6 @@ import com.material.xray.model.SubscriptionAppRouting
 import com.material.xray.model.endpointSummary
 import com.material.xray.model.proxyOutboundCount
 import com.material.xray.service.AlwaysOnVpnState
-import com.material.xray.service.PendingRoutingChange
 import com.material.xray.service.RoutingChangeManager
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher

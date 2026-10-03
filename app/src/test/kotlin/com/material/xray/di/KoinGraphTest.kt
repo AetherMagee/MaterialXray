@@ -2,6 +2,7 @@ package com.material.xray.di
 
 import androidx.work.ListenableWorker
 import com.material.xray.MaterialXrayApp
+import com.material.xray.core.common.di.ApplicationScope
 import com.material.xray.service.AppUpdateWorker
 import com.material.xray.service.GeoDataUpdateWorker
 import com.material.xray.service.SubscriptionUpdateWorker

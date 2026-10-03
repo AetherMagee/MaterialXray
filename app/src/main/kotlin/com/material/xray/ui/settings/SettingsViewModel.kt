@@ -7,6 +7,7 @@ import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.material.xray.R
+import com.material.xray.core.common.connection.ConnectionStateCoordinator
 import com.material.xray.core.network.Ipv6Detector
 import com.material.xray.core.xray.GeoDataAsset
 import com.material.xray.core.xray.GeoDataManager
@@ -32,7 +33,6 @@ import com.material.xray.model.XrayOutbound
 import com.material.xray.model.XrayRuntimeSettings
 import com.material.xray.model.isInProgress
 import com.material.xray.service.AppUpdateChecker
-import com.material.xray.service.ConnectionStateCoordinator
 import com.material.xray.service.DatabaseResetManager
 import com.material.xray.service.OemAutostartManager
 import com.material.xray.service.SettingsRuntimeManager

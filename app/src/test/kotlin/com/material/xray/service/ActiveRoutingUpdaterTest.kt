@@ -1,5 +1,6 @@
 package com.material.xray.service
 
+import com.material.xray.core.common.log.LogBuffer
 import com.material.xray.core.xray.TunManager
 import com.material.xray.core.xray.XrayState
 import com.material.xray.model.ConnectionState

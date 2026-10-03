@@ -5,6 +5,8 @@ import android.os.Build
 import android.os.PowerManager
 import android.system.Os
 import android.system.OsConstants
+import com.material.xray.core.common.log.LogBuffer
+import com.material.xray.core.common.log.LogSource
 import com.material.xray.core.root.RootShell
 import com.material.xray.core.root.shellQuote
 import com.material.xray.core.xray.XRAY_EXECUTABLE_NAME

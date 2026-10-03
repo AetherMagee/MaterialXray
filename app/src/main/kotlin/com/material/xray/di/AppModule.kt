@@ -4,6 +4,7 @@ import android.content.Context
 import android.os.Build
 import com.material.xray.R
 import com.material.xray.core.android.di.CoreAndroidModule
+import com.material.xray.core.common.di.ApplicationScope
 import com.material.xray.core.common.di.CoreCommonModule
 import com.material.xray.core.connection.di.CoreConnectionModule
 import com.material.xray.core.data.di.CoreDataModule

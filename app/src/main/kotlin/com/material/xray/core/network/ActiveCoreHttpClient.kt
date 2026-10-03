@@ -2,12 +2,12 @@ package com.material.xray.core.network
 
 import android.content.Context
 import android.net.LocalSocketAddress
+import com.material.xray.core.common.connection.ConnectionStateCoordinator
 import com.material.xray.core.xray.ACTIVE_CONFIG_FILE
 import com.material.xray.core.xray.AndroidLocalSocketFactory
 import com.material.xray.core.xray.XRAY_APP_HTTP_INBOUND_TAG
 import com.material.xray.data.repository.SettingsRepository
 import com.material.xray.model.ConnectionState
-import com.material.xray.service.ConnectionStateCoordinator
 import java.io.File
 import java.io.IOException
 import java.net.InetSocketAddress

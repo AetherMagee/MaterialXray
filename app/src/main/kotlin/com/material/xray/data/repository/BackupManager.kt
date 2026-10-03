@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import androidx.room.withTransaction
 import com.material.xray.core.app.appKey
+import com.material.xray.core.common.connection.ConnectionStateCoordinator
 import com.material.xray.core.launcher.LauncherIconManager
 import com.material.xray.data.db.AppDatabase
 import com.material.xray.data.db.dao.AppBypassDao
@@ -18,7 +19,6 @@ import com.material.xray.model.BackupData
 import com.material.xray.model.ConnectionState
 import com.material.xray.model.ServerConfig
 import com.material.xray.service.AppUpdateScheduler
-import com.material.xray.service.ConnectionStateCoordinator
 import com.material.xray.service.XrayService
 import java.io.ByteArrayOutputStream
 import java.io.IOException

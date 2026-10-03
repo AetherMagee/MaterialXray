@@ -2,6 +2,9 @@ package com.material.xray.service
 
 import android.os.ParcelFileDescriptor
 import com.material.xray.R
+import com.material.xray.core.common.connection.ConnectionStateCoordinator
+import com.material.xray.core.common.log.LogBuffer
+import com.material.xray.core.common.log.LogSource
 import com.material.xray.core.xray.ConfigGenerator
 import com.material.xray.core.xray.OtherVpnDns
 import com.material.xray.core.xray.PROTECTED_FROM_VPN_MARK

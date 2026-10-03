@@ -2,6 +2,8 @@ package com.material.xray.service
 
 import android.os.FileObserver
 import android.system.Os
+import com.material.xray.core.common.log.LogBuffer
+import com.material.xray.core.common.log.LogSource
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileInputStream

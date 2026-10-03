@@ -1,16 +1,12 @@
 package com.material.xray.service
 
 import android.content.Context
+import com.material.xray.core.common.connection.ConnectionStateCoordinator
+import com.material.xray.core.common.connection.PendingRoutingChange
 import com.material.xray.model.ConnectionState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import org.koin.core.annotation.Singleton
-
-enum class PendingRoutingChange {
-    APP_ROUTING,
-    XRAY_ROUTING,
-    XRAY_CONFIG,
-}
 
 @Singleton
 class RoutingChangeManager(

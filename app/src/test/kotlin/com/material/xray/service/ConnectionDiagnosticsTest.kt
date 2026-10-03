@@ -1,5 +1,6 @@
 package com.material.xray.service
 
+import com.material.xray.core.common.log.LogBuffer
 import com.material.xray.core.root.RootShell
 import com.material.xray.core.root.RootShell.NetworkNamespace
 import com.material.xray.core.xray.TproxyManager

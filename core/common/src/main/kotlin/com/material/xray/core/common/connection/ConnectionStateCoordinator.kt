@@ -1,4 +1,4 @@
-package com.material.xray.service
+package com.material.xray.core.common.connection
 
 import com.material.xray.model.ActiveBalancerSelection
 import com.material.xray.model.ConnectionProgress
@@ -17,7 +17,7 @@ class ConnectionStateCoordinator {
     private val _state = MutableStateFlow<ConnectionState>(ConnectionState.Disconnected)
     val state: StateFlow<ConnectionState> = _state
     private val _connectionProgress = MutableStateFlow<ConnectionProgress?>(null)
-    internal val connectionProgress: StateFlow<ConnectionProgress?> = _connectionProgress.asStateFlow()
+    val connectionProgress: StateFlow<ConnectionProgress?> = _connectionProgress.asStateFlow()
     private val activeProgress = linkedMapOf<Long, ConnectionProgress>()
     private var nextProgressToken = 0L
 
@@ -31,8 +31,8 @@ class ConnectionStateCoordinator {
     private val _events = Channel<ConnectionEvent>(Channel.CONFLATED)
     val events: Flow<ConnectionEvent> = _events.receiveAsFlow()
     private val _activeBalancerSelection = MutableStateFlow<ActiveBalancerSelection?>(null)
-    internal val activeBalancerSelection: StateFlow<ActiveBalancerSelection?> = _activeBalancerSelection.asStateFlow()
-    internal val activeBalancerSelectionSubscribers: StateFlow<Int> = _activeBalancerSelection.subscriptionCount
+    val activeBalancerSelection: StateFlow<ActiveBalancerSelection?> = _activeBalancerSelection.asStateFlow()
+    val activeBalancerSelectionSubscribers: StateFlow<Int> = _activeBalancerSelection.subscriptionCount
     private val _sessionTraffic = MutableStateFlow<SessionTrafficMetrics?>(null)
     val sessionTraffic: StateFlow<SessionTrafficMetrics?> = _sessionTraffic.asStateFlow()
 
@@ -40,7 +40,7 @@ class ConnectionStateCoordinator {
      * Lets the service poll Xray's traffic counters only while something is watching them. Reading
      * the counters costs a gRPC round trip per tick, so an unobserved poll is pure battery drain.
      */
-    internal val sessionTrafficSubscribers: StateFlow<Int> = _sessionTraffic.subscriptionCount
+    val sessionTrafficSubscribers: StateFlow<Int> = _sessionTraffic.subscriptionCount
 
     /**
      * Round-trip time to whatever the tunnel is currently using, measured by the service so the
@@ -48,7 +48,7 @@ class ConnectionStateCoordinator {
      */
     private val _activePingMs = MutableStateFlow<Int?>(null)
     val activePingMs: StateFlow<Int?> = _activePingMs.asStateFlow()
-    internal val activePingSubscribers: StateFlow<Int> = _activePingMs.subscriptionCount
+    val activePingSubscribers: StateFlow<Int> = _activePingMs.subscriptionCount
 
     fun startConnection(transitionState: ConnectionState) {
         require(
@@ -71,7 +71,7 @@ class ConnectionStateCoordinator {
     fun markError(message: String, retryable: Boolean = true) = commit(ConnectionState.Error(message, retryable))
 
     @Synchronized
-    internal fun beginConnectionProgress(progress: ConnectionProgress): Long {
+    fun beginConnectionProgress(progress: ConnectionProgress): Long {
         val token = ++nextProgressToken
         activeProgress[token] = progress
         _connectionProgress.value = progress
@@ -79,7 +79,7 @@ class ConnectionStateCoordinator {
     }
 
     @Synchronized
-    internal fun endConnectionProgress(token: Long) {
+    fun endConnectionProgress(token: Long) {
         if (activeProgress.remove(token) == null) return
         _connectionProgress.value = activeProgress.values.lastOrNull()
     }
@@ -144,17 +144,17 @@ class ConnectionStateCoordinator {
     }
 
     @Synchronized
-    internal fun updateActiveBalancerSelection(selection: ActiveBalancerSelection?) {
+    fun updateActiveBalancerSelection(selection: ActiveBalancerSelection?) {
         _activeBalancerSelection.value = selection.takeIf { _state.value is ConnectionState.Connected }
     }
 
     @Synchronized
-    internal fun updateSessionTraffic(metrics: SessionTrafficMetrics?) {
+    fun updateSessionTraffic(metrics: SessionTrafficMetrics?) {
         _sessionTraffic.value = metrics.takeIf { _state.value is ConnectionState.Connected }
     }
 
     @Synchronized
-    internal fun updateActivePing(latencyMs: Int?) {
+    fun updateActivePing(latencyMs: Int?) {
         _activePingMs.value = latencyMs.takeIf { _state.value is ConnectionState.Connected }
     }
 

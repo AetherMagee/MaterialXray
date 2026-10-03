@@ -1,4 +1,4 @@
-package com.material.xray.core.format
+package com.material.xray.core.common.format
 
 import java.util.Locale
 import org.junit.Assert.assertEquals

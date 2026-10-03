@@ -3,6 +3,7 @@ package com.material.xray.ui.home
 import android.content.Context
 import android.content.res.Resources
 import com.material.xray.R
+import com.material.xray.core.common.di.ApplicationScope
 import com.material.xray.core.locale.appLocaleChanges
 import com.material.xray.core.locale.forAppLanguage
 import com.material.xray.core.locale.localizedString
@@ -11,7 +12,6 @@ import com.material.xray.data.db.entity.SubscriptionEntity
 import com.material.xray.data.repository.ServerRepository
 import com.material.xray.data.repository.SettingsRepository
 import com.material.xray.data.repository.SubscriptionRepository
-import com.material.xray.di.ApplicationScope
 import com.material.xray.model.ServerConfig
 import com.material.xray.model.endpointSummary
 import com.material.xray.model.proxyOutboundCount

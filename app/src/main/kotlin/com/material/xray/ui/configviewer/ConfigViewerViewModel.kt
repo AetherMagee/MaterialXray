@@ -5,6 +5,7 @@ import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.material.xray.R
+import com.material.xray.core.common.connection.ConnectionStateCoordinator
 import com.material.xray.core.xray.ActiveConfigOverrideStore
 import com.material.xray.data.db.entity.ServerEntity
 import com.material.xray.data.parser.SubscriptionFetcher
@@ -14,7 +15,6 @@ import com.material.xray.data.repository.SubscriptionRepository
 import com.material.xray.model.ConnectionState
 import com.material.xray.model.ServerConfig
 import com.material.xray.service.ConnectionRuntimeManager
-import com.material.xray.service.ConnectionStateCoordinator
 import com.material.xray.service.XrayService
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers

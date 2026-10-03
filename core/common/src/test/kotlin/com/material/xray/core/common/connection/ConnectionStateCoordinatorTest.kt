@@ -1,4 +1,4 @@
-package com.material.xray.service
+package com.material.xray.core.common.connection
 
 import com.material.xray.model.ConnectionProgress
 import com.material.xray.model.ConnectionState

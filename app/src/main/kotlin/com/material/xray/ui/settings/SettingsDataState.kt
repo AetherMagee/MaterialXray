@@ -1,9 +1,9 @@
 package com.material.xray.ui.settings
 
+import com.material.xray.core.common.di.ApplicationScope
 import com.material.xray.data.repository.SettingsRepository
 import com.material.xray.data.repository.SettingsSnapshot
 import com.material.xray.data.repository.SubscriptionRepository
-import com.material.xray.di.ApplicationScope
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.SharingStarted

@@ -3,6 +3,8 @@ package com.material.xray.service
 import com.material.xray.core.app.AppInventorySource
 import com.material.xray.core.app.appKey
 import com.material.xray.core.app.profileIdForUid
+import com.material.xray.core.common.log.LogBuffer
+import com.material.xray.core.common.log.LogSource
 import com.material.xray.core.xray.AppProxyRoute
 import com.material.xray.core.xray.ServerAddressResolver
 import com.material.xray.core.xray.TunManager
