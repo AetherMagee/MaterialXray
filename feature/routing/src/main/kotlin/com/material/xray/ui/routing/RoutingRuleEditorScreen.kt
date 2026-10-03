@@ -86,7 +86,7 @@ private val matchModeOptions = listOf(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun RoutingRuleEditorScreen(
+fun RoutingRuleEditorScreen(
     editableRule: EditableRoutingRule,
     onBack: () -> Unit,
     viewModel: RoutingViewModel = koinViewModel(),

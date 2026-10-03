@@ -66,7 +66,7 @@ enum class RoutingRuleViewerTargetKind {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun RoutingRuleViewerScreen(request: RoutingRuleViewerRequest, onBack: () -> Unit) {
+fun RoutingRuleViewerScreen(request: RoutingRuleViewerRequest, onBack: () -> Unit) {
     Scaffold(
         topBar = {
             TopAppBar(
