@@ -6,11 +6,11 @@ import androidx.annotation.PluralsRes
 import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.material.xray.R
 import com.material.xray.core.app.AppInventory
 import com.material.xray.core.app.appKey
 import com.material.xray.core.common.connection.PendingRoutingChange
 import com.material.xray.core.locale.localizedString
+import com.material.xray.core.ui.R
 import com.material.xray.data.db.dao.AppBypassDao
 import com.material.xray.data.db.dao.SubscriptionDao
 import com.material.xray.data.db.entity.AppBypassEntity

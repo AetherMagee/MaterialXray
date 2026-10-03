@@ -51,6 +51,7 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import com.material.xray.core.locale.notifyAppLocaleChanged
+import com.material.xray.core.ui.R
 import com.material.xray.data.db.DatabaseOpenChecker
 import com.material.xray.data.repository.SettingsRepository
 import com.material.xray.service.RecoveryResetManager

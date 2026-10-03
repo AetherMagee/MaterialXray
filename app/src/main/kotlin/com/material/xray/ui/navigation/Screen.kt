@@ -7,7 +7,7 @@ import androidx.compose.material.icons.automirrored.filled.Article
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.ui.graphics.vector.ImageVector
-import com.material.xray.R
+import com.material.xray.core.ui.R
 
 enum class Screen(
     val route: String,

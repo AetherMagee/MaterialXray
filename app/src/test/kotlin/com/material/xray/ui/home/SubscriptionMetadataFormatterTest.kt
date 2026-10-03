@@ -1,6 +1,6 @@
 package com.material.xray.ui.home
 
-import com.material.xray.R
+import com.material.xray.core.ui.R
 import com.material.xray.data.db.entity.SubscriptionEntity
 import java.time.Clock
 import java.time.Instant

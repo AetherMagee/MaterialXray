@@ -4,8 +4,8 @@ import android.app.Application
 import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.material.xray.R
 import com.material.xray.core.common.connection.ConnectionStateCoordinator
+import com.material.xray.core.ui.R
 import com.material.xray.core.xray.ActiveConfigOverrideStore
 import com.material.xray.data.db.entity.ServerEntity
 import com.material.xray.data.parser.SubscriptionFetcher

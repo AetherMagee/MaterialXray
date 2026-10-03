@@ -11,8 +11,8 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
-import com.material.xray.R
 import com.material.xray.core.locale.localizedString
+import com.material.xray.core.ui.R
 import com.material.xray.data.repository.AppUpdateRepository
 import com.material.xray.data.repository.SettingsRepository
 import com.material.xray.model.AppUpdate

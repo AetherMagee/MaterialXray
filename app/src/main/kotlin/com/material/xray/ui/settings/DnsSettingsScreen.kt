@@ -31,7 +31,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import com.material.xray.R
+import com.material.xray.core.ui.R
 import com.material.xray.data.repository.SettingsSnapshot
 import com.material.xray.model.DnsPreset
 import com.material.xray.model.dnsPresetFor

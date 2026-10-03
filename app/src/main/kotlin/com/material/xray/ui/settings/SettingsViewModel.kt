@@ -6,9 +6,9 @@ import android.os.SystemClock
 import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.material.xray.R
 import com.material.xray.core.common.connection.ConnectionStateCoordinator
 import com.material.xray.core.network.Ipv6Detector
+import com.material.xray.core.ui.R
 import com.material.xray.core.xray.GeoDataAsset
 import com.material.xray.core.xray.GeoDataManager
 import com.material.xray.core.xray.TproxyCompatibility

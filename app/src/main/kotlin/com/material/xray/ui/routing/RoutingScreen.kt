@@ -79,7 +79,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.material.xray.R
+import com.material.xray.core.ui.R
 import com.material.xray.core.xray.ProviderGeoDataNotice
 import com.material.xray.data.parser.ProfileRoutingRule
 import com.material.xray.data.parser.ProfileRoutingTarget

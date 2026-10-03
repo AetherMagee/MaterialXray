@@ -74,7 +74,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import com.material.xray.R
+import com.material.xray.core.ui.R
 import com.material.xray.ui.adaptive.TwoPaneMinWidth
 import com.material.xray.ui.adaptive.useNavigationRail
 import com.material.xray.ui.components.AppTopBarHeight

@@ -66,7 +66,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.material.xray.R
+import com.material.xray.core.ui.R
 import com.material.xray.model.RoutingPolicyControl
 import com.material.xray.ui.components.AnimatedDropdownMenu
 import com.material.xray.ui.components.FadingOutlinedTextField as OutlinedTextField

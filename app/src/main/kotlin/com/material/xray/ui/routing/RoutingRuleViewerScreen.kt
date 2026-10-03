@@ -36,7 +36,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.material.xray.R
+import com.material.xray.core.ui.R
 import com.material.xray.ui.components.TooltipIconButton
 import com.material.xray.ui.configviewer.JsonTokenKind
 import com.material.xray.ui.configviewer.tokenizeJsonLines

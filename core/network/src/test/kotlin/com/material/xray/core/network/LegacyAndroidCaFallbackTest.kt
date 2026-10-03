@@ -45,7 +45,7 @@ class LegacyAndroidCaFallbackTest {
 
     @Test
     fun `Mozilla bundle contains the chain anchor missing from the Android 7 device`() {
-        val trustManager = File("../../app/src/main/res/raw/mozilla_ca_bundle.pem").inputStream().use(::loadX509TrustManager)
+        val trustManager = File("../../core/ui/src/main/res/raw/mozilla_ca_bundle.pem").inputStream().use(::loadX509TrustManager)
 
         assertEquals(121, trustManager.acceptedIssuers.size)
         assertTrue(

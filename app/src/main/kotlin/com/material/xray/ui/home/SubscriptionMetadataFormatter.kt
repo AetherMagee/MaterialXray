@@ -3,7 +3,7 @@ package com.material.xray.ui.home
 import android.content.res.Resources
 import androidx.annotation.PluralsRes
 import androidx.annotation.StringRes
-import com.material.xray.R
+import com.material.xray.core.ui.R
 import com.material.xray.data.db.entity.SubscriptionEntity
 import java.text.NumberFormat
 import java.time.Clock

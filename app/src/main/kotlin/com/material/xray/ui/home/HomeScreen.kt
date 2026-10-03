@@ -171,8 +171,8 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
-import com.material.xray.R
 import com.material.xray.core.common.connection.ConnectionEvent
+import com.material.xray.core.ui.R
 import com.material.xray.data.db.entity.ServerEntity
 import com.material.xray.data.db.entity.SubscriptionEntity
 import com.material.xray.data.repository.ProviderRoutingAvailability

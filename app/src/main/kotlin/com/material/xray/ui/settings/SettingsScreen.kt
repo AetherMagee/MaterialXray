@@ -119,8 +119,8 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
-import com.material.xray.R
 import com.material.xray.core.locale.setAppLocales
+import com.material.xray.core.ui.R
 import com.material.xray.core.xray.GeoDataAsset
 import com.material.xray.core.xray.GeoDataDownloadProgress
 import com.material.xray.core.xray.TproxyCompatibility

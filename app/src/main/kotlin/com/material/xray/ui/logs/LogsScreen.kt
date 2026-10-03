@@ -83,10 +83,10 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.material.xray.R
 import com.material.xray.core.common.log.LogEntry
 import com.material.xray.core.common.log.LogSource
 import com.material.xray.core.common.log.displayMessage
+import com.material.xray.core.ui.R
 import com.material.xray.ui.components.AnimatedDropdownMenu
 import com.material.xray.ui.components.AppBarTitle
 import com.material.xray.ui.components.AppTopBarHeight

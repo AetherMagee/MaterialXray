@@ -2,7 +2,6 @@ package com.material.xray.di
 
 import android.content.Context
 import android.os.Build
-import com.material.xray.R
 import com.material.xray.core.android.di.CoreAndroidModule
 import com.material.xray.core.common.di.ApplicationScope
 import com.material.xray.core.common.di.CoreCommonModule
@@ -16,6 +15,7 @@ import com.material.xray.core.network.di.CoreNetworkModule
 import com.material.xray.core.root.di.CoreRootModule
 import com.material.xray.core.runtime.di.CoreRuntimeModule
 import com.material.xray.core.telemetry.di.CoreTelemetryModule
+import com.material.xray.core.ui.R
 import com.material.xray.core.ui.di.CoreUiModule
 import com.material.xray.core.xray.di.CoreXrayModule
 import com.material.xray.feature.configviewer.di.FeatureConfigViewerModule

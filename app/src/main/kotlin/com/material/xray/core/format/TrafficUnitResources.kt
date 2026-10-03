@@ -1,8 +1,8 @@
 package com.material.xray.core.format
 
 import androidx.annotation.StringRes
-import com.material.xray.R
 import com.material.xray.core.common.format.TrafficMagnitude
+import com.material.xray.core.ui.R
 
 /** Unit label for a throughput reading, such as `KiB/s`. */
 @StringRes

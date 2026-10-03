@@ -2,11 +2,11 @@ package com.material.xray.ui.home
 
 import android.content.Context
 import android.content.res.Resources
-import com.material.xray.R
 import com.material.xray.core.common.di.ApplicationScope
 import com.material.xray.core.locale.appLocaleChanges
 import com.material.xray.core.locale.forAppLanguage
 import com.material.xray.core.locale.localizedString
+import com.material.xray.core.ui.R
 import com.material.xray.data.db.entity.ServerEntity
 import com.material.xray.data.db.entity.SubscriptionEntity
 import com.material.xray.data.repository.ServerRepository

@@ -45,7 +45,7 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
-import com.material.xray.R
+import com.material.xray.core.ui.R
 
 /** Height of the app's top bars, which a navigation rail matches to continue their band. */
 val AppTopBarHeight = 52.dp

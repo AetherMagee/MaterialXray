@@ -2,12 +2,12 @@ package com.material.xray.service
 
 import android.content.Context
 import android.os.SystemClock
-import com.material.xray.R
 import com.material.xray.core.common.connection.ConnectionShutdown
 import com.material.xray.core.common.connection.ConnectionStateCoordinator
 import com.material.xray.core.common.log.LogBuffer
 import com.material.xray.core.common.log.LogSource
 import com.material.xray.core.locale.localizedString
+import com.material.xray.core.ui.R
 import com.material.xray.model.ConnectionProgress
 import com.material.xray.model.ConnectionState
 import kotlinx.coroutines.flow.first

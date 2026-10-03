@@ -6,7 +6,7 @@ cd "${ROOT_DIR}"
 
 VERSION_FILE="third_party/mozilla-ca-bundle/VERSION"
 CHECKSUM_FILE="third_party/mozilla-ca-bundle/CHECKSUMS.sha256"
-DESTINATION="app/src/main/res/raw/mozilla_ca_bundle.pem"
+DESTINATION="core/ui/src/main/res/raw/mozilla_ca_bundle.pem"
 VERSION="${1:-$(<"${VERSION_FILE}")}"
 if [[ ! "${VERSION}" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
   echo "Invalid Mozilla CA bundle version: ${VERSION}" >&2

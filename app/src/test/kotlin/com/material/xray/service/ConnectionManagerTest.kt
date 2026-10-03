@@ -1,8 +1,8 @@
 package com.material.xray.service
 
-import com.material.xray.R
 import com.material.xray.core.common.connection.ConnectionStateCoordinator
 import com.material.xray.core.common.log.LogBuffer
+import com.material.xray.core.ui.R
 import com.material.xray.core.xray.ConfigGenerator
 import com.material.xray.core.xray.GeoDataStatus
 import com.material.xray.core.xray.OtherVpnDns

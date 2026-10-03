@@ -1,8 +1,8 @@
 package com.material.xray.ui.text
 
 import androidx.annotation.StringRes
-import com.material.xray.R
 import com.material.xray.core.network.Ipv6SessionState
+import com.material.xray.core.ui.R
 import com.material.xray.model.AppUpdateInterval
 import com.material.xray.model.DnsPreset
 import com.material.xray.model.Ipv6Mode

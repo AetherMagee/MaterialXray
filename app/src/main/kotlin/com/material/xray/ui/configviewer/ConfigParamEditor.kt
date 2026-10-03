@@ -1,7 +1,7 @@
 package com.material.xray.ui.configviewer
 
 import androidx.annotation.StringRes
-import com.material.xray.R
+import com.material.xray.core.ui.R
 import com.material.xray.model.Protocol
 import com.material.xray.model.SERVER_EXTRA_HYSTERIA_OBFS_PASSWORD
 import com.material.xray.model.SERVER_EXTRA_WIREGUARD_PRESHARED_KEY

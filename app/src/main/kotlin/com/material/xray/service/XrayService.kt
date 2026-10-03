@@ -24,7 +24,6 @@ import android.os.PowerManager
 import android.os.SystemClock
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
-import com.material.xray.R
 import com.material.xray.core.common.connection.ConnectionEvent
 import com.material.xray.core.common.connection.ConnectionStateCoordinator
 import com.material.xray.core.common.format.scaleBytes
@@ -39,6 +38,7 @@ import com.material.xray.core.network.Ipv6Detector
 import com.material.xray.core.network.Ipv6SessionState
 import com.material.xray.core.network.ServerLatencyTester
 import com.material.xray.core.root.RootShell
+import com.material.xray.core.ui.R
 import com.material.xray.core.xray.ActiveConfigOverrideStore
 import com.material.xray.core.xray.StateFile
 import com.material.xray.core.xray.TproxyCompatibility

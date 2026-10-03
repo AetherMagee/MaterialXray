@@ -43,7 +43,7 @@ The following component families are licensed under the Apache License 2.0. Thei
 
 - AndroidX libraries, including Activity, AppCompat, Compose, Core, DataStore, Lifecycle, Navigation, Room, SQLite, WorkManager, and their transitive AndroidX modules; Copyright The Android Open Source Project.
 - Jetpack Compose Material, Material 3, and Material icon libraries; Copyright The Android Open Source Project.
-- Material Symbols vector artwork under `app/src/main/res/drawable/`; Copyright Google LLC.
+- Material Symbols vector artwork under `core/ui/src/main/res/drawable/`; Copyright Google LLC.
 - Kotlin standard library, kotlinx.coroutines, and kotlinx.serialization; Copyright JetBrains and Kotlin contributors.
 - Koin; Copyright the original author or authors.
 - Stately; Copyright Touchlab.
