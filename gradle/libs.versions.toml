@@ -18,7 +18,6 @@ appcompat = "1.8.0"
 grpc = "1.84.0"
 protobuf-plugin = "0.10.0"
 zxing = "3.5.4"
-sqlite-jdbc = "3.53.4.0"
 androidx-test = "1.7.0"
 sentry = "8.58.0"
 sentry-gradle = "6.22.0"
@@ -82,7 +81,6 @@ work-runtime-ktx = { group = "androidx.work", name = "work-runtime-ktx", version
 zxing-core = { group = "com.google.zxing", name = "core", version.ref = "zxing" }
 
 junit = { group = "junit", name = "junit", version = "4.13.2" }
-sqlite-jdbc = { group = "org.xerial", name = "sqlite-jdbc", version.ref = "sqlite-jdbc" }
 androidx-test-runner = { group = "androidx.test", name = "runner", version.ref = "androidx-test" }
 sentry-android = { group = "io.sentry", name = "sentry-android", version.ref = "sentry" }
 desugar-jdk-libs-nio = { group = "com.android.tools", name = "desugar_jdk_libs_nio", version.ref = "desugar-jdk-libs" }

@@ -396,7 +396,6 @@ android {
         targetSdk = 36
         versionCode = 940
         versionName = "0.9.4"
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {
             abiFilters += listOf("arm64-v8a", "x86_64", "armeabi-v7a")
@@ -521,6 +520,4 @@ dependencies {
     implementation(libs.coroutines.android)
     implementation(libs.zxing.core)
     implementation(libs.sentry.android)
-
-    androidTestImplementation(libs.androidx.test.runner)
 }
