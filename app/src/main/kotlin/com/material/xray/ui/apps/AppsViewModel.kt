@@ -379,12 +379,17 @@ class AppsViewModel(
     }
 
     fun setAlwaysProxied(app: AppItem, enabled: Boolean) {
-        if (app.routeKind != AppRouteKind.DEFAULT && app.routeKind != AppRouteKind.SERVER) return
         viewModelScope.launch {
             routeWriteMutex.withLock {
                 val current = appBypassDao.getAll().firstOrNull { it.profileId == app.profileId && it.packageName == app.packageName }
-                val route = current?.routeAssignment() ?: AppRouteAssignment(AppRouteMode.DefaultSelected)
-                if (route.mode != AppRouteMode.DefaultSelected && route.mode != AppRouteMode.Server) return@withLock
+                val currentRoute = current?.routeAssignment() ?: AppRouteAssignment(AppRouteMode.DefaultSelected)
+                // Always proxied only means something for a proxied app, so ticking it on another
+                // route proxies the app through the selected server too.
+                val route = when {
+                    currentRoute.mode == AppRouteMode.DefaultSelected || currentRoute.mode == AppRouteMode.Server -> currentRoute
+                    enabled -> AppRouteAssignment(AppRouteMode.DefaultSelected)
+                    else -> return@withLock
+                }
                 appBypassDao.upsert(
                     route.copy(alwaysProxied = enabled).toAppBypassEntity(
                         packageName = app.packageName,

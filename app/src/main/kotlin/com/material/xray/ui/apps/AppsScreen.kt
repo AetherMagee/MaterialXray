@@ -279,7 +279,14 @@ private fun AppRouteEditor(
 
     fun applyAlwaysProxied(target: AppItem, enabled: Boolean) {
         viewModel.setAlwaysProxied(target, enabled)
-        onAppChange(target.copy(alwaysProxied = enabled))
+        val proxied = target.routeKind == AppRouteKind.DEFAULT || target.routeKind == AppRouteKind.SERVER
+        onAppChange(
+            if (proxied || !enabled) {
+                target.copy(alwaysProxied = enabled)
+            } else {
+                target.copy(alwaysProxied = true).withSelectedRoute(AppsViewModel.DEFAULT_ROUTE_OPTION)
+            },
+        )
     }
 
     fun applyEdit(edit: ProviderManagedAppEdit) {
@@ -684,19 +691,17 @@ private fun AppRoutePickerDialog(
                     }
                     if (showAlwaysProxied) {
                         item(key = "alwaysProxied", contentType = "alwaysProxied") {
-                            val enabled = app.routeKind == AppRouteKind.DEFAULT || app.routeKind == AppRouteKind.SERVER
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clickable(
                                         interactionSource = null,
                                         indication = OptionFocusHighlight,
-                                        enabled = enabled,
                                     ) { onAlwaysProxiedChanged(!app.alwaysProxied) }
                                     .padding(vertical = 4.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                Checkbox(checked = app.alwaysProxied, onCheckedChange = null, enabled = enabled)
+                                Checkbox(checked = app.alwaysProxied, onCheckedChange = null)
                                 Column(modifier = Modifier.padding(start = 8.dp)) {
                                     Text(stringResource(R.string.apps_route_always_proxied_title))
                                     Text(
