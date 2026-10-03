@@ -21,7 +21,7 @@ internal fun interface RootCertificateBundle {
 }
 
 /** [refreshScope] must run off the main thread, since the refresh parses and writes the bundle. */
-internal class AndroidRootCertificateBundle(
+class AndroidRootCertificateBundle(
     private val refreshScope: CoroutineScope,
     private val refreshDelayMillis: Long = CACHED_BUNDLE_REFRESH_DELAY_MS,
     private val loadBundledCertificates: () -> List<ByteArray> = { emptyList() },

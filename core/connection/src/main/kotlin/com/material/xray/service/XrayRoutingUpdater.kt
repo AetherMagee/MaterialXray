@@ -15,17 +15,17 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
-internal sealed interface XrayRoutingUpdateResult {
+sealed interface XrayRoutingUpdateResult {
     data object Applied : XrayRoutingUpdateResult
 
     data class Failed(val reason: String) : XrayRoutingUpdateResult
 }
 
-internal fun interface ConnectionXrayRoutingUpdater {
+fun interface ConnectionXrayRoutingUpdater {
     suspend fun replace(endpoint: XrayApiEndpoint, routing: JsonObject): XrayRoutingUpdateResult
 }
 
-internal class XrayCliRoutingUpdater(
+class XrayCliRoutingUpdater(
     private val binaryPath: () -> String?,
     private val binDir: String,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,

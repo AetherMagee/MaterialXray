@@ -1,18 +1,18 @@
 package com.material.xray.service
 
-internal data class VpnNetworkPrefix(
+data class VpnNetworkPrefix(
     val address: String,
     val prefixLength: Int,
 )
 
-internal data class RootlessVpnNetworkPlan(
+data class RootlessVpnNetworkPlan(
     val addresses: List<VpnNetworkPrefix>,
     val routes: List<VpnNetworkPrefix>,
     val dnsServers: List<String>,
     val syntheticDnsAddress: String,
 )
 
-internal fun planRootlessVpnNetwork(allowIpv6: Boolean): RootlessVpnNetworkPlan = RootlessVpnNetworkPlan(
+fun planRootlessVpnNetwork(allowIpv6: Boolean): RootlessVpnNetworkPlan = RootlessVpnNetworkPlan(
     addresses = buildList {
         add(VpnNetworkPrefix(address = VPN_IPV4_ADDRESS, prefixLength = VPN_IPV4_PREFIX_LENGTH))
         if (allowIpv6) {

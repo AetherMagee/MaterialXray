@@ -1,12 +1,12 @@
 package com.material.xray.service
 
-internal data class LocalHealthTransition(
+data class LocalHealthTransition(
     val consecutiveFailures: Int,
     val thresholdReached: Boolean,
     val recovered: Boolean,
 )
 
-internal class LocalXrayHealthMonitor(
+class LocalXrayHealthMonitor(
     private val memoryCheckIntervalMs: Long,
     private val tproxyCheckIntervalMs: Long,
     private val apiProbeIntervalMs: Long,

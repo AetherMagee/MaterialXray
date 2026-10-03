@@ -6,13 +6,13 @@ import com.material.xray.core.root.RootShell
 import com.material.xray.core.root.RootShell.NetworkNamespace
 import com.material.xray.core.xray.TproxyRuntimeState
 
-internal interface DiagnosticCommandRunner {
+interface DiagnosticCommandRunner {
     fun defaultNetworkNamespace(): NetworkNamespace
 
     suspend fun execute(command: String, namespace: NetworkNamespace): RootShell.Result
 }
 
-internal interface ConnectionDiagnosticReporter {
+interface ConnectionDiagnosticReporter {
     suspend fun logNamespaceDiagnostics(
         stage: String,
         tunName: String? = null,
@@ -22,7 +22,7 @@ internal interface ConnectionDiagnosticReporter {
     suspend fun logTproxyDiagnostics(stage: String, state: TproxyRuntimeState, xrayPid: Int?) = Unit
 }
 
-internal class RootShellDiagnosticCommandRunner(
+class RootShellDiagnosticCommandRunner(
     private val shell: RootShell,
 ) : DiagnosticCommandRunner {
     override fun defaultNetworkNamespace(): NetworkNamespace = shell.defaultNetworkNamespace()
@@ -30,7 +30,7 @@ internal class RootShellDiagnosticCommandRunner(
     override suspend fun execute(command: String, namespace: NetworkNamespace): RootShell.Result = shell.execute(command, namespace)
 }
 
-internal class ConnectionDiagnostics(
+class ConnectionDiagnostics(
     private val commandRunner: DiagnosticCommandRunner,
     private val log: LogBuffer,
     appUid: Int = 0,

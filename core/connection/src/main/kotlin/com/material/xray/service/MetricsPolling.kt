@@ -11,7 +11,7 @@ internal const val SESSION_TRAFFIC_POLL_INTERVAL_MS = 1_000
  * refreshed on its own configured schedule regardless, so a faster poll only sharpens the numbers
  * it shows rather than overriding the interval the user chose.
  */
-internal fun metricsPollIntervalMs(
+fun metricsPollIntervalMs(
     notificationIntervalMs: Int,
     notificationWantsMetrics: Boolean,
     uiWantsSessionTraffic: Boolean,
@@ -29,7 +29,7 @@ internal fun metricsPollIntervalMs(
  * began again, so the drop reads as zero rather than as a negative rate. [elapsedMs] is clamped
  * to at least a millisecond so two readings taken in the same millisecond cannot divide by zero.
  */
-internal fun bytesPerSecond(currentBytes: Long, previousBytes: Long, elapsedMs: Long): Long {
+fun bytesPerSecond(currentBytes: Long, previousBytes: Long, elapsedMs: Long): Long {
     val elapsedSeconds = elapsedMs.coerceAtLeast(1).toDouble() / MILLIS_PER_SECOND
     return ((currentBytes - previousBytes).coerceAtLeast(0) / elapsedSeconds).toLong()
 }

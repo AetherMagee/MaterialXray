@@ -15,18 +15,18 @@ internal data class NetworkRetargetSignal(
     val passive: Boolean,
 )
 
-internal enum class NetworkRetargetResult {
+enum class NetworkRetargetResult {
     Done,
     Retry,
 }
 
-internal enum class NetworkRetargetRetryOutcome {
+enum class NetworkRetargetRetryOutcome {
     Stabilized,
     Exhausted,
     Stopped,
 }
 
-internal class NetworkRetargetWorker(
+class NetworkRetargetWorker(
     scope: CoroutineScope,
     private val settleDelayMs: Long,
     private val shouldHandle: () -> Boolean,
@@ -95,7 +95,7 @@ internal class NetworkRetargetWorker(
     }
 }
 
-internal suspend fun retryNetworkRetarget(
+suspend fun retryNetworkRetarget(
     retryDelaysMs: List<Long>,
     shouldContinue: () -> Boolean = { true },
     retarget: suspend (attempt: Int) -> NetworkRetargetResult,

@@ -11,13 +11,13 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
-internal data class ConnectionRequest(
+data class ConnectionRequest(
     val config: ServerConfig,
     val transitionState: ConnectionState = ConnectionState.Connecting,
     val preparation: ConnectionPreparation = ConnectionPreparation.Full,
 )
 
-internal enum class ConnectionPreparation {
+enum class ConnectionPreparation {
     Full,
     ReusePreparedRuntime,
     FastServerSwitch,
@@ -30,12 +30,12 @@ internal enum class ConnectionPreparation {
         get() = this == FastServerSwitch
 }
 
-internal data class ConnectionFailure(
+data class ConnectionFailure(
     val message: String,
     val retryable: Boolean,
 )
 
-internal class ConnectionLifecycle(
+class ConnectionLifecycle(
     private val scope: CoroutineScope,
     private val beforeCommand: () -> Unit,
     private val afterCommand: () -> Unit,

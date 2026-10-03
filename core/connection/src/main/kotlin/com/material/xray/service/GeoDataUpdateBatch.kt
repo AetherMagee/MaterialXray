@@ -1,7 +1,7 @@
 package com.material.xray.service
 
 /** Apply successful updates once all overlapping downloads have released the running core. */
-internal class GeoDataUpdateBatch(private val onUpdated: () -> Unit) {
+class GeoDataUpdateBatch(private val onUpdated: () -> Unit) {
     private val lock = Any()
     private var active = 0
     private var changed = false

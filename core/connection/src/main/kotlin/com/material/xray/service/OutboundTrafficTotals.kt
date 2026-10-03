@@ -6,7 +6,7 @@ package com.material.xray.service
  * Only proxied traffic is split by direction, because that is the only side the connection banner
  * reports; the notification wants a single figure for direct traffic.
  */
-internal data class OutboundTrafficTotals(
+data class OutboundTrafficTotals(
     val proxyUplinkBytes: Long,
     val proxyDownlinkBytes: Long,
     val directBytes: Long,
@@ -25,7 +25,7 @@ internal data class OutboundTrafficTotals(
  * answered before the core recorded anything and the caller has no reading yet rather than a
  * reading of zero.
  */
-internal fun Map<String, Long>.readOutboundTraffic(): OutboundTrafficTotals? {
+fun Map<String, Long>.readOutboundTraffic(): OutboundTrafficTotals? {
     var proxyUplink = 0L
     var proxyDownlink = 0L
     var direct = 0L
