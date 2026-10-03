@@ -30,8 +30,6 @@ import com.material.xray.feature.home.di.FeatureHomeModule
 import com.material.xray.feature.logs.di.FeatureLogsModule
 import com.material.xray.feature.routing.di.FeatureRoutingModule
 import com.material.xray.feature.settings.di.FeatureSettingsModule
-import com.material.xray.telemetry.TelemetryClient
-import com.material.xray.telemetry.TelemetryReporter
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -88,10 +86,7 @@ class AppModule {
         return builder.build()
     }
 
-    // The primary constructors of these two take test seams, so the graph uses the secondary ones.
-    @Singleton
-    fun telemetryReporter(client: TelemetryClient): TelemetryReporter = TelemetryReporter(client)
-
+    // The primary constructor takes test seams, so the graph uses the secondary one.
     @Singleton
     fun providerRoutingCoordinator(
         settingsRepository: SettingsRepository,

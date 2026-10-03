@@ -7,7 +7,7 @@ import java.io.File
  * Synchronous mirror of the diagnostics setting for startup code that runs before Koin and
  * DataStore are available. An absent or unreadable value is always treated as disabled.
  */
-internal class DiagnosticsConsentMirror(
+class DiagnosticsConsentMirror(
     private val file: File,
 ) {
     constructor(context: Context) : this(context.noBackupFilesDir.resolve(FILE_NAME))

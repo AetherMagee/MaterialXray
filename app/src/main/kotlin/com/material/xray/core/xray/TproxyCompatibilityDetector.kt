@@ -14,38 +14,6 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.koin.core.annotation.Singleton
 
-sealed interface TproxyCompatibility {
-    data object Unknown : TproxyCompatibility
-    data object Checking : TproxyCompatibility
-
-    data class Supported(
-        val ipv6: Boolean,
-    ) : TproxyCompatibility
-
-    data class Unsupported(
-        val reason: Reason,
-        val details: String? = null,
-    ) : TproxyCompatibility
-
-    enum class Reason {
-        RootUnavailable,
-        InitNetworkNamespaceUnavailable,
-        IptablesMangleUnavailable,
-        ProcessGroupUnavailable,
-        OwnerMatchUnavailable,
-        MarkTargetUnavailable,
-        TproxyIpv4Unavailable,
-        Ipv6BlockingUnavailable,
-        ListenerInspectionUnavailable,
-        PolicyRoutingUnavailable,
-        RouteTableConflict,
-        TproxyIpv6Unavailable,
-        MarkNamespaceConflict,
-        ProbeCleanupFailed,
-        CommandTimedOut,
-    }
-}
-
 /**
  * Whether a verdict is a real statement about the kernel. A denied root shell, a timeout or a foreign
  * rule conflict says nothing about TPROXY support, so it must not be used to demote the user's backend.

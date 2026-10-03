@@ -10,4 +10,6 @@ dependencies {
     implementation(project(":core:model"))
     implementation(project(":core:common"))
     implementation(project(":core:xray"))
+
+    implementation(libs.sentry.android)
 }

@@ -117,7 +117,7 @@ class SentryTelemetryClient(
     }
 }
 
-internal fun initializeSentryTelemetry(context: Context) {
+fun initializeSentryTelemetry(context: Context) {
     if (!Sentry.isEnabled()) {
         SentryAndroid.init(context) { options -> configureTelemetryOptions(options, context.isDebuggable()) }
     }

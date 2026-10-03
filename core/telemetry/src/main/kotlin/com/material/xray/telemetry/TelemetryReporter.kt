@@ -291,7 +291,7 @@ class TelemetryReporter internal constructor(
     }
 
     @Synchronized
-    internal fun startConnectionStep(
+    fun startConnectionStep(
         progress: ConnectionProgress,
         telemetryStep: ConnectionTelemetryStep?,
     ): TelemetrySpan? {
@@ -305,13 +305,13 @@ class TelemetryReporter internal constructor(
     }
 
     @Synchronized
-    internal fun recordConnectionStepFailure(step: ConnectionTelemetryStep) {
+    fun recordConnectionStepFailure(step: ConnectionTelemetryStep) {
         if (!enabled || !connectionAttemptActive || activeConnectionFailure != null) return
         activeConnectionFailure = step.failureStage to step.failureReason
     }
 
     @Synchronized
-    internal fun updateConnectionContext(
+    fun updateConnectionContext(
         connection: TelemetryConnectionContext,
         clearPriorFailure: Boolean = false,
     ) {
