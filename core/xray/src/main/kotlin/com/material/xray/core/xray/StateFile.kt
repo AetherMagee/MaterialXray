@@ -1,8 +1,8 @@
 package com.material.xray.core.xray
 
-import android.content.Context
-import android.util.AtomicFile
-import android.util.Log
+import com.material.xray.core.common.io.AtomicFile
+import com.material.xray.core.common.log.AppLogger
+import com.material.xray.core.common.log.NoOpAppLogger
 import com.material.xray.model.OtherVpnMode
 import com.material.xray.model.RootConnectionBackend
 import java.io.File
@@ -97,22 +97,26 @@ sealed interface XrayStateReadResult {
     data object Unreadable : XrayStateReadResult
 }
 
-class StateFile(context: Context) {
-    private val file = AtomicFile(File(context.filesDir, "state.json"))
+/** What the running connection set up, kept in `state.json` under [XrayPaths.filesDir] so it can be undone later. */
+class StateFile(
+    paths: XrayPaths,
+    private val logger: AppLogger = NoOpAppLogger,
+) {
+    private val file = AtomicFile(File(paths.filesDir, "state.json"))
     private val json = Json {
         ignoreUnknownKeys = true
         prettyPrint = true
     }
 
     fun readResult(): XrayStateReadResult {
-        if (!file.baseFile.exists()) return XrayStateReadResult.Absent
+        if (!file.exists()) return XrayStateReadResult.Absent
         return runCatching {
             val encoded = file.openRead().bufferedReader().use { it.readText() }
             json.decodeFromString<XrayState>(encoded)
         }.fold(
             onSuccess = { XrayStateReadResult.Present(it) },
             onFailure = { error ->
-                Log.w(TAG, "state.json exists but could not be read", error)
+                logger.w(TAG, "state.json exists but could not be read", error)
                 XrayStateReadResult.Unreadable
             },
         )
@@ -121,15 +125,7 @@ class StateFile(context: Context) {
     fun read(): XrayState? = (readResult() as? XrayStateReadResult.Present)?.state
 
     fun write(state: XrayState) {
-        val output = file.startWrite()
-        var committed = false
-        try {
-            output.write(json.encodeToString(state).toByteArray())
-            file.finishWrite(output)
-            committed = true
-        } finally {
-            if (!committed) file.failWrite(output)
-        }
+        file.writeBytes(json.encodeToString(state).toByteArray())
     }
 
     fun delete() {

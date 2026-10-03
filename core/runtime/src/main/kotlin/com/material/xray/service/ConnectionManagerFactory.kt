@@ -8,8 +8,12 @@ import android.net.RouteInfo
 import android.os.Build
 import android.os.SystemClock
 import androidx.annotation.StringRes
+import com.material.xray.core.android.platform.LogcatAppLogger
+import com.material.xray.core.android.xray.AndroidLocalSockets
+import com.material.xray.core.android.xray.AndroidPlatformDns
 import com.material.xray.core.app.AppInventory
 import com.material.xray.core.common.connection.ConnectionStateCoordinator
+import com.material.xray.core.common.log.AppLogger
 import com.material.xray.core.common.log.LogBuffer
 import com.material.xray.core.common.log.LogSource
 import com.material.xray.core.locale.localizedString
@@ -20,6 +24,7 @@ import com.material.xray.core.xray.CleanupManager
 import com.material.xray.core.xray.ConfigGenerator
 import com.material.xray.core.xray.GeoDataManager
 import com.material.xray.core.xray.GeoDataStatus
+import com.material.xray.core.xray.LocalSockets
 import com.material.xray.core.xray.OtherVpnDns
 import com.material.xray.core.xray.ProviderGeoDataResolution
 import com.material.xray.core.xray.ServerAddressResolver
@@ -406,10 +411,13 @@ internal fun interface ConnectionApiClientFactory {
     fun create(endpoint: XrayApiEndpoint): ConnectionApiClients
 }
 
-internal class AndroidConnectionApiClientFactory : ConnectionApiClientFactory {
+internal class AndroidConnectionApiClientFactory(
+    private val localSockets: LocalSockets,
+    private val logger: AppLogger,
+) : ConnectionApiClientFactory {
     override fun create(endpoint: XrayApiEndpoint): ConnectionApiClients = ConnectionApiClients(
-        stats = XrayStatsClientAdapter(XrayStatsClient(endpoint)),
-        routing = XrayRoutingClientAdapter(XrayRoutingClient(endpoint)),
+        stats = XrayStatsClientAdapter(XrayStatsClient(endpoint, localSockets, logger)),
+        routing = XrayRoutingClientAdapter(XrayRoutingClient(endpoint, localSockets, logger)),
     )
 }
 
@@ -465,7 +473,7 @@ class ConnectionManagerFactory(
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     private val serverAddressResolver by lazy {
-        ServerAddressResolver(context, lastKnownFile = File(context.noBackupFilesDir, "server_addresses.json"))
+        ServerAddressResolver(AndroidPlatformDns(context), lastKnownFile = File(context.noBackupFilesDir, "server_addresses.json"))
     }
     private val rootCertificateBundle by lazy {
         AndroidRootCertificateBundle(
@@ -533,7 +541,7 @@ class ConnectionManagerFactory(
                 onProgressStarted = stateCoordinator::beginConnectionProgress,
                 onProgressFinished = stateCoordinator::endConnectionProgress,
             ),
-            apiClientFactory = AndroidConnectionApiClientFactory(),
+            apiClientFactory = AndroidConnectionApiClientFactory(AndroidLocalSockets(), LogcatAppLogger()),
             xrayRoutingUpdater = XrayCliRoutingUpdater(
                 binaryPath = { xrayBinary.binaryPath },
                 binDir = environment.binDir,

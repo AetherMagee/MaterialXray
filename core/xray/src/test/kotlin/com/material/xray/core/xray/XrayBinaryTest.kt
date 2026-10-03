@@ -88,7 +88,7 @@ class XrayBinaryTest {
     private class FakeEnvironment(
         override val filesDir: File,
         override val nativeLibraryDir: File? = null,
-    ) : XrayBinaryEnvironment
+    ) : XrayPaths
 
     private fun nativeExecutable(dir: File, name: String) = File(dir, name).apply {
         writeText("native")

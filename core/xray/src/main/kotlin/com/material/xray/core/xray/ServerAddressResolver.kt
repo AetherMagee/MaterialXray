@@ -1,12 +1,5 @@
 package com.material.xray.core.xray
 
-import android.content.Context
-import android.net.ConnectivityManager
-import android.net.DnsResolver
-import android.os.Build
-import android.os.CancellationSignal
-import android.os.Looper
-import androidx.annotation.RequiresApi
 import com.material.xray.model.Protocol
 import com.material.xray.model.ServerConfig
 import java.io.File
@@ -14,8 +7,6 @@ import java.net.IDN
 import java.net.Inet6Address
 import java.net.InetAddress
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.Executor
-import kotlin.coroutines.resume
 import kotlin.random.Random
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
@@ -23,7 +14,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.Json
@@ -35,7 +25,7 @@ import kotlinx.serialization.json.contentOrNull
 import okhttp3.Dns
 
 class ServerAddressResolver(
-    private val context: Context? = null,
+    private val platformDns: PlatformDns = PlatformDns.None,
     private val hostLookup: (suspend (String) -> List<String>)? = null,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val nanoTime: () -> Long = System::nanoTime,
@@ -50,7 +40,6 @@ class ServerAddressResolver(
         val unresolvedHosts: List<String> = emptyList(),
     )
 
-    private val directExecutor = Executor { it.run() }
     private val successfulLookups = ConcurrentHashMap<String, CachedLookup>()
     private val lastKnownAddresses by lazy { ConcurrentHashMap(readLastKnownAddresses()) }
 
@@ -158,7 +147,7 @@ class ServerAddressResolver(
 
     private suspend fun resolveHost(host: String, allowIpv6: Boolean): List<String> {
         val now = nanoTime()
-        val cacheKey = "${context?.getSystemService(ConnectivityManager::class.java)?.activeNetwork?.networkHandle ?: 0}:$host"
+        val cacheKey = "${platformDns.activeNetworkHandle()}:$host"
         val cached = successfulLookups[cacheKey]?.takeIf { now - it.createdAtNanos < CACHE_TTL_NANOS }
         val candidates = cached?.addresses ?: (hostLookup?.invoke(host) ?: systemLookup(host)).also { addresses ->
             if (addresses.isNotEmpty()) {
@@ -190,18 +179,13 @@ class ServerAddressResolver(
         }
     }
 
-    // DnsResolver and Dns.SYSTEM query the same netd resolver, so a second concurrent lookup adds no
-    // information. DnsResolver is preferred because it is asynchronous and cancellable, which lets a
-    // stalled query be abandoned after RESOLVE_TIMEOUT_MS; the blocking Dns.SYSTEM lookup is only a
-    // fallback for that failure case and the primary path below Android 10.
+    // The platform resolver and Dns.SYSTEM query the same resolver (netd on Android), so a second
+    // concurrent lookup adds no information. The platform one is preferred because it is
+    // asynchronous and cancellable, which lets a stalled query be abandoned after RESOLVE_TIMEOUT_MS;
+    // the blocking Dns.SYSTEM lookup is only a fallback for that failure case and the primary path
+    // where the platform has none (below Android 10, off Android).
     private suspend fun systemLookup(host: String): List<String> = dnsLookupWithFallback(
-        primaryLookup = {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                withTimeoutOrNull(RESOLVE_TIMEOUT_MS) { resolveWithAndroidDns(host) }
-            } else {
-                null
-            }
-        },
+        primaryLookup = { withTimeoutOrNull(RESOLVE_TIMEOUT_MS) { platformDns.query(host) } },
         fallbackLookup = { resolveWithOkHttpDns(host) },
     )
 
@@ -233,41 +217,6 @@ class ServerAddressResolver(
     private fun isIpv6Address(host: String): Boolean {
         val value = host.trim('[', ']')
         return value.contains(':') && runCatching { InetAddress.getByName(value) }.isSuccess
-    }
-
-    @RequiresApi(Build.VERSION_CODES.Q)
-    private suspend fun resolveWithAndroidDns(host: String): List<String> = suspendCancellableCoroutine { continuation ->
-        val cancellation = CancellationSignal()
-        continuation.invokeOnCancellation { cancellation.cancel() }
-
-        dnsResolver().query(
-            null,
-            host,
-            DnsResolver.FLAG_EMPTY,
-            directExecutor,
-            cancellation,
-            object : DnsResolver.Callback<List<InetAddress>> {
-                override fun onAnswer(answer: List<InetAddress>, rcode: Int) {
-                    if (continuation.isActive) {
-                        continuation.resume(answer.mapNotNull { it.hostAddress })
-                    }
-                }
-
-                override fun onError(error: DnsResolver.DnsException) {
-                    if (continuation.isActive) {
-                        continuation.resume(emptyList())
-                    }
-                }
-            },
-        )
-    }
-
-    @RequiresApi(Build.VERSION_CODES.Q)
-    private fun dnsResolver(): DnsResolver = if (Build.VERSION.SDK_INT >= 37 && context != null) {
-        DnsResolver(context, Looper.getMainLooper())
-    } else {
-        @Suppress("DEPRECATION")
-        DnsResolver.getInstance()
     }
 
     private fun resolveWithOkHttpDns(host: String): List<String> = runCatching {

@@ -9,6 +9,7 @@ import android.os.SystemClock
 import com.material.xray.core.common.di.ApplicationScope
 import com.material.xray.core.common.log.LogBuffer
 import com.material.xray.core.common.log.LogSource
+import com.material.xray.core.xray.PlatformDns
 import com.material.xray.core.xray.ServerAddressResolver
 import com.material.xray.core.xray.XrayInbound
 import com.material.xray.core.xray.buildDns
@@ -81,10 +82,11 @@ class Ipv6Detector(
     private val ephemeralCore: EphemeralXrayCore,
     private val baseClient: OkHttpClient,
     private val logBuffer: LogBuffer,
+    platformDns: PlatformDns,
     @ApplicationScope scope: CoroutineScope,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
-    private val serverAddressResolver = ServerAddressResolver(context)
+    private val serverAddressResolver = ServerAddressResolver(platformDns)
     private val verdicts = Ipv6VerdictCache(scope, SystemClock::elapsedRealtime)
     private val mutableSessionState = MutableStateFlow<Ipv6SessionState?>(null)
 

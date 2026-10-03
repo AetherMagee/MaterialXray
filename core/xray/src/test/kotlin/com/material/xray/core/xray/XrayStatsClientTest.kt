@@ -7,6 +7,7 @@ import io.grpc.InsecureServerCredentials
 import io.grpc.okhttp.OkHttpServerBuilder
 import io.grpc.stub.StreamObserver
 import java.net.ServerSocket
+import javax.net.SocketFactory
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -15,7 +16,7 @@ class XrayStatsClientTest {
     @Test
     fun `reaches an API that starts listening after a failed connect without waiting out the backoff`() = runBlocking {
         val port = ServerSocket(0).use { it.localPort }
-        XrayStatsClient(XrayApiEndpoint.LoopbackTcp(port)).use { client ->
+        XrayStatsClient(XrayApiEndpoint.LoopbackTcp(port), TcpOnlyLocalSockets).use { client ->
             // Nothing listens yet, so this fails; its warning log is unavailable on the JVM.
             runCatching { client.getSysStats() }
 
@@ -29,6 +30,12 @@ class XrayStatsClientTest {
                 server.shutdownNow()
             }
         }
+    }
+
+    private object TcpOnlyLocalSockets : LocalSockets {
+        override fun abstractSocketFactory(name: String): SocketFactory = throw UnsupportedOperationException(name)
+
+        override fun fileSystemSocketFactory(path: String): SocketFactory = throw UnsupportedOperationException(path)
     }
 
     private class SysStatsService(private val uptimeSeconds: Int) : StatsServiceGrpc.StatsServiceImplBase() {

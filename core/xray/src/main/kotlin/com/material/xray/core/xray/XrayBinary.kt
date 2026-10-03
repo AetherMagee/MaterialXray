@@ -1,36 +1,18 @@
 package com.material.xray.core.xray
 
-import android.content.Context
 import com.material.xray.core.process.destroyForciblyCompat
 import com.material.xray.core.process.waitForCompat
 import java.io.File
 import java.util.concurrent.TimeUnit
 
-internal interface XrayBinaryEnvironment {
-    val filesDir: File
-    val nativeLibraryDir: File?
-}
-
-internal class AndroidXrayBinaryEnvironment(
-    private val context: Context,
-) : XrayBinaryEnvironment {
-    override val filesDir: File
-        get() = context.filesDir
-
-    override val nativeLibraryDir: File?
-        get() = context.applicationInfo.nativeLibraryDir?.let(::File)
-}
-
 /**
  * The Android Xray build, which both runtimes launch from the installer-extracted native library
  * directory, plus the helper that hands it a TUN interface in root mode.
  */
-class XrayBinary internal constructor(
-    private val environment: XrayBinaryEnvironment,
+class XrayBinary(
+    private val paths: XrayPaths,
 ) {
-    constructor(context: Context) : this(AndroidXrayBinaryEnvironment(context))
-
-    private val binaryDir = File(environment.filesDir, "bin")
+    private val binaryDir = File(paths.filesDir, "bin")
     val binaryPath: String? get() = nativeExecutablePath(XRAY_EXECUTABLE_NAME)
     val tunLauncherPath: String? get() = nativeExecutablePath(TUN_LAUNCHER_LIBRARY_NAME)
 
@@ -64,26 +46,26 @@ class XrayBinary internal constructor(
         }.getOrNull()
     }
 
-    fun configPath(): String = File(environment.filesDir, ACTIVE_CONFIG_FILE).absolutePath
+    fun configPath(): String = File(paths.filesDir, ACTIVE_CONFIG_FILE).absolutePath
 
     fun readConfig(): String? = File(configPath())
         .takeIf { it.isFile }
         ?.let { config -> runCatching { config.readText() }.getOrNull() }
 
     fun writeConfig(configJson: String) {
-        File(environment.filesDir, ACTIVE_CONFIG_FILE).writeText(configJson)
+        File(paths.filesDir, ACTIVE_CONFIG_FILE).writeText(configJson)
     }
 
     /**
      * The config the user edited by hand, used verbatim in place of a generated one. Null when no
      * override is stored.
      */
-    fun readOverrideConfig(): String? = File(environment.filesDir, ACTIVE_CONFIG_OVERRIDE_FILE)
+    fun readOverrideConfig(): String? = File(paths.filesDir, ACTIVE_CONFIG_OVERRIDE_FILE)
         .takeIf { it.isFile }
         ?.let { override -> runCatching { override.readText() }.getOrNull() }
         ?.takeIf { it.isNotBlank() }
 
-    private fun nativeExecutablePath(name: String): String? = environment.nativeLibraryDir
+    private fun nativeExecutablePath(name: String): String? = paths.nativeLibraryDir
         ?.resolve(name)
         ?.takeIf { it.isFile && it.canExecute() }
         ?.absolutePath

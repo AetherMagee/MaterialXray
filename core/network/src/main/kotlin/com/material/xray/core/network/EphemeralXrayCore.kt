@@ -4,8 +4,10 @@ import android.content.Context
 import android.net.LocalSocket
 import android.net.LocalSocketAddress
 import com.material.xray.core.process.RedirectedProcess
+import com.material.xray.core.xray.LocalSockets
 import com.material.xray.core.xray.XrayBinary
 import com.material.xray.core.xray.XrayInbound
+import com.material.xray.core.xray.XrayPaths
 import java.io.File
 import java.io.IOException
 import java.util.UUID
@@ -34,9 +36,11 @@ class EphemeralXrayCoreException(message: String, cause: Throwable? = null) : IO
 class EphemeralXrayCore(
     private val context: Context,
     private val baseClient: OkHttpClient,
+    xrayPaths: XrayPaths,
+    private val localSockets: LocalSockets,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
-    private val xrayBinary = XrayBinary(context)
+    private val xrayBinary = XrayBinary(xrayPaths)
 
     /**
      * Runs [block] with a client that proxies through a fresh Xray core.
@@ -59,7 +63,7 @@ class EphemeralXrayCore(
     ): T {
         val core = withContext(ioDispatcher) { startCore(inboundTag, startTimeoutMs, buildConfig) }
         try {
-            val client = privateUnixHttpProxyClient(baseClient, core.inbound.path)
+            val client = privateUnixHttpProxyClient(baseClient, core.inbound.path, localSockets)
             try {
                 return block(client, core.logFile)
             } finally {

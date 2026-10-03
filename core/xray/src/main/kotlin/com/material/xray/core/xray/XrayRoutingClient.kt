@@ -1,6 +1,7 @@
 package com.material.xray.core.xray
 
-import android.util.Log
+import com.material.xray.core.common.log.AppLogger
+import com.material.xray.core.common.log.NoOpAppLogger
 import com.material.xray.model.ActiveBalancerSelection
 import com.material.xray.model.BalancerOutbound
 import com.xray.app.observatory.OutboundStatus
@@ -18,6 +19,8 @@ import kotlinx.coroutines.withContext
 
 class XrayRoutingClient(
     private val endpoint: XrayApiEndpoint = XrayApiEndpoint.UnixSocket(XRAY_API_SOCKET_NAME_PREFIX),
+    private val localSockets: LocalSockets,
+    private val logger: AppLogger = NoOpAppLogger,
     private val timeoutMs: Long = XRAY_API_TIMEOUT_MS,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : AutoCloseable {
@@ -52,7 +55,7 @@ class XrayRoutingClient(
                 },
             )
         }.getOrElse { error ->
-            Log.w(TAG, "Xray balancer query failed", error)
+            logger.w(TAG, "Xray balancer query failed", error)
             null
         }
     }
@@ -73,7 +76,7 @@ class XrayRoutingClient(
         if (channelDelegate.isInitialized()) channel.shutdownNow()
     }
 
-    private fun buildChannel(): ManagedChannel = buildXrayApiChannel(endpoint)
+    private fun buildChannel(): ManagedChannel = buildXrayApiChannel(endpoint, localSockets)
 }
 
 private const val TAG = "XrayRoutingClient"

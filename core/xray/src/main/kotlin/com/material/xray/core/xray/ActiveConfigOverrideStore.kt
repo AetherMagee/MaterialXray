@@ -1,6 +1,5 @@
 package com.material.xray.core.xray
 
-import android.content.Context
 import java.io.File
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -16,10 +15,10 @@ import org.koin.core.annotation.Singleton
  */
 @Singleton
 class ActiveConfigOverrideStore(
-    context: Context,
+    paths: XrayPaths,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
-    private val file = context.filesDir.resolve(ACTIVE_CONFIG_OVERRIDE_FILE)
+    private val file = paths.filesDir.resolve(ACTIVE_CONFIG_OVERRIDE_FILE)
 
     /** False when the override could not be written, so the caller does not report a phantom save. */
     suspend fun save(configJson: String): Boolean = withContext(ioDispatcher) {

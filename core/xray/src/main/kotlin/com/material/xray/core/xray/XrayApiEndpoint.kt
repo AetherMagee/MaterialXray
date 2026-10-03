@@ -1,6 +1,5 @@
 package com.material.xray.core.xray
 
-import android.net.LocalSocketAddress
 import io.grpc.InsecureChannelCredentials
 import io.grpc.ManagedChannel
 import io.grpc.okhttp.OkHttpChannelBuilder
@@ -21,17 +20,17 @@ sealed interface XrayApiEndpoint {
     }
 }
 
-internal fun buildXrayApiChannel(endpoint: XrayApiEndpoint): ManagedChannel {
+internal fun buildXrayApiChannel(endpoint: XrayApiEndpoint, localSockets: LocalSockets): ManagedChannel {
     val credentials = InsecureChannelCredentials.create()
     val builder = when (endpoint) {
         is XrayApiEndpoint.UnixSocket ->
             OkHttpChannelBuilder
                 .forTarget(UNUSED_XRAY_API_GRPC_TARGET, credentials)
-                .socketFactory(AndroidLocalSocketFactory(endpoint.name, LocalSocketAddress.Namespace.ABSTRACT))
+                .socketFactory(localSockets.abstractSocketFactory(endpoint.name))
         is XrayApiEndpoint.FileSystemUnixSocket ->
             OkHttpChannelBuilder
                 .forTarget(UNUSED_XRAY_API_GRPC_TARGET, credentials)
-                .socketFactory(AndroidLocalSocketFactory(endpoint.path, LocalSocketAddress.Namespace.FILESYSTEM))
+                .socketFactory(localSockets.fileSystemSocketFactory(endpoint.path))
         is XrayApiEndpoint.LoopbackTcp ->
             OkHttpChannelBuilder
                 .forAddress(XRAY_API_LOOPBACK_ADDRESS, endpoint.port, credentials)

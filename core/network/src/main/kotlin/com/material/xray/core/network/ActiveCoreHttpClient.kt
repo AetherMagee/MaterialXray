@@ -1,10 +1,9 @@
 package com.material.xray.core.network
 
 import android.content.Context
-import android.net.LocalSocketAddress
 import com.material.xray.core.common.connection.ConnectionStateCoordinator
 import com.material.xray.core.xray.ACTIVE_CONFIG_FILE
-import com.material.xray.core.xray.AndroidLocalSocketFactory
+import com.material.xray.core.xray.LocalSockets
 import com.material.xray.core.xray.XRAY_APP_HTTP_INBOUND_TAG
 import com.material.xray.model.ConnectionState
 import java.io.File
@@ -32,6 +31,7 @@ class ActiveCoreHttpClient(
     private val baseClient: OkHttpClient,
     private val trafficRoutingSetting: CoreTrafficRoutingSetting,
     private val connectionState: ConnectionStateCoordinator,
+    private val localSockets: LocalSockets,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : AppHttpClient {
     override suspend fun <T> use(block: suspend (OkHttpClient) -> T): T {
@@ -46,7 +46,7 @@ class ActiveCoreHttpClient(
                 ?.let { privateHttpSocketPath(it, privateDir) }
         } ?: throw IOException("The active Xray private HTTP socket is unavailable")
 
-        val proxyClient = privateUnixHttpProxyClient(baseClient, socketPath)
+        val proxyClient = privateUnixHttpProxyClient(baseClient, socketPath, localSockets)
         return try {
             block(proxyClient)
         } finally {
@@ -62,11 +62,15 @@ internal suspend fun evictProxyConnections(
     withContext(NonCancellable + ioDispatcher) { evict() }
 }
 
-internal fun privateUnixHttpProxyClient(baseClient: OkHttpClient, socketPath: String): OkHttpClient = baseClient.newBuilder()
+internal fun privateUnixHttpProxyClient(
+    baseClient: OkHttpClient,
+    socketPath: String,
+    localSockets: LocalSockets,
+): OkHttpClient = baseClient.newBuilder()
     // OkHttp uses this address to select HTTP proxy framing; the socket factory connects to the
     // private Unix path instead, so no TCP listener is created at this address.
     .proxy(Proxy(Proxy.Type.HTTP, InetSocketAddress("127.0.0.1", 1)))
-    .socketFactory(AndroidLocalSocketFactory(socketPath, LocalSocketAddress.Namespace.FILESYSTEM))
+    .socketFactory(localSockets.fileSystemSocketFactory(socketPath))
     .connectionPool(ConnectionPool())
     .build()
 

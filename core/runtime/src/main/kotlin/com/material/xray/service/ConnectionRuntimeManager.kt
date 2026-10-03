@@ -10,6 +10,7 @@ import com.material.xray.core.ui.R
 import com.material.xray.core.xray.ACTIVE_CONFIG_FILE
 import com.material.xray.core.xray.StateFile
 import com.material.xray.core.xray.TunInterfaceDetector
+import com.material.xray.core.xray.VpnTransportProbe
 import com.material.xray.data.repository.ServerRepository
 import com.material.xray.data.repository.SettingsRepository
 import com.material.xray.model.ConnectionProgress
@@ -28,6 +29,7 @@ class ConnectionRuntimeManager(
     private val serverRepository: ServerRepository,
     private val stateCoordinator: ConnectionStateCoordinator,
     private val log: LogBuffer,
+    private val vpnTransportProbe: VpnTransportProbe,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     private val stateFile = StateFile(context)
@@ -97,7 +99,7 @@ class ConnectionRuntimeManager(
         if (tproxyRecorded) return@withContext RuntimeDetection.RecordedRootRuntime
 
         if (!TunInterfaceDetector.isInterfaceUp(activeTunName)) return@withContext null
-        if (activeTunName == AMBIGUOUS_TUN_NAME && TunInterfaceDetector.isVpnServiceActive(context)) {
+        if (activeTunName == AMBIGUOUS_TUN_NAME && vpnTransportProbe.isVpnActive()) {
             return@withContext RuntimeDetection.Observed(ConnectionState.InterfaceBusy(activeTunName))
         }
 

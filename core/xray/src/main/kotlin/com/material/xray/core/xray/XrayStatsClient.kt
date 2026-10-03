@@ -1,6 +1,7 @@
 package com.material.xray.core.xray
 
-import android.util.Log
+import com.material.xray.core.common.log.AppLogger
+import com.material.xray.core.common.log.NoOpAppLogger
 import com.xray.app.stats.command.QueryStatsRequest
 import com.xray.app.stats.command.StatsServiceGrpc
 import com.xray.app.stats.command.SysStatsRequest
@@ -14,6 +15,8 @@ import kotlinx.coroutines.withContext
 
 class XrayStatsClient(
     private val endpoint: XrayApiEndpoint = XrayApiEndpoint.UnixSocket(XRAY_API_SOCKET_NAME_PREFIX),
+    private val localSockets: LocalSockets,
+    private val logger: AppLogger = NoOpAppLogger,
     private val timeoutMs: Long = XRAY_API_TIMEOUT_MS,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : AutoCloseable {
@@ -35,7 +38,7 @@ class XrayStatsClient(
             )
             response.statList.associate { stat -> stat.name to stat.value }
         }.getOrElse { error ->
-            Log.w(TAG, "Xray stats query failed", error)
+            logger.w(TAG, "Xray stats query failed", error)
             emptyMap()
         }
     }
@@ -56,7 +59,7 @@ class XrayStatsClient(
                 uptimeSeconds = response.uptime,
             )
         }.getOrElse { error ->
-            Log.w(TAG, "Xray sys stats query failed", error)
+            logger.w(TAG, "Xray sys stats query failed", error)
             null
         }
     }
@@ -88,7 +91,7 @@ class XrayStatsClient(
         if (channelDelegate.isInitialized()) channel.shutdownNow()
     }
 
-    private fun buildChannel(): ManagedChannel = buildXrayApiChannel(endpoint)
+    private fun buildChannel(): ManagedChannel = buildXrayApiChannel(endpoint, localSockets)
 }
 
 private const val TAG = "XrayStatsClient"

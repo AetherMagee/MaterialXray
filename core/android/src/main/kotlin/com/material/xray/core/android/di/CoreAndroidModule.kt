@@ -9,5 +9,6 @@ import org.koin.core.annotation.Module
     "com.material.xray.core.launcher",
     "com.material.xray.core.locale",
     "com.material.xray.core.android.platform",
+    "com.material.xray.core.android.xray",
 )
 class CoreAndroidModule

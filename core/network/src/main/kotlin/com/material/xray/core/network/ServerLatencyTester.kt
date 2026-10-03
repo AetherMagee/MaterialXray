@@ -1,8 +1,8 @@
 package com.material.xray.core.network
 
-import android.content.Context
 import android.os.SystemClock
 import com.material.xray.core.common.log.xrayTimestampPrefix
+import com.material.xray.core.xray.PlatformDns
 import com.material.xray.core.xray.ServerAddressResolver
 import com.material.xray.core.xray.XrayInbound
 import com.material.xray.core.xray.buildDns
@@ -137,12 +137,12 @@ internal suspend fun executeTimedHttpProbe(
 
 @Singleton
 class ServerLatencyTester(
-    context: Context,
     private val ephemeralCore: EphemeralXrayCore,
+    platformDns: PlatformDns,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     private val json = Json { prettyPrint = true }
-    private val serverAddressResolver = ServerAddressResolver(context)
+    private val serverAddressResolver = ServerAddressResolver(platformDns)
 
     suspend fun measure(
         server: ServerConfig,
