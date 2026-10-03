@@ -1,5 +1,6 @@
 package com.material.xray.di
 
+import androidx.datastore.core.DataStore
 import androidx.work.ListenableWorker
 import com.material.xray.MaterialXrayApp
 import com.material.xray.core.android.data.AndroidSubscriptionDeviceIdentity
@@ -36,6 +37,8 @@ import com.material.xray.core.xray.XrayPaths
 import com.material.xray.data.parser.SubscriptionDeviceIdentity
 import com.material.xray.data.platform.BackupStorage
 import com.material.xray.data.platform.LauncherIconSwitcher
+import com.material.xray.data.repository.AppUpdateDataStore
+import com.material.xray.data.repository.SettingsDataStore
 import com.material.xray.data.repository.SettingsRepository
 import com.material.xray.service.AppUpdateScheduler
 import com.material.xray.service.AppUpdateWorker
@@ -127,6 +130,19 @@ class KoinGraphTest {
             val providers = definitions.filter { contract in it.secondaryTypes }.map { it.primaryType }.toSet()
             assertEquals("${contract.simpleName} providers", setOf(implementation), providers)
         }
+    }
+
+    // Opening a store needs an Android Context, so only the definitions are checked here.
+    @OptIn(KoinInternalApi::class)
+    @Test
+    fun `each preference store has one definition under its own qualifier`() {
+        val qualifiers = koin.instanceRegistry.instances.values
+            .map { it.beanDefinition }
+            .distinct()
+            .filter { it.primaryType == DataStore::class }
+            .map { it.qualifier }
+
+        assertEquals(listOf(named<AppUpdateDataStore>(), named<SettingsDataStore>()).sortedBy { it.value }, qualifiers.sortedBy { it?.value })
     }
 
     // Building the database needs an Android Context, so only the definitions are checked here.

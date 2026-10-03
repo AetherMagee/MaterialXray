@@ -45,6 +45,7 @@ import org.koin.core.annotation.Singleton
         CoreAndroidModule::class,
         CoreDatabaseModule::class,
         DatabaseModule::class,
+        DataStoreModule::class,
         CoreDataModule::class,
         CoreTelemetryModule::class,
         CoreRuntimeModule::class,

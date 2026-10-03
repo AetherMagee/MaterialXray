@@ -1,13 +1,13 @@
 package com.material.xray.data.repository
 
-import android.content.Context
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
-import androidx.datastore.preferences.preferencesDataStore
 import com.material.xray.core.common.telemetry.DiagnosticsConsentMirroring
 import com.material.xray.core.network.CoreTrafficRoutingSetting
 import com.material.xray.core.xray.GeoDataDefaults
@@ -77,19 +77,13 @@ data class SettingsSnapshot(
     val diagnosticsEnabled: Boolean,
 )
 
-private val Context.dataStore by preferencesDataStore(
-    name = "settings",
-    produceMigrations = { listOf(SettingsDefaultMigration()) },
-)
-
 @Suppress("TooManyFunctions")
 @Singleton(binds = [CoreTrafficRoutingSetting::class, GeoDataUrlSettings::class])
 class SettingsRepository(
-    private val context: Context,
+    @SettingsDataStore private val store: DataStore<Preferences>,
     private val diagnosticsConsentMirror: DiagnosticsConsentMirroring,
 ) : CoreTrafficRoutingSetting,
     GeoDataUrlSettings {
-    private val store get() = context.dataStore
     private val json = Json { ignoreUnknownKeys = true }
 
     companion object {

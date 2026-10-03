@@ -1,10 +1,10 @@
 package com.material.xray.data.repository
 
-import android.content.Context
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
-import androidx.datastore.preferences.preferencesDataStore
 import com.material.xray.core.common.platform.AppBuildInfo
 import com.material.xray.model.AppUpdate
 import com.material.xray.model.AppUpdateCheckStatus
@@ -15,15 +15,12 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import org.koin.core.annotation.Singleton
 
-private val Context.appUpdateDataStore by preferencesDataStore(name = "app_update")
-
 @Singleton
 class AppUpdateRepository(
-    private val context: Context,
+    @AppUpdateDataStore private val store: DataStore<Preferences>,
     private val releaseFetcher: GitHubReleaseFetcher,
     appBuildInfo: AppBuildInfo,
 ) {
-    private val store get() = context.appUpdateDataStore
     private val currentVersionName = appBuildInfo.versionName
     val availableUpdate: Flow<AppUpdate?> = store.data.map { preferences ->
         preferences[AVAILABLE_RELEASE_TAG]
