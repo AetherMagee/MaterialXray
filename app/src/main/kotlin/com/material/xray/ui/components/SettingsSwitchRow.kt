@@ -41,7 +41,7 @@ fun SettingsSwitchRow(
             .toggleable(
                 value = checked,
                 interactionSource = null,
-                indication = null,
+                indication = FocusHighlight,
                 enabled = enabled,
                 role = Role.Switch,
                 onValueChange = onCheckedChange,

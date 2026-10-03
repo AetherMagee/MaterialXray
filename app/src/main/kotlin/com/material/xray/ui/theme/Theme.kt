@@ -40,10 +40,12 @@ fun MaterialXrayTheme(
 
 // Material's 10% focus layer is too faint to follow across a room with a TV remote. Focus is only
 // shown without touch, so this leaves phone taps unchanged.
+const val FOCUSED_STATE_LAYER_ALPHA = 0.24f
+
 private val FocusVisibleRippleConfiguration = RippleConfiguration(
     rippleAlpha = RippleAlpha(
         draggedAlpha = RippleDefaults.RippleAlpha.draggedAlpha,
-        focusedAlpha = 0.24f,
+        focusedAlpha = FOCUSED_STATE_LAYER_ALPHA,
         hoveredAlpha = RippleDefaults.RippleAlpha.hoveredAlpha,
         pressedAlpha = RippleDefaults.RippleAlpha.pressedAlpha,
     ),

@@ -44,7 +44,7 @@ fun SelectableOptionRow(
                 selected = selected,
                 enabled = enabled,
                 interactionSource = null,
-                indication = null,
+                indication = FocusHighlight,
                 onClick = onSelected,
                 role = Role.RadioButton,
             )

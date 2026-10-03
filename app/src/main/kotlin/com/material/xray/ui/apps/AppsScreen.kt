@@ -67,6 +67,7 @@ import com.material.xray.R
 import com.material.xray.model.RoutingPolicyControl
 import com.material.xray.ui.components.AnimatedDropdownMenu
 import com.material.xray.ui.components.FadingOutlinedTextField as OutlinedTextField
+import com.material.xray.ui.components.FocusHighlight
 import com.material.xray.ui.components.ScrollFadeEdges
 import com.material.xray.ui.components.SelectableOptionRow
 import com.material.xray.ui.components.TooltipIconButton
@@ -674,7 +675,7 @@ private fun AppRoutePickerDialog(
                                     .fillMaxWidth()
                                     .clickable(
                                         interactionSource = null,
-                                        indication = null,
+                                        indication = FocusHighlight,
                                         enabled = enabled,
                                     ) { onAlwaysProxiedChanged(!app.alwaysProxied) }
                                     .padding(vertical = 4.dp),

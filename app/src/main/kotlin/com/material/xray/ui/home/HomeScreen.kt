@@ -119,6 +119,7 @@ import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -2077,7 +2078,8 @@ private fun SubscriptionHeader(
                 .then(reorderModifier)
                 .then(
                     if (canCollapse) {
-                        Modifier.clickable(
+                        // The arrow already offers this to a remote, with a visible focus ring.
+                        Modifier.focusProperties { canFocus = false }.clickable(
                             interactionSource = titleInteractionSource,
                             indication = null,
                             role = Role.Button,
