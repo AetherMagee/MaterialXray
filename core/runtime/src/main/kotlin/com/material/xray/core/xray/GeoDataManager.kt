@@ -64,7 +64,7 @@ data class GeoDataDownloadProgress(
             ?.let { total -> (bytesDownloaded.toDouble() / total).coerceIn(0.0, 1.0).toFloat() }
 }
 
-internal fun combinedGeoDataDownloadProgress(
+fun combinedGeoDataDownloadProgress(
     progress: Collection<GeoDataDownloadProgress>,
 ): GeoDataDownloadProgress? {
     if (progress.isEmpty()) return null

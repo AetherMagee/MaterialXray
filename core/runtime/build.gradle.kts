@@ -17,4 +17,14 @@ dependencies {
     implementation(project(":core:database"))
     implementation(project(":core:data"))
     implementation(project(":core:telemetry"))
+    // Notification strings and icons.
+    implementation(project(":core:ui"))
+
+    implementation(libs.core.ktx)
+    implementation(libs.work.runtime.ktx)
+    implementation(libs.koin.android)
+    implementation(libs.koin.androidx.workmanager)
+    implementation(libs.coroutines.android)
+    implementation(libs.okhttp)
+    implementation(libs.serialization.json)
 }

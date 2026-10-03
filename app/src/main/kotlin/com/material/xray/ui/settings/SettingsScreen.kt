@@ -2023,12 +2023,13 @@ private fun GeoDataCircularProgress(progress: GeoDataDownloadProgress?, descript
 @Composable
 private fun GeoDataDownloadStatus(progress: GeoDataDownloadProgress?) {
     val context = LocalContext.current
+    val totalBytes = progress?.totalBytes
     val text = when {
         progress == null -> stringResource(R.string.settings_updating)
-        progress.totalBytes != null && progress.totalBytes > 0L -> stringResource(
+        totalBytes != null && totalBytes > 0L -> stringResource(
             R.string.settings_geodata_download_progress_with_total,
             Formatter.formatShortFileSize(context, progress.bytesDownloaded),
-            Formatter.formatShortFileSize(context, progress.totalBytes),
+            Formatter.formatShortFileSize(context, totalBytes),
         )
         else -> stringResource(
             R.string.settings_geodata_download_progress,
