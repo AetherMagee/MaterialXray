@@ -25,6 +25,8 @@ internal fun Project.configureAndroidCommon() {
         compileSdk = 37
         compileSdkMinor = 0
         buildToolsVersion = "37.0.0"
+        // :core:runtime builds its launcher with it and :app's buildXray compiles Xray with its clang.
+        ndkVersion = "30.0.16248370"
 
         defaultConfig.minSdk = 24
 

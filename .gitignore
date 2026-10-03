@@ -2,7 +2,7 @@
 build/
 .gradle/
 .kotlin/
-app/.cxx/
+.cxx/
 local.properties
 
 # IDE

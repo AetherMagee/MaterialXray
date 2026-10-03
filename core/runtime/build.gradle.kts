@@ -4,6 +4,20 @@ plugins {
 
 android {
     namespace = "com.material.xray.core.runtime"
+
+    defaultConfig {
+        ndk {
+            abiFilters += listOf("arm64-v8a", "x86_64", "armeabi-v7a")
+        }
+    }
+
+    // XrayProcessSupervisor's rootless launcher and the root TUN exec helper.
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+            version = "3.31.6"
+        }
+    }
 }
 
 dependencies {
