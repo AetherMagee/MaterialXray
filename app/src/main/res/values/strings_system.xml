@@ -21,6 +21,7 @@
     <string name="logs_share">Share logs</string>
     <string name="logs_share_failed">Could not share logs</string>
     <string name="logs_clear">Clear logs</string>
+    <string name="logs_scroll_to_bottom">Scroll to bottom</string>
     <string name="logs_copied">Logs copied</string>
     <string name="log_entry_copied">Copied</string>
     <string name="clipboard_label_logs">%1$s logs</string>

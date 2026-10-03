@@ -20,6 +20,7 @@
     <string name="logs_share">Поделиться журналом</string>
     <string name="logs_share_failed">Не удалось поделиться журналом</string>
     <string name="logs_clear">Очистить журнал</string>
+    <string name="logs_scroll_to_bottom">Прокрутить вниз</string>
     <string name="logs_copied">Журнал скопирован</string>
     <string name="log_entry_copied">Скопировано</string>
     <string name="clipboard_label_logs">Журнал %1$s</string>

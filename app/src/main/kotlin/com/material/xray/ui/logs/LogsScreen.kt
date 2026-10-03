@@ -10,6 +10,11 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -34,6 +39,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.DropdownMenuItem
@@ -42,11 +48,13 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -55,6 +63,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -333,6 +342,7 @@ private fun LogEntriesList(
     onSelect: (LogEntry) -> Unit,
 ) {
     val listState = rememberLazyListState()
+    val coroutineScope = rememberCoroutineScope()
     val currentEntries by rememberUpdatedState(entries)
     val currentSelectedIds by rememberUpdatedState(selectedIds)
     val changeSelection by rememberUpdatedState(onSelectionChange)
@@ -365,61 +375,112 @@ private fun LogEntriesList(
         }
     }
 
+    var followTail by listState.rememberFollowTail()
+
     val selectionMode = selectedIds.isNotEmpty()
-    LaunchedEffect(entries.lastOrNull()?.id, selectionMode, gesture != null) {
-        if (entries.isNotEmpty() && !selectionMode && gesture == null) {
+    val autoScroll = followTail && !selectionMode && gesture == null
+    LaunchedEffect(entries.lastOrNull()?.id, autoScroll) {
+        if (autoScroll && entries.isNotEmpty()) {
             listState.scrollToItem(entries.size - 1)
         }
     }
 
-    LazyColumn(
-        state = listState,
-        modifier = Modifier
-            .fillMaxSize()
-            .pointerInput(listState) {
-                awaitEachGesture {
-                    val down = awaitFirstDown(requireUnconsumed = false)
-                    val anchorId = listState.logAt(down.position.y) ?: return@awaitEachGesture
-                    val longPress = awaitLongPressOrCancellation(down.id)
-                    if (longPress == null) {
-                        if (currentEvent.changes.any { it.id == down.id && it.changedToUp() } && currentSelectedIds.isNotEmpty()) {
-                            changeSelection(if (anchorId in currentSelectedIds) currentSelectedIds - anchorId else currentSelectedIds + anchorId)
-                        }
-                    } else {
-                        try {
-                            gesture = LogDragSelection(anchorId, currentSelectedIds)
-                            fingerY = longPress.position.y
-                            hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                            extendSelection(fingerY)
-                            longPress.consume()
-                            drag(longPress.id) { change ->
-                                fingerY = change.position.y
-                                extendSelection(fingerY)
-                                change.consume()
+    Box(modifier = Modifier.fillMaxSize()) {
+        LazyColumn(
+            state = listState,
+            modifier = Modifier
+                .fillMaxSize()
+                .pointerInput(listState) {
+                    awaitEachGesture {
+                        val down = awaitFirstDown(requireUnconsumed = false)
+                        val anchorId = listState.logAt(down.position.y) ?: return@awaitEachGesture
+                        val longPress = awaitLongPressOrCancellation(down.id)
+                        if (longPress == null) {
+                            if (currentEvent.changes.any { it.id == down.id && it.changedToUp() } && currentSelectedIds.isNotEmpty()) {
+                                changeSelection(if (anchorId in currentSelectedIds) currentSelectedIds - anchorId else currentSelectedIds + anchorId)
                             }
-                            currentEvent.changes.forEach { it.consume() }
-                        } finally {
-                            gesture = null
+                        } else {
+                            try {
+                                gesture = LogDragSelection(anchorId, currentSelectedIds)
+                                fingerY = longPress.position.y
+                                hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                                extendSelection(fingerY)
+                                longPress.consume()
+                                drag(longPress.id) { change ->
+                                    fingerY = change.position.y
+                                    extendSelection(fingerY)
+                                    change.consume()
+                                }
+                                currentEvent.changes.forEach { it.consume() }
+                            } finally {
+                                gesture = null
+                            }
                         }
                     }
+                },
+            contentPadding = PaddingValues(vertical = 4.dp),
+        ) {
+            itemsIndexed(
+                items = entries,
+                key = { _, entry -> entry.id },
+                contentType = { _, entry -> entry.source },
+            ) { index, entry ->
+                LogEntryRow(
+                    entry = entry,
+                    showDivider = index < entries.lastIndex,
+                    selected = entry.id in selectedIds,
+                    onClick = { if (selectionMode) onSelect(entry) },
+                    onLongClick = { onSelect(entry) },
+                )
+            }
+        }
+        ScrollToBottomButton(
+            visible = !followTail && entries.isNotEmpty(),
+            onClick = {
+                coroutineScope.launch {
+                    listState.animateScrollToItem(currentEntries.lastIndex)
+                    followTail = true
                 }
             },
-        contentPadding = PaddingValues(vertical = 4.dp),
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(16.dp),
+        )
+    }
+}
+
+@Composable
+private fun ScrollToBottomButton(visible: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn() + scaleIn(),
+        exit = fadeOut() + scaleOut(),
+        modifier = modifier,
     ) {
-        itemsIndexed(
-            items = entries,
-            key = { _, entry -> entry.id },
-            contentType = { _, entry -> entry.source },
-        ) { index, entry ->
-            LogEntryRow(
-                entry = entry,
-                showDivider = index < entries.lastIndex,
-                selected = entry.id in selectedIds,
-                onClick = { if (selectionMode) onSelect(entry) },
-                onLongClick = { onSelect(entry) },
-            )
+        SmallFloatingActionButton(onClick = onClick) {
+            Icon(Icons.Default.KeyboardArrowDown, contentDescription = stringResource(R.string.logs_scroll_to_bottom))
         }
     }
+}
+
+/**
+ * Whether the list should follow new entries: true while the user is at the bottom. Scrolling up
+ * clears it, and reaching the bottom again, by hand or with the button, sets it.
+ */
+@Composable
+private fun LazyListState.rememberFollowTail(): MutableState<Boolean> {
+    val followTail = remember { mutableStateOf(true) }
+    LaunchedEffect(this) {
+        snapshotFlow { canScrollForward to lastScrolledBackward }
+            .collect { (canScrollForward, scrolledBackward) ->
+                if (!canScrollForward) {
+                    followTail.value = true
+                } else if (scrolledBackward) {
+                    followTail.value = false
+                }
+            }
+    }
+    return followTail
 }
 
 private fun LazyListState.logAt(y: Float): Long? {
