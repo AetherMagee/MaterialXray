@@ -212,7 +212,7 @@ class XrayConfigRoutingTest {
         )
 
         val rules = routing.getValue("rules").jsonArray.map { it.jsonObject }
-        assertEquals("IPOnDemand", routing.getValue("domainStrategy").jsonPrimitive.content)
+        assertEquals("IPIfNonMatch", routing.getValue("domainStrategy").jsonPrimitive.content)
         assertEquals(listOf("app-in-direct"), rules[0].array("inboundTag"))
         assertEquals(listOf("10.10.14.2"), rules[0].array("ip"))
         assertEquals("block", rules[0].getValue("outboundTag").jsonPrimitive.content)

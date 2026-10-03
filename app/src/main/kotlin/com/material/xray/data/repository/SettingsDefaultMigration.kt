@@ -103,12 +103,13 @@ private fun validateSettingsDefaultsRevision(
     }
 }
 
-internal const val CURRENT_SETTINGS_DEFAULTS_REVISION = 9
+internal const val CURRENT_SETTINGS_DEFAULTS_REVISION = 10
 private const val PREVIOUS_XRAY_BUFFER_SIZE_KIB = 512
 private const val PREVIOUS_TUN_NAME = "xray0"
 private const val PREVIOUS_DNS_SERVERS = "1.1.1.1,1.0.0.1"
 private const val PREVIOUS_IPV6_DNS_SERVERS =
     "1.1.1.1,1.0.0.1,2606:4700:4700::1111,2606:4700:4700::1001"
+private const val PREVIOUS_ROUTING_DOMAIN_STRATEGY = "IPOnDemand"
 
 // Increment the revision and append a change whenever a compiled default changes or a setting is retired.
 private val SETTINGS_DEFAULT_CHANGES = listOf(
@@ -141,6 +142,16 @@ private val SETTINGS_DEFAULT_CHANGES = listOf(
     providerRoutingSeparationChange(revision = 7),
     missingCustomRoutingRepair(revision = 8),
     staleProviderRoutingCleanup(revision = 9),
+    settingDefaultChange(
+        revision = 10,
+        key = SettingsRepository.ROUTING_DOMAIN_STRATEGY,
+        previousDefault = PREVIOUS_ROUTING_DOMAIN_STRATEGY,
+    ),
+    settingDefaultChange(
+        revision = 10,
+        key = SettingsRepository.PROVIDER_ROUTING_DOMAIN_STRATEGY,
+        previousDefault = PREVIOUS_ROUTING_DOMAIN_STRATEGY,
+    ),
 )
 
 private fun providerRoutingSeparationChange(revision: Int): SettingDefaultChange = object : SettingDefaultChange {

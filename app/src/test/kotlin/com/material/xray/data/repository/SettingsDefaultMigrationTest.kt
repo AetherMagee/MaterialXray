@@ -56,6 +56,32 @@ class SettingsDefaultMigrationTest {
     }
 
     @Test
+    fun `previous routing domain strategy default is removed for both routing sources`() = runTest {
+        val preferences = mutablePreferencesOf(
+            SETTINGS_DEFAULTS_REVISION to 9,
+            SettingsRepository.ROUTING_DOMAIN_STRATEGY to "IPOnDemand",
+            SettingsRepository.PROVIDER_ROUTING_DOMAIN_STRATEGY to "IPOnDemand",
+        )
+
+        val migrated = SettingsDefaultMigration().migrate(preferences)
+
+        assertNull(migrated[SettingsRepository.ROUTING_DOMAIN_STRATEGY])
+        assertNull(migrated[SettingsRepository.PROVIDER_ROUTING_DOMAIN_STRATEGY])
+    }
+
+    @Test
+    fun `chosen routing domain strategy survives migration`() = runTest {
+        val preferences = mutablePreferencesOf(
+            SETTINGS_DEFAULTS_REVISION to 9,
+            SettingsRepository.ROUTING_DOMAIN_STRATEGY to "AsIs",
+        )
+
+        val migrated = SettingsDefaultMigration().migrate(preferences)
+
+        assertEquals("AsIs", migrated[SettingsRepository.ROUTING_DOMAIN_STRATEGY])
+    }
+
+    @Test
     fun `removed latency DNS setting is deleted`() = runTest {
         val latencyDnsServers = stringPreferencesKey("latency_dns_servers")
         val preferences = mutablePreferencesOf(

@@ -29,7 +29,7 @@ data class SubscriptionRouting(
     )
 
     companion object {
-        const val DEFAULT_DOMAIN_STRATEGY = "IPOnDemand"
+        const val DEFAULT_DOMAIN_STRATEGY = "IPIfNonMatch"
 
         fun normalizeDomainStrategy(
             value: String?,
