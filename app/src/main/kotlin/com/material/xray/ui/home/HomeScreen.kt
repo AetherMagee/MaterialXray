@@ -1,6 +1,7 @@
 package com.material.xray.ui.home
 
 import android.Manifest
+import android.content.ActivityNotFoundException
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
@@ -1541,7 +1542,12 @@ private fun ConnectionUiState.handleClick(
     connectVpn: () -> Unit,
 ) {
     when {
-        isConnected && isAlwaysOnVpn -> context.startActivity(Intent(Settings.ACTION_VPN_SETTINGS))
+        // Android TV has no VPN settings screen to send the user to.
+        isConnected && isAlwaysOnVpn -> try {
+            context.startActivity(Intent(Settings.ACTION_VPN_SETTINGS))
+        } catch (_: ActivityNotFoundException) {
+            disconnect()
+        }
         isConnected -> disconnect()
         !isTransitioning && useRootService -> connectRoot()
         !isTransitioning -> connectVpn()
@@ -1707,6 +1713,8 @@ private fun AddSubscriptionActionButton(
     onAddManually: () -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val hasCamera = remember(context) { context.packageManager.hasSystemFeature(PackageManager.FEATURE_CAMERA_ANY) }
 
     Box(modifier = modifier) {
         OutlinedButton(
@@ -1732,19 +1740,21 @@ private fun AddSubscriptionActionButton(
                     onPasteFromClipboard()
                 },
             )
-            DropdownMenuItem(
-                text = { Text(stringResource(R.string.home_scan_qr_code)) },
-                leadingIcon = {
-                    Icon(
-                        painter = painterResource(R.drawable.ic_qr_code_scanner_24),
-                        contentDescription = null,
-                    )
-                },
-                onClick = {
-                    expanded = false
-                    onScanQrCode()
-                },
-            )
+            if (hasCamera) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.home_scan_qr_code)) },
+                    leadingIcon = {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_qr_code_scanner_24),
+                            contentDescription = null,
+                        )
+                    },
+                    onClick = {
+                        expanded = false
+                        onScanQrCode()
+                    },
+                )
+            }
             DropdownMenuItem(
                 text = { Text(stringResource(R.string.home_add_manually)) },
                 leadingIcon = {
