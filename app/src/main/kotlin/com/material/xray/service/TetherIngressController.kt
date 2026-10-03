@@ -19,6 +19,11 @@ internal class TetherIngressController(
         var completed = current
         try {
             val addresses = gateway.readLocalAddresses(current.ipv6Enabled)
+            log.append(
+                LogSource.APP,
+                "Tether addresses changed: added=${addresses - current.localAddresses.toSet()}, " +
+                    "removed=${current.localAddresses - addresses.toSet()}",
+            )
             val updated = current.copy(localAddresses = addresses, tetherChainSlot = current.nextTetherChainSlot())
             val plan = TproxyTrafficPlan(
                 runtimeState = updated,

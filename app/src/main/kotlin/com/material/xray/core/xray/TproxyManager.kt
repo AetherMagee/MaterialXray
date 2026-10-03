@@ -588,6 +588,13 @@ class TproxyManager internal constructor(
             return commands.shellAnd()
         }
 
+        /** Defines `has_<family>`, which reports a missing rule and its chain's actual rules on stderr. */
+        private fun ruleCheckFunction(family: String): String = "has_$family() { case \"\$newline\$${family}_rules\$newline\" in " +
+            "*\"\$newline\$1\$newline\"*) true;; *) " +
+            "{ printf 'missing $family rule: %s\\n' \"\$1\" >&2; " +
+            "chain=\${1#-A }; chain=\${chain%% *}; printf '%s\\n' \"\$${family}_rules\" | " +
+            "grep -F -- \"-A \$chain \" >&2; return 1; };; esac; }"
+
         fun verifyCommand(state: TproxyRuntimeState, appUid: Int): String {
             val names = chainNames(appUid)
             val prefix = hex(state.markPrefix)
@@ -604,11 +611,7 @@ class TproxyManager internal constructor(
                 "v4_rules=\$($IPV4 -t mangle -S)",
                 "v4_slot_rules=\$($IPV4 -t mangle -S ${names.slot(state.outputChainSlot)})",
                 "newline='\n'",
-                "has_v4() { case \"\$newline\$v4_rules\$newline\" in " +
-                    "*\"\$newline\$1\$newline\"*) true;; *) " +
-                    "{ printf 'missing v4 rule: %s\\n' \"\$1\" >&2; " +
-                    "chain=\${1#-A }; chain=\${chain%% *}; printf '%s\\n' \"\$v4_rules\" | " +
-                    "grep -F -- \"-A \$chain \" >&2; return 1; };; esac; }",
+                ruleCheckFunction("v4"),
                 "has_v4_fragment() { case \"\$v4_slot_rules\" in *\"\$1\"*) true;; *) return 1;; esac; }",
                 "has_v4_order() { case \"\$newline\$v4_slot_rules\$newline\" in " +
                     "*\"\$newline\$1\$newline\$2\$newline\"*) true;; *) return 1;; esac; }",
@@ -648,8 +651,7 @@ class TproxyManager internal constructor(
             if (state.ipv6Enabled) {
                 commands += "v6_rules=\$($IPV6 -t mangle -S)"
                 commands += "v6_slot_rules=\$($IPV6 -t mangle -S ${names.slot(state.outputChainSlot)})"
-                commands += "has_v6() { case \"\$newline\$v6_rules\$newline\" in " +
-                    "*\"\$newline\$1\$newline\"*) true;; *) return 1;; esac; }"
+                commands += ruleCheckFunction("v6")
                 commands += "has_v6_fragment() { case \"\$v6_slot_rules\" in *\"\$1\"*) true;; *) return 1;; esac; }"
                 commands += "has_v6_order() { case \"\$newline\$v6_slot_rules\$newline\" in " +
                     "*\"\$newline\$1\$newline\$2\$newline\"*) true;; *) return 1;; esac; }"
@@ -689,8 +691,7 @@ class TproxyManager internal constructor(
             } else {
                 commands += "v6_rules=\$($IPV6 -t filter -S)"
                 commands += "v6_slot_rules=\$($IPV6 -t filter -S ${names.slot(state.outputChainSlot)})"
-                commands += "has_v6() { case \"\$newline\$v6_rules\$newline\" in " +
-                    "*\"\$newline\$1\$newline\"*) true;; *) return 1;; esac; }"
+                commands += ruleCheckFunction("v6")
                 commands += hasV6("OUTPUT -j ${names.output}")
                 commands += hasV6("${names.output} -j ${names.slot(state.outputChainSlot)}")
                 commands += "case \"\$v6_slot_rules\" in *'--reject-with icmp6-no-route'*) true;; *) false;; esac"
