@@ -119,7 +119,9 @@ import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -209,6 +211,7 @@ fun HomeScreen(
     onSubscriptionLinkHandled: () -> Unit,
     onOpenServerConfig: (Long, String) -> Unit,
     onViewRunningConfig: () -> Unit,
+    addSubscriptionFocusRequester: FocusRequester,
     viewModel: HomeViewModel = koinViewModel(),
 ) {
     val uiState = collectHomeUiState(viewModel)
@@ -391,6 +394,7 @@ fun HomeScreen(
             subscriptions == null -> Unit
             subscriptions.isEmpty() -> item {
                 EmptySubscriptionsCard(
+                    addFocusRequester = addSubscriptionFocusRequester,
                     onPasteFromClipboard = pasteFromClipboard,
                     onScanQrCode = openQrScanner,
                     onAddManually = { showAddDialog = true },
@@ -471,7 +475,9 @@ fun HomeScreen(
                 }
                 item(contentType = "addSubscription") {
                     AddSubscriptionActionButton(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .focusRequester(addSubscriptionFocusRequester),
                         onPasteFromClipboard = pasteFromClipboard,
                         onScanQrCode = openQrScanner,
                         onAddManually = { showAddDialog = true },
@@ -1679,6 +1685,7 @@ private fun appUpdateInstallProgressText(progress: AppUpdateInstallProgress): St
 
 @Composable
 private fun EmptySubscriptionsCard(
+    addFocusRequester: FocusRequester,
     onPasteFromClipboard: () -> Unit,
     onScanQrCode: () -> Unit,
     onAddManually: () -> Unit,
@@ -1698,6 +1705,7 @@ private fun EmptySubscriptionsCard(
                 style = MaterialTheme.typography.bodyMedium,
             )
             AddSubscriptionActionButton(
+                modifier = Modifier.focusRequester(addFocusRequester),
                 onPasteFromClipboard = onPasteFromClipboard,
                 onScanQrCode = onScanQrCode,
                 onAddManually = onAddManually,

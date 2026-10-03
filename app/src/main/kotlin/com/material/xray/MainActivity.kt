@@ -42,6 +42,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
@@ -172,6 +175,7 @@ class MainActivity : AppCompatActivity() {
         val settings by settingsDataState.data.collectAsStateWithLifecycle()
         var diagnosticsNoticeVisible by remember { mutableStateOf(false) }
         val scope = rememberCoroutineScope()
+        val addSubscriptionFocusRequester = remember { FocusRequester() }
         LaunchedEffect(settings?.diagnosticsNoticeShown) {
             if (settings?.diagnosticsNoticeShown == false) {
                 diagnosticsNoticeVisible = true
@@ -184,9 +188,11 @@ class MainActivity : AppCompatActivity() {
             MainNavigation(
                 pendingSubscriptionLink = pendingSubscriptionLink,
                 onSubscriptionLinkHandled = { pendingSubscriptionLink = null },
+                addSubscriptionFocusRequester = addSubscriptionFocusRequester,
             )
             DiagnosticsNotice(
                 visible = diagnosticsNoticeVisible,
+                focusAfterHiding = addSubscriptionFocusRequester,
                 onDismiss = {
                     diagnosticsNoticeVisible = false
                     scope.launch { settingsRepository.markDiagnosticsNoticeShown() }
@@ -206,9 +212,22 @@ class MainActivity : AppCompatActivity() {
 @Composable
 private fun DiagnosticsNotice(
     visible: Boolean,
+    focusAfterHiding: FocusRequester,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // A remote can only reach the notice if it starts there. Touch mode refuses the request, so
+    // phones keep focus where it was.
+    val dismissFocusRequester = remember { FocusRequester() }
+    var focused by remember { mutableStateOf(false) }
+    LaunchedEffect(visible) {
+        if (visible) {
+            dismissFocusRequester.requestFocus()
+        } else if (focused) {
+            // On first launch there is nothing to connect yet, so adding a subscription comes next.
+            focusAfterHiding.requestFocus()
+        }
+    }
     AnimatedVisibility(
         visible = visible,
         modifier = modifier,
@@ -217,8 +236,9 @@ private fun DiagnosticsNotice(
     ) {
         ElevatedCard(
             modifier = Modifier
-                .widthIn(max = 560.dp)
-                .fillMaxWidth(),
+                .widthIn(max = 400.dp)
+                .fillMaxWidth()
+                .onFocusChanged { focused = it.hasFocus },
             colors = CardDefaults.elevatedCardColors(
                 containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
             ),
@@ -240,7 +260,11 @@ private fun DiagnosticsNotice(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
-                TooltipIconButton(tooltip = stringResource(R.string.diagnostics_dismiss), onClick = onDismiss) {
+                TooltipIconButton(
+                    tooltip = stringResource(R.string.diagnostics_dismiss),
+                    onClick = onDismiss,
+                    modifier = Modifier.focusRequester(dismissFocusRequester),
+                ) {
                     Icon(
                         imageVector = Icons.Outlined.Close,
                         contentDescription = stringResource(R.string.diagnostics_dismiss),

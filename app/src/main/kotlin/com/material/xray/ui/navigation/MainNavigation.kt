@@ -54,6 +54,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalDensity
@@ -99,6 +100,7 @@ import org.koin.compose.viewmodel.koinViewModel
 fun MainNavigation(
     pendingSubscriptionLink: String?,
     onSubscriptionLinkHandled: () -> Unit,
+    addSubscriptionFocusRequester: FocusRequester,
 ) {
     val viewModel: MainNavigationViewModel = koinViewModel()
     val navController = rememberNavController()
@@ -251,6 +253,7 @@ fun MainNavigation(
                                     configViewerRequest = ConfigViewerRequest.Server(serverId, name)
                                 },
                                 onViewRunningConfig = { configViewerRequest = ConfigViewerRequest.Running },
+                                addSubscriptionFocusRequester = addSubscriptionFocusRequester,
                             )
                         }
                         composable(Screen.Logs.route) { LogsScreen(showTitleBarLogo) }
