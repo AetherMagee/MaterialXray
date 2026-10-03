@@ -4,6 +4,7 @@ import android.content.Context
 import com.material.xray.core.common.connection.ConnectionStateCoordinator
 import com.material.xray.core.xray.ActiveConfigOverrideStore
 import com.material.xray.data.db.AppDatabase
+import com.material.xray.data.db.deleteAllRows
 import com.material.xray.data.repository.SettingsRepository
 import com.material.xray.model.ConnectionState
 import kotlinx.coroutines.CoroutineDispatcher
@@ -35,7 +36,7 @@ class DatabaseResetManager(
         }
 
         withContext(NonCancellable) {
-            withContext(ioDispatcher) { database.clearAllTables() }
+            withContext(ioDispatcher) { database.deleteAllRows() }
             settingsRepository.setLastServerId(-1)
             activeConfigOverrideStore.clear()
             routingChangeManager.clearPendingChanges()
