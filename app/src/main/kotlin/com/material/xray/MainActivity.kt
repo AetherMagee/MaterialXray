@@ -51,6 +51,10 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import com.material.xray.core.locale.notifyAppLocaleChanged
+import com.material.xray.core.navigation.HomeKey
+import com.material.xray.core.navigation.Navigator
+import com.material.xray.core.navigation.TopLevelKeys
+import com.material.xray.core.navigation.rememberNavigationState
 import com.material.xray.core.ui.R
 import com.material.xray.data.db.DatabaseOpenChecker
 import com.material.xray.data.repository.SettingsRepository
@@ -177,6 +181,15 @@ class MainActivity : AppCompatActivity() {
         var diagnosticsNoticeVisible by remember { mutableStateOf(false) }
         val scope = rememberCoroutineScope()
         val addSubscriptionFocusRequester = remember { FocusRequester() }
+        val navigationState = rememberNavigationState(startKey = HomeKey, topLevelKeys = TopLevelKeys.toSet())
+        val navigator = remember(navigationState) { Navigator(navigationState) }
+        LaunchedEffect(pendingSubscriptionLink) {
+            if (pendingSubscriptionLink != null) {
+                // The Home screen takes the link, so it has to be on screen: its tab, nothing over it.
+                navigator.selectTab(HomeKey)
+                navigator.closeDetail()
+            }
+        }
         LaunchedEffect(settings?.diagnosticsNoticeShown) {
             if (settings?.diagnosticsNoticeShown == false) {
                 diagnosticsNoticeVisible = true
@@ -187,6 +200,8 @@ class MainActivity : AppCompatActivity() {
         }
         Box {
             MainNavigation(
+                navigationState = navigationState,
+                navigator = navigator,
                 pendingSubscriptionLink = pendingSubscriptionLink,
                 onSubscriptionLinkHandled = { pendingSubscriptionLink = null },
                 addSubscriptionFocusRequester = addSubscriptionFocusRequester,
