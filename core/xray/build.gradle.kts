@@ -1,5 +1,6 @@
 plugins {
     id("materialxray.android.library")
+    id("org.jetbrains.kotlin.plugin.serialization")
     alias(libs.plugins.protobuf)
 }
 
@@ -36,7 +37,12 @@ protobuf {
 dependencies {
     implementation(project(":core:model"))
     implementation(project(":core:common"))
+    implementation(project(":core:root"))
 
+    implementation(libs.androidx.annotation)
+    implementation(libs.coroutines.core)
+    implementation(libs.serialization.json)
+    implementation(libs.okhttp)
     implementation(libs.grpc.okhttp)
     implementation(libs.grpc.protobuf.lite)
     implementation(libs.grpc.stub)

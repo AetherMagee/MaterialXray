@@ -6,7 +6,7 @@ import java.net.Inet6Address
 import java.net.InetAddress
 
 /** Exact host addresses in the root network namespace, including downstream tether interfaces. */
-internal object LocalAddresses {
+object LocalAddresses {
     const val COMMAND = "ip -o address show"
 
     suspend fun read(
@@ -60,7 +60,7 @@ internal object LocalAddresses {
 }
 
 /** Requires the same changed snapshot twice so an address transition cannot tear down a working tunnel. */
-internal class LocalAddressChangeTracker {
+class LocalAddressChangeTracker {
     private var installed: List<String>? = null
     private var candidate: List<String>? = null
 

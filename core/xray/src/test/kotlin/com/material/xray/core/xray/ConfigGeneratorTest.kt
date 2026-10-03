@@ -584,7 +584,7 @@ class ConfigGeneratorTest {
             it.jsonObject["outboundTag"]?.jsonPrimitive?.content == "app-proxy-42"
         }.jsonObject
         assertEquals("tun-in", appRoute["inboundTag"]!!.jsonArray.single().jsonPrimitive.content)
-        assertEquals(TunManager.appRouteSourceAddresses(1), appRoute.sourceAddresses())
+        assertEquals(appRouteSourceAddresses(1), appRoute.sourceAddresses())
     }
 
     @Test
@@ -617,7 +617,7 @@ class ConfigGeneratorTest {
             it["domain"]?.jsonArray?.any { domain -> domain.jsonPrimitive.content == "domain:ru" } == true
         }
         val fallbackIndex = rules.indexOfFirst {
-            it.sourceAddresses() == TunManager.appRouteSourceAddresses(1) &&
+            it.sourceAddresses() == appRouteSourceAddresses(1) &&
                 it["outboundTag"]?.jsonPrimitive?.content == "proxy"
         }
 
@@ -640,7 +640,7 @@ class ConfigGeneratorTest {
         )
         val rules = Json.parseToJsonElement(config).jsonObject["routing"]!!.jsonObject["rules"]!!.jsonArray.map { it.jsonObject }
         val forcedIndex = rules.indexOfFirst {
-            it.sourceAddresses() == TunManager.appRouteSourceAddresses(1) &&
+            it.sourceAddresses() == appRouteSourceAddresses(1) &&
                 it["outboundTag"]?.jsonPrimitive?.content == "proxy"
         }
         val regularIndex = rules.indexOfFirst {
@@ -677,7 +677,7 @@ class ConfigGeneratorTest {
             it["domain"]?.jsonArray?.any { domain -> domain.jsonPrimitive.content == "domain:ru" } == true
         }
         val fallbackIndex = rules.indexOfFirst {
-            it.sourceAddresses() == TunManager.appRouteSourceAddresses(1) &&
+            it.sourceAddresses() == appRouteSourceAddresses(1) &&
                 it["outboundTag"]?.jsonPrimitive?.content == "app-proxy-42"
         }
         assertTrue(regularIndex in 0 until fallbackIndex)

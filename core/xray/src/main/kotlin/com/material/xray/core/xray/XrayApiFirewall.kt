@@ -3,7 +3,7 @@ package com.material.xray.core.xray
 import com.material.xray.core.root.RootShell
 import com.material.xray.core.xray.FirewallCommands.IPV4 as IPTABLES
 
-internal class XrayApiFirewall(
+class XrayApiFirewall(
     private val execute: suspend (String) -> RootShell.Result,
 ) {
     constructor(shell: RootShell) : this(execute = { command -> shell.execute(command) })

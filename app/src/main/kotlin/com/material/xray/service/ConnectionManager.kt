@@ -1409,7 +1409,8 @@ internal class ConnectionManager(
         if (persistedState?.rootConnectionBackend == RootConnectionBackend.Tproxy) {
             val tproxyState = persistedState.tproxy ?: return PhysicalRouteUpdateResult.RequiresReconnect
             if (!processSupervisor.isAlive(connectedState.corePid)) return PhysicalRouteUpdateResult.RequiresReconnect
-            val updatedTproxy = if (tproxyState.tetherUpstreamInterface != null && tproxyState.tetherUpstreamInterface != physicalRoute.dev) {
+            val previousUpstream = tproxyState.tetherUpstreamInterface
+            val updatedTproxy = if (previousUpstream != null && previousUpstream != physicalRoute.dev) {
                 val addresses = if (tproxyState.dynamicLocalAddresses) {
                     emptyList()
                 } else {
@@ -1435,7 +1436,7 @@ internal class ConnectionManager(
                     tetherUpstreamInterface = physicalRoute.dev,
                     bypassLan = runtimeSettings.bypassLan,
                 )
-                if (!tetherIngress.retargetUpstream(plan, tproxyState.tetherUpstreamInterface)) {
+                if (!tetherIngress.retargetUpstream(plan, previousUpstream)) {
                     return PhysicalRouteUpdateResult.RequiresReconnect
                 }
                 log.append(LogSource.APP, "Tether upstream changed to ${physicalRoute.dev} without restarting Xray")

@@ -5,7 +5,6 @@ import java.util.Properties
 import java.util.zip.ZipFile
 import javax.inject.Inject
 import org.gradle.api.DefaultTask
-import org.gradle.api.artifacts.VersionCatalogsExtension
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.FileSystemOperations
 import org.gradle.api.file.RegularFileProperty
@@ -27,7 +26,6 @@ plugins {
     id("materialxray.android.compose")
     id("com.google.devtools.ksp")
     id("org.jetbrains.kotlin.plugin.serialization")
-    alias(libs.plugins.protobuf)
     alias(libs.plugins.sentry.android)
 }
 
@@ -349,8 +347,6 @@ val hasReleaseSigning = listOf(
     releaseKeyPassword,
     releaseStorePassword,
 ).all { !it.isNullOrBlank() }
-val libsCatalog = extensions.getByType<VersionCatalogsExtension>().named("libs")
-val grpcVersion = libsCatalog.findVersion("grpc").get().requiredVersion
 val xrayMetadataDirectory = rootProject.layout.projectDirectory.dir("third_party/xray")
 val generateLegalAssets = tasks.register<GenerateLegalAssets>("generateLegalAssets") {
     projectLicense.set(rootProject.layout.projectDirectory.file("LICENSE"))
@@ -505,32 +501,6 @@ tasks.matching { task ->
     dependsOn(validateReleaseTelemetry)
 }
 
-protobuf {
-    protoc {
-        // Match grpc-protobuf-lite's 3.x javalite runtime.
-        artifact = "com.google.protobuf:protoc:3.25.8"
-    }
-    plugins {
-        create("grpc") {
-            artifact = "io.grpc:protoc-gen-grpc-java:$grpcVersion"
-        }
-    }
-    generateProtoTasks {
-        all().forEach { task ->
-            task.builtins {
-                create("java") {
-                    option("lite")
-                }
-            }
-            task.plugins {
-                create("grpc") {
-                    option("lite")
-                }
-            }
-        }
-    }
-}
-
 dependencies {
     implementation(project(":core:model"))
     implementation(project(":core:common"))
@@ -569,10 +539,6 @@ dependencies {
     implementation(libs.datastore.preferences)
 
     implementation(libs.okhttp)
-    implementation(libs.grpc.okhttp)
-    implementation(libs.grpc.protobuf.lite)
-    implementation(libs.grpc.stub)
-    compileOnly(libs.tomcat.annotations.api)
     implementation(libs.serialization.json)
     implementation(libs.coroutines.android)
     implementation(libs.zxing.core)

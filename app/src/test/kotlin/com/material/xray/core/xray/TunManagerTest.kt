@@ -140,10 +140,10 @@ class TunManagerTest {
 
     @Test
     fun `app TUN IPv6 addresses use distinct bounded subnets`() {
-        assertEquals("fd10:10:14:1::1/64", TunManager.appTunIpv6AddressCidr(1))
-        assertEquals("fd10:10:14:fe::1/64", TunManager.appTunIpv6AddressCidr(254))
-        assertEquals(TunManager.appTunIpv6AddressCidr(1), TunManager.appTunIpv6AddressCidr(0))
-        assertEquals(TunManager.appTunIpv6AddressCidr(254), TunManager.appTunIpv6AddressCidr(255))
+        assertEquals("fd10:10:14:1::1/64", appTunIpv6AddressCidr(1))
+        assertEquals("fd10:10:14:fe::1/64", appTunIpv6AddressCidr(254))
+        assertEquals(appTunIpv6AddressCidr(1), appTunIpv6AddressCidr(0))
+        assertEquals(appTunIpv6AddressCidr(254), appTunIpv6AddressCidr(255))
     }
 
     @Test
@@ -160,7 +160,7 @@ class TunManagerTest {
 
     @Test
     fun `app group source addresses are the group's TUN addresses`() {
-        assertEquals(listOf("10.0.3.1", "fd10:10:14:3::1"), TunManager.appRouteSourceAddresses(3))
+        assertEquals(listOf("10.0.3.1", "fd10:10:14:3::1"), appRouteSourceAddresses(3))
     }
 
     @Test

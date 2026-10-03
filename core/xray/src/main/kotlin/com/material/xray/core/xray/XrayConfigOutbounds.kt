@@ -139,7 +139,7 @@ internal fun buildPrivateHttpInbound(path: String, tag: String) = buildJsonObjec
     put("tag", tag)
 }
 
-internal fun buildProxyOutbound(
+fun buildProxyOutbound(
     server: ServerConfig,
     fwmark: Int,
     physicalInterface: String?,
@@ -211,7 +211,7 @@ internal fun buildCoreOutbounds(
 
 // Android's protectedFromVpn fwmark bit, the one VpnService.protect() sets: these sockets skip
 // other apps' VPNs and follow the underlying default network.
-internal const val PROTECTED_FROM_VPN_MARK = 0x20000
+const val PROTECTED_FROM_VPN_MARK = 0x20000
 
 // RFC 8305's recommended connection attempt delay.
 private const val HAPPY_EYEBALLS_TRY_DELAY_MS = 250

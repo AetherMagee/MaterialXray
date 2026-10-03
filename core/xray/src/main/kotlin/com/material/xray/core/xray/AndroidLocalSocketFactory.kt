@@ -15,7 +15,7 @@ import java.net.SocketException
 import java.nio.channels.SocketChannel
 import javax.net.SocketFactory
 
-internal class AndroidLocalSocketFactory(
+class AndroidLocalSocketFactory(
     socketName: String,
     namespace: LocalSocketAddress.Namespace,
 ) : SocketFactory() {

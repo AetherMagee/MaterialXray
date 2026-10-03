@@ -323,11 +323,11 @@ class RawConfigTunInjectorTest {
 
         val rules = root.getValue("routing").jsonObject.getValue("rules").jsonArray.map { it.jsonObject }
         val appFallback = rules.first {
-            it.sourceAddresses() == TunManager.appRouteSourceAddresses(1)
+            it.sourceAddresses() == appRouteSourceAddresses(1)
         }
         assertEquals(providerTag, appFallback.getValue("outboundTag").jsonPrimitive.content)
         val forcedRule = rules.first {
-            it.sourceAddresses() == TunManager.appRouteSourceAddresses(2)
+            it.sourceAddresses() == appRouteSourceAddresses(2)
         }
         assertEquals(providerTag, forcedRule.getValue("outboundTag").jsonPrimitive.content)
         assertTrue(rules.any { it["network"]?.jsonPrimitive?.content == "tcp,udp" && it["outboundTag"]?.jsonPrimitive?.content == providerTag })
@@ -530,7 +530,7 @@ class RawConfigTunInjectorTest {
             .getValue("routing").jsonObject
             .getValue("rules").jsonArray
             .map { it.jsonObject }
-            .first { it.sourceAddresses() == TunManager.appRouteSourceAddresses(1) }
+            .first { it.sourceAddresses() == appRouteSourceAddresses(1) }
         assertEquals("balance", appFallback.getValue("balancerTag").jsonPrimitive.content)
         assertTrue("outboundTag" !in appFallback)
     }
@@ -603,10 +603,10 @@ class RawConfigTunInjectorTest {
         }
         val scopedProxyIndex = rules.indexOfFirst {
             it["domain"]?.jsonArray?.singleOrNull()?.jsonPrimitive?.content == "domain:proxy.example" &&
-                it.sourceAddresses() == TunManager.appRouteSourceAddresses(1)
+                it.sourceAddresses() == appRouteSourceAddresses(1)
         }
         val fallbackIndex = rules.indexOfLast {
-            it.sourceAddresses() == TunManager.appRouteSourceAddresses(1) && it["domain"] == null
+            it.sourceAddresses() == appRouteSourceAddresses(1) && it["domain"] == null
         }
         assertTrue(directIndex in 0 until scopedProxyIndex)
         assertTrue(scopedProxyIndex in 0 until fallbackIndex)

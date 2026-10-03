@@ -10,8 +10,8 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
-internal const val XRAY_API_SOCKET_NAME_PREFIX = "material-xray-api"
-internal const val XRAY_API_TIMEOUT_MS = 2_000L
+const val XRAY_API_SOCKET_NAME_PREFIX = "material-xray-api"
+const val XRAY_API_TIMEOUT_MS = 2_000L
 
 internal const val XRAY_API_TAG = "api"
 
@@ -62,7 +62,7 @@ internal fun buildStatsPolicy(
 
 internal fun buildStatsConfig() = buildJsonObject { }
 
-internal fun parseXrayApiEndpoint(configJson: String): XrayApiEndpoint? = runCatching {
+fun parseXrayApiEndpoint(configJson: String): XrayApiEndpoint? = runCatching {
     val root = Json.parseToJsonElement(configJson) as? JsonObject
     val api = root?.get("api") as? JsonObject
     val listen = api

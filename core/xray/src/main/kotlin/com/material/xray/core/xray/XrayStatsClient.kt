@@ -12,7 +12,7 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-internal class XrayStatsClient(
+class XrayStatsClient(
     private val endpoint: XrayApiEndpoint = XrayApiEndpoint.UnixSocket(XRAY_API_SOCKET_NAME_PREFIX),
     private val timeoutMs: Long = XRAY_API_TIMEOUT_MS,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
@@ -93,7 +93,7 @@ internal class XrayStatsClient(
 
 private const val TAG = "XrayStatsClient"
 
-internal data class XraySysStats(
+data class XraySysStats(
     val numGoroutine: Int,
     val numGc: Int,
     val alloc: Long,

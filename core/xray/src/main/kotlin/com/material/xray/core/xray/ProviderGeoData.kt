@@ -13,9 +13,9 @@ import java.util.concurrent.TimeUnit
 internal val PROVIDER_GEO_DATA_STALE_AFTER_MS = TimeUnit.HOURS.toMillis(48)
 internal val PROVIDER_GEO_DATA_RETRY_AFTER_MS = TimeUnit.HOURS.toMillis(4)
 private const val PROVIDER_GEO_DATA_FILE_PREFIX = "provider-"
-internal const val PROVIDER_GEO_DATA_FILE_SUFFIX = ".dat"
+const val PROVIDER_GEO_DATA_FILE_SUFFIX = ".dat"
 private const val PROVIDER_GEO_DATA_HASH_LENGTH = 16
-internal const val PROVIDER_GEO_DATA_DOWNLOAD_SUFFIX = ".download"
+const val PROVIDER_GEO_DATA_DOWNLOAD_SUFFIX = ".download"
 private const val GEOSITE_PREFIX = "geosite:"
 private const val GEOIP_PREFIX = "geoip:"
 
@@ -23,22 +23,22 @@ private const val GEOIP_PREFIX = "geoip:"
  * Name of the file holding the provider geodata downloaded from [url]. Files are keyed by URL, so
  * subscriptions that point at the same data share one download.
  */
-internal fun providerGeoDataFileName(url: String): String {
+fun providerGeoDataFileName(url: String): String {
     val digest = MessageDigest.getInstance("SHA-256").digest(url.toByteArray())
     val hash = digest.joinToString("") { "%02x".format(Locale.ROOT, it) }.take(PROVIDER_GEO_DATA_HASH_LENGTH)
     return "$PROVIDER_GEO_DATA_FILE_PREFIX$hash$PROVIDER_GEO_DATA_FILE_SUFFIX"
 }
 
-internal fun isProviderGeoDataFileName(name: String): Boolean = name.startsWith(PROVIDER_GEO_DATA_FILE_PREFIX) && name.endsWith(PROVIDER_GEO_DATA_FILE_SUFFIX)
+fun isProviderGeoDataFileName(name: String): Boolean = name.startsWith(PROVIDER_GEO_DATA_FILE_PREFIX) && name.endsWith(PROVIDER_GEO_DATA_FILE_SUFFIX)
 
-internal data class ProviderGeoDataFailure(val at: Long, val throughTunnel: Boolean)
+data class ProviderGeoDataFailure(val at: Long, val throughTunnel: Boolean)
 
 /**
  * Whether a provider file should be fetched now, given what is on disk and how the last attempt
  * failed. A failure outside the tunnel says nothing about the tunnel, so it never delays an attempt
  * through it.
  */
-internal fun providerGeoDataNeedsDownload(
+fun providerGeoDataNeedsDownload(
     lastModified: Long?,
     lastFailure: ProviderGeoDataFailure?,
     now: Long,
@@ -57,7 +57,7 @@ internal fun providerGeoDataNeedsDownload(
  * entries carry their code in field 1, so the rest of every entry is skipped without being parsed.
  * Throws [IOException] for anything that is not such a list, which is how a download is validated.
  */
-internal fun readGeoDataCodes(input: InputStream): Set<String> {
+fun readGeoDataCodes(input: InputStream): Set<String> {
     val reader = ProtobufReader(input)
     val codes = mutableSetOf<String>()
     while (true) {
@@ -80,7 +80,7 @@ internal fun readGeoDataCodes(input: InputStream): Set<String> {
     return codes
 }
 
-internal fun readGeoDataCodes(file: File): Set<String> = file.inputStream().buffered().use(::readGeoDataCodes)
+fun readGeoDataCodes(file: File): Set<String> = file.inputStream().buffered().use(::readGeoDataCodes)
 
 private const val LIST_ENTRY_TAG = 0x0AL
 private const val WIRE_TYPE_MASK = 0x07L
@@ -169,7 +169,7 @@ private class ProtobufReader(private val input: InputStream) {
     }
 }
 
-internal data class ProviderGeoDataResolution(
+data class ProviderGeoDataResolution(
     val rules: List<RoutingRule>,
     /** Provider files the resolved rules now read from. */
     val usedUrls: Set<String> = emptySet(),
@@ -190,7 +190,7 @@ internal data class ProviderGeoDataResolution(
  * [providerCodes] returns the codes of the provider file downloaded from a URL, or null when that
  * file is not available.
  */
-internal fun resolveProviderGeoData(
+fun resolveProviderGeoData(
     rules: List<RoutingRule>,
     defaultGeoipCodes: Set<String>,
     defaultGeositeCodes: Set<String>,
@@ -252,7 +252,7 @@ enum class ProviderGeoDataNotice {
 }
 
 /** What the routing screen tells the user about the geodata behind the selected provider's rules. */
-internal fun providerGeoDataNotice(
+fun providerGeoDataNotice(
     urls: Set<String>,
     state: ProviderGeoDataState,
     connected: Boolean,
@@ -269,4 +269,4 @@ internal fun providerGeoDataNotice(
     }
 }
 
-internal fun List<RoutingRule>.providerGeoDataUrls(): Set<String> = flatMapTo(mutableSetOf()) { it.geoData?.urls().orEmpty() }
+fun List<RoutingRule>.providerGeoDataUrls(): Set<String> = flatMapTo(mutableSetOf()) { it.geoData?.urls().orEmpty() }

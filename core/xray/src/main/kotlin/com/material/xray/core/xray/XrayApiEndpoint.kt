@@ -39,9 +39,9 @@ internal fun buildXrayApiChannel(endpoint: XrayApiEndpoint): ManagedChannel {
     return builder.proxyDetector { null }.build()
 }
 
-internal const val XRAY_API_LOOPBACK_ADDRESS = "127.0.0.1"
+const val XRAY_API_LOOPBACK_ADDRESS = "127.0.0.1"
 
-internal fun XrayApiEndpoint.cliServerAddress(): String? = when (this) {
+fun XrayApiEndpoint.cliServerAddress(): String? = when (this) {
     is XrayApiEndpoint.FileSystemUnixSocket -> "unix://$path"
     is XrayApiEndpoint.LoopbackTcp -> "$XRAY_API_LOOPBACK_ADDRESS:$port"
     is XrayApiEndpoint.UnixSocket -> null

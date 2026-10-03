@@ -104,9 +104,9 @@ class XrayBinary internal constructor(
 private val XRAY_VERSION_REGEX = Regex("^Xray\\s+v?([^\\s]+)")
 
 /** The core's file name, which is also the process name `pidof` finds it by. */
-internal const val XRAY_EXECUTABLE_NAME = "libxray.so"
+const val XRAY_EXECUTABLE_NAME = "libxray.so"
 
-internal const val ACTIVE_CONFIG_FILE = "config.json"
+const val ACTIVE_CONFIG_FILE = "config.json"
 
 /** Sibling of [ACTIVE_CONFIG_FILE] holding a hand-edited config that replaces generation. */
 internal const val ACTIVE_CONFIG_OVERRIDE_FILE = "config_override.json"

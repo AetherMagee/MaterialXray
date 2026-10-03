@@ -722,16 +722,6 @@ class TunManager internal constructor(
 
         fun appRouteTable(baseRouteTable: Int, index: Int): Int = baseRouteTable + APP_ROUTE_TABLE_OFFSET + index - 1
 
-        fun appTunAddressCidr(index: Int): String = "10.0.${index.coerceIn(1, 254)}.1/30"
-
-        fun appTunIpv6AddressCidr(index: Int): String = "fd10:10:14:${index.coerceIn(1, 254).toString(16)}::1/64"
-
-        /** The source addresses an app group's traffic carries into the TUN, one per family. */
-        fun appRouteSourceAddresses(index: Int): List<String> = listOf(
-            appTunAddressCidr(index).address(),
-            appTunIpv6AddressCidr(index).address(),
-        )
-
         internal fun tunAddressCidrs(appRouteCount: Int): List<String> = listOf(DEFAULT_TUN_ADDRESS_CIDR) +
             (1..appRouteCount.coerceIn(0, MAX_APP_TUN_ROUTES)).map(::appTunAddressCidr)
 

@@ -177,8 +177,8 @@ class TproxyManager internal constructor(
     }
 
     suspend fun updateTetherUpstream(plan: TproxyTrafficPlan, previousUpstream: String): TunManager.RoutingResult {
-        requireNotNull(plan.runtimeState.tetherUpstreamInterface)
-        val upstreamGuard = execute(installUpstreamGuardCommand(previousUpstream, plan.runtimeState.tetherUpstreamInterface), "TPROXY upstream guard setup")
+        val upstream = requireNotNull(plan.runtimeState.tetherUpstreamInterface)
+        val upstreamGuard = execute(installUpstreamGuardCommand(previousUpstream, upstream), "TPROXY upstream guard setup")
         if (!upstreamGuard.success) return upstreamGuard
         val guard = installGuard(plan)
         if (!guard.success) return guard
@@ -1430,10 +1430,7 @@ class TproxyManager internal constructor(
             require(plan.groups.isNotEmpty() && plan.groups.count { it.isBase } == 1)
             require(plan.groups.map { it.state } == plan.runtimeState.groups)
             require(plan.routeProfileIds.all { it >= 0 })
-            require(
-                plan.runtimeState.tetherUpstreamInterface == null ||
-                    TETHER_INTERFACE_PATTERN.matches(plan.runtimeState.tetherUpstreamInterface),
-            )
+            require(plan.runtimeState.tetherUpstreamInterface.let { it == null || TETHER_INTERFACE_PATTERN.matches(it) })
         }
 
         private fun IntRange.asArgument(): String = if (first == last) first.toString() else "$first-$last"

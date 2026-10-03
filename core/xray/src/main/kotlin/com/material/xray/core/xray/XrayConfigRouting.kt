@@ -14,7 +14,7 @@ import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
-internal const val TUN_INBOUND_TAG = "tun-in"
+const val TUN_INBOUND_TAG = "tun-in"
 private const val DEFAULT_DNS_TAG = "default-dns"
 private const val DOMESTIC_DNS_TAG = "domestic-dns"
 private const val OTHER_VPN_DNS_TAG = "other-vpn-dns"
@@ -26,7 +26,7 @@ internal sealed interface XrayRouteTarget {
     data class Balancer(val tag: String) : XrayRouteTarget
 }
 
-internal fun buildDns(
+fun buildDns(
     servers: String,
     domesticServers: String = "",
     bootstrapHosts: Map<String, List<String>> = emptyMap(),
@@ -245,7 +245,7 @@ internal fun AppProxyRoute.trafficMatcher(dataInboundTags: List<String>): Map<St
     inboundTagMatcher(listOf(inboundTag))
 } else {
     inboundTagMatcher(listOf(TUN_INBOUND_TAG)) +
-        ("source" to buildJsonArray { TunManager.appRouteSourceAddresses(routeIndex).forEach { add(it) } })
+        ("source" to buildJsonArray { appRouteSourceAddresses(routeIndex).forEach { add(it) } })
 }
 
 private fun inboundTagMatcher(tags: List<String>): Map<String, JsonElement> = mapOf("inboundTag" to buildJsonArray { tags.forEach { add(it) } })

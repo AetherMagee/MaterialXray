@@ -25,10 +25,10 @@ sealed interface XrayInbound {
     ) : XrayInbound
 }
 
-internal fun XrayInbound.toJson(): JsonObject = when (this) {
+fun XrayInbound.toJson(): JsonObject = when (this) {
     is XrayInbound.Tun -> buildTunInbound(name, tag, mtu)
     is XrayInbound.Tproxy -> buildTproxyInbound(port, tag, allowIpv6, acceptNonLoopback)
     is XrayInbound.PrivateHttp -> buildPrivateHttpInbound(path, tag)
 }
 
-internal const val XRAY_APP_HTTP_INBOUND_TAG = "mxray-http-in"
+const val XRAY_APP_HTTP_INBOUND_TAG = "mxray-http-in"
