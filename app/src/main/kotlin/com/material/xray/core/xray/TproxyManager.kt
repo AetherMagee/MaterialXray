@@ -171,7 +171,7 @@ class TproxyManager internal constructor(
     suspend fun updateTetherAddresses(plan: TproxyTrafficPlan): TunManager.RoutingResult {
         val state = plan.runtimeState
         requireNotNull(state.tetherUpstreamInterface)
-        val result = execute(tetherAddressUpdateCommand(plan), "TPROXY tether address update")
+        val result = execute(tetherRoutingUpdateCommand(plan), "TPROXY tether address update")
         if (result.success) localAddressTracker.markInstalled(state.localAddresses, state.ipv6Enabled)
         return result
     }

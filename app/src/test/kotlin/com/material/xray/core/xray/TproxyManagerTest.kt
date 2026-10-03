@@ -139,6 +139,10 @@ class TproxyManagerTest {
         assertTrue(command.contains("-C MXP278b -j MXP278bA"))
         assertTrue(command.contains("-A MXP278bB -d 192.168.44.1/32 -j RETURN"))
         assertTrue(command.contains("-R MXP278b 1 -j MXP278bB"))
+        // Verification follows the slot into the IPv6 reject chains, so they must swap with it.
+        assertTrue(command.contains("ip6tables -w 2 -t filter -C MXP278b -j MXP278bAF"))
+        assertTrue(command.contains("-R MXP278b 1 -j MXP278bBF"))
+        assertTrue(command.contains("-R MXP278bI 1 -j MXP278bBI"))
         assertFalse(command.contains("-A MXP278bB -d 192.168.43.1/32 -j RETURN"))
         assertFalse(command.contains("-I PREROUTING"))
         assertFalse(command.contains("-N MXP278bL"))
