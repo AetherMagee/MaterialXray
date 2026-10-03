@@ -5,7 +5,7 @@
     <string name="settings_connectivity_title">Подключение</string>
     <string name="settings_bypass_lan_title">Обход локальной сети</string>
     <string name="settings_bypass_lan_description">Направлять трафик к частным IP-адресам и доменам напрямую</string>
-    <string name="settings_allow_ipv6_connections">Разрешить подключения IPv6</string>
+    <string name="settings_ipv6_mode_label">Подключения IPv6</string>
     <string name="settings_allow_ipv6_dns_ipv4_only">У выбранных серверов DNS нет адресов IPv6, поэтому запросы DNS всё равно идут по IPv4.</string>
     <string name="settings_routing_policy_title">Политика маршрутизации</string>
     <string name="settings_section_core">Ядро</string>

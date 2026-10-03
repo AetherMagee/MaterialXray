@@ -7,6 +7,7 @@ import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.material.xray.R
+import com.material.xray.core.network.Ipv6Detector
 import com.material.xray.core.xray.GeoDataAsset
 import com.material.xray.core.xray.GeoDataManager
 import com.material.xray.core.xray.TproxyCompatibility
@@ -19,6 +20,7 @@ import com.material.xray.model.AppUpdateCheckStatus
 import com.material.xray.model.AppUpdateInterval
 import com.material.xray.model.ConnectionState
 import com.material.xray.model.GeoDataUpdateInterval
+import com.material.xray.model.Ipv6Mode
 import com.material.xray.model.LauncherIcon
 import com.material.xray.model.NotificationField
 import com.material.xray.model.NotificationStyle
@@ -85,6 +87,7 @@ class SettingsViewModel(
     private val settingsRuntimeManager: SettingsRuntimeManager,
     private val oemAutostartManager: OemAutostartManager,
     private val geoDataManager: GeoDataManager,
+    ipv6Detector: Ipv6Detector,
     settingsDataState: SettingsDataState,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : ViewModel() {
@@ -109,6 +112,7 @@ class SettingsViewModel(
     val geositeUpdating: StateFlow<Boolean> = _geositeUpdating.asStateFlow()
     val geoDataClearing: StateFlow<Boolean> = _geoDataClearing.asStateFlow()
     val connectionState = connectionStateCoordinator.state
+    val ipv6SessionState = ipv6Detector.sessionState
     val geoDataDownloadProgress = geoDataManager.downloadProgress
     val geoDataLastUpdated = geoDataManager.lastUpdated
     val geoDataCachedSizes = geoDataManager.cachedSizes
@@ -223,13 +227,16 @@ class SettingsViewModel(
         settingsRepo.setOtherVpnMode(mode)
         reloadActiveConnectionIfConnected()
     }
-    fun setAllowIpv6(enabled: Boolean) = viewModelScope.launch {
+    fun setIpv6Mode(mode: Ipv6Mode) = viewModelScope.launch {
         val settings = currentSettings()
-        if (enabled == settings.allowIpv6) return@launch
-        if (enabled && !isIpv6SelectionEnabled(settings.useRootService, settings.rootConnectionBackend, tproxyCompatibility.value)) {
+        if (mode == settings.ipv6Mode) return@launch
+        if (
+            mode != Ipv6Mode.Off &&
+            !isIpv6SelectionEnabled(settings.useRootService, settings.rootConnectionBackend, tproxyCompatibility.value)
+        ) {
             return@launch
         }
-        settingsRepo.setAllowIpv6(enabled)
+        settingsRepo.setIpv6Mode(mode)
         reloadActiveConnectionIfConnected()
     }
     fun setXrayBufferSizeKiB(bufferSizeKiB: Int) = viewModelScope.launch {

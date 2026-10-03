@@ -31,6 +31,8 @@ import com.material.xray.core.format.sizeUnit
 import com.material.xray.core.locale.appLocaleChanges
 import com.material.xray.core.locale.forAppLanguage
 import com.material.xray.core.locale.localizedString
+import com.material.xray.core.network.Ipv6Detector
+import com.material.xray.core.network.Ipv6SessionState
 import com.material.xray.core.network.ServerLatencyTester
 import com.material.xray.core.root.RootShell
 import com.material.xray.core.xray.ActiveConfigOverrideStore
@@ -52,6 +54,7 @@ import com.material.xray.data.repository.SettingsRepository
 import com.material.xray.model.ActiveBalancerSelection
 import com.material.xray.model.ConnectionProgress
 import com.material.xray.model.ConnectionState
+import com.material.xray.model.Ipv6Mode
 import com.material.xray.model.NotificationField
 import com.material.xray.model.NotificationSettings
 import com.material.xray.model.NotificationStyle
@@ -127,6 +130,8 @@ class XrayService(
 
     private val telemetryReporter: TelemetryReporter by inject()
 
+    private val ipv6Detector: Ipv6Detector by inject()
+
     private lateinit var connectionManager: ConnectionManager
     private lateinit var connectionLifecycle: ConnectionLifecycle
     private lateinit var healthWatchdog: XrayHealthWatchdog
@@ -156,6 +161,18 @@ class XrayService(
     private var processRecoveryJob: Job? = null
     private var alwaysOnRetryJob: Job? = null
     private var fullReconfigurationPending = false
+
+    /** Whether the running session carries IPv6, which later partial updates must keep. */
+    @Volatile
+    private var sessionAllowIpv6: Boolean? = null
+
+    /** The Auto verdict the running session was built with; null outside Auto. */
+    private var sessionAutoIpv6: Boolean? = null
+
+    /** The network that verdict was given for; a recheck only matters once this changes. */
+    private var sessionIpv6Network: String? = null
+    private var ipv6ConfirmJob: Job? = null
+    private var ipv6RecheckJob: Job? = null
 
     @Volatile
     private var xrayMemoryRestartThresholdMiB = XrayRuntimeSettings.DEFAULT_XRAY_MEMORY_RESTART_THRESHOLD_MIB
@@ -737,17 +754,21 @@ class XrayService(
             connectionStateCoordinator.emitEvent(ConnectionEvent.RootUnavailableFallback)
         }
         val useRootService = shouldUseRootService(runtimeSettings.useRootService, rootServiceAvailable, forceVpnService)
-        val baseRuntimeSettings = if (useRootService) {
-            runtimeSettings
-        } else {
-            runtimeSettings.copy(useRootService = false, tunName = ROOTLESS_TUN_NAME)
-        }
         val tproxyCompatibility = if (
             useRootService && runtimeSettings.rootConnectionBackend == RootConnectionBackend.Tproxy
         ) {
             tproxyCompatibilityDetector.detect()
         } else {
             TproxyCompatibility.Unknown
+        }
+        val autoIpv6 = autoIpv6For(config, useRootService, runtimeSettings.rootConnectionBackend, tproxyCompatibility)
+        sessionAutoIpv6 = autoIpv6
+        if (autoIpv6 == null) ipv6Detector.publishSessionState(null)
+        val requestedRuntimeSettings = autoIpv6?.let { runtimeSettings.copy(allowIpv6 = it) } ?: runtimeSettings
+        val baseRuntimeSettings = if (useRootService) {
+            requestedRuntimeSettings
+        } else {
+            requestedRuntimeSettings.copy(useRootService = false, tunName = ROOTLESS_TUN_NAME)
         }
         val effectiveRuntimeSettings = baseRuntimeSettings.copy(
             allowIpv6 = effectiveTproxyIpv6(
@@ -764,6 +785,7 @@ class XrayService(
         if (baseRuntimeSettings.allowIpv6 && !effectiveRuntimeSettings.allowIpv6) {
             logBuffer.append(LogSource.APP, "TPROXY IPv6 is unavailable; using IPv4-only TPROXY")
         }
+        sessionAllowIpv6 = effectiveRuntimeSettings.allowIpv6
         val rootlessNetworkPlan = if (effectiveRuntimeSettings.useRootService) {
             null
         } else {
@@ -931,7 +953,7 @@ class XrayService(
             return reloadActiveConnection()
         }
 
-        val runtimeSettings = settingsRepo.runtimeSettingsSnapshot()
+        val runtimeSettings = sessionRuntimeSettings()
 
         logBuffer.append(LogSource.APP, "Applying app routing changes...")
         connectionStateCoordinator.markApplyingRoutingChanges()
@@ -964,7 +986,7 @@ class XrayService(
         val config = activeConfig ?: return true
         val connectedState = connectionStateCoordinator.state.value as? ConnectionState.Connected
             ?: return reloadActiveConnection()
-        val runtimeSettings = settingsRepo.runtimeSettingsSnapshot()
+        val runtimeSettings = sessionRuntimeSettings()
 
         logBuffer.append(LogSource.APP, "Applying Xray routing changes...")
         connectionStateCoordinator.markApplyingRoutingChanges()
@@ -1039,12 +1061,26 @@ class XrayService(
             return true
         }
         connectionStateCoordinator.restoreConnected(restoredState)
+        val restoredIpv6 = withContext(ioDispatcher) { stateFile.read()?.ipv6Enabled } ?: false
+        sessionAllowIpv6 = restoredIpv6
+        sessionAutoIpv6 = restoredIpv6.takeIf { settingsRepo.ipv6Mode.first() == Ipv6Mode.Auto }
+        sessionIpv6Network = ipv6Detector.networkKey()
+        ipv6Detector.publishSessionState(
+            sessionAutoIpv6?.let { restoredAuto ->
+                when {
+                    restoredAuto -> Ipv6SessionState.Enabled
+                    sessionIpv6Network == null -> Ipv6SessionState.NoIpv6Network
+                    else -> Ipv6SessionState.CheckFailed
+                }
+            },
+        )
         xrayLogStreamer.showRecentHistory()
         activePhysicalNetwork = currentPhysicalNetworkSnapshot()
         handleStateSideEffects(restoredState)
         updateNotification()
         if (activeConfig != null) {
             scheduleNetworkRetarget("service state restored", settle = false)
+            scheduleIpv6Recheck()
         }
         return true
     }
@@ -1269,7 +1305,7 @@ class XrayService(
             probeUrl = settingsRepo.latencyCheckUrl.first(),
             dnsServers = settingsRepo.dnsServers.first(),
             domesticDnsServers = settingsRepo.domesticDnsServers.first(),
-            allowIpv6 = settingsRepo.allowIpv6.first(),
+            allowIpv6 = sessionAllowIpv6 ?: false,
         ).latencyMs.takeIf { it >= 0 }
     }
 
@@ -1636,18 +1672,22 @@ class XrayService(
     private fun networkCallback(source: String) = object : ConnectivityManager.NetworkCallback() {
         override fun onAvailable(network: Network) {
             scheduleNetworkRetarget("$source available", settle = false)
+            scheduleIpv6Recheck()
         }
 
         override fun onLost(network: Network) {
             scheduleNetworkRetarget("$source lost", settle = false)
+            scheduleIpv6Recheck()
         }
 
         override fun onCapabilitiesChanged(network: Network, networkCapabilities: NetworkCapabilities) {
             scheduleNetworkRetarget("$source capabilities changed", settle = true)
+            scheduleIpv6Recheck()
         }
 
         override fun onLinkPropertiesChanged(network: Network, linkProperties: LinkProperties) {
             scheduleNetworkRetarget("$source link properties changed", settle = true)
+            scheduleIpv6Recheck()
         }
     }
 
@@ -1660,6 +1700,91 @@ class XrayService(
         }
         networkCallbacks.clear()
         networkCallbacksAvailable = false
+    }
+
+    /** Auto settles IPv6 per network, so a changed network gets the question asked again once it calms down. */
+    private fun scheduleIpv6Recheck() {
+        if (sessionAutoIpv6 == null) return
+        val config = activeConfig ?: return
+        launchIpv6Check(config, settleDelayMs = IPV6_RECHECK_SETTLE_DELAY_MS, afterConnect = false)
+    }
+
+    /**
+     * Decides Auto before the core starts, so the answer never costs a second restart: a remembered
+     * one, or the quick direct check. The check through the server then runs for the next connection.
+     * Null when Auto is not in charge.
+     */
+    private suspend fun autoIpv6For(
+        config: ServerConfig,
+        useRootService: Boolean,
+        backend: RootConnectionBackend,
+        tproxyCompatibility: TproxyCompatibility,
+    ): Boolean? {
+        if (settingsRepo.ipv6Mode.first() != Ipv6Mode.Auto) return null
+        // Auto has nothing to decide where TPROXY cannot carry IPv6 at all.
+        if (!effectiveTproxyIpv6(true, useRootService, backend, tproxyCompatibility)) return null
+        val decision = ipv6Detector.decide(config)
+        sessionIpv6Network = decision.networkKey
+        ipv6Detector.publishSessionState(decision.state)
+        val reason = when (decision.state) {
+            Ipv6SessionState.NoIpv6Network -> "this network has no IPv6"
+            Ipv6SessionState.CheckFailed -> "IPv6 failed the check on this network"
+            else -> "IPv6 works on this network"
+        }
+        logBuffer.append(LogSource.APP, "IPv6 (auto): ${if (decision.enabled) "enabled" else "disabled"}, $reason")
+        if (!decision.confirmed) launchIpv6Check(config, settleDelayMs = 0, afterConnect = true)
+        return decision.enabled
+    }
+
+    /**
+     * Restarts the core only when the network really changed and the answer with it; on the same
+     * network a different answer waits for the next connection instead.
+     */
+    private fun launchIpv6Check(config: ServerConfig, settleDelayMs: Long, afterConnect: Boolean) {
+        // Kept apart, so the callbacks a starting VPN sets off cannot cancel the check after connecting.
+        val job = scope.launch {
+            delay(settleDelayMs)
+            // A lost network is no answer; the next one to appear brings its own recheck.
+            if (!ipv6Detector.hasPhysicalNetwork()) return@launch
+            val network = ipv6Detector.networkKey()
+            val sameNetwork = network == sessionIpv6Network
+            // Android reports capability changes all the time on cellular; only a new prefix matters.
+            if (!afterConnect && sameNetwork) return@launch
+            val works = ipv6Detector.check(config)
+            val running = sessionAutoIpv6 ?: return@launch
+            if (activeConfig != config) return@launch
+            if (works == running) {
+                sessionIpv6Network = network
+                return@launch
+            }
+            if (sameNetwork) {
+                if (running) ipv6Detector.publishSessionState(Ipv6SessionState.EnabledUntilReconnect)
+                return@launch
+            }
+            launchConnectionCommand {
+                // A reconnect that ran meanwhile, such as root mode's route fix-up, already decided afresh.
+                if (sessionIpv6Network == network || sessionAutoIpv6 == works) return@launchConnectionCommand
+                if (connectionStateCoordinator.state.value !is ConnectionState.Connected) return@launchConnectionCommand
+                logBuffer.append(
+                    LogSource.APP,
+                    if (works) "IPv6 works on this network; reconnecting with IPv6" else "IPv6 is not working on this network; reconnecting without it",
+                )
+                reloadActiveConnection(forceFull = true)
+            }
+        }
+        if (afterConnect) {
+            ipv6ConfirmJob?.cancel()
+            ipv6ConfirmJob = job
+        } else {
+            ipv6RecheckJob?.cancel()
+            ipv6RecheckJob = job
+        }
+    }
+
+    /** Settings as the running session uses them; partial updates must not flip its IPv6. */
+    private suspend fun sessionRuntimeSettings(): XrayRuntimeSettings {
+        val settings = settingsRepo.runtimeSettingsSnapshot()
+        return sessionAllowIpv6?.let { settings.copy(allowIpv6 = it) } ?: settings
     }
 
     private fun scheduleNetworkRetarget(reason: String, settle: Boolean) {
@@ -1722,7 +1847,7 @@ class XrayService(
             restartRuntime(latestConfig)
             return@runConnectionCommand NetworkRetargetResult.Done
         }
-        connectionManager.followOtherVpnRouting(latestState, settingsRepo.runtimeSettingsSnapshot())
+        connectionManager.followOtherVpnRouting(latestState, sessionRuntimeSettings())
         val previousNetwork = activePhysicalNetwork
         val currentNetwork = currentPhysicalNetworkSnapshot()
         val currentRoute = withContext(ioDispatcher) {
@@ -1775,7 +1900,7 @@ class XrayService(
                 "${currentRoute.describe()}, refreshing routing...",
         )
         updateNotification(localizedString(R.string.notification_status_refreshing_physical_route))
-        val runtimeSettings = settingsRepo.runtimeSettingsSnapshot()
+        val runtimeSettings = sessionRuntimeSettings()
         val result = withContext(ioDispatcher) {
             connectionManager.updatePhysicalBypassRoute(
                 connectedState = latestState,
@@ -2412,6 +2537,9 @@ class XrayService(
         private const val BALANCER_SELECTION_POLL_INTERVAL_MS = 5_000L
         private const val METRICS_PRIMING_DELAY_MS = 250L
         private const val RECONFIGURE_SETTLE_DELAY_MS = 200L
+
+        // Long enough for a network change, and root mode's route fix-up, to settle before probing it.
+        private const val IPV6_RECHECK_SETTLE_DELAY_MS = 1_500L
         private const val PING_POLL_INTERVAL_MS = 10_000L
         private const val ROOTLESS_TUN_NAME = "tun0"
         private const val TRANSPORT_LABEL_WIFI = "wifi"

@@ -80,6 +80,8 @@ data class XrayState(
     val rootConnectionBackend: RootConnectionBackend = RootConnectionBackend.Tun,
     val tproxy: TproxyRuntimeState? = null,
     val transitionGuard: TproxyRuntimeState? = null,
+    /** Whether the session carries IPv6, which Auto mode may decide differently next time. */
+    val ipv6Enabled: Boolean = false,
 )
 
 /**

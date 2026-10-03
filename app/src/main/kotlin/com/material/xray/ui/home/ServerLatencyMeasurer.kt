@@ -1,10 +1,12 @@
 package com.material.xray.ui.home
 
+import com.material.xray.core.network.Ipv6Detector
 import com.material.xray.core.network.ServerLatencyTester
 import com.material.xray.core.network.describeFailure
 import com.material.xray.data.db.entity.ServerEntity
 import com.material.xray.data.repository.ServerRepository
 import com.material.xray.data.repository.SettingsRepository
+import com.material.xray.model.Ipv6Mode
 import com.material.xray.model.PingMethod
 import com.material.xray.service.LogBuffer
 import com.material.xray.service.LogSource
@@ -18,6 +20,7 @@ class ServerLatencyMeasurer(
     private val settingsRepo: SettingsRepository,
     private val serverRepo: ServerRepository,
     private val serverLatencyTester: ServerLatencyTester,
+    private val ipv6Detector: Ipv6Detector,
     private val logBuffer: LogBuffer,
 ) {
     /** A probe that cannot run is reported as -1 for each of its methods rather than thrown. */
@@ -46,7 +49,12 @@ class ServerLatencyMeasurer(
         val probeUrl = settingsRepo.latencyCheckUrl.first()
         val dnsServers = settingsRepo.dnsServers.first()
         val domesticDnsServers = settingsRepo.domesticDnsServers.first()
-        val allowIpv6 = settingsRepo.allowIpv6.first()
+        val allowIpv6 = when (settingsRepo.ipv6Mode.first()) {
+            Ipv6Mode.Off -> false
+            Ipv6Mode.On -> true
+            // Auto pings the way a session would connect: IPv6 only once it has been seen to work.
+            Ipv6Mode.Auto -> ipv6Detector.knownVerdict(config)
+        }
         val latencyByMethod = buildMap {
             methods.forEach { method ->
                 val result = serverLatencyTester.measure(

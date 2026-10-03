@@ -2,7 +2,9 @@ package com.material.xray.ui.text
 
 import androidx.annotation.StringRes
 import com.material.xray.R
+import com.material.xray.core.network.Ipv6SessionState
 import com.material.xray.model.AppUpdateInterval
+import com.material.xray.model.Ipv6Mode
 import com.material.xray.model.LauncherIcon
 import com.material.xray.model.NotificationField
 import com.material.xray.model.NotificationStyle
@@ -74,6 +76,31 @@ val RoutingPolicyControl.descriptionResource: Int
     get() = when (this) {
         RoutingPolicyControl.User -> R.string.routing_policy_user_description
         RoutingPolicyControl.SubscriptionProvider -> R.string.routing_policy_subscription_provider_description
+    }
+
+@get:StringRes
+val Ipv6SessionState.labelResource: Int
+    get() = when (this) {
+        Ipv6SessionState.Enabled -> R.string.ipv6_session_enabled
+        Ipv6SessionState.EnabledUntilReconnect -> R.string.ipv6_session_enabled_until_reconnect
+        Ipv6SessionState.NoIpv6Network -> R.string.ipv6_session_no_ipv6_network
+        Ipv6SessionState.CheckFailed -> R.string.ipv6_session_check_failed
+    }
+
+@get:StringRes
+val Ipv6Mode.labelResource: Int
+    get() = when (this) {
+        Ipv6Mode.Off -> R.string.ipv6_mode_off_label
+        Ipv6Mode.Auto -> R.string.ipv6_mode_auto_label
+        Ipv6Mode.On -> R.string.ipv6_mode_on_label
+    }
+
+@get:StringRes
+val Ipv6Mode.descriptionResource: Int
+    get() = when (this) {
+        Ipv6Mode.Off -> R.string.ipv6_mode_off_description
+        Ipv6Mode.Auto -> R.string.ipv6_mode_auto_description
+        Ipv6Mode.On -> R.string.ipv6_mode_on_description
     }
 
 @get:StringRes

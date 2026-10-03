@@ -123,7 +123,9 @@ import com.material.xray.data.repository.BackupSummary
 import com.material.xray.data.repository.SettingsSnapshot
 import com.material.xray.model.AppUpdateCheckStatus
 import com.material.xray.model.AppUpdateInterval
+import com.material.xray.model.ConnectionState
 import com.material.xray.model.GeoDataUpdateInterval
+import com.material.xray.model.Ipv6Mode
 import com.material.xray.model.LauncherIcon
 import com.material.xray.model.NotificationField
 import com.material.xray.model.NotificationSettings
@@ -209,6 +211,7 @@ private fun SettingsScreenContent(
     val geositeUpdating by viewModel.geositeUpdating.collectAsStateWithLifecycle()
     val geoDataClearing by viewModel.geoDataClearing.collectAsStateWithLifecycle()
     val connectionState by viewModel.connectionState.collectAsStateWithLifecycle()
+    val ipv6SessionState by viewModel.ipv6SessionState.collectAsStateWithLifecycle()
     val geoDataDownloadProgress by viewModel.geoDataDownloadProgress.collectAsStateWithLifecycle()
     val geoDataLastUpdated by viewModel.geoDataLastUpdated.collectAsStateWithLifecycle()
     val geoDataCachedSizes by viewModel.geoDataCachedSizes.collectAsStateWithLifecycle()
@@ -227,7 +230,7 @@ private fun SettingsScreenContent(
     val bypassLan = settings.bypassLan
     val tunnelTetheredClients = settings.tunnelTetheredClients
     val otherVpnMode = settings.otherVpnMode
-    val allowIpv6 = settings.allowIpv6
+    val ipv6Mode = settings.ipv6Mode
     val xrayBufferSizeKiB = settings.xrayBufferSizeKiB
     val tunMtu = settings.tunMtu
     val xrayMemoryRestartThresholdMiB = settings.xrayMemoryRestartThresholdMiB
@@ -516,17 +519,32 @@ private fun SettingsScreenContent(
                             onCheckedChange = { viewModel.setBypassLan(it) },
                         )
 
-                        SettingsSwitchRow(
-                            title = stringResource(R.string.settings_allow_ipv6_connections),
-                            checked = allowIpv6,
-                            onCheckedChange = { viewModel.setAllowIpv6(it) },
-                            enabled = isIpv6SelectionEnabled(rootServiceActive, rootConnectionBackend, tproxyCompatibility),
+                        val ipv6Selectable = isIpv6SelectionEnabled(rootServiceActive, rootConnectionBackend, tproxyCompatibility)
+                        ReadOnlyDropdownField(
+                            label = stringResource(R.string.settings_ipv6_mode_label),
+                            selectedText = stringResource(ipv6Mode.labelResource),
+                            supportingText = listOfNotNull(
+                                stringResource(ipv6Mode.descriptionResource),
+                                ipv6SessionState
+                                    ?.takeIf { ipv6Mode == Ipv6Mode.Auto && connectionState is ConnectionState.Connected }
+                                    ?.let { stringResource(it.labelResource) },
+                            ).joinToString("\n"),
+                            options = Ipv6Mode.entries.map { mode ->
+                                DropdownOption(
+                                    value = mode,
+                                    label = stringResource(mode.labelResource),
+                                    description = stringResource(mode.descriptionResource),
+                                    enabled = ipv6Selectable || mode == Ipv6Mode.Off,
+                                )
+                            },
+                            onSelected = viewModel::setIpv6Mode,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
                         )
 
                         // The resolver lists carry both address families, so this only happens on a
                         // hand-written list. Worth saying here, because the switch looks like it
                         // applies to DNS and in that state it cannot.
-                        if (allowIpv6 && hasIpv4OnlyDnsServers(dnsServers, domesticDnsServers)) {
+                        if (ipv6Mode != Ipv6Mode.Off && hasIpv4OnlyDnsServers(dnsServers, domesticDnsServers)) {
                             SettingsNotice(text = stringResource(R.string.settings_allow_ipv6_dns_ipv4_only))
                         }
                     }

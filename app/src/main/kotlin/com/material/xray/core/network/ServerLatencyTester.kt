@@ -98,10 +98,11 @@ internal fun mergeDnsServerSettings(
     .distinct()
     .joinToString(",")
 
-private suspend fun executeTimedHttpProbe(
+internal suspend fun executeTimedHttpProbe(
     client: OkHttpClient,
     request: Request,
-    nanoTime: () -> Long,
+    nanoTime: () -> Long = { SystemClock.elapsedRealtimeNanos() },
+    successCodes: IntRange = HTTP_SUCCESS_CODES,
 ): ProbeAttempt = suspendCancellableCoroutine { continuation ->
     val call = client.newCall(request)
     continuation.invokeOnCancellation {
@@ -111,7 +112,7 @@ private suspend fun executeTimedHttpProbe(
     try {
         val startedAt = nanoTime()
         val attempt = call.execute().use { response ->
-            if (response.code !in HTTP_SUCCESS_CODES) {
+            if (response.code !in successCodes) {
                 ProbeAttempt.failed("HTTP ${response.code}")
             } else {
                 response.body.byteStream().use { input ->

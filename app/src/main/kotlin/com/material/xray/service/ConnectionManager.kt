@@ -864,6 +864,7 @@ internal class ConnectionManager(
                 rootConnectionBackend = setup.rootBackend,
                 tproxy = setup.tproxyPlan?.runtimeState,
                 transitionGuard = transitionGuard,
+                ipv6Enabled = setup.runtimeSettings.allowIpv6,
             ),
         )
     }

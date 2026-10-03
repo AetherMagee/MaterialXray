@@ -11,6 +11,7 @@ import androidx.datastore.preferences.preferencesDataStore
 import com.material.xray.model.AppUpdateInterval
 import com.material.xray.model.DnsPreset
 import com.material.xray.model.GeoDataUpdateInterval
+import com.material.xray.model.Ipv6Mode
 import com.material.xray.model.LauncherIcon
 import com.material.xray.model.NotificationField
 import com.material.xray.model.NotificationSettings
@@ -46,7 +47,7 @@ data class SettingsSnapshot(
     val bypassLan: Boolean,
     val tunnelTetheredClients: Boolean,
     val otherVpnMode: OtherVpnMode,
-    val allowIpv6: Boolean,
+    val ipv6Mode: Ipv6Mode,
     val xrayBufferSizeKiB: Int,
     val tunMtu: Int,
     val xrayMemoryRestartThresholdMiB: Int,
@@ -102,7 +103,10 @@ class SettingsRepository(
         val BYPASS_LAN = booleanPreferencesKey("bypass_lan")
         val TUNNEL_TETHERED_CLIENTS = booleanPreferencesKey("tunnel_tethered_clients")
         val OTHER_VPN_MODE = stringPreferencesKey("other_vpn_mode")
-        val ALLOW_IPV6 = booleanPreferencesKey("allow_ipv6")
+        val IPV6_MODE = stringPreferencesKey("ipv6_mode")
+
+        /** Replaced by [IPV6_MODE]; kept so older backups restore, after which the migration converts it. */
+        val LEGACY_ALLOW_IPV6 = booleanPreferencesKey("allow_ipv6")
         val LAST_SERVER_ID = longPreferencesKey("last_server_id")
         val GEOIP_URL = stringPreferencesKey("geoip_url")
         val GEOSITE_URL = stringPreferencesKey("geosite_url")
@@ -190,7 +194,7 @@ class SettingsRepository(
     val bypassLan: Flow<Boolean> = store.data.map { it[BYPASS_LAN] ?: true }
     val tunnelTetheredClients: Flow<Boolean> = store.data.map { it[TUNNEL_TETHERED_CLIENTS] ?: false }
     val otherVpnMode: Flow<OtherVpnMode> = store.data.map { OtherVpnMode.fromValue(it[OTHER_VPN_MODE]) }
-    val allowIpv6: Flow<Boolean> = store.data.map { it[ALLOW_IPV6] ?: false }
+    val ipv6Mode: Flow<Ipv6Mode> = store.data.map { Ipv6Mode.fromValue(it[IPV6_MODE]) }
     val lastServerId: Flow<Long> = store.data.map { it[LAST_SERVER_ID] ?: -1L }
     val xrayLogLevel: Flow<XrayLogLevel> = store.data.map { prefs ->
         resolveXrayLogLevel(prefs[XRAY_LOG_LEVEL], prefs[LAST_XRAY_LOG_LEVEL])
@@ -346,7 +350,7 @@ class SettingsRepository(
             bypassLan = prefs[BYPASS_LAN] ?: true,
             tunnelTetheredClients = prefs[TUNNEL_TETHERED_CLIENTS] ?: false,
             otherVpnMode = OtherVpnMode.fromValue(prefs[OTHER_VPN_MODE]),
-            allowIpv6 = prefs[ALLOW_IPV6] ?: false,
+            ipv6Mode = Ipv6Mode.fromValue(prefs[IPV6_MODE]),
             xrayBufferSizeKiB = XrayRuntimeSettings.normalizeXrayBufferSizeKiB(prefs[XRAY_BUFFER_SIZE_KIB]),
             tunMtu = XrayRuntimeSettings.normalizeTunMtu(prefs[TUN_MTU]),
             xrayMemoryRestartThresholdMiB =
@@ -405,7 +409,8 @@ class SettingsRepository(
         bypassLan = bypassLan.first(),
         tunnelTetheredClients = tunnelTetheredClients.first(),
         otherVpnMode = otherVpnMode.first(),
-        allowIpv6 = allowIpv6.first(),
+        // Auto is settled per session by the service, which starts from IPv4.
+        allowIpv6 = ipv6Mode.first() == Ipv6Mode.On,
         routingRules = routingRules.first(),
         xrayBufferSizeKiB = xrayBufferSizeKiB.first(),
         tunMtu = tunMtu.first(),
@@ -438,7 +443,7 @@ class SettingsRepository(
     suspend fun setBypassLan(enabled: Boolean) = store.edit { it[BYPASS_LAN] = enabled }
     suspend fun setTunnelTetheredClients(enabled: Boolean) = store.edit { it[TUNNEL_TETHERED_CLIENTS] = enabled }
     suspend fun setOtherVpnMode(mode: OtherVpnMode) = store.edit { it[OTHER_VPN_MODE] = mode.persistedValue }
-    suspend fun setAllowIpv6(enabled: Boolean) = store.edit { it[ALLOW_IPV6] = enabled }
+    suspend fun setIpv6Mode(mode: Ipv6Mode) = store.edit { it[IPV6_MODE] = mode.persistedValue }
     suspend fun setLastServerId(id: Long) = store.edit { it[LAST_SERVER_ID] = id }
     suspend fun compareAndSetLastServerId(expectedId: Long, id: Long): Boolean {
         var updated = false
@@ -655,7 +660,8 @@ class SettingsRepository(
                 ?.toBooleanStrictOrNull()
                 ?.let { prefs[TUNNEL_TETHERED_CLIENTS] = it }
             map["other_vpn_mode"]?.let { prefs[OTHER_VPN_MODE] = OtherVpnMode.fromValue(it).persistedValue }
-            map["allow_ipv6"]?.toBooleanStrictOrNull()?.let { prefs[ALLOW_IPV6] = it }
+            map["ipv6_mode"]?.let { prefs[IPV6_MODE] = Ipv6Mode.fromValue(it).persistedValue }
+            map["allow_ipv6"]?.toBooleanStrictOrNull()?.let { prefs[LEGACY_ALLOW_IPV6] = it }
             map["last_server_id"]?.let { prefs[LAST_SERVER_ID] = it.toLongOrNull() ?: -1L }
             val showAdvancedOptions = map["show_advanced_options"]?.toBooleanStrictOrNull()
             if (map["xray_log_level"] != null || map["last_xray_log_level"] != null) {

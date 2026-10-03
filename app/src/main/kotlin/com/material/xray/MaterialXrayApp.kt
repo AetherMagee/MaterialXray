@@ -4,11 +4,14 @@ import android.app.Application
 import android.util.Log
 import com.material.xray.core.launcher.LauncherIconManager
 import com.material.xray.core.locale.initializeAppLocales
+import com.material.xray.core.network.Ipv6Detector
 import com.material.xray.core.xray.ProviderGeoDataManager
 import com.material.xray.data.db.DatabaseOpenChecker
 import com.material.xray.data.repository.BackupManager
+import com.material.xray.data.repository.ServerRepository
 import com.material.xray.data.repository.SettingsRepository
 import com.material.xray.di.ApplicationScope
+import com.material.xray.model.Ipv6Mode
 import com.material.xray.service.AppUpdateScheduler
 import com.material.xray.service.GeoDataUpdateScheduler
 import com.material.xray.service.OemAutostartManager
@@ -56,6 +59,10 @@ class MaterialXrayApp : Application() {
 
     private val providerGeoDataManager: ProviderGeoDataManager by inject()
 
+    private val serverRepository: ServerRepository by inject()
+
+    private val ipv6Detector: Ipv6Detector by inject()
+
     private val appScope: CoroutineScope by inject(named<ApplicationScope>())
 
     override fun onCreate() {
@@ -91,6 +98,13 @@ class MaterialXrayApp : Application() {
                 .onFailure { error -> Log.e(LOG_TAG, "Unable to schedule initial geodata refresh", error) }
         }
         appScope.launch { providerGeoDataManager.keepUpToDate() }
+        appScope.launch {
+            // Settle IPv6 for the selected server before the user connects, so Auto can start with it.
+            if (settingsRepository.ipv6Mode.first() != Ipv6Mode.Auto || !databaseOpenChecker.canRead()) return@launch
+            val server = serverRepository.getById(settingsRepository.lastServerId.first()) ?: return@launch
+            runCatching { ipv6Detector.check(serverRepository.parseConfig(server)) }
+                .onFailure { error -> Log.e(LOG_TAG, "Unable to check IPv6", error) }
+        }
         appScope.launch {
             if (settingsRepository.autoConnect.first()) {
                 delay(STARTUP_BACKGROUND_WORK_DELAY_SECONDS * 1_000)

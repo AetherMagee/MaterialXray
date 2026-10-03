@@ -48,7 +48,7 @@ class StartupDiagnosticsLoggerTest {
         xrayBufferSizeKiB = 64,
         memoryRestartThresholdMiB = 200,
         bypassLan = true,
-        allowIpv6 = false,
+        ipv6Mode = "off",
         defaultOutbound = "proxy",
         xrayLogLevel = "none",
         dnsServers = "1.1.1.1,1.0.0.1",

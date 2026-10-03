@@ -124,7 +124,7 @@ class SettingsDefaultMigrationTest {
     fun `migration leaves a resolver list that matches no provider alone`() = runTest {
         val preferences = mutablePreferencesOf(
             SETTINGS_DEFAULTS_REVISION to 3,
-            SettingsRepository.ALLOW_IPV6 to true,
+            SettingsRepository.LEGACY_ALLOW_IPV6 to true,
             SettingsRepository.DNS_SERVERS to "8.8.8.8,9.9.9.9",
             SettingsRepository.DOMESTIC_DNS_SERVERS to "192.0.2.53",
         )
@@ -165,7 +165,7 @@ class SettingsDefaultMigrationTest {
         )
         val dualStackPreferences = mutablePreferencesOf(
             SETTINGS_DEFAULTS_REVISION to 3,
-            SettingsRepository.ALLOW_IPV6 to true,
+            SettingsRepository.LEGACY_ALLOW_IPV6 to true,
             SettingsRepository.DNS_SERVERS to "1.1.1.1,1.0.0.1",
         )
 
@@ -206,7 +206,7 @@ class SettingsDefaultMigrationTest {
     fun `the retired Cloudflare default is cleared from the revision it was stored at`() = runTest {
         val preferences = mutablePreferencesOf(
             SETTINGS_DEFAULTS_REVISION to 4,
-            SettingsRepository.ALLOW_IPV6 to true,
+            SettingsRepository.LEGACY_ALLOW_IPV6 to true,
             SettingsRepository.DNS_SERVERS to "1.1.1.1,1.0.0.1,2606:4700:4700::1111,2606:4700:4700::1001",
         )
 
@@ -223,7 +223,7 @@ class SettingsDefaultMigrationTest {
         )
         val dualStackPreferences = mutablePreferencesOf(
             SETTINGS_DEFAULTS_REVISION to 4,
-            SettingsRepository.ALLOW_IPV6 to true,
+            SettingsRepository.LEGACY_ALLOW_IPV6 to true,
             SettingsRepository.DNS_SERVERS to
                 "1.1.1.1,1.0.0.1,2606:4700:4700::1111,2606:4700:4700::1001",
         )
@@ -397,6 +397,20 @@ class SettingsDefaultMigrationTest {
             settings = mapOf(SETTINGS_DEFAULTS_REVISION.name to "99"),
             backupVersion = 4,
         )
+    }
+
+    @Test
+    fun `only an explicit IPv6 off survives the switch becoming a mode`() = runTest {
+        val cases = listOf(false to "off", true to null, null to null)
+        for ((allowIpv6, expectedMode) in cases) {
+            val preferences = mutablePreferencesOf(SETTINGS_DEFAULTS_REVISION to 10)
+            allowIpv6?.let { preferences[SettingsRepository.LEGACY_ALLOW_IPV6] = it }
+
+            val migrated = SettingsDefaultMigration().migrate(preferences)
+
+            assertEquals(expectedMode, migrated[SettingsRepository.IPV6_MODE])
+            assertNull(migrated[SettingsRepository.LEGACY_ALLOW_IPV6])
+        }
     }
 
     @Test(expected = IllegalArgumentException::class)

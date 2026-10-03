@@ -20,6 +20,16 @@
     <string name="root_connection_backend_tun_label">TUN interface</string>
     <string name="root_connection_backend_tun_description">Creates a virtual network interface and routes app traffic through it into the core.</string>
     <string name="root_connection_backend_tproxy_label">Transparent proxy</string>
+    <string name="ipv6_session_enabled">Now: IPv6 on</string>
+    <string name="ipv6_session_enabled_until_reconnect">Now: IPv6 on, but it failed the check through the server, so the next connection uses IPv4 only</string>
+    <string name="ipv6_session_no_ipv6_network">Now: IPv4 only, this network has no IPv6</string>
+    <string name="ipv6_session_check_failed">Now: IPv4 only, IPv6 failed the check on this network</string>
+    <string name="ipv6_mode_off_label">Off</string>
+    <string name="ipv6_mode_off_description">Connect over IPv4 only.</string>
+    <string name="ipv6_mode_auto_label">Auto</string>
+    <string name="ipv6_mode_auto_description">Use IPv6 on networks where a quick check through the server shows it working. Until the check passes, connections use IPv4.</string>
+    <string name="ipv6_mode_on_label">On</string>
+    <string name="ipv6_mode_on_description">Always use IPv6 when the network has it, trying it before IPv4.</string>
     <string name="other_vpn_mode_auto_routing_label">Auto-routing</string>
     <string name="other_vpn_mode_auto_routing_description">Proxied apps stay on MXray, except for the other VPN\'s own networks. Other apps use the other VPN.</string>
     <string name="other_vpn_mode_tunnel_in_tunnel_label">Tunnel-in-tunnel</string>

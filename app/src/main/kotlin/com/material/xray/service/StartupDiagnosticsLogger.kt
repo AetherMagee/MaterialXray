@@ -75,7 +75,7 @@ class StartupDiagnosticsLogger(
             xrayBufferSizeKiB = runtimeSettings.xrayBufferSizeKiB,
             memoryRestartThresholdMiB = settingsRepository.xrayMemoryRestartThresholdMiB.first(),
             bypassLan = runtimeSettings.bypassLan,
-            allowIpv6 = runtimeSettings.allowIpv6,
+            ipv6Mode = settingsRepository.ipv6Mode.first().persistedValue,
             defaultOutbound = runtimeSettings.defaultOutbound.tag,
             xrayLogLevel = runtimeSettings.logLevel.value,
             dnsServers = runtimeSettings.dnsServers,
@@ -125,7 +125,7 @@ internal data class StartupDiagnosticSnapshot(
     val xrayBufferSizeKiB: Int,
     val memoryRestartThresholdMiB: Int,
     val bypassLan: Boolean,
-    val allowIpv6: Boolean,
+    val ipv6Mode: String,
     val defaultOutbound: String,
     val xrayLogLevel: String,
     val dnsServers: String,
@@ -151,7 +151,7 @@ internal fun formatStartupDiagnostics(snapshot: StartupDiagnosticSnapshot): List
         "Power: batteryOptimizationsIgnored=$batteryOptimizationsIgnored, " +
             "lowPowerStandbyExempt=${lowPowerStandbyExempt?.toString() ?: "unsupported"}",
         "Connection settings: mode=$serviceMode, autoConnect=$autoConnect, passiveWatchdog=$passiveHealthMonitoring, " +
-            "bypassLan=$bypassLan, ipv6=$allowIpv6",
+            "bypassLan=$bypassLan, ipv6=$ipv6Mode",
         "Xray settings: tun=${tunName.diagnosticValue()}, mtu=$tunMtu, buffer=$xrayBufferSizeKiB KiB, " +
             "memoryRestart=$memoryRestartThresholdMiB MiB, outbound=${defaultOutbound.diagnosticValue()}, " +
             "logLevel=${xrayLogLevel.diagnosticValue()}",

@@ -5,7 +5,7 @@
     <string name="settings_connectivity_title">Connectivity</string>
     <string name="settings_bypass_lan_title">Bypass LAN</string>
     <string name="settings_bypass_lan_description">Route private IPs and LAN domains directly</string>
-    <string name="settings_allow_ipv6_connections">Allow IPv6 connections</string>
+    <string name="settings_ipv6_mode_label">IPv6 connections</string>
     <string name="settings_allow_ipv6_dns_ipv4_only">Your configured DNS resolvers don\'t have IPv6 addresses, so DNS lookups will still use IPv4.</string>
     <string name="settings_routing_policy_title">Routing policy</string>
     <string name="settings_section_core">Core</string>

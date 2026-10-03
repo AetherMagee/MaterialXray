@@ -18,6 +18,16 @@
     <string name="root_connection_backend_tun_label">Интерфейс TUN</string>
     <string name="root_connection_backend_tun_description">Создаёт виртуальный интерфейс и направляет трафик приложений к ядру через него.</string>
     <string name="root_connection_backend_tproxy_label">Прозрачный прокси</string>
+    <string name="ipv6_session_enabled">Сейчас: IPv6 включён</string>
+    <string name="ipv6_session_enabled_until_reconnect">Сейчас: IPv6 включён, но не прошёл проверку через сервер, поэтому следующее подключение будет только по IPv4</string>
+    <string name="ipv6_session_no_ipv6_network">Сейчас: только IPv4, в этой сети нет IPv6</string>
+    <string name="ipv6_session_check_failed">Сейчас: только IPv4, IPv6 не прошёл проверку в этой сети</string>
+    <string name="ipv6_mode_off_label">Выкл.</string>
+    <string name="ipv6_mode_off_description">Подключаться только по IPv4.</string>
+    <string name="ipv6_mode_auto_label">Авто</string>
+    <string name="ipv6_mode_auto_description">Использовать IPv6 в сетях, где быстрая проверка через сервер показывает, что он работает. Пока проверка не пройдена, подключения идут по IPv4.</string>
+    <string name="ipv6_mode_on_label">Вкл.</string>
+    <string name="ipv6_mode_on_description">Всегда использовать IPv6, если он есть в сети, пробуя его раньше IPv4.</string>
     <string name="other_vpn_mode_auto_routing_label">Автомаршрутизация</string>
     <string name="other_vpn_mode_auto_routing_description">Проксируемые приложения остаются в MXray, кроме собственных сетей другого VPN. Остальные приложения используют другой VPN.</string>
     <string name="other_vpn_mode_tunnel_in_tunnel_label">Туннель в туннеле</string>

@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.mutablePreferencesOf
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.material.xray.model.BackupData
+import com.material.xray.model.Ipv6Mode
 import com.material.xray.model.RoutingPolicyControl
 import com.material.xray.model.RoutingRuleCatalog
 import com.material.xray.model.canonicalDnsServers
@@ -103,7 +104,7 @@ private fun validateSettingsDefaultsRevision(
     }
 }
 
-internal const val CURRENT_SETTINGS_DEFAULTS_REVISION = 10
+internal const val CURRENT_SETTINGS_DEFAULTS_REVISION = 11
 private const val PREVIOUS_XRAY_BUFFER_SIZE_KIB = 512
 private const val PREVIOUS_TUN_NAME = "xray0"
 private const val PREVIOUS_DNS_SERVERS = "1.1.1.1,1.0.0.1"
@@ -152,7 +153,20 @@ private val SETTINGS_DEFAULT_CHANGES = listOf(
         key = SettingsRepository.PROVIDER_ROUTING_DOMAIN_STRATEGY,
         previousDefault = PREVIOUS_ROUTING_DOMAIN_STRATEGY,
     ),
+    ipv6ModeChange(revision = 11),
 )
+
+/** The IPv6 switch became a mode. Only an explicit off stays off; everyone else gets Auto, the new default. */
+private fun ipv6ModeChange(revision: Int): SettingDefaultChange = object : SettingDefaultChange {
+    override val revision = revision
+
+    override fun apply(preferences: MutablePreferences) {
+        if (preferences[SettingsRepository.LEGACY_ALLOW_IPV6] == false) {
+            preferences[SettingsRepository.IPV6_MODE] = Ipv6Mode.Off.persistedValue
+        }
+        preferences.remove(SettingsRepository.LEGACY_ALLOW_IPV6)
+    }
+}
 
 private fun providerRoutingSeparationChange(revision: Int): SettingDefaultChange = object : SettingDefaultChange {
     override val revision = revision
