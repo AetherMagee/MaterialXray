@@ -260,6 +260,7 @@ private fun SettingsScreenContent(
     val appUpdateChecksEnabled = settings.appUpdateChecksEnabled
     val diagnosticsEnabled = settings.diagnosticsEnabled
     val context = LocalContext.current
+    val isTelevision = remember(context) { context.packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK) }
     val resources = LocalResources.current
     val lifecycleOwner = LocalLifecycleOwner.current
     rememberSystemState { viewModel.refreshOemAutostartGuidance() }
@@ -470,12 +471,15 @@ private fun SettingsScreenContent(
                         onCheckedChange = viewModel::setSortOutboundsByLatency,
                     )
 
-                    NotificationSettingsSection(
-                        settings = notificationSettings,
-                        onConfigureFields = { showNotificationFieldsDialog = true },
-                        onConfigureStyle = { showFieldStyleDialog = true },
-                        onConfigureFrequency = { showUpdateFrequencyDialog = true },
-                    )
+                    // TVs have no notification shade, so nobody would see the connection notification.
+                    if (!isTelevision) {
+                        NotificationSettingsSection(
+                            settings = notificationSettings,
+                            onConfigureFields = { showNotificationFieldsDialog = true },
+                            onConfigureStyle = { showFieldStyleDialog = true },
+                            onConfigureFrequency = { showUpdateFrequencyDialog = true },
+                        )
+                    }
 
                     SettingsNestedSection(title = stringResource(R.string.settings_app_icon_title)) {
                         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
