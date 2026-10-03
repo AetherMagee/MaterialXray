@@ -1,7 +1,7 @@
 package com.material.xray.core.network
 
-import android.os.SystemClock
 import com.material.xray.core.common.log.xrayTimestampPrefix
+import com.material.xray.core.common.platform.MonotonicClock
 import com.material.xray.core.xray.PlatformDns
 import com.material.xray.core.xray.ServerAddressResolver
 import com.material.xray.core.xray.XrayInbound
@@ -63,7 +63,7 @@ internal data class ProbeAttempt(
 internal suspend fun measureBestHttpLatency(
     client: OkHttpClient,
     request: Request,
-    nanoTime: () -> Long = { SystemClock.elapsedRealtimeNanos() },
+    nanoTime: () -> Long,
 ): ProbeAttempt = bestAttempt(HTTP_PROBE_ATTEMPTS) { executeTimedHttpProbe(client, request, nanoTime) }
 
 /** Keeps the fastest success, or the last failure when every attempt failed. */
@@ -101,7 +101,7 @@ internal fun mergeDnsServerSettings(
 internal suspend fun executeTimedHttpProbe(
     client: OkHttpClient,
     request: Request,
-    nanoTime: () -> Long = { SystemClock.elapsedRealtimeNanos() },
+    nanoTime: () -> Long,
     successCodes: IntRange = HTTP_SUCCESS_CODES,
 ): ProbeAttempt = suspendCancellableCoroutine { continuation ->
     val call = client.newCall(request)
@@ -139,6 +139,7 @@ internal suspend fun executeTimedHttpProbe(
 class ServerLatencyTester(
     private val ephemeralCore: EphemeralXrayCore,
     platformDns: PlatformDns,
+    private val clock: MonotonicClock,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     private val json = Json { prettyPrint = true }
@@ -270,7 +271,7 @@ class ServerLatencyTester(
                 .build()
         }.getOrElse { return ProbeAttempt.failed("Invalid probe URL $probeUrl") }
 
-        return measureBestHttpLatency(client, request)
+        return measureBestHttpLatency(client, request, clock::elapsedNanos)
     }
 
     private suspend fun measureTcpConnect(address: String, port: Int): ProbeAttempt {
@@ -289,9 +290,9 @@ class ServerLatencyTester(
         try {
             socket.tcpNoDelay = true
 
-            val startedAt = SystemClock.elapsedRealtimeNanos()
+            val startedAt = clock.elapsedNanos()
             socket.connect(InetSocketAddress(host, port), TCP_CONNECT_TIMEOUT_MS)
-            val elapsedMs = (SystemClock.elapsedRealtimeNanos() - startedAt) / NANOS_PER_MILLISECOND
+            val elapsedMs = (clock.elapsedNanos() - startedAt) / NANOS_PER_MILLISECOND
             val latency = elapsedMs.toInt().coerceAtLeast(1)
             if (continuation.isActive) {
                 continuation.resume(ProbeAttempt(latency))

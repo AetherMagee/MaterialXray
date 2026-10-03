@@ -187,7 +187,7 @@ class Ipv6Detector(
             name to suspend {
                 val request = Request.Builder().url(url).header("Cache-Control", "no-cache").build()
                 // Any answer proves the round trip; a redirect is not followed.
-                withContext(ioDispatcher) { executeTimedHttpProbe(client, request, successCodes = ANY_HTTP_STATUS) }
+                withContext(ioDispatcher) { executeTimedHttpProbe(client, request, clock::elapsedNanos, successCodes = ANY_HTTP_STATUS) }
                     .failure.orEmpty()
             }
         }

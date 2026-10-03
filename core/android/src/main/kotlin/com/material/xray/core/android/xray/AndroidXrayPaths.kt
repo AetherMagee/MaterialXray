@@ -11,6 +11,9 @@ class AndroidXrayPaths(private val context: Context) : XrayPaths {
     override val filesDir: File
         get() = context.filesDir
 
+    override val cacheDir: File
+        get() = context.cacheDir
+
     override val nativeLibraryDir: File?
         get() = context.applicationInfo.nativeLibraryDir?.let(::File)
 }

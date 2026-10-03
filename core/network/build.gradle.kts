@@ -1,9 +1,5 @@
 plugins {
-    id("materialxray.android.library")
-}
-
-android {
-    namespace = "com.material.xray.core.network"
+    id("materialxray.jvm.library")
 }
 
 dependencies {

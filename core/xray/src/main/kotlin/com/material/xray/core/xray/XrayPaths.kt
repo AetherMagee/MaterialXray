@@ -10,6 +10,9 @@ interface XrayPaths {
     /** App-private storage for the core's config, the runtime state and its asset directory. */
     val filesDir: File
 
+    /** Scratch space for short-lived cores; the platform may clear it. */
+    val cacheDir: File
+
     /** Where the installer extracted the native executables; null when the platform has none. */
     val nativeLibraryDir: File?
 }

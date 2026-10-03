@@ -1,8 +1,5 @@
 package com.material.xray.core.network
 
-import android.content.Context
-import android.net.LocalSocket
-import android.net.LocalSocketAddress
 import com.material.xray.core.process.RedirectedProcess
 import com.material.xray.core.xray.LocalSockets
 import com.material.xray.core.xray.XrayBinary
@@ -10,6 +7,7 @@ import com.material.xray.core.xray.XrayInbound
 import com.material.xray.core.xray.XrayPaths
 import java.io.File
 import java.io.IOException
+import java.net.InetSocketAddress
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CoroutineDispatcher
@@ -34,9 +32,8 @@ class EphemeralXrayCoreException(message: String, cause: Throwable? = null) : IO
  */
 @Singleton
 class EphemeralXrayCore(
-    private val context: Context,
     private val baseClient: OkHttpClient,
-    xrayPaths: XrayPaths,
+    private val xrayPaths: XrayPaths,
     private val localSockets: LocalSockets,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
@@ -93,8 +90,8 @@ class EphemeralXrayCore(
     ): RunningCore {
         currentCoroutineContext().ensureActive()
         val binaryPath = resolveBinaryPath()
-        val binDir = context.filesDir.resolve("bin").also { it.mkdirs() }
-        val workDir = context.cacheDir.resolve("helper-cores").also { it.mkdirs() }
+        val binDir = xrayPaths.filesDir.resolve("bin").also { it.mkdirs() }
+        val workDir = xrayPaths.cacheDir.resolve("helper-cores").also { it.mkdirs() }
         val runId = UUID.randomUUID().toString()
         val configFile = workDir.resolve("xray-$runId.json")
         val logFile = workDir.resolve("xray-$runId.log")
@@ -180,9 +177,10 @@ class EphemeralXrayCore(
     }
 
     private fun canConnectSocket(path: String): Boolean {
-        val socket = LocalSocket()
+        val socket = localSockets.fileSystemSocketFactory(path).createSocket()
         return try {
-            socket.connect(LocalSocketAddress(path, LocalSocketAddress.Namespace.FILESYSTEM))
+            // The factory's sockets ignore the address and dial [path].
+            socket.connect(InetSocketAddress(0))
             true
         } catch (_: IOException) {
             false

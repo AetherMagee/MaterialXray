@@ -1,10 +1,10 @@
 package com.material.xray.core.network
 
-import android.content.Context
 import com.material.xray.core.common.connection.ConnectionStateCoordinator
 import com.material.xray.core.xray.ACTIVE_CONFIG_FILE
 import com.material.xray.core.xray.LocalSockets
 import com.material.xray.core.xray.XRAY_APP_HTTP_INBOUND_TAG
+import com.material.xray.core.xray.XrayPaths
 import com.material.xray.model.ConnectionState
 import java.io.File
 import java.io.IOException
@@ -27,7 +27,7 @@ import org.koin.core.annotation.Singleton
 /** Only the app's HTTP downloads use the private data socket; latency probes use their own client. */
 @Singleton
 class ActiveCoreHttpClient(
-    private val context: Context,
+    private val xrayPaths: XrayPaths,
     private val baseClient: OkHttpClient,
     private val trafficRoutingSetting: CoreTrafficRoutingSetting,
     private val connectionState: ConnectionStateCoordinator,
@@ -38,9 +38,9 @@ class ActiveCoreHttpClient(
         if (!trafficRoutingSetting.routeMxrayTrafficThroughXray.first()) return block(baseClient)
         if (connectionState.state.value !is ConnectionState.Connected) return block(baseClient)
 
-        val privateDir = context.filesDir.resolve("bin")
+        val privateDir = xrayPaths.filesDir.resolve("bin")
         val socketPath = withContext(ioDispatcher) {
-            File(context.filesDir, ACTIVE_CONFIG_FILE)
+            File(xrayPaths.filesDir, ACTIVE_CONFIG_FILE)
                 .takeIf(File::isFile)
                 ?.readText()
                 ?.let { privateHttpSocketPath(it, privateDir) }

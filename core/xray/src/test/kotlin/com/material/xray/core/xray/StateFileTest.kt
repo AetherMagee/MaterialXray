@@ -34,6 +34,8 @@ class StateFileTest {
 
     private class TestPaths(override val filesDir: File) : XrayPaths {
         override val nativeLibraryDir: File? = null
+        override val cacheDir: File
+            get() = filesDir
     }
 
     private fun withTempDir(block: (File) -> Unit) {
