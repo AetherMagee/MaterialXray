@@ -474,10 +474,13 @@ androidComponents {
     }
 }
 
+// Only the release artifacts, not every release task: `packageReleaseResources` is also part of
+// the release compilation that detekt's type resolution and lint run on.
 tasks.matching { task ->
     task.name == "assembleRelease" ||
         task.name == "bundleRelease" ||
-        task.name.startsWith("packageRelease")
+        task.name == "packageRelease" ||
+        task.name == "packageReleaseBundle"
 }.configureEach {
     dependsOn(validateReleaseTelemetry)
 }
