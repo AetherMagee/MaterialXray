@@ -8,6 +8,7 @@ import android.os.CancellationSignal
 import android.os.Looper
 import androidx.annotation.RequiresApi
 import com.material.xray.model.ServerConfig
+import java.io.File
 import java.net.IDN
 import java.net.Inet6Address
 import java.net.InetAddress
@@ -37,6 +38,8 @@ class ServerAddressResolver(
     private val hostLookup: (suspend (String) -> List<String>)? = null,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val nanoTime: () -> Long = System::nanoTime,
+    /** Keeps the last-known addresses across restarts; without it they live only as long as the process. */
+    private val lastKnownFile: File? = null,
 ) {
     data class Result(
         val server: ServerConfig,
@@ -48,7 +51,7 @@ class ServerAddressResolver(
 
     private val directExecutor = Executor { it.run() }
     private val successfulLookups = ConcurrentHashMap<String, CachedLookup>()
-    private val lastKnownAddresses = ConcurrentHashMap<String, List<String>>()
+    private val lastKnownAddresses by lazy { ConcurrentHashMap(readLastKnownAddresses()) }
 
     suspend fun resolve(server: ServerConfig, allowIpv6: Boolean = false): Result = withContext(ioDispatcher) {
         if (server.rawConfigJson.isNotBlank()) {
@@ -138,15 +141,31 @@ class ServerAddressResolver(
         val candidates = cached?.addresses ?: (hostLookup?.invoke(host) ?: systemLookup(host)).also { addresses ->
             if (addresses.isNotEmpty()) {
                 successfulLookups[cacheKey] = CachedLookup(addresses, now)
-                lastKnownAddresses[host] = addresses
+                if (lastKnownAddresses.put(host, addresses) != addresses) writeLastKnownAddresses()
             }
         }.ifEmpty {
             // When another app's VPN covers this app, Android sends its lookups to that VPN's
             // resolver, and the TPROXY guard holds the VPN's own traffic while MXray reconnects. A
-            // reconnect always follows a successful lookup, so the answer it got is reused.
+            // reconnect always follows a successful lookup, so the answer it got is reused. It is kept
+            // on disk because a restored connection starts in a new process behind the same rules.
             lastKnownAddresses[host].orEmpty()
         }
         return candidates.distinct().filter { allowIpv6 || !isIpv6Address(it) }
+    }
+
+    private fun readLastKnownAddresses(): Map<String, List<String>> = runCatching {
+        lastKnownFile?.takeIf(File::exists)?.let { Json.decodeFromString<Map<String, List<String>>>(it.readText()) }
+    }.getOrNull().orEmpty()
+
+    @Synchronized
+    private fun writeLastKnownAddresses() {
+        val file = lastKnownFile ?: return
+        // A whole-file swap, so a crash mid-write leaves the previous copy rather than a torn one.
+        runCatching {
+            val temporary = File(file.path + ".tmp")
+            temporary.writeText(Json.encodeToString(lastKnownAddresses.toMap()))
+            check(temporary.renameTo(file))
+        }
     }
 
     // DnsResolver and Dns.SYSTEM query the same netd resolver, so a second concurrent lookup adds no

@@ -2,6 +2,7 @@ package com.material.xray.core.xray
 
 import com.material.xray.model.Protocol
 import com.material.xray.model.ServerConfig
+import java.io.File
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
@@ -84,6 +85,20 @@ class ServerAddressResolverTest {
         assertEquals(listOf("192.0.2.1"), result.candidates)
         assertTrue(result.unresolvedHosts.isEmpty())
         assertTrue(ServerAddressResolver(hostLookup = { emptyList() }).resolve(server).unresolvedHosts.isNotEmpty())
+    }
+
+    @Test
+    fun `last-known addresses outlive the process when a file keeps them`() = runTest {
+        val file = File.createTempFile("server_addresses", ".json").apply { delete() }
+        val server = rawServer("one.example")
+        try {
+            ServerAddressResolver(hostLookup = { listOf("192.0.2.1") }, lastKnownFile = file).resolve(server)
+
+            val restarted = ServerAddressResolver(hostLookup = { emptyList() }, lastKnownFile = file)
+            assertEquals(listOf("192.0.2.1"), restarted.resolve(server).candidates)
+        } finally {
+            file.delete()
+        }
     }
 
     @Test

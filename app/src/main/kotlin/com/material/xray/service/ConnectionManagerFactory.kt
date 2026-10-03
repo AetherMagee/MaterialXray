@@ -45,6 +45,7 @@ import com.material.xray.model.ServerConfig
 import com.material.xray.telemetry.ConnectionTelemetryStep
 import com.material.xray.telemetry.TelemetryReporter
 import com.material.xray.telemetry.TelemetrySpan
+import java.io.File
 import java.net.InetAddress
 import java.net.ServerSocket
 import kotlinx.coroutines.CoroutineDispatcher
@@ -458,7 +459,9 @@ class ConnectionManagerFactory(
     private val telemetryReporter: TelemetryReporter,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
-    private val serverAddressResolver by lazy { ServerAddressResolver(context) }
+    private val serverAddressResolver by lazy {
+        ServerAddressResolver(context, lastKnownFile = File(context.noBackupFilesDir, "server_addresses.json"))
+    }
     private val rootCertificateBundle by lazy {
         AndroidRootCertificateBundle(
             refreshScope = CoroutineScope(SupervisorJob() + ioDispatcher),
