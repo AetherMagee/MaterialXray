@@ -8,7 +8,6 @@ koin = "4.2.2"
 koin-compiler = "1.2.1"
 room = "2.8.5"
 datastore = "1.2.1"
-navigation = "2.10.2"
 navigation3 = "1.2.0"
 lifecycle = "2.11.0"
 okhttp = "5.5.0"
@@ -40,7 +39,6 @@ compose-material3-adaptive = { group = "androidx.compose.material3.adaptive", na
 
 activity-compose = { group = "androidx.activity", name = "activity-compose", version = "1.13.0" }
 appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
-navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigation" }
 navigation3-runtime = { group = "androidx.navigation3", name = "navigation3-runtime", version.ref = "navigation3" }
 navigation3-ui = { group = "androidx.navigation3", name = "navigation3-ui", version.ref = "navigation3" }
 

@@ -505,7 +505,6 @@ dependencies {
 
     implementation(libs.activity.compose)
     implementation(libs.appcompat)
-    implementation(libs.navigation.compose)
     implementation(libs.core.ktx)
     implementation(libs.core.splashscreen)
     implementation(libs.work.runtime.ktx)
