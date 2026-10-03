@@ -99,6 +99,7 @@ import com.material.xray.ui.components.FadingOutlinedTextField
 import com.material.xray.ui.components.MaskOutputTransformation
 import com.material.xray.ui.components.ScrolledTopAppBar
 import com.material.xray.ui.components.TooltipIconButton
+import com.material.xray.ui.components.selectedOptionFocusModifier
 import org.koin.compose.viewmodel.koinViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -547,9 +548,11 @@ private fun ProtocolDropdown(field: EditField, draft: TextFieldState) {
                 .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
         )
         ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            val selectedOptionFocus = selectedOptionFocusModifier()
             Protocol.entries.forEach { protocol ->
                 DropdownMenuItem(
                     text = { Text(protocol.displayName) },
+                    modifier = if (protocol == selected) selectedOptionFocus else Modifier,
                     onClick = {
                         draft.setTextAndPlaceCursorAtEnd(protocol.name)
                         expanded = false

@@ -11,11 +11,14 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 
 /**
  * A text field that opens a menu instead of a keyboard, for picking one of a fixed set of values.
@@ -56,6 +59,7 @@ fun <T> ReadOnlyDropdownField(
             expanded = expanded,
             onDismissRequest = { expanded = false },
         ) {
+            val selectedOptionFocus = selectedOptionFocusModifier()
             options.forEach { option ->
                 DropdownMenuItem(
                     text = {
@@ -76,11 +80,24 @@ fun <T> ReadOnlyDropdownField(
                         expanded = false
                         onSelected(option.value)
                     },
+                    modifier = if (option.label == selectedText) selectedOptionFocus else Modifier,
                     enabled = option.enabled,
                 )
             }
         }
     }
+}
+
+/**
+ * Focuses the menu option it is applied to as the menu opens, so a remote starts on the current
+ * value rather than at the top. Call it inside the menu's content. Touch mode refuses the request,
+ * so phones are unaffected.
+ */
+@Composable
+fun selectedOptionFocusModifier(): Modifier {
+    val focusRequester = remember { FocusRequester() }
+    LaunchedEffect(focusRequester) { focusRequester.requestFocus() }
+    return Modifier.focusRequester(focusRequester)
 }
 
 /**
