@@ -1233,16 +1233,20 @@ private fun SettingsServiceSection(
             )
 
             if (rootConnectionBackend == RootConnectionBackend.Tproxy) {
-                SettingsNestedSection(title = stringResource(R.string.settings_other_vpn_mode)) {
-                    OtherVpnMode.entries.forEach { mode ->
-                        SettingsRadioRow(
-                            title = stringResource(mode.labelResource),
+                ReadOnlyDropdownField(
+                    label = stringResource(R.string.settings_other_vpn_mode),
+                    selectedText = stringResource(otherVpnMode.labelResource),
+                    supportingText = stringResource(otherVpnMode.descriptionResource),
+                    options = OtherVpnMode.entries.map { mode ->
+                        DropdownOption(
+                            value = mode,
+                            label = stringResource(mode.labelResource),
                             description = stringResource(mode.descriptionResource),
-                            selected = mode == otherVpnMode,
-                            onClick = { actions.onOtherVpnModeChange(mode) },
                         )
-                    }
-                }
+                    },
+                    onSelected = actions.onOtherVpnModeChange,
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                )
             }
         }
 
