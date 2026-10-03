@@ -386,6 +386,11 @@ val validateReleaseTelemetry = tasks.register<ValidateReleaseTelemetry>("validat
 android {
     namespace = "com.material.xray"
 
+    // Strings and drawables live in :core:ui, but only :app sees every module that uses them.
+    // Linting the dependencies as one project keeps UnusedResources and similar cross-module
+    // checks working; a library's own lint skips them.
+    lint.checkDependencies = true
+
     defaultConfig {
         applicationId = "com.material.xray"
         targetSdk = 36
