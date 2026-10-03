@@ -128,12 +128,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.InputMode
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LookaheadScope
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
@@ -2319,19 +2321,21 @@ private fun SubscriptionDescriptionText(description: String) {
     val textColor = MaterialTheme.colorScheme.onSurfaceVariant
     val uriHandler = LocalUriHandler.current
     var pendingUrl by remember(description) { mutableStateOf<String?>(null) }
-    val annotatedDescription = remember(description, linkColor) {
-        description.withUrlLinks(linkColor) { url ->
-            pendingUrl = url
-        }
+    // Selection and links are focus stops that draw nothing, so a remote would lose focus in the
+    // announcement. Without touch it is plain text; the links keep their look.
+    val touch = LocalInputModeManager.current.inputMode == InputMode.Touch
+    val annotatedDescription = remember(description, linkColor, touch) {
+        description.withUrlLinks(linkColor, onUrlClick = if (touch) { url -> pendingUrl = url } else null)
     }
-
-    SelectionContainer {
+    val descriptionText = @Composable {
         Text(
             text = annotatedDescription,
             style = MaterialTheme.typography.bodySmall,
             color = textColor,
         )
     }
+
+    if (touch) SelectionContainer(content = descriptionText) else descriptionText()
 
     pendingUrl?.let { url ->
         AlertDialog(
@@ -2643,14 +2647,12 @@ private fun String.withMetadataEmphasis(expiredStatusText: String) = buildAnnota
 
 private fun String.withUrlLinks(
     linkColor: Color,
-    onUrlClick: (String) -> Unit,
+    onUrlClick: ((String) -> Unit)?,
 ): AnnotatedString = buildAnnotatedString {
     var cursor = 0
-    val linkStyles = TextLinkStyles(
-        style = SpanStyle(
-            color = linkColor,
-            textDecoration = TextDecoration.Underline,
-        ),
+    val linkStyle = SpanStyle(
+        color = linkColor,
+        textDecoration = TextDecoration.Underline,
     )
 
     subscriptionUrlRegex.findAll(this@withUrlLinks).forEach { match ->
@@ -2665,17 +2667,21 @@ private fun String.withUrlLinks(
         val url = this@withUrlLinks.substring(start, end)
         val linkStart = length
         append(url)
-        addLink(
-            LinkAnnotation.Clickable(
-                tag = url.normalizedSubscriptionUrl(),
-                styles = linkStyles,
-                linkInteractionListener = LinkInteractionListener { link ->
-                    (link as? LinkAnnotation.Clickable)?.tag?.let(onUrlClick)
-                },
-            ),
-            start = linkStart,
-            end = length,
-        )
+        if (onUrlClick == null) {
+            addStyle(linkStyle, start = linkStart, end = length)
+        } else {
+            addLink(
+                LinkAnnotation.Clickable(
+                    tag = url.normalizedSubscriptionUrl(),
+                    styles = TextLinkStyles(style = linkStyle),
+                    linkInteractionListener = LinkInteractionListener { link ->
+                        (link as? LinkAnnotation.Clickable)?.tag?.let(onUrlClick)
+                    },
+                ),
+                start = linkStart,
+                end = length,
+            )
+        }
         cursor = end
     }
 
