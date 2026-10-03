@@ -4,7 +4,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.material.xray.core.common.connection.ConnectionStateCoordinator
 import com.material.xray.core.common.connection.PendingRoutingChange
-import com.material.xray.core.xray.ProviderGeoDataManager
 import com.material.xray.core.xray.ProviderGeoDataNotice
 import com.material.xray.core.xray.providerGeoDataNotice
 import com.material.xray.core.xray.providerGeoDataUrls
@@ -12,6 +11,7 @@ import com.material.xray.data.db.dao.SubscriptionDao
 import com.material.xray.data.parser.ProfileRouting
 import com.material.xray.data.parser.ProfileRoutingInspector
 import com.material.xray.data.parser.ProfileRoutingRule
+import com.material.xray.data.repository.ProviderGeoDataManager
 import com.material.xray.data.repository.ProviderRoutingAvailability
 import com.material.xray.data.repository.ServerRepository
 import com.material.xray.data.repository.SettingsRepository

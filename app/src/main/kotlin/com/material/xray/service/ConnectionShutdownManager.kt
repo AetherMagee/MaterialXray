@@ -3,6 +3,7 @@ package com.material.xray.service
 import android.content.Context
 import android.os.SystemClock
 import com.material.xray.R
+import com.material.xray.core.common.connection.ConnectionShutdown
 import com.material.xray.core.common.connection.ConnectionStateCoordinator
 import com.material.xray.core.common.log.LogBuffer
 import com.material.xray.core.common.log.LogSource
@@ -13,12 +14,12 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
 import org.koin.core.annotation.Singleton
 
-@Singleton
+@Singleton(binds = [ConnectionShutdown::class])
 class ConnectionShutdownManager(
     private val context: Context,
     private val stateCoordinator: ConnectionStateCoordinator,
     private val log: LogBuffer,
-) {
+) : ConnectionShutdown {
     private val stepExecutor = ConnectionStepExecutor(
         elapsedRealtime = SystemClock::elapsedRealtime,
         log = { message -> log.append(LogSource.APP, message) },
@@ -26,18 +27,22 @@ class ConnectionShutdownManager(
         onProgressFinished = stateCoordinator::endConnectionProgress,
     )
 
-    suspend fun disconnectIfRunning() = stepExecutor.execute(
+    override suspend fun disconnectIfRunning() = stepExecutor.execute(
         ConnectionStep("Disconnect Xray for maintenance", ConnectionProgress.StoppingCore) {
             disconnectIfRunningOnce()
         },
     )
+
+    override fun forceDisconnect() {
+        XrayService.disconnect(context, force = true)
+    }
 
     private suspend fun disconnectIfRunningOnce() {
         if (!stateCoordinator.state.value.requiresRuntimeDisconnect()) return
 
         stateCoordinator.markDisconnecting()
         try {
-            XrayService.disconnect(context, force = true)
+            forceDisconnect()
         } catch (error: IllegalStateException) {
             markStopFailure()
             throw error

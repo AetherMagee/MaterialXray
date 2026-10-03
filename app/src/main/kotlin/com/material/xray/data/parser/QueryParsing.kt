@@ -1,5 +1,7 @@
 package com.material.xray.data.parser
 
+import com.material.xray.core.common.text.decodeUriComponentLeniently
+
 /**
  * Splits a raw query string and percent-decodes each key and value exactly once.
  *

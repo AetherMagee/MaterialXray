@@ -6,15 +6,16 @@ import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
+import com.material.xray.core.common.connection.AppUpdateScheduling
 import com.material.xray.model.AppUpdateInterval
 import java.util.concurrent.TimeUnit
 import org.koin.core.annotation.Singleton
 
-@Singleton
+@Singleton(binds = [AppUpdateScheduling::class])
 class AppUpdateScheduler(
     private val context: Context,
-) {
-    fun setEnabled(enabled: Boolean, interval: AppUpdateInterval) {
+) : AppUpdateScheduling {
+    override fun setEnabled(enabled: Boolean, interval: AppUpdateInterval) {
         val workManager = WorkManager.getInstance(context)
         workManager.cancelUniqueWork(LEGACY_IMMEDIATE_WORK_NAME)
         if (enabled) {

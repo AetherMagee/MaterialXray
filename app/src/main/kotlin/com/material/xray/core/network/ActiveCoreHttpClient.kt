@@ -6,7 +6,6 @@ import com.material.xray.core.common.connection.ConnectionStateCoordinator
 import com.material.xray.core.xray.ACTIVE_CONFIG_FILE
 import com.material.xray.core.xray.AndroidLocalSocketFactory
 import com.material.xray.core.xray.XRAY_APP_HTTP_INBOUND_TAG
-import com.material.xray.data.repository.SettingsRepository
 import com.material.xray.model.ConnectionState
 import java.io.File
 import java.io.IOException
@@ -31,12 +30,12 @@ import org.koin.core.annotation.Singleton
 class ActiveCoreHttpClient(
     private val context: Context,
     private val baseClient: OkHttpClient,
-    private val settingsRepository: SettingsRepository,
+    private val trafficRoutingSetting: CoreTrafficRoutingSetting,
     private val connectionState: ConnectionStateCoordinator,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : AppHttpClient {
     override suspend fun <T> use(block: suspend (OkHttpClient) -> T): T {
-        if (!settingsRepository.routeMxrayTrafficThroughXray.first()) return block(baseClient)
+        if (!trafficRoutingSetting.routeMxrayTrafficThroughXray.first()) return block(baseClient)
         if (connectionState.state.value !is ConnectionState.Connected) return block(baseClient)
 
         val privateDir = context.filesDir.resolve("bin")

@@ -1,5 +1,6 @@
 package com.material.xray.data.parser
 
+import com.material.xray.core.common.text.decodeUriComponentLeniently
 import com.material.xray.model.Protocol
 import com.material.xray.model.ServerConfig
 import java.net.URI

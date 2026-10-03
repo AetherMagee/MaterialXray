@@ -1,10 +1,10 @@
 package com.material.xray.data.repository
 
+import com.material.xray.core.common.connection.ConnectionShutdown
 import com.material.xray.core.xray.ActiveConfigOverrideStore
 import com.material.xray.data.db.dao.AppBypassDao
 import com.material.xray.data.db.entity.ServerEntity
 import com.material.xray.data.db.entity.SubscriptionEntity
-import com.material.xray.service.ConnectionShutdownManager
 import java.io.IOException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
@@ -21,7 +21,7 @@ class SubscriptionRefreshCoordinator(
     private val settingsRepository: SettingsRepository,
     private val appBypassDao: AppBypassDao,
     private val providerRoutingCoordinator: ProviderRoutingCoordinator,
-    private val connectionShutdownManager: ConnectionShutdownManager,
+    private val connectionShutdown: ConnectionShutdown,
     private val serverSelectionCoordinator: ServerSelectionCoordinator,
     private val activeConfigOverrideStore: ActiveConfigOverrideStore,
 ) {
@@ -70,7 +70,7 @@ class SubscriptionRefreshCoordinator(
                 ?.takeIf { it.subscriptionId == subscription.id }
                 ?.id
             if (removedSelectedServerId != null) {
-                connectionShutdownManager.disconnectIfRunning()
+                connectionShutdown.disconnectIfRunning()
             }
 
             withContext(NonCancellable) {
@@ -156,7 +156,7 @@ class SubscriptionRefreshCoordinator(
             SelectedServerRefreshOutcome.Unchanged -> Unit
             SelectedServerRefreshOutcome.Removed -> {
                 try {
-                    connectionShutdownManager.disconnectIfRunning()
+                    connectionShutdown.disconnectIfRunning()
                 } finally {
                     settingsRepository.compareAndSetLastServerId(selectedServer.id, -1)
                     activeConfigOverrideStore.clear()

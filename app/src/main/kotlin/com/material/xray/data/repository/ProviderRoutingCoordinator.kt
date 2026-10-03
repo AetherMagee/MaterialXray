@@ -1,9 +1,9 @@
 package com.material.xray.data.repository
 
 import com.material.xray.core.common.connection.PendingRoutingChange
+import com.material.xray.core.common.connection.RoutingChangeNotifier
 import com.material.xray.data.db.dao.SubscriptionDao
 import com.material.xray.model.RoutingPolicyControl
-import com.material.xray.service.RoutingChangeManager
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -45,7 +45,7 @@ class ProviderRoutingCoordinator internal constructor(
         subscriptionDao: SubscriptionDao,
         subscriptionAppRoutingRepository: SubscriptionAppRoutingRepository,
         subscriptionRoutingRepository: SubscriptionRoutingRepository,
-        routingChangeManager: RoutingChangeManager,
+        routingChangeNotifier: RoutingChangeNotifier,
     ) : this(
         loadSelection = {
             if (settingsRepository.routingPolicyControl.first() != RoutingPolicyControl.SubscriptionProvider) {
@@ -70,7 +70,7 @@ class ProviderRoutingCoordinator internal constructor(
         applyXrayRouting = subscriptionRoutingRepository::applyForSubscription,
         clearAppRouting = subscriptionAppRoutingRepository::clear,
         clearXrayRouting = subscriptionRoutingRepository::clear,
-        applyActiveConnectionChange = routingChangeManager::requestActiveConnectionUpdate,
+        applyActiveConnectionChange = routingChangeNotifier::requestActiveConnectionUpdate,
     )
 
     private val refreshMutex = Mutex()

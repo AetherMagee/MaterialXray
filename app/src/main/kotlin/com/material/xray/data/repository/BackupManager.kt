@@ -4,6 +4,8 @@ import android.content.Context
 import android.net.Uri
 import androidx.room.withTransaction
 import com.material.xray.core.app.appKey
+import com.material.xray.core.common.connection.AppUpdateScheduling
+import com.material.xray.core.common.connection.ConnectionShutdown
 import com.material.xray.core.common.connection.ConnectionStateCoordinator
 import com.material.xray.core.launcher.LauncherIconManager
 import com.material.xray.data.db.AppDatabase
@@ -18,8 +20,6 @@ import com.material.xray.data.db.entity.toAppBypassEntity
 import com.material.xray.model.BackupData
 import com.material.xray.model.ConnectionState
 import com.material.xray.model.ServerConfig
-import com.material.xray.service.AppUpdateScheduler
-import com.material.xray.service.XrayService
 import java.io.ByteArrayOutputStream
 import java.io.IOException
 import kotlinx.coroutines.CancellationException
@@ -43,7 +43,8 @@ class BackupManager(
     private val appBypassDao: AppBypassDao,
     private val settingsRepository: SettingsRepository,
     private val launcherIconManager: LauncherIconManager,
-    private val appUpdateScheduler: AppUpdateScheduler,
+    private val appUpdateScheduler: AppUpdateScheduling,
+    private val connectionShutdown: ConnectionShutdown,
     private val connectionStateCoordinator: ConnectionStateCoordinator,
 ) {
     private val json = Json {
@@ -225,7 +226,7 @@ class BackupManager(
 
     private suspend fun disconnectActiveConnection() {
         if (!connectionStateCoordinator.state.value.isRunning()) return
-        XrayService.disconnect(context, force = true)
+        connectionShutdown.forceDisconnect()
         checkNotNull(
             withTimeoutOrNull(DISCONNECT_TIMEOUT_MILLIS) {
                 connectionStateCoordinator.state.first { !it.isRunning() }

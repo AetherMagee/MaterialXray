@@ -1,4 +1,4 @@
-package com.material.xray.data.parser
+package com.material.xray.core.common.text
 
 import java.net.URLDecoder
 
@@ -11,7 +11,7 @@ import java.net.URLDecoder
  * Throws [IllegalArgumentException] on malformed percent escapes; use [decodeUriComponentLeniently]
  * where a malformed component should degrade to its raw form instead of failing the caller.
  */
-internal fun decodeUriComponent(value: String): String = URLDecoder.decode(value.replace("+", "%2B"), "UTF-8")
+fun decodeUriComponent(value: String): String = URLDecoder.decode(value.replace("+", "%2B"), "UTF-8")
 
 /**
  * Like [decodeUriComponent], but a component with malformed percent escapes is returned verbatim.
@@ -19,4 +19,4 @@ internal fun decodeUriComponent(value: String): String = URLDecoder.decode(value
  * Share links found in the wild routinely carry stray `%` characters in cosmetic fields such as
  * names; rejecting the whole link over them would lose otherwise usable configurations.
  */
-internal fun decodeUriComponentLeniently(value: String): String = runCatching { decodeUriComponent(value) }.getOrDefault(value)
+fun decodeUriComponentLeniently(value: String): String = runCatching { decodeUriComponent(value) }.getOrDefault(value)

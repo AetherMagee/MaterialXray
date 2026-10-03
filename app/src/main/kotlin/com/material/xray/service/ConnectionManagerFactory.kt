@@ -21,7 +21,6 @@ import com.material.xray.core.xray.ConfigGenerator
 import com.material.xray.core.xray.GeoDataManager
 import com.material.xray.core.xray.GeoDataStatus
 import com.material.xray.core.xray.OtherVpnDns
-import com.material.xray.core.xray.ProviderGeoDataManager
 import com.material.xray.core.xray.ProviderGeoDataResolution
 import com.material.xray.core.xray.ServerAddressResolver
 import com.material.xray.core.xray.StateFile
@@ -39,6 +38,7 @@ import com.material.xray.core.xray.XrayRoutingClient
 import com.material.xray.core.xray.XrayStatsClient
 import com.material.xray.core.xray.XraySysStats
 import com.material.xray.data.db.dao.AppBypassDao
+import com.material.xray.data.repository.ProviderGeoDataManager
 import com.material.xray.data.repository.ServerRepository
 import com.material.xray.model.ActiveBalancerSelection
 import com.material.xray.model.ConnectionProgress

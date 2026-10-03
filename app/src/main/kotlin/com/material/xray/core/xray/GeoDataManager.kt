@@ -2,7 +2,6 @@ package com.material.xray.core.xray
 
 import android.content.Context
 import com.material.xray.core.network.AppHttpClient
-import com.material.xray.data.repository.SettingsRepository
 import java.io.File
 import java.io.IOException
 import java.io.InputStream
@@ -96,7 +95,7 @@ enum class GeoDataAsset(val fileName: String, val displayName: String) {
 class GeoDataManager(
     private val context: Context,
     private val httpClient: AppHttpClient,
-    private val settingsRepository: SettingsRepository,
+    private val urlSettings: GeoDataUrlSettings,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     private val binaryDir get() = File(context.filesDir, "bin")
@@ -345,22 +344,22 @@ class GeoDataManager(
     private suspend fun resolveState(seedBundled: Boolean = true): ResolvedGeoDataState {
         binaryDir.mkdirs()
 
-        val configuredGeoipUrl = normalizeGeoDataUrl(settingsRepository.geoipUrl.first())
-        val configuredGeositeUrl = normalizeGeoDataUrl(settingsRepository.geositeUrl.first())
-        val geoipUrl = configuredGeoipUrl.ifEmpty { SettingsRepository.DEFAULT_GEOIP_URL }
-        val geositeUrl = configuredGeositeUrl.ifEmpty { SettingsRepository.DEFAULT_GEOSITE_URL }
+        val configuredGeoipUrl = normalizeGeoDataUrl(urlSettings.geoipUrl.first())
+        val configuredGeositeUrl = normalizeGeoDataUrl(urlSettings.geositeUrl.first())
+        val geoipUrl = configuredGeoipUrl.ifEmpty { GeoDataDefaults.GEOIP_URL }
+        val geositeUrl = configuredGeositeUrl.ifEmpty { GeoDataDefaults.GEOSITE_URL }
         val geoipFile = File(binaryDir, GEOIP_FILE_NAME)
         val geositeFile = File(binaryDir, GEOSITE_FILE_NAME)
         if (seedBundled) {
             seedBundledGeoData(
                 geoipUrl,
-                SettingsRepository.DEFAULT_GEOIP_URL,
+                GeoDataDefaults.GEOIP_URL,
                 geoipFile,
                 geoipSourceFile,
             ) { context.assets.open(GEOIP_FILE_NAME) }
             seedBundledGeoData(
                 geositeUrl,
-                SettingsRepository.DEFAULT_GEOSITE_URL,
+                GeoDataDefaults.GEOSITE_URL,
                 geositeFile,
                 geositeSourceFile,
             ) { context.assets.open(GEOSITE_FILE_NAME) }

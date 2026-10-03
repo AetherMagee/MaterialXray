@@ -3,16 +3,17 @@ package com.material.xray.service
 import android.content.Context
 import com.material.xray.core.common.connection.ConnectionStateCoordinator
 import com.material.xray.core.common.connection.PendingRoutingChange
+import com.material.xray.core.common.connection.RoutingChangeNotifier
 import com.material.xray.model.ConnectionState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import org.koin.core.annotation.Singleton
 
-@Singleton
+@Singleton(binds = [RoutingChangeNotifier::class])
 class RoutingChangeManager(
     private val context: Context,
     private val connectionStateCoordinator: ConnectionStateCoordinator,
-) {
+) : RoutingChangeNotifier {
     private val pendingChanges = PendingRoutingChangeStore()
     val hasPendingChanges: StateFlow<Boolean> = pendingChanges.hasPendingChanges
 
@@ -24,7 +25,7 @@ class RoutingChangeManager(
         pendingChanges.clear()
     }
 
-    fun requestActiveConnectionUpdate(kind: PendingRoutingChange): Boolean {
+    override fun requestActiveConnectionUpdate(kind: PendingRoutingChange): Boolean {
         if (connectionStateCoordinator.state.value !is ConnectionState.Connected) return false
         markPendingChanges(kind)
         maybeReloadActiveConnection()

@@ -1,6 +1,6 @@
 package com.material.xray.core.xray
 
-import com.material.xray.data.parser.decodeUriComponent
+import com.material.xray.core.common.text.decodeUriComponent
 import com.material.xray.model.Protocol
 import com.material.xray.model.SERVER_EXTRA_HYSTERIA_CONGESTION
 import com.material.xray.model.SERVER_EXTRA_HYSTERIA_DOWN

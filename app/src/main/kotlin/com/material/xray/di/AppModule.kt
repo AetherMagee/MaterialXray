@@ -4,6 +4,7 @@ import android.content.Context
 import android.os.Build
 import com.material.xray.R
 import com.material.xray.core.android.di.CoreAndroidModule
+import com.material.xray.core.common.connection.RoutingChangeNotifier
 import com.material.xray.core.common.di.ApplicationScope
 import com.material.xray.core.common.di.CoreCommonModule
 import com.material.xray.core.connection.di.CoreConnectionModule
@@ -30,7 +31,6 @@ import com.material.xray.feature.home.di.FeatureHomeModule
 import com.material.xray.feature.logs.di.FeatureLogsModule
 import com.material.xray.feature.routing.di.FeatureRoutingModule
 import com.material.xray.feature.settings.di.FeatureSettingsModule
-import com.material.xray.service.RoutingChangeManager
 import com.material.xray.telemetry.TelemetryClient
 import com.material.xray.telemetry.TelemetryReporter
 import java.util.concurrent.TimeUnit
@@ -103,13 +103,13 @@ class AppModule {
         subscriptionDao: SubscriptionDao,
         subscriptionAppRoutingRepository: SubscriptionAppRoutingRepository,
         subscriptionRoutingRepository: SubscriptionRoutingRepository,
-        routingChangeManager: RoutingChangeManager,
+        routingChangeNotifier: RoutingChangeNotifier,
     ): ProviderRoutingCoordinator = ProviderRoutingCoordinator(
         settingsRepository,
         serverRepository,
         subscriptionDao,
         subscriptionAppRoutingRepository,
         subscriptionRoutingRepository,
-        routingChangeManager,
+        routingChangeNotifier,
     )
 }

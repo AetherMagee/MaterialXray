@@ -6,9 +6,9 @@ import com.material.xray.core.common.di.ApplicationScope
 import com.material.xray.core.launcher.LauncherIconManager
 import com.material.xray.core.locale.initializeAppLocales
 import com.material.xray.core.network.Ipv6Detector
-import com.material.xray.core.xray.ProviderGeoDataManager
 import com.material.xray.data.db.DatabaseOpenChecker
 import com.material.xray.data.repository.BackupManager
+import com.material.xray.data.repository.ProviderGeoDataManager
 import com.material.xray.data.repository.ServerRepository
 import com.material.xray.data.repository.SettingsRepository
 import com.material.xray.model.Ipv6Mode

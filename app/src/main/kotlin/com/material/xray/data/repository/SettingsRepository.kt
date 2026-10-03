@@ -8,6 +8,9 @@ import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.material.xray.core.network.CoreTrafficRoutingSetting
+import com.material.xray.core.xray.GeoDataDefaults
+import com.material.xray.core.xray.GeoDataUrlSettings
 import com.material.xray.model.AppUpdateInterval
 import com.material.xray.model.DnsPreset
 import com.material.xray.model.GeoDataUpdateInterval
@@ -80,10 +83,11 @@ private val Context.dataStore by preferencesDataStore(
 )
 
 @Suppress("TooManyFunctions")
-@Singleton
+@Singleton(binds = [CoreTrafficRoutingSetting::class, GeoDataUrlSettings::class])
 class SettingsRepository(
     private val context: Context,
-) {
+) : CoreTrafficRoutingSetting,
+    GeoDataUrlSettings {
     private val store get() = context.dataStore
     private val json = Json { ignoreUnknownKeys = true }
     private val diagnosticsConsentMirror = DiagnosticsConsentMirror(context)
@@ -156,10 +160,8 @@ class SettingsRepository(
         private val LEGACY_GEO_DATA_BASE_URL = stringPreferencesKey("geo_data_base_url")
         private const val CURRENT_ROUTING_RULES_VERSION = 2
 
-        const val DEFAULT_GEOIP_URL =
-            "https://github.com/v2fly/geoip/releases/latest/download/geoip.dat"
-        const val DEFAULT_GEOSITE_URL =
-            "https://github.com/v2fly/domain-list-community/releases/latest/download/dlc.dat"
+        const val DEFAULT_GEOIP_URL = GeoDataDefaults.GEOIP_URL
+        const val DEFAULT_GEOSITE_URL = GeoDataDefaults.GEOSITE_URL
         const val DEFAULT_LATENCY_CHECK_URL = "https://gstatic.com/generate_204"
 
         // Spelled as presets rather than literals so the shipped default is always one the DNS
@@ -211,7 +213,7 @@ class SettingsRepository(
     val showAdvancedOptions: Flow<Boolean> = store.data.map { prefs ->
         prefs[SHOW_ADVANCED_OPTIONS] ?: false
     }
-    val routeMxrayTrafficThroughXray: Flow<Boolean> = store.data.map { prefs ->
+    override val routeMxrayTrafficThroughXray: Flow<Boolean> = store.data.map { prefs ->
         prefs[ROUTE_MXRAY_TRAFFIC_THROUGH_XRAY] ?: true
     }
     val appSpecificServerNoteShown: Flow<Boolean> = store.data.map { prefs ->
@@ -226,12 +228,12 @@ class SettingsRepository(
     val rootConnectionBackend: Flow<RootConnectionBackend> = store.data.map { prefs ->
         RootConnectionBackend.fromValue(prefs[ROOT_CONNECTION_BACKEND])
     }
-    val geoipUrl: Flow<String> = store.data.map { prefs ->
+    override val geoipUrl: Flow<String> = store.data.map { prefs ->
         prefs[GEOIP_URL]
             ?: prefs[LEGACY_GEO_DATA_BASE_URL]?.let { legacyBaseUrl -> appendLegacyFileName(legacyBaseUrl, "geoip.dat") }
             ?: DEFAULT_GEOIP_URL
     }
-    val geositeUrl: Flow<String> = store.data.map { prefs ->
+    override val geositeUrl: Flow<String> = store.data.map { prefs ->
         prefs[GEOSITE_URL]
             ?: prefs[LEGACY_GEO_DATA_BASE_URL]?.let { legacyBaseUrl -> appendLegacyFileName(legacyBaseUrl, "geosite.dat") }
             ?: DEFAULT_GEOSITE_URL
