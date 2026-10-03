@@ -1,10 +1,5 @@
 plugins {
-    id("materialxray.android.library")
-    id("org.jetbrains.kotlin.plugin.serialization")
-}
-
-android {
-    namespace = "com.material.xray.core.data"
+    id("materialxray.jvm.library")
 }
 
 dependencies {
@@ -14,8 +9,9 @@ dependencies {
     implementation(project(":core:network"))
     implementation(project(":core:database"))
 
-    // SettingsRepository's setters return the edited Preferences, so DataStore is part of the API.
-    api(libs.datastore.preferences)
+    // SettingsRepository's setters return the edited Preferences, and the stores are injected, so
+    // DataStore is part of the API.
+    api(libs.datastore.preferences.core)
     implementation(libs.coroutines.core)
     implementation(libs.okhttp)
     implementation(libs.serialization.json)
