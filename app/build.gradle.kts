@@ -21,18 +21,14 @@ import org.gradle.api.tasks.PathSensitive
 import org.gradle.api.tasks.PathSensitivity
 import org.gradle.api.tasks.TaskAction
 import org.gradle.process.ExecOperations
-import org.jlleitschuh.gradle.ktlint.reporter.ReporterType
 
 plugins {
-    alias(libs.plugins.android.application)
-    alias(libs.plugins.ksp)
-    alias(libs.plugins.kotlin.serialization)
-    alias(libs.plugins.compose.compiler)
-    alias(libs.plugins.koin.compiler)
+    id("materialxray.android.application")
+    id("materialxray.android.compose")
+    id("com.google.devtools.ksp")
+    id("org.jetbrains.kotlin.plugin.serialization")
     alias(libs.plugins.protobuf)
     alias(libs.plugins.sentry.android)
-    id("dev.detekt") version ("2.0.0-alpha.5")
-    id("org.jlleitschuh.gradle.ktlint") version ("14.2.0")
 }
 
 @CacheableTask
@@ -394,13 +390,9 @@ val validateReleaseTelemetry = tasks.register<ValidateReleaseTelemetry>("validat
 
 android {
     namespace = "com.material.xray"
-    compileSdk = 37
-    compileSdkMinor = 0
-    buildToolsVersion = "37.0.0"
 
     defaultConfig {
         applicationId = "com.material.xray"
-        minSdk = 24
         targetSdk = 36
         versionCode = 940
         versionName = "0.9.4"
@@ -438,22 +430,6 @@ android {
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             signingConfig = signingConfigs.findByName("release")
         }
-    }
-
-    buildFeatures {
-        compose = true
-    }
-
-    compileOptions {
-        isCoreLibraryDesugaringEnabled = true
-    }
-
-    lint {
-        // Analysing the test sources costs more than the rest of the build put together, and it
-        // reruns on every main-source edit because the test classes depend on them. detekt and
-        // ktlint already cover the test sources, and the Android-specific checks lint adds are
-        // about shipped code.
-        ignoreTestSources = true
     }
 
     packaging {
@@ -498,33 +474,6 @@ ksp {
 
 tasks.withType<Test>().configureEach {
     systemProperty("room.schemaLocation", roomSchemaDirectory.asFile.path)
-}
-
-detekt {
-    buildUponDefaultConfig = true
-    config.setFrom(rootProject.files("config/detekt/detekt.yml"))
-    basePath.set(rootDir)
-}
-
-ktlint {
-    ignoreFailures.set(false)
-    reporters {
-        reporter(ReporterType.PLAIN)
-        reporter(ReporterType.HTML)
-    }
-    filter {
-        // KSP (Room) and protobuf/grpc write Kotlin/Java into build/generated;
-        // those are attached to the source sets, so exclude them from linting.
-        exclude { element -> element.file.path.contains("/generated/") }
-    }
-}
-
-// Formatting is a source mutation, so it does not belong on the path that compiles the sources:
-// rewriting a file mid-build invalidates the up-to-date checks of everything downstream, and it
-// races an editor that has the same file open. The prek hook formats on commit, and `check` still
-// enforces it here.
-tasks.named("check") {
-    dependsOn("ktlintFormat")
 }
 
 androidComponents {
@@ -583,28 +532,15 @@ protobuf {
 }
 
 dependencies {
-    coreLibraryDesugaring(libs.desugar.jdk.libs.nio)
-
-    implementation(platform(libs.compose.bom))
-    implementation(libs.compose.material3)
-    implementation(libs.compose.material3.adaptive)
-    implementation(libs.compose.ui)
-    implementation(libs.compose.ui.tooling.preview)
-    implementation(libs.compose.icons.extended)
-    debugImplementation(libs.compose.ui.tooling)
-
     implementation(libs.activity.compose)
     implementation(libs.appcompat)
     implementation(libs.navigation.compose)
-    implementation(libs.lifecycle.runtime.compose)
-    implementation(libs.lifecycle.viewmodel.compose)
     implementation(libs.core.ktx)
     implementation(libs.core.splashscreen)
     implementation(libs.work.runtime.ktx)
 
     implementation(platform(libs.koin.bom))
     implementation(libs.koin.android)
-    implementation(libs.koin.annotations)
     implementation(libs.koin.androidx.compose)
     implementation(libs.koin.androidx.workmanager)
 
@@ -623,8 +559,6 @@ dependencies {
     implementation(libs.zxing.core)
     implementation(libs.sentry.android)
 
-    testImplementation(libs.junit)
-    testImplementation(libs.coroutines.test)
     testImplementation(libs.okhttp.mockwebserver)
     testImplementation(libs.okhttp.tls)
     testImplementation(libs.sqlite.jdbc)
