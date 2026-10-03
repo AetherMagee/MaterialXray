@@ -4,6 +4,7 @@ import android.util.Log
 import com.xray.app.stats.command.QueryStatsRequest
 import com.xray.app.stats.command.StatsServiceGrpc
 import com.xray.app.stats.command.SysStatsRequest
+import io.grpc.ConnectivityState
 import io.grpc.ManagedChannel
 import io.grpc.StatusRuntimeException
 import java.util.concurrent.TimeUnit
@@ -61,7 +62,7 @@ internal class XrayStatsClient(
     }
 
     private fun <T> withBlockingStub(block: (StatsServiceGrpc.StatsServiceBlockingStub) -> T): Result<T> = try {
-        Result.success(block(stub.withDeadlineAfter(timeoutMs, TimeUnit.MILLISECONDS)))
+        Result.success(block(currentStub().withDeadlineAfter(timeoutMs, TimeUnit.MILLISECONDS)))
     } catch (e: StatusRuntimeException) {
         Result.failure(e)
     } catch (e: IllegalArgumentException) {
@@ -70,6 +71,17 @@ internal class XrayStatsClient(
         Result.failure(e)
     } catch (e: SecurityException) {
         Result.failure(e)
+    }
+
+    /**
+     * A failed connect leaves the channel in TRANSIENT_FAILURE, where calls fail without dialling until
+     * its reconnect backoff (1 s at first) runs out, and resetting the backoff does not lift that. The
+     * core's API socket only appears once the core has started, so the readiness poll would wait out
+     * the backoff rather than its own interval. An idle channel dials on its next call instead.
+     */
+    private fun currentStub(): StatsServiceGrpc.StatsServiceBlockingStub {
+        if (channel.getState(false) == ConnectivityState.TRANSIENT_FAILURE) channel.enterIdle()
+        return stub
     }
 
     override fun close() {
