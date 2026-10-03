@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.input.TextFieldLineLimits
+import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Info
@@ -44,7 +46,9 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
@@ -73,7 +77,11 @@ import org.koin.compose.viewmodel.koinViewModel
 fun AppBypassContent(active: Boolean, viewModel: AppsViewModel = koinViewModel()) {
     val lifecycleOwner = LocalLifecycleOwner.current
     val apps by viewModel.apps.collectAsStateWithLifecycle()
-    val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
+    // The view model only receives the query, so the field is seeded from it once.
+    val searchQuery = rememberSaveable(saver = TextFieldState.Saver) { TextFieldState(viewModel.searchQuery.value) }
+    LaunchedEffect(searchQuery) {
+        snapshotFlow { searchQuery.text.toString() }.collect(viewModel::setSearchQuery)
+    }
     val isLoadingApps by viewModel.isLoadingApps.collectAsStateWithLifecycle()
     val appLoadProgress by viewModel.appLoadProgress.collectAsStateWithLifecycle()
     val routingPolicyControl by viewModel.routingPolicyControl.collectAsStateWithLifecycle()
@@ -134,10 +142,9 @@ fun AppBypassContent(active: Boolean, viewModel: AppsViewModel = koinViewModel()
             }
 
             OutlinedTextField(
-                value = searchQuery,
-                onValueChange = { viewModel.setSearchQuery(it) },
+                state = searchQuery,
                 label = { Text(stringResource(R.string.apps_search)) },
-                singleLine = true,
+                lineLimits = TextFieldLineLimits.SingleLine,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(start = 16.dp, top = 0.dp, end = 16.dp, bottom = 8.dp),
@@ -603,10 +610,10 @@ private fun AppRoutePickerDialog(
     onSelected: (AppRouteOption) -> Unit,
 ) {
     val context = LocalContext.current
-    var query by remember(app.appKey) { mutableStateOf("") }
+    val query = remember(app.appKey) { TextFieldState() }
     val filteredOptions by remember(routeOptions, query) {
         derivedStateOf {
-            val trimmed = query.trim()
+            val trimmed = query.text.trim()
             if (trimmed.isEmpty()) {
                 routeOptions
             } else {
@@ -636,10 +643,9 @@ private fun AppRoutePickerDialog(
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 if (routeOptions.size > 8) {
                     OutlinedTextField(
-                        value = query,
-                        onValueChange = { query = it },
+                        state = query,
                         label = { Text(stringResource(R.string.apps_search_configurations)) },
-                        singleLine = true,
+                        lineLimits = TextFieldLineLimits.SingleLine,
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }

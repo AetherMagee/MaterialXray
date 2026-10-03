@@ -46,6 +46,11 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.InputTransformation
+import androidx.compose.foundation.text.input.TextFieldLineLimits
+import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.foundation.text.input.byValue
+import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
@@ -271,29 +276,29 @@ private fun SettingsScreenContent(
     val rootServiceAvailable = rootAvailable != false
     val rootServiceActive = useRootService && rootAvailable == true
 
-    var editingTunName by rememberSaveable(tunName) { mutableStateOf(tunName) }
-    var editingXrayBufferSizeKiB by rememberSaveable(xrayBufferSizeKiB) { mutableStateOf(xrayBufferSizeKiB.toString()) }
-    var editingTunMtu by rememberSaveable(tunMtu) { mutableStateOf(tunMtu.toString()) }
-    var editingXrayMemoryRestartThresholdMiB by rememberSaveable(xrayMemoryRestartThresholdMiB) {
-        mutableStateOf(xrayMemoryRestartThresholdMiB.toString())
+    val editingTunName = rememberSaveable(tunName, saver = TextFieldState.Saver) { TextFieldState(tunName) }
+    val editingXrayBufferSizeKiB = rememberSaveable(xrayBufferSizeKiB, saver = TextFieldState.Saver) { TextFieldState(xrayBufferSizeKiB.toString()) }
+    val editingTunMtu = rememberSaveable(tunMtu, saver = TextFieldState.Saver) { TextFieldState(tunMtu.toString()) }
+    val editingXrayMemoryRestartThresholdMiB = rememberSaveable(xrayMemoryRestartThresholdMiB, saver = TextFieldState.Saver) {
+        TextFieldState(xrayMemoryRestartThresholdMiB.toString())
     }
-    var editingGeoipUrl by rememberSaveable(geoipUrl) { mutableStateOf(geoipUrl) }
-    var editingGeositeUrl by rememberSaveable(geositeUrl) { mutableStateOf(geositeUrl) }
-    var editingGeoDataUpdateIntervalHours by rememberSaveable(geoDataUpdateIntervalHours) {
-        mutableStateOf(geoDataUpdateIntervalHours.toString())
+    val editingGeoipUrl = rememberSaveable(geoipUrl, saver = TextFieldState.Saver) { TextFieldState(geoipUrl) }
+    val editingGeositeUrl = rememberSaveable(geositeUrl, saver = TextFieldState.Saver) { TextFieldState(geositeUrl) }
+    val editingGeoDataUpdateIntervalHours = rememberSaveable(geoDataUpdateIntervalHours, saver = TextFieldState.Saver) {
+        TextFieldState(geoDataUpdateIntervalHours.toString())
     }
-    var editingLatencyCheckUrl by rememberSaveable(latencyCheckUrl) { mutableStateOf(latencyCheckUrl) }
+    val editingLatencyCheckUrl = rememberSaveable(latencyCheckUrl, saver = TextFieldState.Saver) { TextFieldState(latencyCheckUrl) }
     val topAppBarScrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
-    val hasTunNameChanges by remember(editingTunName, tunName) { derivedStateOf { editingTunName != tunName } }
+    val hasTunNameChanges by remember(editingTunName, tunName) { derivedStateOf { editingTunName.text.toString() != tunName } }
     val parsedXrayBufferSizeKiB by remember(editingXrayBufferSizeKiB) {
-        derivedStateOf { editingXrayBufferSizeKiB.toIntOrNull() }
+        derivedStateOf { editingXrayBufferSizeKiB.text.toString().toIntOrNull() }
     }
-    val parsedTunMtu by remember(editingTunMtu) { derivedStateOf { editingTunMtu.toIntOrNull() } }
+    val parsedTunMtu by remember(editingTunMtu) { derivedStateOf { editingTunMtu.text.toString().toIntOrNull() } }
     val parsedXrayMemoryRestartThresholdMiB by remember(editingXrayMemoryRestartThresholdMiB) {
-        derivedStateOf { editingXrayMemoryRestartThresholdMiB.toIntOrNull() }
+        derivedStateOf { editingXrayMemoryRestartThresholdMiB.text.toString().toIntOrNull() }
     }
     val parsedGeoDataUpdateIntervalHours by remember(editingGeoDataUpdateIntervalHours) {
-        derivedStateOf { editingGeoDataUpdateIntervalHours.toIntOrNull() }
+        derivedStateOf { editingGeoDataUpdateIntervalHours.text.toString().toIntOrNull() }
     }
     val isXrayBufferSizeKiBValid by remember(parsedXrayBufferSizeKiB) {
         derivedStateOf { parsedXrayBufferSizeKiB?.let(XrayRuntimeSettings::isValidXrayBufferSizeKiB) == true }
@@ -311,31 +316,31 @@ private fun SettingsScreenContent(
         derivedStateOf { parsedGeoDataUpdateIntervalHours?.let(GeoDataUpdateInterval::isValid) == true }
     }
     val hasXrayBufferSizeKiBChanges by remember(editingXrayBufferSizeKiB, xrayBufferSizeKiB) {
-        derivedStateOf { editingXrayBufferSizeKiB != xrayBufferSizeKiB.toString() }
+        derivedStateOf { editingXrayBufferSizeKiB.text.toString() != xrayBufferSizeKiB.toString() }
     }
     val hasTunMtuChanges by remember(editingTunMtu, tunMtu) {
-        derivedStateOf { editingTunMtu != tunMtu.toString() }
+        derivedStateOf { editingTunMtu.text.toString() != tunMtu.toString() }
     }
     val hasXrayMemoryRestartThresholdMiBChanges by remember(
         editingXrayMemoryRestartThresholdMiB,
         xrayMemoryRestartThresholdMiB,
     ) {
-        derivedStateOf { editingXrayMemoryRestartThresholdMiB != xrayMemoryRestartThresholdMiB.toString() }
+        derivedStateOf { editingXrayMemoryRestartThresholdMiB.text.toString() != xrayMemoryRestartThresholdMiB.toString() }
     }
     val hasGeoipUrlChanges by remember(editingGeoipUrl, geoipUrl) {
-        derivedStateOf { editingGeoipUrl.trim() != geoipUrl }
+        derivedStateOf { editingGeoipUrl.text.toString().trim() != geoipUrl }
     }
     val hasGeositeUrlChanges by remember(editingGeositeUrl, geositeUrl) {
-        derivedStateOf { editingGeositeUrl.trim() != geositeUrl }
+        derivedStateOf { editingGeositeUrl.text.toString().trim() != geositeUrl }
     }
     val hasGeoDataUpdateIntervalHoursChanges by remember(
         editingGeoDataUpdateIntervalHours,
         geoDataUpdateIntervalHours,
     ) {
-        derivedStateOf { editingGeoDataUpdateIntervalHours != geoDataUpdateIntervalHours.toString() }
+        derivedStateOf { editingGeoDataUpdateIntervalHours.text.toString() != geoDataUpdateIntervalHours.toString() }
     }
     val hasLatencyCheckUrlChanges by remember(editingLatencyCheckUrl, latencyCheckUrl) {
-        derivedStateOf { editingLatencyCheckUrl.trim() != latencyCheckUrl }
+        derivedStateOf { editingLatencyCheckUrl.text.toString().trim() != latencyCheckUrl }
     }
     val xrayCoreVersionText = xrayCoreVersionText(xrayCoreVersion)
     val appUpdateCheckInProgress = appUpdateCheckStatus?.isInProgress == true
@@ -604,8 +609,7 @@ private fun SettingsScreenContent(
                             visible = true,
                             editingTunName = editingTunName,
                             hasTunNameChanges = hasTunNameChanges,
-                            onEditingTunNameChange = { editingTunName = it },
-                            onSave = { viewModel.setTunName(editingTunName) },
+                            onSave = { viewModel.setTunName(editingTunName.text.toString()) },
                         )
                     }
                 }
@@ -626,8 +630,7 @@ private fun SettingsScreenContent(
                         verticalArrangement = Arrangement.spacedBy(16.dp),
                     ) {
                         AdvancedIntegerSetting(
-                            value = editingXrayBufferSizeKiB,
-                            onValueChange = { editingXrayBufferSizeKiB = it },
+                            state = editingXrayBufferSizeKiB,
                             label = stringResource(R.string.settings_xray_buffer_size_label),
                             supportingText = stringResource(
                                 R.string.settings_xray_buffer_size_supporting_text,
@@ -650,8 +653,7 @@ private fun SettingsScreenContent(
                         ) {
                             TunMtuSetting(
                                 visible = true,
-                                value = editingTunMtu,
-                                onValueChange = { editingTunMtu = it },
+                                state = editingTunMtu,
                                 isValid = isTunMtuValid,
                                 hasChanges = hasTunMtuChanges,
                                 onSave = { parsedTunMtu?.let(viewModel::setTunMtu) },
@@ -665,8 +667,7 @@ private fun SettingsScreenContent(
                         verticalArrangement = Arrangement.spacedBy(16.dp),
                     ) {
                         AdvancedIntegerSetting(
-                            value = editingXrayMemoryRestartThresholdMiB,
-                            onValueChange = { editingXrayMemoryRestartThresholdMiB = it },
+                            state = editingXrayMemoryRestartThresholdMiB,
                             label = stringResource(R.string.settings_xray_memory_restart_threshold_label),
                             supportingText = stringResource(
                                 R.string.settings_xray_memory_restart_threshold_supporting_text,
@@ -743,8 +744,7 @@ private fun SettingsScreenContent(
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
                     AdvancedIntegerSetting(
-                        value = editingGeoDataUpdateIntervalHours,
-                        onValueChange = { editingGeoDataUpdateIntervalHours = it },
+                        state = editingGeoDataUpdateIntervalHours,
                         label = stringResource(R.string.settings_geo_data_update_interval_label),
                         supportingText = stringResource(
                             R.string.settings_geo_data_update_interval_supporting_text,
@@ -769,10 +769,9 @@ private fun SettingsScreenContent(
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
                     OutlinedTextField(
-                        value = editingGeoipUrl,
-                        onValueChange = { editingGeoipUrl = it },
+                        state = editingGeoipUrl,
                         label = { Text(stringResource(R.string.settings_geoip_url_label)) },
-                        singleLine = true,
+                        lineLimits = TextFieldLineLimits.SingleLine,
                         modifier = Modifier.fillMaxWidth(),
                         supportingText = {
                             if (geoipUpdating) {
@@ -790,7 +789,7 @@ private fun SettingsScreenContent(
                             Box {
                                 TooltipIconButton(
                                     tooltip = stringResource(R.string.settings_update_geoip),
-                                    onClick = { viewModel.updateGeoipAsset(editingGeoipUrl) },
+                                    onClick = { viewModel.updateGeoipAsset(editingGeoipUrl.text.toString()) },
                                     enabled = !geoipUpdating && !geoDataClearing,
                                 ) {
                                     if (geoipUpdating) {
@@ -810,7 +809,7 @@ private fun SettingsScreenContent(
                         },
                     )
                     if (hasGeoipUrlChanges) {
-                        Button(onClick = { viewModel.setGeoipUrl(editingGeoipUrl) }) {
+                        Button(onClick = { viewModel.setGeoipUrl(editingGeoipUrl.text.toString()) }) {
                             Text(stringResource(R.string.settings_save))
                         }
                     }
@@ -823,10 +822,9 @@ private fun SettingsScreenContent(
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
                     OutlinedTextField(
-                        value = editingGeositeUrl,
-                        onValueChange = { editingGeositeUrl = it },
+                        state = editingGeositeUrl,
                         label = { Text(stringResource(R.string.settings_geosite_url_label)) },
-                        singleLine = true,
+                        lineLimits = TextFieldLineLimits.SingleLine,
                         modifier = Modifier.fillMaxWidth(),
                         supportingText = {
                             if (geositeUpdating) {
@@ -844,7 +842,7 @@ private fun SettingsScreenContent(
                             Box {
                                 TooltipIconButton(
                                     tooltip = stringResource(R.string.settings_update_geosite),
-                                    onClick = { viewModel.updateGeositeAsset(editingGeositeUrl) },
+                                    onClick = { viewModel.updateGeositeAsset(editingGeositeUrl.text.toString()) },
                                     enabled = !geositeUpdating && !geoDataClearing,
                                 ) {
                                     if (geositeUpdating) {
@@ -864,7 +862,7 @@ private fun SettingsScreenContent(
                         },
                     )
                     if (hasGeositeUrlChanges) {
-                        Button(onClick = { viewModel.setGeositeUrl(editingGeositeUrl) }) {
+                        Button(onClick = { viewModel.setGeositeUrl(editingGeositeUrl.text.toString()) }) {
                             Text(stringResource(R.string.settings_save))
                         }
                     }
@@ -878,15 +876,14 @@ private fun SettingsScreenContent(
                         verticalArrangement = Arrangement.spacedBy(16.dp),
                     ) {
                         OutlinedTextField(
-                            value = editingLatencyCheckUrl,
-                            onValueChange = { editingLatencyCheckUrl = it },
+                            state = editingLatencyCheckUrl,
                             label = { Text(stringResource(R.string.settings_latency_check_url_label)) },
-                            singleLine = true,
+                            lineLimits = TextFieldLineLimits.SingleLine,
                             modifier = Modifier.fillMaxWidth(),
                             supportingText = { Text(stringResource(R.string.settings_latency_check_url_supporting_text)) },
                         )
                         if (hasLatencyCheckUrlChanges) {
-                            Button(onClick = { viewModel.setLatencyCheckUrl(editingLatencyCheckUrl) }) {
+                            Button(onClick = { viewModel.setLatencyCheckUrl(editingLatencyCheckUrl.text.toString()) }) {
                                 Text(stringResource(R.string.settings_save))
                             }
                         }
@@ -1792,18 +1789,16 @@ private fun legalDocuments(): List<LegalDocument> = listOf(
 @Composable
 private fun RootTunNameSetting(
     visible: Boolean,
-    editingTunName: String,
+    editingTunName: TextFieldState,
     hasTunNameChanges: Boolean,
-    onEditingTunNameChange: (String) -> Unit,
     onSave: () -> Unit,
 ) {
     if (!visible) return
 
     OutlinedTextField(
-        value = editingTunName,
-        onValueChange = onEditingTunNameChange,
+        state = editingTunName,
         label = { Text(stringResource(R.string.settings_tun_interface_name_label)) },
-        singleLine = true,
+        lineLimits = TextFieldLineLimits.SingleLine,
         modifier = Modifier.fillMaxWidth(),
         supportingText = { Text(stringResource(R.string.settings_tun_interface_name_automatic)) },
     )
@@ -1815,16 +1810,14 @@ private fun RootTunNameSetting(
 @Composable
 private fun TunMtuSetting(
     visible: Boolean,
-    value: String,
-    onValueChange: (String) -> Unit,
+    state: TextFieldState,
     isValid: Boolean,
     hasChanges: Boolean,
     onSave: () -> Unit,
 ) {
     if (!visible) return
     AdvancedIntegerSetting(
-        value = value,
-        onValueChange = onValueChange,
+        state = state,
         label = stringResource(R.string.settings_tun_mtu_label),
         supportingText = stringResource(
             R.string.settings_tun_mtu_supporting_text,
@@ -1841,8 +1834,7 @@ private fun TunMtuSetting(
 
 @Composable
 private fun AdvancedIntegerSetting(
-    value: String,
-    onValueChange: (String) -> Unit,
+    state: TextFieldState,
     label: String,
     supportingText: String,
     suffix: String,
@@ -1851,14 +1843,14 @@ private fun AdvancedIntegerSetting(
     onSave: () -> Unit,
 ) {
     OutlinedTextField(
-        value = value,
-        onValueChange = { newValue -> onValueChange(newValue.filter(Char::isDigit).take(5)) },
+        state = state,
         label = { Text(label) },
         supportingText = { Text(supportingText) },
         suffix = { Text(suffix) },
-        isError = value.isNotEmpty() && !isValid,
+        isError = state.text.isNotEmpty() && !isValid,
+        inputTransformation = digitsOnly(maxLength = 5),
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-        singleLine = true,
+        lineLimits = TextFieldLineLimits.SingleLine,
         modifier = Modifier.fillMaxWidth(),
     )
     if (hasChanges) {
@@ -2313,8 +2305,8 @@ private fun UpdateFrequencyDialog(
     onDismiss: () -> Unit,
     onConfirm: (Int) -> Unit,
 ) {
-    var text by remember { mutableStateOf(currentValue.toString()) }
-    val parsed = text.toIntOrNull()
+    val interval = rememberTextFieldState(currentValue.toString())
+    val parsed = interval.text.toString().toIntOrNull()
     val isValid = parsed != null &&
         parsed in NotificationSettings.MIN_UPDATE_INTERVAL_MS..NotificationSettings.MAX_UPDATE_INTERVAL_MS
 
@@ -2323,10 +2315,10 @@ private fun UpdateFrequencyDialog(
         title = { Text(stringResource(R.string.settings_notification_update_frequency)) },
         text = {
             OutlinedTextField(
-                value = text,
-                onValueChange = { value -> text = value.filter(Char::isDigit).take(4) },
-                singleLine = true,
-                isError = text.isNotEmpty() && !isValid,
+                state = interval,
+                inputTransformation = digitsOnly(maxLength = 4),
+                lineLimits = TextFieldLineLimits.SingleLine,
+                isError = interval.text.isNotEmpty() && !isValid,
                 suffix = { Text(stringResource(R.string.settings_milliseconds_abbreviation)) },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 supportingText = {
@@ -2501,4 +2493,8 @@ private fun notificationFieldSummary(settings: NotificationSettings): String {
     } else {
         enabledFields.joinToString(stringResource(R.string.settings_notification_field_separator))
     }
+}
+
+private fun digitsOnly(maxLength: Int) = InputTransformation.byValue { _, proposed ->
+    proposed.filter(Char::isDigit).take(maxLength)
 }

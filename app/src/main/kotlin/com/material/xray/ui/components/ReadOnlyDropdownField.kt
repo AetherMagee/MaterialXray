@@ -2,6 +2,7 @@ package com.material.xray.ui.components
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
@@ -42,8 +43,7 @@ fun <T> ReadOnlyDropdownField(
         modifier = modifier,
     ) {
         OutlinedTextField(
-            value = selectedText,
-            onValueChange = {},
+            state = remember(selectedText) { TextFieldState(selectedText) },
             readOnly = true,
             label = { Text(label) },
             supportingText = supportingText?.let { { Text(it) } },

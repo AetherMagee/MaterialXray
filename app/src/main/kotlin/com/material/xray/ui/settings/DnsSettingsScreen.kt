@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.text.input.TextFieldLineLimits
+import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
@@ -159,7 +161,7 @@ private fun DnsResolverSection(
         // nothing about encryption, so the next provider picked from the menu gets it.
         mutableStateOf(isEncryptedDnsValue(servers) || !storedPreset.supportsEncryption)
     }
-    var editingServers by rememberSaveable(servers) { mutableStateOf(servers) }
+    val editingServers = rememberSaveable(servers, saver = TextFieldState.Saver) { TextFieldState(servers) }
     val preset = if (customPicked) DnsPreset.Custom else storedPreset
 
     Column(
@@ -225,15 +227,14 @@ private fun DnsResolverSection(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 OutlinedTextField(
-                    value = editingServers,
-                    onValueChange = { editingServers = it },
+                    state = editingServers,
                     label = { Text(stringResource(R.string.settings_dns_custom_label)) },
-                    singleLine = true,
+                    lineLimits = TextFieldLineLimits.SingleLine,
                     modifier = Modifier.fillMaxWidth(),
                     supportingText = { Text(stringResource(R.string.settings_dns_custom_supporting_text)) },
                 )
-                if (editingServers.trim() != servers) {
-                    Button(onClick = { onServersChange(editingServers) }) {
+                if (editingServers.text.toString().trim() != servers) {
+                    Button(onClick = { onServersChange(editingServers.text.toString()) }) {
                         Text(stringResource(R.string.settings_save))
                     }
                 }

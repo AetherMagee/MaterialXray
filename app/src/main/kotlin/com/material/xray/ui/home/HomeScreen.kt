@@ -61,6 +61,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.TextAutoSize
+import androidx.compose.foundation.text.input.TextFieldLineLimits
+import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -2779,8 +2782,8 @@ private fun EditSubscriptionDialog(
     onConfirm: (String, String, Boolean, Boolean, Int, SubscriptionUserAgentMode, String, String) -> Unit,
 ) {
     var advancedExpanded by rememberSaveable(subscription.id) { mutableStateOf(false) }
-    var name by rememberSaveable(subscription.id) { mutableStateOf(subscription.name) }
-    var url by rememberSaveable(subscription.id) { mutableStateOf(subscription.url) }
+    val name = rememberSaveable(subscription.id, saver = TextFieldState.Saver) { TextFieldState(subscription.name) }
+    val url = rememberSaveable(subscription.id, saver = TextFieldState.Saver) { TextFieldState(subscription.url) }
     var preferJson by rememberSaveable(subscription.id) { mutableStateOf(subscription.preferJson ?: true) }
     var allowInsecureUpdates by rememberSaveable(subscription.id) {
         mutableStateOf(subscription.allowInsecureUpdates)
@@ -2791,20 +2794,20 @@ private fun EditSubscriptionDialog(
     var userAgentMode by rememberSaveable(subscription.id) {
         mutableStateOf(SubscriptionUserAgentMode.fromValue(subscription.userAgentMode))
     }
-    var customUserAgent by rememberSaveable(subscription.id) {
-        mutableStateOf(subscription.customUserAgent.orEmpty())
+    val customUserAgent = rememberSaveable(subscription.id, saver = TextFieldState.Saver) {
+        TextFieldState(subscription.customUserAgent.orEmpty())
     }
-    var customHeaders by rememberSaveable(subscription.id) {
-        mutableStateOf(subscription.customHeaders.orEmpty())
+    val customHeaders = rememberSaveable(subscription.id, saver = TextFieldState.Saver) {
+        TextFieldState(subscription.customHeaders.orEmpty())
     }
-    val hasChanges = name.trim() != subscription.name ||
-        url.trim() != subscription.url ||
+    val hasChanges = name.text.toString().trim() != subscription.name ||
+        url.text.toString().trim() != subscription.url ||
         preferJson != (subscription.preferJson ?: true) ||
         allowInsecureUpdates != subscription.allowInsecureUpdates ||
         autoUpdateIntervalHours != subscription.autoUpdateIntervalHours ||
         userAgentMode != SubscriptionUserAgentMode.fromValue(subscription.userAgentMode) ||
-        customUserAgent.trim().ifBlank { null } != subscription.customUserAgent ||
-        customHeaders.trim().ifBlank { null } != subscription.customHeaders
+        customUserAgent.text.toString().trim().ifBlank { null } != subscription.customUserAgent ||
+        customHeaders.text.toString().trim().ifBlank { null } != subscription.customHeaders
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.home_edit_subscription_title)) },
@@ -2813,19 +2816,17 @@ private fun EditSubscriptionDialog(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
             ) {
                 OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
+                    state = name,
                     label = { Text(stringResource(R.string.home_field_name)) },
-                    singleLine = true,
+                    lineLimits = TextFieldLineLimits.SingleLine,
                     modifier = Modifier.fillMaxWidth(),
                     supportingText = { Text(stringResource(R.string.home_name_from_provider_hint)) },
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 OutlinedTextField(
-                    value = url,
-                    onValueChange = { url = it },
+                    state = url,
                     label = { Text(stringResource(R.string.home_field_url)) },
-                    singleLine = true,
+                    lineLimits = TextFieldLineLimits.SingleLine,
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Spacer(modifier = Modifier.height(16.dp))
@@ -2854,8 +2855,6 @@ private fun EditSubscriptionDialog(
                     customUserAgent = customUserAgent,
                     customHeaders = customHeaders,
                     onUserAgentModeChange = { userAgentMode = it },
-                    onCustomUserAgentChange = { customUserAgent = it },
-                    onCustomHeadersChange = { customHeaders = it },
                 )
             }
         },
@@ -2863,17 +2862,17 @@ private fun EditSubscriptionDialog(
             Button(
                 onClick = {
                     onConfirm(
-                        name.trim(),
-                        url.trim(),
+                        name.text.toString().trim(),
+                        url.text.toString().trim(),
                         preferJson,
                         allowInsecureUpdates,
                         autoUpdateIntervalHours,
                         userAgentMode,
-                        customUserAgent,
-                        customHeaders,
+                        customUserAgent.text.toString(),
+                        customHeaders.text.toString(),
                     )
                 },
-                enabled = url.isNotBlank() && hasChanges,
+                enabled = url.text.isNotBlank() && hasChanges,
             ) {
                 Text(stringResource(R.string.home_action_save))
             }
@@ -2945,13 +2944,13 @@ private fun AddSubscriptionDialog(
     onConfirm: (String, String, Boolean, Boolean, SubscriptionUserAgentMode, String, String) -> Unit,
 ) {
     var advancedExpanded by rememberSaveable { mutableStateOf(false) }
-    var name by rememberSaveable { mutableStateOf("") }
-    var url by rememberSaveable { mutableStateOf("") }
+    val name = rememberTextFieldState()
+    val url = rememberTextFieldState()
     var preferJson by rememberSaveable { mutableStateOf(true) }
     var allowInsecureUpdates by rememberSaveable { mutableStateOf(false) }
     var userAgentMode by rememberSaveable { mutableStateOf(SubscriptionUserAgentMode.default) }
-    var customUserAgent by rememberSaveable { mutableStateOf("") }
-    var customHeaders by rememberSaveable { mutableStateOf("") }
+    val customUserAgent = rememberTextFieldState()
+    val customHeaders = rememberTextFieldState()
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -2961,18 +2960,16 @@ private fun AddSubscriptionDialog(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
             ) {
                 OutlinedTextField(
-                    value = url,
-                    onValueChange = { url = it },
+                    state = url,
                     label = { Text(stringResource(R.string.home_field_url)) },
-                    singleLine = true,
+                    lineLimits = TextFieldLineLimits.SingleLine,
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
+                    state = name,
                     label = { Text(stringResource(R.string.home_field_name)) },
-                    singleLine = true,
+                    lineLimits = TextFieldLineLimits.SingleLine,
                     modifier = Modifier.fillMaxWidth(),
                     supportingText = { Text(stringResource(R.string.home_name_from_provider_hint)) },
                 )
@@ -2988,8 +2985,6 @@ private fun AddSubscriptionDialog(
                     customUserAgent = customUserAgent,
                     customHeaders = customHeaders,
                     onUserAgentModeChange = { userAgentMode = it },
-                    onCustomUserAgentChange = { customUserAgent = it },
-                    onCustomHeadersChange = { customHeaders = it },
                 )
             }
         },
@@ -2997,16 +2992,16 @@ private fun AddSubscriptionDialog(
             TextButton(
                 onClick = {
                     onConfirm(
-                        name.trim(),
-                        url.trim(),
+                        name.text.toString().trim(),
+                        url.text.toString().trim(),
                         preferJson,
                         allowInsecureUpdates,
                         userAgentMode,
-                        customUserAgent,
-                        customHeaders,
+                        customUserAgent.text.toString(),
+                        customHeaders.text.toString(),
                     )
                 },
-                enabled = url.isNotBlank(),
+                enabled = url.text.isNotBlank(),
             ) {
                 Text(stringResource(R.string.home_action_add))
             }
@@ -3028,11 +3023,9 @@ private fun SubscriptionAdvancedOptions(
     allowInsecureUpdates: Boolean,
     onAllowInsecureUpdatesChange: (Boolean) -> Unit,
     userAgentMode: SubscriptionUserAgentMode,
-    customUserAgent: String,
-    customHeaders: String,
+    customUserAgent: TextFieldState,
+    customHeaders: TextFieldState,
     onUserAgentModeChange: (SubscriptionUserAgentMode) -> Unit,
-    onCustomUserAgentChange: (String) -> Unit,
-    onCustomHeadersChange: (String) -> Unit,
 ) {
     TextButton(
         onClick = { onExpandedChange(!expanded) },
@@ -3067,8 +3060,6 @@ private fun SubscriptionAdvancedOptions(
                 customUserAgent = customUserAgent,
                 customHeaders = customHeaders,
                 onModeChange = onUserAgentModeChange,
-                onCustomUserAgentChange = onCustomUserAgentChange,
-                onCustomHeadersChange = onCustomHeadersChange,
             )
             Spacer(modifier = Modifier.height(8.dp))
             SettingsSwitchRow(
@@ -3111,11 +3102,9 @@ private fun SubscriptionFetchTypeDropdown(
 @Composable
 private fun SubscriptionUserAgentSection(
     selectedMode: SubscriptionUserAgentMode,
-    customUserAgent: String,
-    customHeaders: String,
+    customUserAgent: TextFieldState,
+    customHeaders: TextFieldState,
     onModeChange: (SubscriptionUserAgentMode) -> Unit,
-    onCustomUserAgentChange: (String) -> Unit,
-    onCustomHeadersChange: (String) -> Unit,
 ) {
     ReadOnlyDropdownField(
         label = stringResource(R.string.home_field_user_agent),
@@ -3132,8 +3121,7 @@ private fun SubscriptionUserAgentSection(
     if (selectedMode == SubscriptionUserAgentMode.CUSTOM) {
         Spacer(modifier = Modifier.height(8.dp))
         OutlinedTextField(
-            value = customUserAgent,
-            onValueChange = onCustomUserAgentChange,
+            state = customUserAgent,
             label = { Text(stringResource(R.string.home_field_user_agent)) },
             placeholder = {
                 Text(
@@ -3143,15 +3131,14 @@ private fun SubscriptionUserAgentSection(
                     ),
                 )
             },
-            singleLine = true,
+            lineLimits = TextFieldLineLimits.SingleLine,
             modifier = Modifier.fillMaxWidth(),
         )
         Spacer(modifier = Modifier.height(8.dp))
         OutlinedTextField(
-            value = customHeaders,
-            onValueChange = onCustomHeadersChange,
+            state = customHeaders,
             label = { Text(stringResource(R.string.home_field_headers)) },
-            minLines = 3,
+            lineLimits = TextFieldLineLimits.MultiLine(minHeightInLines = 3),
             modifier = Modifier.fillMaxWidth(),
             supportingText = { Text(stringResource(R.string.home_headers_example)) },
         )

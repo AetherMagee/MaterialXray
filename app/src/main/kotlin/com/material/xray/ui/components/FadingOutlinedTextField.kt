@@ -1,28 +1,26 @@
 package com.material.xray.ui.components
 
 import androidx.compose.foundation.ScrollState
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.relocation.BringIntoViewRequester
-import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.InputTransformation
+import androidx.compose.foundation.text.input.OutputTransformation
+import androidx.compose.foundation.text.input.TextFieldBuffer
+import androidx.compose.foundation.text.input.TextFieldLineLimits
+import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.selection.LocalTextSelectionColors
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -38,24 +36,32 @@ import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.takeOrElse
+import androidx.compose.ui.input.InputMode
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.error
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.input.TextFieldValue
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-/** Keeps the String API's cursor and IME composition, just like BasicTextField's adapter. */
+/**
+ * An outlined text field whose text fades out at an edge it can be scrolled past.
+ *
+ * It only opens the keyboard on focus while the user is touching the screen. With a TV remote or
+ * a keyboard, focus passes through it like any other control, and OK opens the keyboard.
+ */
 @Composable
 fun FadingOutlinedTextField(
-    value: String,
-    onValueChange: (String) -> Unit,
+    state: TextFieldState,
     modifier: Modifier = Modifier,
     textStyle: TextStyle = LocalTextStyle.current,
     label: @Composable (() -> Unit)? = null,
@@ -64,60 +70,10 @@ fun FadingOutlinedTextField(
     suffix: @Composable (() -> Unit)? = null,
     supportingText: @Composable (() -> Unit)? = null,
     isError: Boolean = false,
-    visualTransformation: VisualTransformation = VisualTransformation.None,
+    inputTransformation: InputTransformation? = null,
+    outputTransformation: OutputTransformation? = null,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
-    singleLine: Boolean = false,
-    minLines: Int = 1,
-) {
-    var editorValue by remember { mutableStateOf(TextFieldValue(value)) }
-    val current = editorValue.copy(text = value)
-    var lastText by remember(value) { mutableStateOf(value) }
-    SideEffect {
-        if (current.selection != editorValue.selection || current.composition != editorValue.composition) {
-            editorValue = current
-        }
-    }
-    FadingOutlinedTextField(
-        value = current,
-        onValueChange = {
-            editorValue = it
-            if (lastText != it.text) {
-                lastText = it.text
-                onValueChange(it.text)
-            }
-        },
-        modifier = modifier,
-        textStyle = textStyle,
-        label = label,
-        placeholder = placeholder,
-        trailingIcon = trailingIcon,
-        suffix = suffix,
-        supportingText = supportingText,
-        isError = isError,
-        visualTransformation = visualTransformation,
-        keyboardOptions = keyboardOptions,
-        singleLine = singleLine,
-        minLines = minLines,
-    )
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun FadingOutlinedTextField(
-    value: TextFieldValue,
-    onValueChange: (TextFieldValue) -> Unit,
-    modifier: Modifier = Modifier,
-    textStyle: TextStyle = LocalTextStyle.current,
-    label: @Composable (() -> Unit)? = null,
-    placeholder: @Composable (() -> Unit)? = null,
-    trailingIcon: @Composable (() -> Unit)? = null,
-    suffix: @Composable (() -> Unit)? = null,
-    supportingText: @Composable (() -> Unit)? = null,
-    isError: Boolean = false,
-    visualTransformation: VisualTransformation = VisualTransformation.None,
-    keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
-    singleLine: Boolean = false,
-    minLines: Int = 1,
+    lineLimits: TextFieldLineLimits = TextFieldLineLimits.Default,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val focused by interactionSource.collectIsFocusedAsState()
@@ -130,86 +86,79 @@ fun FadingOutlinedTextField(
         }
     }
     val scroll = rememberScrollState()
-    val requester = remember { BringIntoViewRequester() }
-    var previousSelection by remember { mutableStateOf(value.selection) }
-    var textLayout by remember { mutableStateOf<TextLayoutResult?>(null) }
     val density = LocalDensity.current
     val labelLineHeight = MaterialTheme.typography.bodySmall.lineHeight
     val labelPadding = with(density) { (if (labelLineHeight.isSp) labelLineHeight else 16.sp).toDp() / 2 }
     val errorMessage = stringResource(androidx.compose.ui.R.string.default_error_message)
-
-    LaunchedEffect(value.selection, value.text, visualTransformation, textLayout, focused) {
-        val cursorOffset = when {
-            value.selection.start != previousSelection.start -> value.selection.start
-            value.selection.end != previousSelection.end -> value.selection.end
-            else -> value.selection.min
-        }
-        previousSelection = value.selection
-        if (focused) {
-            textLayout?.let { layout ->
-                val transformed = visualTransformation.filter(value.annotatedString)
-                val offset = transformed.offsetMapping.originalToTransformed(cursorOffset)
-                requester.bringIntoView(layout.getCursorRect(offset.coerceIn(0, layout.layoutInput.text.length)))
-            }
-        }
-    }
+    val singleLine = lineLimits == TextFieldLineLimits.SingleLine
+    // Without a touch, focus alone doesn't start an input session, so the field's own OK handling
+    // has no keyboard to show. Asking for one here makes the field start the session itself.
+    var keyboardRequested by remember { mutableStateOf(false) }
+    val touching = LocalInputModeManager.current.inputMode == InputMode.Touch
+    LaunchedEffect(focused) { if (!focused) keyboardRequested = false }
+    val materialDecorator = OutlinedTextFieldDefaults.decorator(
+        state = state,
+        enabled = true,
+        lineLimits = lineLimits,
+        outputTransformation = outputTransformation,
+        interactionSource = interactionSource,
+        label = if (label == null) {
+            null
+        } else {
+            { label() }
+        },
+        placeholder = placeholder,
+        trailingIcon = trailingIcon,
+        suffix = suffix,
+        supportingText = supportingText,
+        isError = isError,
+        colors = colors,
+    )
 
     CompositionLocalProvider(LocalTextSelectionColors provides colors.textSelectionColors) {
         BasicTextField(
-            value = value,
-            onValueChange = onValueChange,
+            state = state,
             modifier = modifier
+                .onPreviewKeyEvent { event ->
+                    // Only a remote's OK: Enter must keep reaching the field as a newline or submit.
+                    val opensKeyboard = !touching && !keyboardRequested && event.type == KeyEventType.KeyDown && event.key == Key.DirectionCenter
+                    if (opensKeyboard) keyboardRequested = true
+                    opensKeyboard
+                }
                 .semantics(mergeDescendants = true) { if (isError) error(errorMessage) }
                 .then(if (label == null) Modifier else Modifier.padding(top = labelPadding))
                 .defaultMinSize(minWidth = OutlinedTextFieldDefaults.MinWidth, minHeight = OutlinedTextFieldDefaults.MinHeight),
             textStyle = textStyle.merge(TextStyle(color = color)),
-            keyboardOptions = keyboardOptions,
-            singleLine = singleLine,
-            minLines = minLines,
-            visualTransformation = visualTransformation,
+            inputTransformation = inputTransformation,
+            keyboardOptions = keyboardOptions.copy(
+                showKeyboardOnFocus = keyboardRequested || touching,
+            ),
+            lineLimits = lineLimits,
             interactionSource = interactionSource,
             cursorBrush = SolidColor(if (isError) colors.errorCursorColor else colors.cursorColor),
-            onTextLayout = { textLayout = it },
-            decorationBox = { innerTextField ->
-                OutlinedTextFieldDefaults.DecorationBox(
-                    value = value.text,
-                    enabled = true,
-                    singleLine = singleLine,
-                    visualTransformation = visualTransformation,
-                    interactionSource = interactionSource,
-                    label = label,
-                    placeholder = placeholder,
-                    trailingIcon = trailingIcon,
-                    suffix = suffix,
-                    supportingText = supportingText,
-                    isError = isError,
-                    colors = colors,
-                    innerTextField = {
-                        // Multiline form fields can grow inside a scrolling page. Only a bounded
-                        // viewport, such as the JSON editor, needs its own vertical scrolling.
-                        BoxWithConstraints(propagateMinConstraints = true) {
-                            val scrollable = singleLine || constraints.hasBoundedHeight
-                            val scrollModifier = when {
-                                singleLine -> Modifier.horizontalScroll(scroll)
-                                scrollable -> Modifier.verticalScroll(scroll)
-                                else -> Modifier
-                            }
-                            Box(modifier = Modifier.textEdgeFade(scroll, singleLine, scrollable).then(scrollModifier)) {
-                                Box(modifier = Modifier.bringIntoViewRequester(requester)) { innerTextField() }
-                            }
-                        }
-                    },
-                )
+            outputTransformation = outputTransformation,
+            decorator = { innerTextField ->
+                materialDecorator.Decoration {
+                    Box(modifier = Modifier.textEdgeFade(scroll, horizontal = singleLine)) { innerTextField() }
+                }
             },
+            scrollState = scroll,
         )
     }
 }
 
+/** Shows every character as a dot, for a secret the user has not asked to reveal. */
+object MaskOutputTransformation : OutputTransformation {
+    override fun TextFieldBuffer.transformOutput() {
+        // One replacement per character keeps the cursor mapped to the character it sits on.
+        for (index in 0 until length) replace(index, index + 1, "\u2022")
+    }
+}
+
 @Composable
-private fun Modifier.textEdgeFade(scroll: ScrollState, horizontal: Boolean, scrollable: Boolean): Modifier {
+private fun Modifier.textEdgeFade(scroll: ScrollState, horizontal: Boolean): Modifier {
     val fadeWidth = with(LocalDensity.current) { 16.dp.toPx() }
     val rtl = horizontal && LocalLayoutDirection.current == LayoutDirection.Rtl
-    if (!scrollable) return this
     return graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
         .drawWithContent {
             drawContent()

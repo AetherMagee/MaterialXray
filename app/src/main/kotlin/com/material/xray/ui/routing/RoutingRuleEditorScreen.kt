@@ -12,6 +12,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.input.TextFieldLineLimits
+import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -38,7 +40,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.material.xray.R
@@ -118,18 +119,10 @@ internal fun RoutingRuleEditorScreen(
         onBack()
     }
 
-    var name by rememberSaveable(rule.id, stateSaver = TextFieldValue.Saver) {
-        mutableStateOf(TextFieldValue(rule.name))
-    }
-    var domains by rememberSaveable(rule.id, stateSaver = TextFieldValue.Saver) {
-        mutableStateOf(TextFieldValue(rule.domains.joinToString(", ")))
-    }
-    var ips by rememberSaveable(rule.id, stateSaver = TextFieldValue.Saver) {
-        mutableStateOf(TextFieldValue(rule.ips.joinToString(", ")))
-    }
-    var port by rememberSaveable(rule.id, stateSaver = TextFieldValue.Saver) {
-        mutableStateOf(TextFieldValue(rule.port.orEmpty()))
-    }
+    val name = rememberSaveable(rule.id, saver = TextFieldState.Saver) { TextFieldState(rule.name) }
+    val domains = rememberSaveable(rule.id, saver = TextFieldState.Saver) { TextFieldState(rule.domains.joinToString(", ")) }
+    val ips = rememberSaveable(rule.id, saver = TextFieldState.Saver) { TextFieldState(rule.ips.joinToString(", ")) }
+    val port = rememberSaveable(rule.id, saver = TextFieldState.Saver) { TextFieldState(rule.port.orEmpty()) }
     var selectedOutbound by rememberSaveable(rule.id) { mutableStateOf(rule.outboundTag) }
     var selectedOperator by rememberSaveable(rule.id) { mutableStateOf(rule.operator) }
     var selectedProtocols by rememberSaveable(rule.id) { mutableStateOf(rule.protocols.toSet()) }
@@ -158,11 +151,11 @@ internal fun RoutingRuleEditorScreen(
     }
 
     fun editedRule(): RoutingRule = rule.copy(
-        name = name.text.trim().ifEmpty { rule.name },
+        name = name.text.toString().trim().ifEmpty { rule.name },
         outboundTag = selectedOutbound,
-        domains = splitCsv(domains.text),
-        ips = splitCsv(ips.text),
-        port = port.text.trim().ifEmpty { null },
+        domains = splitCsv(domains.text.toString()),
+        ips = splitCsv(ips.text.toString()),
+        port = port.text.toString().trim().ifEmpty { null },
         protocols = availableProtocolOptions.filter { it in selectedProtocols },
         operator = selectedOperator,
     )
@@ -213,10 +206,9 @@ internal fun RoutingRuleEditorScreen(
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             OutlinedTextField(
-                value = name,
-                onValueChange = { name = it },
+                state = name,
                 label = { Text(stringResource(R.string.routing_name_label)) },
-                singleLine = true,
+                lineLimits = TextFieldLineLimits.SingleLine,
                 modifier = Modifier.fillMaxWidth(),
             )
 
@@ -237,22 +229,19 @@ internal fun RoutingRuleEditorScreen(
             )
 
             OutlinedTextField(
-                value = domains,
-                onValueChange = { domains = it },
+                state = domains,
                 label = { Text(stringResource(R.string.routing_domains_label)) },
                 supportingText = { Text(stringResource(R.string.routing_domains_supporting_text)) },
                 modifier = Modifier.fillMaxWidth(),
             )
             OutlinedTextField(
-                value = ips,
-                onValueChange = { ips = it },
+                state = ips,
                 label = { Text(stringResource(R.string.routing_ips_label)) },
                 supportingText = { Text(stringResource(R.string.routing_ips_supporting_text)) },
                 modifier = Modifier.fillMaxWidth(),
             )
             OutlinedTextField(
-                value = port,
-                onValueChange = { port = it },
+                state = port,
                 label = { Text(stringResource(R.string.routing_port_label)) },
                 supportingText = { Text(stringResource(R.string.routing_port_supporting_text)) },
                 modifier = Modifier.fillMaxWidth(),

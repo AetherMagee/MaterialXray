@@ -30,6 +30,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.TextFieldLineLimits
+import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -81,8 +84,6 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -95,6 +96,7 @@ import com.material.xray.R
 import com.material.xray.model.Protocol
 import com.material.xray.ui.components.ExpansionArrow
 import com.material.xray.ui.components.FadingOutlinedTextField
+import com.material.xray.ui.components.MaskOutputTransformation
 import com.material.xray.ui.components.ScrolledTopAppBar
 import com.material.xray.ui.components.TooltipIconButton
 import org.koin.compose.viewmodel.koinViewModel
@@ -126,12 +128,14 @@ fun ConfigViewerScreen(
     // and it would push the whole JSON document through the flow on every character.
     val jsonSeed = (uiState as? ConfigViewerUiState.JsonEditor)?.initialText
     val paramsSeed = (uiState as? ConfigViewerUiState.ParamsEditor)?.initialSections
-    var jsonDraft by remember(jsonSeed) { mutableStateOf(jsonSeed.orEmpty()) }
-    var paramsDraft by remember(paramsSeed) { mutableStateOf(paramsSeed.orEmpty()) }
+    val jsonDraft = remember(jsonSeed) { TextFieldState(jsonSeed.orEmpty()) }
+    val paramsDraft = remember(paramsSeed) {
+        paramsSeed.orEmpty().flatMap { it.fields }.associate { it.key to TextFieldState(it.value) }
+    }
     val onSave = {
         when (uiState) {
-            is ConfigViewerUiState.JsonEditor -> viewModel.save(EditDraft.Json(jsonDraft))
-            is ConfigViewerUiState.ParamsEditor -> viewModel.save(EditDraft.Params(paramsDraft))
+            is ConfigViewerUiState.JsonEditor -> viewModel.save(EditDraft.Json(jsonDraft.text.toString()))
+            is ConfigViewerUiState.ParamsEditor -> viewModel.save(EditDraft.Params(paramsSeed.orEmpty().withDrafts(paramsDraft)))
             else -> Unit
         }
     }
@@ -233,16 +237,11 @@ fun ConfigViewerScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 is ConfigViewerUiState.JsonDocument -> JsonDocumentContent(state, padding.calculateBottomPadding())
-                is ConfigViewerUiState.JsonEditor -> JsonEditorContent(
-                    state = state,
-                    text = jsonDraft,
-                    onTextChange = { jsonDraft = it },
-                )
+                is ConfigViewerUiState.JsonEditor -> JsonEditorContent(state = state, text = jsonDraft)
                 is ConfigViewerUiState.Params -> ParamsList(state, padding.calculateBottomPadding())
                 is ConfigViewerUiState.ParamsEditor -> ParamsEditorList(
                     state = state,
-                    sections = paramsDraft,
-                    onFieldChange = { key, value -> paramsDraft = paramsDraft.withField(key, value) },
+                    drafts = paramsDraft,
                 )
             }
         }
@@ -320,8 +319,7 @@ private fun JsonDocumentContent(state: ConfigViewerUiState.JsonDocument, bottomI
 @Composable
 private fun JsonEditorContent(
     state: ConfigViewerUiState.JsonEditor,
-    text: String,
-    onTextChange: (String) -> Unit,
+    text: TextFieldState,
 ) {
     Column(
         modifier = Modifier
@@ -332,8 +330,7 @@ private fun JsonEditorContent(
     ) {
         state.errorRes?.let { EditErrorText(it) }
         FadingOutlinedTextField(
-            value = text,
-            onValueChange = onTextChange,
+            state = text,
             modifier = Modifier.fillMaxSize(),
             textStyle = MaterialTheme.typography.bodySmall.copy(
                 fontFamily = FontFamily.Monospace,
@@ -443,8 +440,7 @@ private fun ParamsList(state: ConfigViewerUiState.Params, bottomInset: Dp) {
 @Composable
 private fun ParamsEditorList(
     state: ConfigViewerUiState.ParamsEditor,
-    sections: List<EditSection>,
-    onFieldChange: (EditKey, String) -> Unit,
+    drafts: Map<EditKey, TextFieldState>,
 ) {
     LazyColumn(
         modifier = Modifier
@@ -456,22 +452,18 @@ private fun ParamsEditorList(
         state.errorRes?.let { errorRes ->
             item(contentType = "error") { EditErrorText(errorRes) }
         }
-        items(sections, key = { it.titleRes }, contentType = { "editSection" }) { section ->
-            EditSectionCard(section, onFieldChange)
+        items(state.initialSections, key = { it.titleRes }, contentType = { "editSection" }) { section ->
+            EditSectionCard(section, drafts)
         }
     }
 }
 
-private fun List<EditSection>.withField(key: EditKey, value: String): List<EditSection> = map { section ->
-    if (section.fields.none { it.key == key }) {
-        section
-    } else {
-        section.copy(fields = section.fields.map { if (it.key == key) it.copy(value = value) else it })
-    }
+private fun List<EditSection>.withDrafts(drafts: Map<EditKey, TextFieldState>): List<EditSection> = map { section ->
+    section.copy(fields = section.fields.map { it.copy(value = drafts.getValue(it.key).text.toString()) })
 }
 
 @Composable
-private fun EditSectionCard(section: EditSection, onFieldChange: (EditKey, String) -> Unit) {
+private fun EditSectionCard(section: EditSection, drafts: Map<EditKey, TextFieldState>) {
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
@@ -490,9 +482,9 @@ private fun EditSectionCard(section: EditSection, onFieldChange: (EditKey, Strin
             section.fields.forEach { field ->
                 key(field.key) {
                     if (field.key == EditKey.Protocol) {
-                        ProtocolDropdown(field) { onFieldChange(field.key, it) }
+                        ProtocolDropdown(field, drafts.getValue(field.key))
                     } else {
-                        EditFieldItem(field) { onFieldChange(field.key, it) }
+                        EditFieldItem(field, drafts.getValue(field.key))
                     }
                 }
             }
@@ -501,21 +493,20 @@ private fun EditSectionCard(section: EditSection, onFieldChange: (EditKey, Strin
 }
 
 @Composable
-private fun EditFieldItem(field: EditField, onValueChange: (String) -> Unit) {
+private fun EditFieldItem(field: EditField, draft: TextFieldState) {
     var revealed by rememberSaveable(field.key) { mutableStateOf(false) }
     val masked = field.isSecret && !revealed
 
     FadingOutlinedTextField(
-        value = field.value,
-        onValueChange = onValueChange,
+        state = draft,
         modifier = Modifier.fillMaxWidth(),
         label = { Text(field.label.resolve()) },
-        singleLine = true,
+        lineLimits = TextFieldLineLimits.SingleLine,
         textStyle = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
         keyboardOptions = KeyboardOptions(
             keyboardType = if (field.key == EditKey.Port) KeyboardType.Number else KeyboardType.Text,
         ),
-        visualTransformation = if (masked) PasswordVisualTransformation() else VisualTransformation.None,
+        outputTransformation = if (masked) MaskOutputTransformation else null,
         trailingIcon = if (!field.isSecret) {
             null
         } else {
@@ -535,9 +526,11 @@ private fun EditFieldItem(field: EditField, onValueChange: (String) -> Unit) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ProtocolDropdown(field: EditField, onValueChange: (String) -> Unit) {
+private fun ProtocolDropdown(field: EditField, draft: TextFieldState) {
     var expanded by remember { mutableStateOf(false) }
-    val selected = Protocol.entries.find { it.name == field.value }
+    val value = draft.text.toString()
+    val selected = Protocol.entries.find { it.name == value }
+    val selectedText = selected?.displayName ?: value
 
     ExposedDropdownMenuBox(
         expanded = expanded,
@@ -545,8 +538,7 @@ private fun ProtocolDropdown(field: EditField, onValueChange: (String) -> Unit) 
         modifier = Modifier.fillMaxWidth(),
     ) {
         OutlinedTextField(
-            value = selected?.displayName ?: field.value,
-            onValueChange = {},
+            state = remember(selectedText) { TextFieldState(selectedText) },
             readOnly = true,
             label = { Text(field.label.resolve()) },
             trailingIcon = { ExpansionArrow(expanded = expanded, contentDescription = null) },
@@ -559,7 +551,7 @@ private fun ProtocolDropdown(field: EditField, onValueChange: (String) -> Unit) 
                 DropdownMenuItem(
                     text = { Text(protocol.displayName) },
                     onClick = {
-                        onValueChange(protocol.name)
+                        draft.setTextAndPlaceCursorAtEnd(protocol.name)
                         expanded = false
                     },
                 )
