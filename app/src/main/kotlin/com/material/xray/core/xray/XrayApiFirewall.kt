@@ -15,17 +15,15 @@ internal class XrayApiFirewall(
         return execute(buildApplyCommand(chainA, chainB, port, appUid)).isSuccess
     }
 
-    suspend fun remove(appUid: Int): Boolean {
-        if (appUid <= 0) return false
-        return execute(
-            buildString {
-                append(shellHelpers())
-                append("; refresh_ruleset || exit 1; status=0")
-                append("; remove_chain ${chainName(appUid, "a")} || status=1")
-                append("; remove_chain ${chainName(appUid, "b")} || status=1")
-                append("; exit \$status")
-            },
-        ).isSuccess
+    fun removeCommand(appUid: Int): String {
+        require(appUid > 0)
+        return buildString {
+            append(shellHelpers())
+            append("; refresh_ruleset || exit 1; status=0")
+            append("; remove_chain ${chainName(appUid, "a")} || status=1")
+            append("; remove_chain ${chainName(appUid, "b")} || status=1")
+            append("; exit \$status")
+        }
     }
 
     internal fun buildApplyCommand(chainA: String, chainB: String, port: Int, appUid: Int): String = buildString {

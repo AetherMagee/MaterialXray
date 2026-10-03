@@ -304,17 +304,7 @@ class TunManager internal constructor(
         return if (result.isSuccess) RoutingResult(success = true) else result.toRoutingError(command)
     }
 
-    suspend fun removeRouting(
-        fwmark: Int,
-        routeMark: Int,
-        routeTable: Int,
-        tunName: String,
-        managedAppRouteCount: Int = MAX_APP_TUN_ROUTES,
-    ): Boolean = executeCommand(
-        routingRemovalCommand(fwmark, routeMark, routeTable, tunName, managedAppRouteCount),
-    ).isSuccess
-
-    private fun routingRemovalCommand(
+    internal fun routingRemovalCommand(
         fwmark: Int,
         routeMark: Int,
         routeTable: Int,

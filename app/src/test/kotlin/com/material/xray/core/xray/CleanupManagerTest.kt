@@ -42,4 +42,41 @@ class CleanupManagerTest {
         assertFalse(command.contains("kill 42"))
         assertFalse(command.contains("kill -9 42"))
     }
+
+    @Test
+    fun `batched cleanup reports every stage even after one exits with a failure`() {
+        val command = cleanupBatchCommand(
+            listOf(
+                "refresh() { exit 3; }; refresh; echo unreachable",
+                "printf 'no newline'",
+                "sleep 0.05 # trailing comment",
+            ),
+        )
+        val process = ProcessBuilder("sh", "-c", command).start()
+        val output = process.inputStream.bufferedReader().readText()
+
+        assertEquals(1, process.waitFor())
+        assertFalse(output.contains("unreachable"))
+        val reports = parseCleanupStageReports(output)
+        assertEquals(listOf(0, 1, 2), reports.keys.sorted())
+        assertEquals(3, reports.getValue(0).exitCode)
+        assertEquals(0, reports.getValue(1).exitCode)
+        assertEquals(0, reports.getValue(2).exitCode)
+        assertTrue(reports.getValue(2).durationMs >= 40)
+        assertEquals(0, reports.getValue(2).durationMs % 10)
+    }
+
+    @Test
+    fun `batched cleanup succeeds when every stage does`() {
+        val command = cleanupBatchCommand(listOf("true", "status=0; exit \$status"))
+
+        assertEquals(0, ProcessBuilder("sh", "-c", command).start().waitFor())
+    }
+
+    @Test
+    fun `stage reports ignore unrelated output`() {
+        val reports = parseCleanupStageReports("noise\n__MXRAY_CLEANUP_STAGE__ 1 0 20\nmore __MXRAY_CLEANUP_STAGE__ 2 0 10\n")
+
+        assertEquals(mapOf(1 to CleanupStageReport(exitCode = 0, durationMs = 20)), reports)
+    }
 }

@@ -530,18 +530,8 @@ class TunManagerTest {
     }
 
     @Test
-    fun `routing cleanup removes IPv6 rules routes and update guard`() = runTest {
-        val commands = mutableListOf<String>()
-        val manager = TunManager { command ->
-            commands += command
-            if (command == LocalAddresses.COMMAND) {
-                successfulCommand("1: lo inet 127.0.0.1/8 scope host lo\n2: ap0 inet 192.168.43.1/24 scope global ap0")
-            } else {
-                successfulCommand()
-            }
-        }
-
-        manager.removeRouting(
+    fun `routing cleanup removes IPv6 rules routes and update guard`() {
+        val command = TunManager { successfulCommand() }.routingRemovalCommand(
             fwmark = 255,
             routeMark = 100,
             routeTable = 100,
@@ -549,30 +539,12 @@ class TunManagerTest {
             managedAppRouteCount = 1,
         )
 
-        assertEquals(1, commands.size)
-        assertTrue(commands.single().contains("ip -6 rule show"))
-        assertTrue(commands.single().contains("ip -6 route flush table 100"))
-        assertTrue(commands.single().contains("ip -6 route flush table 102"))
-        assertTrue(commands.single().contains("status=0"))
-        assertTrue(commands.single().endsWith("exit \$status"))
-        assertEquals(0, ProcessBuilder("sh", "-n", "-c", commands.single()).start().waitFor())
-    }
-
-    @Test
-    fun `routing cleanup reports an inspection failure`() = runTest {
-        val manager = TunManager { command ->
-            if (command.contains("ip rule show")) RootShell.Result(1, "", "unavailable") else successfulCommand()
-        }
-
-        val cleaned = manager.removeRouting(
-            fwmark = 255,
-            routeMark = 100,
-            routeTable = 100,
-            tunName = "wlan1",
-            managedAppRouteCount = 1,
-        )
-
-        assertFalse(cleaned)
+        assertTrue(command.contains("ip -6 rule show"))
+        assertTrue(command.contains("ip -6 route flush table 100"))
+        assertTrue(command.contains("ip -6 route flush table 102"))
+        assertTrue(command.contains("status=0"))
+        assertTrue(command.endsWith("exit \$status"))
+        assertEquals(0, ProcessBuilder("sh", "-n", "-c", command).start().waitFor())
     }
 
     @Test

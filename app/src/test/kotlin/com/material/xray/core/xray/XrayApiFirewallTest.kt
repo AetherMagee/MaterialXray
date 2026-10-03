@@ -97,16 +97,9 @@ class XrayApiFirewallTest {
     }
 
     @Test
-    fun `remove handles both UID-scoped chains in one transaction`() = runTest {
-        val commands = mutableListOf<String>()
-        val firewall = XrayApiFirewall { command ->
-            commands += command
-            successfulCommand()
-        }
+    fun `remove handles both UID-scoped chains in one transaction`() {
+        val command = XrayApiFirewall { successfulCommand() }.removeCommand(appUid = 10_518)
 
-        assertTrue(firewall.remove(appUid = 10_518))
-
-        val command = commands.single()
         assertTrue(command.contains("remove_chain mxray_api_10518_a"))
         assertTrue(command.contains("remove_chain mxray_api_10518_b"))
         assertTrue(command.contains("remove_chain mxray_api_10518_a || status=1"))

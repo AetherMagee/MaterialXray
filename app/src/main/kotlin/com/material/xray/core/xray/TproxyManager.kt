@@ -331,8 +331,6 @@ class TproxyManager internal constructor(
         }.shellAnd()
     }
 
-    suspend fun remove(state: TproxyRuntimeState?, preserveGuard: Boolean = false): Boolean = executeCommand(cleanupCommand(state, appUid, preserveGuard)).isSuccess
-
     suspend fun removeGuard(): Boolean {
         val removed = (bulkRestoreSupported && executeCommand(guardRemovalRestoreCommand(guardCoversTethering)).isSuccess) ||
             executeCommand(guardCleanupCommand(appUid, guardCoversTethering)).isSuccess
