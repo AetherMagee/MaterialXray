@@ -10,5 +10,9 @@ android {
 dependencies {
     implementation(project(":core:model"))
     implementation(project(":core:common"))
-    implementation(project(":core:runtime"))
+    // Only for Ipv6SessionState's text mapping in ui/text.
+    implementation(project(":core:network"))
+
+    implementation(libs.core.ktx)
+    implementation(libs.coroutines.core)
 }
