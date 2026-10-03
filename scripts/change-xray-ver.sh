@@ -1,4 +1,7 @@
 #!/bin/bash
+# Points the build at another Xray release. The Gradle build downloads the binaries itself; this
+# script records what it may accept: the version, its source commit and license, and the SHA-256 of
+# every official archive and of the executable inside it.
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -8,9 +11,9 @@ VERSION_FILE="third_party/xray/VERSION"
 CHECKSUM_FILE="third_party/xray/CHECKSUMS.sha256"
 LICENSE_FILE="third_party/xray/LICENSE"
 COMMIT_FILE="third_party/xray/COMMIT"
-VERSION="${1:-$(<"${VERSION_FILE}")}"
+VERSION="${1:-}"
 if [[ ! "${VERSION}" =~ ^v[0-9]+([.][0-9]+)*$ ]]; then
-  echo "Invalid Xray version: ${VERSION}" >&2
+  echo "Usage: $0 <Xray release tag, e.g. v26.9.30>" >&2
   exit 1
 fi
 
@@ -24,10 +27,9 @@ cleanup() {
 }
 trap cleanup EXIT
 
-download_xray() {
+verify_xray() {
   local archive_name="$1"
-  local staged_binary="$2"
-  local destination="$3"
+  local abi="$2"
   local unpack_dir="${WORK_DIR}/${archive_name%.zip}"
   local archive_path="${WORK_DIR}/${archive_name}"
   local digest_path="${archive_path}.dgst"
@@ -57,8 +59,6 @@ download_xray() {
 
   mkdir -p "${unpack_dir}"
   unzip -qo "${archive_path}" xray LICENSE -d "${unpack_dir}"
-  cp "${unpack_dir}/xray" "${staged_binary}"
-  chmod 755 "${staged_binary}"
 
   if [[ -f "${WORK_DIR}/xray-license" ]]; then
     cmp "${WORK_DIR}/xray-license" "${unpack_dir}/LICENSE"
@@ -66,19 +66,16 @@ download_xray() {
     cp "${unpack_dir}/LICENSE" "${WORK_DIR}/xray-license"
   fi
 
-  read -r actual_sha256 _ < <(sha256sum "${staged_binary}")
+  read -r actual_sha256 _ < <(sha256sum "${unpack_dir}/xray")
   ARCHIVE_CHECKSUMS+=("${expected_sha256}  ${archive_name%.zip}-${VERSION}.zip")
-  BINARY_CHECKSUMS+=("${actual_sha256}  ${destination}")
+  BINARY_CHECKSUMS+=("${actual_sha256}  lib/${abi}/libxray.so")
 }
 
-echo "Downloading xray-core ${VERSION}..."
+echo "Verifying xray-core ${VERSION}..."
 
 # Both modes run the Android build. It only adopts a TUN as an open fd via xray.tun.fd: rootless
 # mode hands it VpnService's, root mode creates one with the libxraytun.so launcher.
-download_xray \
-  "Xray-android-arm64-v8a.zip" \
-  "${WORK_DIR}/xray-android-arm64-v8a" \
-  "app/src/main/jniLibs/arm64-v8a/libxray.so"
+verify_xray "Xray-android-arm64-v8a.zip" "arm64-v8a"
 
 XRAY_COMMIT=""
 while read -r commit ref; do
@@ -100,13 +97,9 @@ fi
   "${WORK_DIR}/Xray-core-${VERSION}-source.tar.gz" \
   "${XRAY_COMMIT}"
 
-mkdir -p "app/src/main/jniLibs/arm64-v8a"
-install -m 755 "${WORK_DIR}/xray-android-arm64-v8a" "app/src/main/jniLibs/arm64-v8a/libxray.so"
 cp "${WORK_DIR}/xray-license" "${LICENSE_FILE}"
 printf '%s\n' "${VERSION}" > "${VERSION_FILE}"
 printf '%s\n' "${XRAY_COMMIT}" > "${COMMIT_FILE}"
 printf '%s\n' "${ARCHIVE_CHECKSUMS[@]}" "${BINARY_CHECKSUMS[@]}" > "${CHECKSUM_FILE}"
 
-echo "Done."
-file app/src/main/jniLibs/arm64-v8a/libxray.so
-ls -lh app/src/main/jniLibs/arm64-v8a/libxray.so
+echo "Recorded Xray ${VERSION}."

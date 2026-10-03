@@ -20,8 +20,9 @@
 - Main boundaries: `core/xray` builds Xray config/TUN/routing, `core/root` wraps root shell execution, `data` holds Room/repositories/subscription parsing, and `ui` holds Compose screens.
 
 ## Native Assets
-- Only arm64 is wired: `abiFilters += "arm64-v8a"`. Both modes run the official Android Xray build, `app/src/main/jniLibs/arm64-v8a/libxray.so`, from `nativeLibraryDir`.
-- Update the Xray binary with `./scripts/download-xray.sh` for the recorded version or pass another Xray tag; the script writes the arm64 destination and fixes permissions.
+- Only arm64 is wired: `abiFilters += "arm64-v8a"`. Both modes run the official Android Xray build as `libxray.so` from `nativeLibraryDir`.
+- No Xray binary is committed. The `downloadXray` task fetches the release recorded in `third_party/xray/VERSION` and fails unless the archive and executable match `third_party/xray/CHECKSUMS.sha256`, so building an APK needs network access once per Xray version.
+- Switch Xray versions with `./scripts/change-xray-ver.sh <tag>`; it verifies the upstream digests and rewrites the version, commit, license and checksums under `third_party/xray/`.
 - The Android build only adopts a TUN as an open fd (`xray.tun.fd`). Rootless mode starts Xray through `app/src/main/cpp/xray_launcher.c` (`System.loadLibrary("xray_launcher")`) with the VpnService fd; root TUN mode execs it through `app/src/main/cpp/xray_tun_exec.c`, built as the executable `libxraytun.so` so the installer extracts it. Native changes need an Android build, not only JVM tests.
 
 ## Data And Generated Code

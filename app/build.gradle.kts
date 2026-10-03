@@ -2,12 +2,14 @@ import java.io.File
 import java.net.URI
 import java.security.MessageDigest
 import java.util.Properties
+import java.util.zip.ZipFile
 import javax.inject.Inject
 import org.gradle.api.DefaultTask
 import org.gradle.api.artifacts.VersionCatalogsExtension
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.FileSystemOperations
 import org.gradle.api.file.RegularFileProperty
+import org.gradle.api.provider.MapProperty
 import org.gradle.api.provider.Property
 import org.gradle.api.tasks.CacheableTask
 import org.gradle.api.tasks.Input
@@ -141,6 +143,85 @@ abstract class DownloadGeoData : DefaultTask() {
     }
 }
 
+/**
+ * Downloads the official Android Xray builds recorded in `third_party/xray` and unpacks each one as
+ * `<abi>/libxray.so`. Both the release archive and the executable inside it must match
+ * `CHECKSUMS.sha256`, so a build can only package the binaries `change-xray-ver.sh` verified.
+ */
+@CacheableTask
+abstract class DownloadXray : DefaultTask() {
+    @get:Input
+    abstract val version: Property<String>
+
+    /** Release archive name without the `.zip` extension, by ABI. */
+    @get:Input
+    abstract val archives: MapProperty<String, String>
+
+    @get:InputFile
+    @get:PathSensitive(PathSensitivity.NONE)
+    abstract val checksums: RegularFileProperty
+
+    @get:OutputDirectory
+    abstract val outputDirectory: DirectoryProperty
+
+    @TaskAction
+    fun download() {
+        val expectedSha256 = checksums.get().asFile.readLines()
+            .map { it.trim().split(Regex("\\s+"), limit = 2) }
+            .filter { it.size == 2 }
+            .associate { (sha256, name) -> name to sha256 }
+        fun expected(name: String) = requireNotNull(expectedSha256[name]) {
+            "third_party/xray/CHECKSUMS.sha256 has no entry for $name; run scripts/change-xray-ver.sh"
+        }
+
+        val output = outputDirectory.get().asFile.apply {
+            deleteRecursively()
+            mkdirs()
+        }
+        archives.get().forEach { (abi, archiveName) ->
+            val archive = File(temporaryDir, "$archiveName.zip")
+            try {
+                val url = "https://github.com/XTLS/Xray-core/releases/download/${version.get()}/$archiveName.zip"
+                URI(url).toURL().openConnection().apply {
+                    connectTimeout = 30_000
+                    readTimeout = 60_000
+                }.getInputStream().use { input ->
+                    archive.outputStream().use { outputStream -> input.copyTo(outputStream) }
+                }
+                check(sha256(archive) == expected("$archiveName-${version.get()}.zip")) {
+                    "SHA-256 mismatch for $archiveName.zip"
+                }
+                val binary = File(output, "$abi/libxray.so").apply { parentFile.mkdirs() }
+                ZipFile(archive).use { zip ->
+                    val entry = checkNotNull(zip.getEntry("xray")) { "$archiveName.zip has no xray executable" }
+                    zip.getInputStream(entry).use { input ->
+                        binary.outputStream().use { outputStream -> input.copyTo(outputStream) }
+                    }
+                }
+                check(sha256(binary) == expected("lib/$abi/libxray.so")) {
+                    "SHA-256 mismatch for the xray executable in $archiveName.zip"
+                }
+                binary.setExecutable(true)
+            } finally {
+                archive.delete()
+            }
+        }
+    }
+
+    private fun sha256(file: File): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        file.inputStream().use { input ->
+            val buffer = ByteArray(64 * 1024)
+            while (true) {
+                val count = input.read(buffer)
+                if (count < 0) break
+                digest.update(buffer, 0, count)
+            }
+        }
+        return digest.digest().joinToString("") { "%02x".format(it) }
+    }
+}
+
 val localProperties = Properties().apply {
     val file = rootProject.file("local.properties")
     if (file.isFile) {
@@ -175,12 +256,13 @@ val hasReleaseSigning = listOf(
 ).all { !it.isNullOrBlank() }
 val libsCatalog = extensions.getByType<VersionCatalogsExtension>().named("libs")
 val grpcVersion = libsCatalog.findVersion("grpc").get().requiredVersion
+val xrayMetadataDirectory = rootProject.layout.projectDirectory.dir("third_party/xray")
 val generateLegalAssets = tasks.register<GenerateLegalAssets>("generateLegalAssets") {
     projectLicense.set(rootProject.layout.projectDirectory.file("LICENSE"))
     thirdPartyNotices.set(rootProject.layout.projectDirectory.file("THIRD_PARTY_NOTICES.md"))
     thirdPartyLicenses.set(rootProject.layout.projectDirectory.dir("third_party/licenses"))
     xrayLicense.set(rootProject.layout.projectDirectory.file("third_party/xray/LICENSE"))
-    xrayMetadata.set(rootProject.layout.projectDirectory.dir("third_party/xray"))
+    xrayMetadata.set(xrayMetadataDirectory)
     outputDirectory.set(layout.buildDirectory.dir("generated/legalAssets"))
 }
 val downloadGeoData = tasks.register<DownloadGeoData>("downloadGeoData") {
@@ -188,6 +270,12 @@ val downloadGeoData = tasks.register<DownloadGeoData>("downloadGeoData") {
     geositeUrl.set("https://github.com/v2fly/domain-list-community/releases/latest/download/dlc.dat")
     outputDirectory.set(layout.buildDirectory.dir("generated/geodataAssets"))
     outputs.upToDateWhen { false }
+}
+val downloadXray = tasks.register<DownloadXray>("downloadXray") {
+    version.set(providers.fileContents(xrayMetadataDirectory.file("VERSION")).asText.map(String::trim))
+    archives.put("arm64-v8a", "Xray-android-arm64-v8a")
+    checksums.set(xrayMetadataDirectory.file("CHECKSUMS.sha256"))
+    outputDirectory.set(layout.buildDirectory.dir("generated/xrayJniLibs/download"))
 }
 val validateReleaseTelemetry = tasks.register<ValidateReleaseTelemetry>("validateReleaseTelemetry") {
     configured.set(sentryAuthToken.map { true }.orElse(false))
@@ -260,6 +348,9 @@ android {
     packaging {
         jniLibs {
             useLegacyPackaging = true
+            // Xray ships stripped; packaging it untouched keeps the APK's copy byte-identical to
+            // the official executable CHECKSUMS.sha256 lists.
+            keepDebugSymbols += "**/libxray.so"
         }
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
@@ -334,6 +425,10 @@ androidComponents {
         variant.sources.assets?.addGeneratedSourceDirectory(
             downloadGeoData,
             DownloadGeoData::outputDirectory,
+        )
+        variant.sources.jniLibs?.addGeneratedSourceDirectory(
+            downloadXray,
+            DownloadXray::outputDirectory,
         )
     }
 }

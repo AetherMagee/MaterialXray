@@ -118,19 +118,19 @@ Releases before `v0.5.0` do not have attestations.
 
 ### Runtime and native assets
 
-Only `arm64-v8a` is currently packaged. Both modes run the official Android Xray build from `app/src/main/jniLibs/arm64-v8a/libxray.so`. Rootless mode launches it through the JNI shim in `app/src/main/cpp/xray_launcher.c`; root TUN mode launches it through `app/src/main/cpp/xray_tun_exec.c`, which creates the TUN interface and hands Xray its descriptor.
+Only `arm64-v8a` is currently packaged. Both modes run the official Android Xray build, which the Gradle build downloads and packages as `libxray.so`. Rootless mode launches it through the JNI shim in `app/src/main/cpp/xray_launcher.c`; root TUN mode launches it through `app/src/main/cpp/xray_tun_exec.c`, which creates the TUN interface and hands Xray its descriptor.
 
 Each APK build downloads the latest `geoip.dat` and `geosite.dat` from `v2fly/geoip` and `v2fly/domain-list-community` and bundles them as assets. On first use, the app copies the bundled files into Xray's data directory, so a new installation can connect without downloading geodata. The app also queues a one-time background sync on first launch; its download does not delay tunnel startup. Later updates and custom download URLs remain available in Settings. APK builds require access to those release assets.
 
 In rootful TUN mode, the service manages the tunnel interface and routing. Every per-app proxy group shares that one interface: each group's routing table gives its traffic a distinct source address, and Xray routes on that address. Rootful mode binds outbound connections to the physical network interface to avoid routing loops, watches Wi-Fi and cellular changes, and retargets the connection when needed. Rootless mode passes Android's VPN TUN file descriptor to Xray and excludes Material Xray itself from the VPN to prevent routing loops, relying on Android's network routing rather than the rootful retargeting logic.
 
-Update the bundled Xray binary with:
+No Xray binary is committed. APK builds download the release recorded in `third_party/xray/VERSION` and refuse any archive or executable that does not match `third_party/xray/CHECKSUMS.sha256`. Switch Xray versions with:
 
 ```sh
-./scripts/download-xray.sh
+./scripts/change-xray-ver.sh v26.9.30
 ```
 
-The script uses the version recorded in `third_party/xray/VERSION`, or accepts an Xray release tag as an argument. It downloads the arm64 Android build, verifies the published SHA-256 digests, preserves Xray's license, and records hashes under `third_party/xray/`.
+The script verifies the published SHA-256 digests of the Android builds, preserves Xray's license, and records the version, source commit and hashes under `third_party/xray/`.
 
 ### Project layout
 
