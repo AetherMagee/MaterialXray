@@ -37,7 +37,8 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
+import androidx.compose.material3.pulltorefresh.pullToRefresh
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -52,8 +53,10 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.input.InputMode
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -110,11 +113,18 @@ fun AppBypassContent(active: Boolean, viewModel: AppsViewModel = koinViewModel()
         }
     }
 
-    PullToRefreshBox(
-        isRefreshing = isLoadingApps && !showInitialLoading,
-        onRefresh = { if (!isLoadingApps) viewModel.refreshApps() },
-        modifier = Modifier.fillMaxSize(),
-        state = pullToRefreshState,
+    val isRefreshing = isLoadingApps && !showInitialLoading
+    // On TV, focus scrolls the list as if it were dragged, which reads as a pull that never ends at the
+    // top. Without touch the header's refresh button does the job.
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .pullToRefresh(
+                isRefreshing = isRefreshing,
+                state = pullToRefreshState,
+                enabled = LocalInputModeManager.current.inputMode == InputMode.Touch,
+                onRefresh = { if (!isLoadingApps) viewModel.refreshApps() },
+            ),
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
             if (showInitialLoading) {
@@ -214,6 +224,11 @@ fun AppBypassContent(active: Boolean, viewModel: AppsViewModel = koinViewModel()
                 ScrollFadeEdges()
             }
         }
+        PullToRefreshDefaults.Indicator(
+            state = pullToRefreshState,
+            isRefreshing = isRefreshing,
+            modifier = Modifier.align(Alignment.TopCenter),
+        )
     }
 
     editingApp?.let { app ->
