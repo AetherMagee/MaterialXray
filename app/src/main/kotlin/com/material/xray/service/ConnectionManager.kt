@@ -930,7 +930,7 @@ internal class ConnectionManager(
                         ConnectionProgress.ConfiguringRouting,
                         telemetryStep = ConnectionTelemetryStep.VerifyTproxy,
                         isSuccessful = { it.success },
-                        action = { tproxyGateway.verify(tproxyPlan.runtimeState) },
+                        action = { tproxyGateway.verifyActivation(tproxyPlan.runtimeState) },
                     ),
                 )
                 if (!verification.success) {

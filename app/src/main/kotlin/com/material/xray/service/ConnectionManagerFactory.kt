@@ -294,6 +294,7 @@ internal interface TproxyRoutingGateway {
     suspend fun updateTetherAddresses(plan: TproxyTrafficPlan): TunManager.RoutingResult
     suspend fun updateTetherUpstream(plan: TproxyTrafficPlan, previousUpstream: String): TunManager.RoutingResult
     suspend fun verify(state: TproxyRuntimeState): TunManager.RoutingResult
+    suspend fun verifyActivation(state: TproxyRuntimeState): TunManager.RoutingResult = verify(state)
     suspend fun checkHealth(state: TproxyRuntimeState): Boolean
     suspend fun removeGuard(): Boolean
     suspend fun syncOtherVpnRules(state: TproxyRuntimeState): TunManager.RoutingResult = TunManager.RoutingResult(success = true)
@@ -372,6 +373,7 @@ internal class TproxyManagerRoutingGateway(
     override suspend fun updateTetherAddresses(plan: TproxyTrafficPlan): TunManager.RoutingResult = manager.updateTetherAddresses(plan)
     override suspend fun updateTetherUpstream(plan: TproxyTrafficPlan, previousUpstream: String): TunManager.RoutingResult = manager.updateTetherUpstream(plan, previousUpstream)
     override suspend fun verify(state: TproxyRuntimeState): TunManager.RoutingResult = manager.verify(state)
+    override suspend fun verifyActivation(state: TproxyRuntimeState): TunManager.RoutingResult = manager.verifyActivation(state)
     override suspend fun checkHealth(state: TproxyRuntimeState): Boolean = manager.checkHealth(state)
     override suspend fun removeGuard(): Boolean = manager.removeGuard()
     override suspend fun syncOtherVpnRules(state: TproxyRuntimeState): TunManager.RoutingResult = manager.syncOtherVpnRules(state)

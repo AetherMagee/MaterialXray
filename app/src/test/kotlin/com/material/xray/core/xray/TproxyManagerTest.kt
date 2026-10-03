@@ -31,6 +31,7 @@ class TproxyManagerTest {
                     TproxyManager.activationRestoreCommand(plan, APP_UID),
                     TproxyManager.updateCommand(plan, APP_UID, "a", "b"),
                     TproxyManager.verifyCommand(plan.runtimeState, APP_UID),
+                    tproxyListenerVerifyCommand(plan.runtimeState),
                     TproxyManager.cleanupCommand(plan.runtimeState, APP_UID),
                 )
                 commands.forEach { command ->
@@ -243,6 +244,47 @@ class TproxyManagerTest {
         assertFalse(manager.localAddressesChanged())
         output = output.replace("2001:db8::1", "2001:db8::2")
         assertFalse(manager.localAddressesChanged())
+    }
+
+    @Test
+    fun `bulk activation is confirmed by checking only the core listeners`() = runTest {
+        val commands = mutableListOf<String>()
+        val manager = TproxyManager(APP_UID) { command ->
+            commands += command
+            if (command.startsWith("ip rule show")) {
+                RootShell.Result(0, "\n__MXRAY_TPROXY_ROUTES__\n", "")
+            } else {
+                RootShell.Result(0, "", "")
+            }
+        }
+        val plan = plan()
+        assertTrue(manager.activate(plan).success)
+
+        assertTrue(manager.verifyActivation(plan.runtimeState).success)
+
+        assertEquals(tproxyListenerVerifyCommand(plan.runtimeState), commands.last())
+        assertFalse(commands.last().contains(" -S"))
+        assertTrue(commands.last().contains("has_port \"\$tcp_listeners\" 48321"))
+        assertTrue(commands.last().contains("has_port \"\$udp_listeners\" 48321"))
+    }
+
+    @Test
+    fun `activation applied rule by rule is verified in full`() = runTest {
+        val commands = mutableListOf<String>()
+        val manager = TproxyManager(APP_UID) { command ->
+            commands += command
+            when {
+                command.startsWith("ip rule show") -> RootShell.Result(0, "\n__MXRAY_TPROXY_ROUTES__\n", "")
+                command.contains("-restore") -> RootShell.Result(127, "", "")
+                else -> RootShell.Result(0, "", "")
+            }
+        }
+        val plan = plan()
+        assertTrue(manager.activate(plan).success)
+
+        assertTrue(manager.verifyActivation(plan.runtimeState).success)
+
+        assertEquals(TproxyManager.verifyCommand(plan.runtimeState, APP_UID), commands.last())
     }
 
     @Test

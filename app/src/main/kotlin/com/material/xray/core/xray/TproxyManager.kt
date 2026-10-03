@@ -30,6 +30,7 @@ class TproxyManager internal constructor(
     private var bulkRestoreSupported = false
     private var useIndividualCommands = false
     private var guardCoversTethering = false
+    private var activationAppliedAtomically = false
     private val localAddressTracker = LocalAddressChangeTracker()
     private var dynamicLocalAddresses = false
 
@@ -72,6 +73,7 @@ class TproxyManager internal constructor(
 
     suspend fun activate(plan: TproxyTrafficPlan): TunManager.RoutingResult {
         val state = plan.runtimeState
+        activationAppliedAtomically = false
         dynamicLocalAddresses = state.dynamicLocalAddresses
         localAddressTracker.markInstalled(state.localAddresses, state.ipv6Enabled)
         val inspection = executeCommand(activationInspectionCommand(state))
@@ -92,7 +94,10 @@ class TproxyManager internal constructor(
         }
         if (useIndividualCommands) return execute(activationCommand(plan, appUid), "TPROXY routing setup")
         val restored = executeCommand(activationRestoreCommand(plan, appUid, checkSupport = !bulkRestoreSupported))
-        if (restored.isSuccess) return TunManager.RoutingResult(success = true)
+        if (restored.isSuccess) {
+            activationAppliedAtomically = true
+            return TunManager.RoutingResult(success = true)
+        }
         if (!restored.canRetryIndividually()) {
             return restored.toRoutingResult("TPROXY bulk routing setup")
         }
@@ -265,13 +270,26 @@ class TproxyManager internal constructor(
         return commands.shellAnd()
     }
 
-    suspend fun verify(state: TproxyRuntimeState): TunManager.RoutingResult {
+    suspend fun verify(state: TproxyRuntimeState): TunManager.RoutingResult = verify(state, verifyCommand(state, appUid))
+
+    /**
+     * Confirms the activation just applied, once the core is up. A bulk activation commits each
+     * table through iptables-restore, which is atomic, behind the route commands it is chained to,
+     * so its success already proves the rules and re-reading every table would only cost time on
+     * the connect path. What it cannot prove is that the core bound the TPROXY ports.
+     */
+    suspend fun verifyActivation(state: TproxyRuntimeState): TunManager.RoutingResult = verify(
+        state,
+        if (activationAppliedAtomically) tproxyListenerVerifyCommand(state) else verifyCommand(state, appUid),
+    )
+
+    private suspend fun verify(state: TproxyRuntimeState, command: String): TunManager.RoutingResult {
         dynamicLocalAddresses = state.dynamicLocalAddresses
         localAddressTracker.ensureInstalled(state.localAddresses, state.ipv6Enabled)
         if (state.tetherUpstreamInterface != null && !state.dynamicLocalAddresses && state.localAddresses.isEmpty()) {
             return TunManager.RoutingResult(false, "Local interface addresses were not captured during routing setup")
         }
-        return execute(verifyCommand(state, appUid), "TPROXY routing verification")
+        return execute(command, "TPROXY routing verification")
     }
 
     suspend fun checkHealth(state: TproxyRuntimeState): Boolean = executeCommand(
@@ -596,10 +614,6 @@ class TproxyManager internal constructor(
                 "has_v4_fragment() { case \"\$v4_slot_rules\" in *\"\$1\"*) true;; *) return 1;; esac; }",
                 "has_v4_order() { case \"\$newline\$v4_slot_rules\$newline\" in " +
                     "*\"\$newline\$1\$newline\$2\$newline\"*) true;; *) return 1;; esac; }",
-                "has_port() { case \"\$1\" in *\":\$2 \"*|*\".\$2 \"*) true;; *) return 1;; esac; }",
-                "listeners=\$(ss -lntu)",
-                "tcp_listeners=\$(printf '%s\\n' \"\$listeners\" | grep '^tcp ')",
-                "udp_listeners=\$(printf '%s\\n' \"\$listeners\" | grep '^udp ')",
                 hasV4("OUTPUT -j ${names.output}"),
                 hasV4("${names.output} -j ${names.slot(state.outputChainSlot)}"),
                 hasV4("PREROUTING -j ${names.prerouting}"),
@@ -632,8 +646,6 @@ class TproxyManager internal constructor(
                             "${canonicalLocalDestinationMatch(state, protocol)} -m $protocol --dport ${group.port} -j DROP",
                     )
                 }
-                commands += "has_port \"\$tcp_listeners\" ${group.port}"
-                commands += "has_port \"\$udp_listeners\" ${group.port}"
             }
             if (state.ipv6Enabled) {
                 commands += "v6_rules=\$($IPV6 -t mangle -S)"
@@ -724,6 +736,7 @@ class TproxyManager internal constructor(
                     commands += hasV6("${names.tetherForwardSlot(state.tetherChainSlot)} -i $upstream -j RETURN")
                 }
             }
+            commands += listenerChecks(state)
             return commands.shellAnd()
         }
 
@@ -1470,6 +1483,19 @@ class TproxyManager internal constructor(
 
             fun tetherInputSlot(value: String): String = tetherSlot(value) + "I"
         }
+    }
+}
+
+internal fun tproxyListenerVerifyCommand(state: TproxyRuntimeState): String = listenerChecks(state).shellAnd()
+
+private fun listenerChecks(state: TproxyRuntimeState): List<String> = buildList {
+    add("has_port() { case \"\$1\" in *\":\$2 \"*|*\".\$2 \"*) true;; *) return 1;; esac; }")
+    add("listeners=\$(ss -lntu)")
+    add("tcp_listeners=\$(printf '%s\\n' \"\$listeners\" | grep '^tcp ')")
+    add("udp_listeners=\$(printf '%s\\n' \"\$listeners\" | grep '^udp ')")
+    state.groups.forEach { group ->
+        add("has_port \"\$tcp_listeners\" ${group.port}")
+        add("has_port \"\$udp_listeners\" ${group.port}")
     }
 }
 
