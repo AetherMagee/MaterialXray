@@ -1979,11 +1979,12 @@ private class SubscriptionFocusRequesters(private val afterLast: FocusRequester)
     suspend fun focusAfterRemoval(subscriptions: List<SubscriptionEntity>?) {
         val (removedId, target) = pendingRemoval ?: return
         if (subscriptions?.none { it.id == removedId } != true) return
-        pendingRemoval = null
-        requesters.remove(removedId)
-        // Let the list place the subscription that moved up before focusing it.
+        // Let the list place the subscription that moved up before focusing it. Clearing the
+        // pending removal only afterwards matters: it restarts the effect that runs this.
         withFrameNanos { }
         target.requestFocus()
+        pendingRemoval = null
+        requesters.remove(removedId)
     }
 }
 
