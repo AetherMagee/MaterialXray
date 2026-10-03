@@ -105,6 +105,7 @@ import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
@@ -116,6 +117,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.runtime.toMutableStateList
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -253,6 +255,16 @@ fun HomeScreen(
     }
     val subscriptionOrder = remember(uiState.subscriptions?.map { it.id }) {
         uiState.subscriptions.orEmpty().map { it.id }.toMutableStateList()
+    }
+    val subscriptionFocus = remember(addSubscriptionFocusRequester) {
+        SubscriptionFocusRequesters(afterLast = addSubscriptionFocusRequester)
+    }
+    LaunchedEffect(uiState.subscriptions, subscriptionFocus.pendingRemoval) {
+        subscriptionFocus.focusAfterRemoval(uiState.subscriptions)
+    }
+    val removeSubscription = { subscription: SubscriptionEntity ->
+        subscriptionFocus.onRemoving(subscription.id, subscriptionOrder)
+        viewModel.deleteSubscription(subscription)
     }
     val listState = rememberLazyListState()
     val hapticFeedback = LocalHapticFeedback.current
@@ -429,6 +441,7 @@ fun HomeScreen(
                         canCollapse = subscriptions.size > 1,
                         expanded = subscription.id !in collapsedSubscriptionIds,
                         canReorder = subscriptions.size > 1,
+                        focusRequester = subscriptionFocus.forSubscription(subscription.id),
                         actions = SubscriptionCardActions(
                             onDragStart = {
                                 hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -455,7 +468,7 @@ fun HomeScreen(
                             },
                             onDelete = {
                                 if (servers.isEmpty()) {
-                                    viewModel.deleteSubscription(subscription)
+                                    removeSubscription(subscription)
                                 } else {
                                     removeSubscriptionRequest = subscription to servers.size
                                 }
@@ -622,7 +635,7 @@ fun HomeScreen(
         request = removeSubscriptionRequest,
         onDismiss = { removeSubscriptionRequest = null },
         onConfirm = { subscription ->
-            viewModel.deleteSubscription(subscription)
+            removeSubscription(subscription)
             removeSubscriptionRequest = null
         },
     )
@@ -1815,6 +1828,7 @@ private fun SubscriptionCard(
     canCollapse: Boolean,
     expanded: Boolean,
     canReorder: Boolean,
+    focusRequester: FocusRequester,
     actions: SubscriptionCardActions,
 ) {
     val currentOnDragStart by rememberUpdatedState(actions.onDragStart)
@@ -1856,8 +1870,12 @@ private fun SubscriptionCard(
         label = "subscriptionShadow",
     )
 
+    // Focus lands on the first server, or on the header when no server is shown.
+    val serversShown = (!canCollapse || expanded) && servers.isNotEmpty()
     Surface(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .then(if (serversShown) Modifier else Modifier.focusRequester(focusRequester)),
         shape = CardDefaults.elevatedShape,
         color = MaterialTheme.colorScheme.surfaceContainer,
         shadowElevation = subscriptionElevation,
@@ -1908,7 +1926,7 @@ private fun SubscriptionCard(
                         )
                     } else {
                         LookaheadScope {
-                            Column {
+                            Column(modifier = if (serversShown) Modifier.focusRequester(focusRequester) else Modifier) {
                                 servers.forEachIndexed { index, server ->
                                     key(server.entity.id) {
                                         Column(modifier = Modifier.animateBounds(this@LookaheadScope)) {
@@ -1936,6 +1954,36 @@ private fun SubscriptionCard(
                 }
             }
         }
+    }
+}
+
+/**
+ * Where remote focus goes in the subscription list. Removing a subscription takes its focused menu
+ * button with it, and Android would then hand focus to the first thing on screen, so focus moves to
+ * whatever followed the removed subscription instead.
+ */
+@Stable
+private class SubscriptionFocusRequesters(private val afterLast: FocusRequester) {
+    private val requesters = mutableMapOf<Long, FocusRequester>()
+
+    var pendingRemoval by mutableStateOf<Pair<Long, FocusRequester>?>(null)
+        private set
+
+    fun forSubscription(id: Long): FocusRequester = requesters.getOrPut(id) { FocusRequester() }
+
+    fun onRemoving(id: Long, order: List<Long>) {
+        val nextId = order.getOrNull(order.indexOf(id) + 1)
+        pendingRemoval = id to (nextId?.let(::forSubscription) ?: afterLast)
+    }
+
+    suspend fun focusAfterRemoval(subscriptions: List<SubscriptionEntity>?) {
+        val (removedId, target) = pendingRemoval ?: return
+        if (subscriptions?.none { it.id == removedId } != true) return
+        pendingRemoval = null
+        requesters.remove(removedId)
+        // Let the list place the subscription that moved up before focusing it.
+        withFrameNanos { }
+        target.requestFocus()
     }
 }
 
