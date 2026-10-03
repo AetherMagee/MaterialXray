@@ -58,7 +58,7 @@ The app is still under active development. Device-specific behavior is possible,
 
 This project is AI-assisted.
 
-Material Xray is a single-module Kotlin Android app using Jetpack Compose, Koin, Room, DataStore, and WorkManager. Xray-core handles proxy connections; the app manages subscriptions, configuration, routing, and the service lifecycle.
+Material Xray is a multi-module Kotlin Android app using Jetpack Compose, Navigation 3, Koin, Room, DataStore, and WorkManager. Platform-free code lives in plain JVM modules so a future Compose Multiplatform desktop build can reuse it. Xray-core handles proxy connections; the app manages subscriptions, configuration, routing, and the service lifecycle.
 
 ### Build and install
 
@@ -87,12 +87,12 @@ prek install
 Run tests and assemble the app, then lint and static analysis:
 
 ```sh
-./gradlew :app:testDebugUnitTest :app:assembleDebug
+./gradlew test :app:assembleDebug
 ./gradlew :app:lintDebug
 prek run --all-files
 ```
 
-Formatting is checked by the hook, not applied by a build. Use `./gradlew :app:ktlintFormat` to fix Kotlin formatting. Device tests require a connected device or emulator and run with `./gradlew :app:connectedDebugAndroidTest`.
+Formatting is checked by the hook, not applied by a build. Use `./gradlew ktlintFormat` to fix Kotlin formatting. The instrumentation test requires a connected device or emulator and runs with `./gradlew :core:android:connectedDebugAndroidTest`.
 
 ### Signed releases
 
@@ -118,7 +118,7 @@ Releases before `v0.5.0` do not have attestations.
 
 ### Runtime and native assets
 
-The APK packages `arm64-v8a`, `x86_64` and `armeabi-v7a`. Both modes run an Android Xray build, packaged as `libxray.so`. For `arm64-v8a` and `x86_64` the Gradle build downloads the official one. Upstream publishes no Android `armeabi-v7a` build, so the Gradle build compiles it from the pinned Xray commit with upstream's Android flags and Go toolchain; building an APK therefore needs Go 1.21 or newer. Rootless mode launches it through the JNI shim in `app/src/main/cpp/xray_launcher.c`; root TUN mode launches it through `app/src/main/cpp/xray_tun_exec.c`, which creates the TUN interface and hands Xray its descriptor.
+The APK packages `arm64-v8a`, `x86_64` and `armeabi-v7a`. Both modes run an Android Xray build, packaged as `libxray.so`. For `arm64-v8a` and `x86_64` the Gradle build downloads the official one. Upstream publishes no Android `armeabi-v7a` build, so the Gradle build compiles it from the pinned Xray commit with upstream's Android flags and Go toolchain; building an APK therefore needs Go 1.21 or newer. Rootless mode launches it through the JNI shim in `core/runtime/src/main/cpp/xray_launcher.c`; root TUN mode launches it through `core/runtime/src/main/cpp/xray_tun_exec.c`, which creates the TUN interface and hands Xray its descriptor.
 
 Each APK build downloads the latest `geoip.dat` and `geosite.dat` from `v2fly/geoip` and `v2fly/domain-list-community` and bundles them as assets. On first use, the app copies the bundled files into Xray's data directory, so a new installation can connect without downloading geodata. The app also queues a one-time background sync on first launch; its download does not delay tunnel startup. Later updates and custom download URLs remain available in Settings. APK builds require access to those release assets.
 
@@ -134,14 +134,25 @@ The script verifies the published SHA-256 digests of the Android builds, preserv
 
 ### Project layout
 
+Kotlin packages are unchanged across modules; only the Gradle module boundaries and Android namespaces differ.
+
 ```text
-app/src/main/kotlin/com/material/xray/
-  core/root/      Root shell execution
-  core/xray/      Xray binary, configuration, TUN, and routing
-  data/           Database, repositories, and subscription parsing
-  model/          Server and connection state models
-  service/        Connection service, logs, and boot receiver
-  ui/             Compose screens and navigation
+build-logic/        Gradle convention plugins shared by every module
+core/model          Server, routing and connection state models (JVM)
+core/common         Logging, formatting, log buffer, connection state coordinator (JVM)
+core/root           Root shell and process execution (JVM)
+core/xray           Xray configuration, TUN and routing plans, gRPC stubs (JVM)
+core/network        Link probing, DNS and bundled CA handling (JVM)
+core/connection     Connection lifecycle, health watchdog, routing updaters (JVM)
+core/database       Room database, entities, DAOs, migrations and schemas (JVM)
+core/data           Repositories and subscription parsing (JVM)
+core/android        Android implementations of the JVM modules' platform interfaces
+core/telemetry      Sentry integration
+core/runtime        VpnService, connection manager, workers, tile, native launcher
+core/ui             Theme, components, adaptive layout and all resources
+core/navigation     Navigation 3 keys, navigator and scene strategies
+feature/*           One Compose screen tree per tab or destination
+app/                Application, activity, NavDisplay root, DI assembly, packaging
 ```
 
 ## License

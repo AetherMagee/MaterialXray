@@ -3,21 +3,26 @@
 ## Commands
 - Run Gradle from the repo root with the wrapper: `./gradlew :app:assembleDebug`.
 - Install the prek-managed Git hook with `prek install`; run all hook checks explicitly with `prek run --all-files`.
-- Unit tests: `./gradlew :app:testDebugUnitTest`.
-- Single test class: `./gradlew :app:testDebugUnitTest --tests com.material.xray.core.xray.ConfigGeneratorTest`.
-- Single Kotlin backtick-named test: `./gradlew :app:testDebugUnitTest --tests "com.material.xray.core.xray.ConfigGeneratorTest.generates TUN inbound with correct name and MTU"`.
-- Final lint and broader local verification: `./gradlew :app:lintDebug` and `./gradlew :app:check`.
-- Type-resolving static analysis: `./gradlew :app:detektDebug :app:detektDebugUnitTest`. These tasks compile the sources first. prek's plain `:app:detekt` is quicker, but it silently skips every rule that needs types.
-- Formatting is not applied by building. `prek` verifies it with `ktlintCheck`; fix it with `./gradlew :app:ktlintFormat`.
+- Unit tests for every module: `./gradlew test`. JVM modules have a plain `test` task; in Android modules `test` runs `testDebugUnitTest`.
+- One module: `./gradlew :core:xray:test` or `./gradlew :feature:home:testDebugUnitTest`.
+- Single test class: `./gradlew :core:xray:test --tests com.material.xray.core.xray.ConfigGeneratorTest`.
+- Single Kotlin backtick-named test: `./gradlew :core:xray:test --tests "com.material.xray.core.xray.ConfigGeneratorTest.generates TUN inbound with correct name and MTU"`.
+- Type-resolving static analysis: `./gradlew detektMain detektTest -x detektRelease`. In Android modules `detektMain` covers every variant, and the release one only adds a second compilation of the same sources, hence the exclusion. These tasks compile the sources first. prek's plain `detekt` is quicker, but it silently skips every rule that needs types.
+- Final lint: `./gradlew :app:lintDebug`. `:app` has `lint.checkDependencies = true`, so that one task lints every module as one project; a library's own lint task is not meaningful on its own.
+- Formatting is not applied by building. `prek` verifies it with `ktlintCheck`; fix it with `./gradlew ktlintFormat`.
 - Iterate with targeted unit tests. Run the full unit-test suite before final QA, then defer assembly and lint until source edits are finished because they rerun expensive dexing and analysis work.
-- Device-only flows need a connected device/emulator: `./gradlew :app:installDebug` and `./gradlew :app:connectedDebugAndroidTest`.
+- Device-only flows need a connected device/emulator: `./gradlew :app:installDebug`. The only instrumentation test is `./gradlew :core:android:connectedDebugAndroidTest`.
 - Release signing is read from env vars, Gradle properties, then `local.properties`: `RELEASE_KEYSTORE_PATH`, `RELEASE_KEY_ALIAS`, `RELEASE_KEY_PASSWORD`, `RELEASE_STORE_PASSWORD`.
 
 ## Project Shape
-- This is a single-module Android app; `settings.gradle.kts` includes only `:app` and the namespace/application id is `com.material.xray`.
-- App startup is `MaterialXrayApp` for Koin and scheduled subscription refresh, then `MainActivity` -> `MaterialXrayTheme` -> `MainNavigation` for Compose tabs.
-- The runtime service is `service/XrayService.kt`, a `VpnService` that handles both root-managed service mode and rootless Android `VpnService` mode.
-- Main boundaries: `core/xray` builds Xray config/TUN/routing, `core/root` wraps root shell execution, `data` holds Room/repositories/subscription parsing, and `ui` holds Compose screens.
+- Multi-module build. `settings.gradle.kts` lists the modules; `build-logic/` is an included build with the convention plugins every module applies by id: `materialxray.jvm.library`, `materialxray.android.library`, `materialxray.android.compose`, `materialxray.android.feature`, `materialxray.android.application`. SDK levels, Java 11, detekt/ktlint, Koin and the test dependencies are configured once in `build-logic/src/main/kotlin/MaterialXrayConventions.kt`.
+- Kotlin package names did not change with the split: a class keeps its `com.material.xray.*` package whatever module it lives in. Only the Android namespaces (and so the `R` classes) differ per module.
+- Platform-free modules are plain `kotlin("jvm")` modules, so the compiler is what keeps `android.*` out of them: `:core:model`, `:core:common`, `:core:root`, `:core:xray`, `:core:network`, `:core:connection`, `:core:database`, `:core:data`. Anything they need from the platform is an interface in the JVM module (`AppLogger`, `PlatformInfo`, `MonotonicClock`, `XrayPaths`, `LocalSockets`, `PlatformDns`, `VpnTransportProbe`, `NetworkLinkProbe`, `SubscriptionDeviceIdentity`, …) with the Android implementation in `:core:android` under `com.material.xray.core.android.*`, bound with `@Singleton(binds = [Interface::class])`.
+- Android library modules: `:core:android` (platform implementations, app inventory, launcher, locale), `:core:telemetry` (Sentry), `:core:runtime` (`XrayService`, `ConnectionManager`, workers, tile, boot receiver, the native launcher, and its own `AndroidManifest.xml` with the service/receiver entries and permissions), `:core:ui` (theme, components, adaptive layout, every string and drawable resource; its `R` is the app's `R`), `:core:navigation` (`NavKey`s, `Navigator`, scene strategies), and `:feature:home`, `:feature:routing`, `:feature:logs`, `:feature:settings`, `:feature:configviewer` (one Compose screen tree each, with their view models).
+- `:app` is the thin shell: `MaterialXrayApp`, `MainActivity`, `ui/navigation` (the `NavDisplay` root), `di/AppModule` and `di/DatabaseModule`, the launcher icons and manifest, the Xray download/build tasks, legal and geodata assets, signing and the Sentry plugin. The application id and namespace are `com.material.xray`.
+- Dependency direction is strictly downwards: features depend on core modules and never on each other or on `:app`; `:core:runtime` depends on `:core:ui` only for `R`; `:core:data` depends on nothing Android. The `materialxray.android.feature` convention wires the standard feature dependency set, so a feature's `build.gradle.kts` lists only its extras.
+- Navigation is Navigation 3: `MainNavigation` in `:app` hosts one `NavDisplay`; the keys and `Navigator` live in `:core:navigation`; `ui/navigation/AppEntries.kt` in `:app` maps each key to a feature screen. Tab chrome (rail, bars, side sheets) is drawn inside the tab entries and shared across them with `sharedBounds`.
+- App startup is `MaterialXrayApp` for Koin and scheduled subscription refresh, then `MainActivity` -> `MaterialXrayTheme` -> `MainNavigation`.
 
 ## Native Assets
 - The APK is universal: arm64-v8a, x86_64 and armeabi-v7a. Both modes run an Android Xray build as `libxray.so` from `nativeLibraryDir`.
@@ -26,15 +31,16 @@
   - `buildXray` compiles armeabi-v7a, which upstream does not publish for Android, from `third_party/xray/COMMIT` with upstream's Android flags and the Go toolchain in `third_party/xray/GO_TOOLCHAIN`. It needs Go 1.21+ on `PATH` (Go fetches the pinned toolchain) and takes about a minute on a cold cache.
   - Both tasks are cacheable, so a `clean` restores them from the build cache.
 - Switch Xray versions with `./scripts/change-xray-ver.sh <tag>`; it verifies the upstream digests and rewrites the version, commit, Go toolchain, license and checksums under `third_party/xray/`.
-- The Android build only adopts a TUN as an open fd (`xray.tun.fd`). Rootless mode starts Xray through `app/src/main/cpp/xray_launcher.c` (`System.loadLibrary("xray_launcher")`) with the VpnService fd; root TUN mode execs it through `app/src/main/cpp/xray_tun_exec.c`, built as the executable `libxraytun.so` so the installer extracts it. Native changes need an Android build, not only JVM tests.
+- The Android build only adopts a TUN as an open fd (`xray.tun.fd`). The native sources live in `core/runtime/src/main/cpp`. Rootless mode starts Xray through `xray_launcher.c` (`System.loadLibrary("xray_launcher")`) with the VpnService fd; root TUN mode execs it through `xray_tun_exec.c`, built as the executable `libxraytun.so` so the installer extracts it. Native changes need an Android build, not only JVM tests.
 
 ## Data And Generated Code
+- Room lives in `:core:database`, a JVM module on Room's KMP driver API (`androidx.sqlite`). Migrations receive an `SQLiteConnection`; transactions go through `withWriteTransaction`; tests use the bundled SQLite driver. `:app`'s `di/DatabaseModule` opens the real file with `AndroidSQLiteDriver`.
 - Room schema version is in `AppDatabase`. When changing entities, bump that version and append the SQL for the new step to `DatabaseMigrations.sqlByStartVersion`; `DatabaseModule` registers the whole chain, so nothing else needs editing.
-- Room exports one JSON schema per version into `app/schemas`; commit the new file after building. `DatabaseMigrationChainTest` replays every migration and compares the result against it, so a migration that drifts from the entities fails `testDebugUnitTest`.
+- Room exports one JSON schema per version into `core/database/schemas`; commit the new file after building. `DatabaseMigrationChainTest` replays every migration and compares the result against it, so a migration that drifts from the entities fails `:core:database:test`.
 - Only a downgrade falls back to recreating the tables. A failed upgrade throws instead of wiping the user's data, so a broken migration must be fixed rather than absorbed.
-- Room uses KSP from `app/build.gradle.kts`; prefer Gradle tasks for verification so generated code is produced.
-- Dependency injection is Koin with the Koin Compiler Plugin. Annotate classes with `@Singleton`, `@Factory`, `@KoinViewModel` or `@KoinWorker` (Koin's annotations, not `javax.inject`); `AppModule`'s `@ComponentScan` picks them up and `@KoinApplication` on `MaterialXrayApp` assembles the graph. Third-party types, and classes the graph must build through a secondary constructor because the primary one is a test seam, get a provider function in `di/AppModule.kt` or `di/DatabaseModule.kt`.
-- The compiler plugin fails the build on a missing binding, but only in a compilation that includes `MaterialXrayApp`; an incremental compile that skips it prints `compile-safety validation skipped`. `KoinGraphTest` checks the parts that only resolve at runtime.
+- Room uses KSP from `core/database/build.gradle.kts`; prefer Gradle tasks for verification so generated code is produced.
+- Dependency injection is Koin with the Koin Compiler Plugin. Annotate classes with `@Singleton`, `@Factory`, `@KoinViewModel` or `@KoinWorker` (Koin's annotations, not `javax.inject`). Every module has a `di/<Module>Module` class with `@Module @ComponentScan` over its own packages; `:app`'s `AppModule` includes them all and `@KoinApplication` on `MaterialXrayApp` assembles the graph. A new module needs its `@Module` class added to `AppModule`'s `includes`. Third-party types, and classes the graph must build through a secondary constructor because the primary one is a test seam, get a provider function in the owning module's `@Module` class or in `:app`'s `di/AppModule.kt` / `di/DatabaseModule.kt`.
+- The compiler plugin fails the build on a missing binding, but only in a compilation that includes `MaterialXrayApp`; an incremental compile that skips it prints `compile-safety validation skipped`. `KoinGraphTest` in `:app` checks the parts that only resolve at runtime, including every interface-to-Android-implementation binding; add a pair there when you add a seam.
 - `local.properties`, Gradle outputs, `.cxx`, and most local IDE state are gitignored; do not depend on local-only values except SDK path or local signing credentials.
 
 ## CI
@@ -42,11 +48,12 @@
 - `.github/workflows/release.yml` manually builds, signs, uploads, and publishes a release APK.
 
 ## QA
-- Finish all source edits, then run `./gradlew :app:testDebugUnitTest :app:assembleDebug :app:detektDebug :app:detektDebugUnitTest` first.
+- Finish all source edits, then run `./gradlew test :app:assembleDebug detektMain detektTest -x detektRelease` first.
 - After those checks pass and no further source changes are planned, run the expensive final lint with `./gradlew :app:lintDebug`.
 - Run `prek run --all-files` last so ktlint and detekt validate the final worktree.
 - Do not call a repository change truly 'done' until all three QA commands succeed. These build-dependent checks intentionally run locally rather than in CI or prek.
 - If a required check cannot run, report that explicitly.
+- Run one Gradle invocation at a time and do not override `kotlin.daemon.jvmargs`; parallel builds in several worktrees have exhausted the machine's memory before.
 
 ## Agent Workflow
 - After implementing a change, you should check whether a device is attached over ADB. If it is, you should install the debug build of the app on the device to let the User verify the change.
