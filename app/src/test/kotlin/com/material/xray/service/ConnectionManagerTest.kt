@@ -579,6 +579,26 @@ class ConnectionManagerTest {
     }
 
     @Test
+    fun `stand down steps aside while another VPN claims the internet and resumes after`() = runTest {
+        val harness = Harness()
+        harness.environment.vpnRoutes = listOf("0.0.0.0/0", "203.0.113.0/24")
+        val settings = runtimeSettings().copy(
+            rootConnectionBackend = RootConnectionBackend.Tproxy,
+            otherVpnMode = OtherVpnMode.StandDown,
+        )
+
+        harness.manager.connect(server(), settings, preparation = ConnectionPreparation.ReusePreparedRuntime)
+        val connected = harness.stateCoordinator.state.value as ConnectionState.Connected
+        assertEquals(listOf("0.0.0.0/0"), harness.stateStore.state?.tproxy?.standDownRoutes)
+
+        harness.environment.vpnRoutes = emptyList()
+        harness.manager.followOtherVpnRouting(connected, settings)
+        assertEquals(listOf(emptyList<String>()), harness.tproxyGateway.updatedStates.map { it.standDownRoutes })
+        assertEquals(emptyList<String>(), harness.stateStore.state?.tproxy?.standDownRoutes)
+        assertEquals(0, harness.tproxyGateway.otherVpnRuleSyncs)
+    }
+
+    @Test
     fun `tunnel-in-tunnel mirrors VPN rules instead of returning its routes`() = runTest {
         val harness = Harness()
         harness.environment.vpnRoutes = listOf("203.0.113.0/24")

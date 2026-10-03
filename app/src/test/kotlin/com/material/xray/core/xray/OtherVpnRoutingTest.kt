@@ -1,6 +1,7 @@
 package com.material.xray.core.xray
 
 import com.material.xray.core.root.RootShell
+import com.material.xray.model.OtherVpnMode
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -73,6 +74,44 @@ class OtherVpnRoutingTest {
     }
 
     @Test
+    fun `stand down takes what the other VPN routes only where it claims the internet`() {
+        val exitNode = listOf("0.0.0.0/0", "100.64.0.0/10", "fd7a:115c:a1e0::/48")
+        val state = plan(otherVpnMode = OtherVpnMode.StandDown).runtimeState
+
+        assertEquals(listOf("0.0.0.0/0"), otherVpnStandDownRoutes(exitNode))
+        // Half of the internet counts as claiming it, but the other half stays with the core.
+        assertEquals(listOf("0.0.0.0/1"), otherVpnStandDownRoutes(listOf("0.0.0.0/1", "10.0.0.0/8")))
+        assertEquals(listOf("0:0:0:0:0:0:0:0/1", "8000:0:0:0:0:0:0:0/1"), otherVpnStandDownRoutes(listOf("::/1", "8000::/1")))
+        assertEquals(listOf("0.0.0.0/0"), state.followingOtherVpn(exitNode).standDownRoutes)
+        // Without a full tunnel it auto-routes, and the other modes never stand down.
+        with(state.followingOtherVpn(listOf("203.0.113.0/24"))) {
+            assertEquals(emptyList<String>(), standDownRoutes)
+            assertEquals(listOf("203.0.113.0/24"), otherVpnRoutes)
+        }
+        assertEquals(emptyList<String>(), state.copy(otherVpnMode = OtherVpnMode.AutoRouting).followingOtherVpn(exitNode).standDownRoutes)
+    }
+
+    @Test
+    fun `standing down returns what the other VPN routes after the core's own exemptions`() {
+        val command = TproxyManager.activationCommand(
+            plan(otherVpnRoutes = listOf("0.0.0.0/0", "::/0"), otherVpnMode = OtherVpnMode.StandDown),
+            APP_UID,
+        )
+        val standDown = "iptables -w 2 -t mangle -A MXOA278b -d 0.0.0.0/0 -j RETURN"
+        val ipv6StandDown = "ip6tables -w 2 -t filter -A MXOA278b -d 0:0:0:0:0:0:0:0/0 -j RETURN"
+
+        assertTrue(command.contains(standDown))
+        assertTrue(command.indexOf("-A MXOA278b -d 127.0.0.0/8 -j RETURN") < command.indexOf(standDown))
+        assertTrue(command.indexOf(standDown) < command.indexOf("-A MXOA278b -p tcp --dport 53 -j MARK"))
+        // With IPv6 off for the core, the other VPN gets IPv6 instead of it being refused.
+        assertTrue(
+            command.indexOf(ipv6StandDown) in 0 until
+                command.indexOf("ip6tables -w 2 -t filter -A MXOA278b -m owner --uid-owner 10000-99999 -p tcp --dport 53 -j REJECT"),
+        )
+        assertFalse(TproxyManager.activationCommand(plan(otherVpnRoutes = listOf("0.0.0.0/0")), APP_UID).contains(standDown))
+    }
+
+    @Test
     fun `only secure VPN rules are mirrored`() {
         val rules = MirroredVpnRule.vpnRules(DEVICE_RULES)
 
@@ -135,12 +174,17 @@ class OtherVpnRoutingTest {
         assertTrue(isOtherVpnMirrorRule(rules.single()))
     }
 
-    private fun plan(allowIpv6: Boolean = false, otherVpnRoutes: List<String> = emptyList()): TproxyTrafficPlan {
+    private fun plan(
+        allowIpv6: Boolean = false,
+        otherVpnRoutes: List<String> = emptyList(),
+        otherVpnMode: OtherVpnMode = OtherVpnMode.default,
+    ): TproxyTrafficPlan {
         val state = TproxyManager.createRuntimeState(
             routeTable = 300,
             groups = listOf(Long.MAX_VALUE to "tproxy-in-default", 7L to "app-in-7"),
             ports = listOf(48_321, 48_322),
             allowIpv6 = allowIpv6,
+            otherVpnMode = otherVpnMode,
             otherVpnRoutes = otherVpnRoutes,
         )
         return TproxyTrafficPlan(

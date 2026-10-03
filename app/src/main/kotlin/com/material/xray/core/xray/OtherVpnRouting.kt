@@ -1,5 +1,6 @@
 package com.material.xray.core.xray
 
+import com.material.xray.model.OtherVpnMode
 import java.math.BigInteger
 import java.net.InetAddress
 
@@ -73,8 +74,28 @@ fun otherVpnBypassRoutes(routes: List<String>, bypassLan: Boolean, ipv6Enabled: 
         .toList()
 }
 
+/**
+ * What Stand down leaves to another VPN publishing [routes]: in each family where it claims the
+ * internet, every destination it routes. Anything it does not route stays with the core.
+ */
+fun otherVpnStandDownRoutes(routes: List<String>): List<String> = routes.mapNotNull(Cidr::parse)
+    .groupBy { it.isIpv6 }
+    .values
+    .filter(::coversHalfOfFamily)
+    .flatMap(::outermost)
+    .map(Cidr::toString)
+    .sorted()
+
+/** This state with what its mode leaves to another VPN that publishes [routes]. */
+fun TproxyRuntimeState.followingOtherVpn(routes: List<String>): TproxyRuntimeState = copy(
+    otherVpnRoutes = if (otherVpnMode == OtherVpnMode.TunnelInTunnel) emptyList() else otherVpnBypassRoutes(routes, bypassLan, ipv6Enabled),
+    standDownRoutes = if (otherVpnMode == OtherVpnMode.StandDown) otherVpnStandDownRoutes(routes) else emptyList(),
+)
+
+private fun outermost(routes: List<Cidr>): List<Cidr> = routes.filterNot { route -> routes.any { it != route && it.contains(route) } }.distinct()
+
 private fun coversHalfOfFamily(routes: List<Cidr>): Boolean {
-    val outermost = routes.filterNot { route -> routes.any { it != route && it.contains(route) } }.distinct()
+    val outermost = outermost(routes)
     val bits = outermost.firstOrNull()?.let { it.address.size * Byte.SIZE_BITS } ?: return false
     val covered = outermost.fold(BigInteger.ZERO) { sum, route -> sum + BigInteger.ONE.shiftLeft(bits - route.prefixLength) }
     return covered >= BigInteger.ONE.shiftLeft(bits - 1)

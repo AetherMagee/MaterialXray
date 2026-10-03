@@ -430,12 +430,7 @@ class TproxyManager internal constructor(
                 localAddresses = localAddresses,
                 dynamicLocalAddresses = dynamicLocalAddresses,
                 otherVpnMode = otherVpnMode,
-                otherVpnRoutes = if (otherVpnMode == OtherVpnMode.AutoRouting) {
-                    otherVpnBypassRoutes(otherVpnRoutes, bypassLan, allowIpv6)
-                } else {
-                    emptyList()
-                },
-            )
+            ).followingOtherVpn(otherVpnRoutes)
         }
 
         /** What the output chain returns for every app, and what it adds with LAN bypass on. */
@@ -1222,6 +1217,10 @@ class TproxyManager internal constructor(
             uidRanges(plan.bypassUids - appUid).forEach { range ->
                 add("$IPV6 -t filter -A $chain -m owner --uid-owner ${range.asArgument()} -j RETURN")
             }
+            // With IPv6 off for the core, what Stand down hands over goes to the other VPN instead of being refused.
+            plan.runtimeState.standDownRoutes.filter { ':' in it }.forEach { cidr ->
+                add("$IPV6 -t filter -A $chain -d $cidr -j RETURN")
+            }
             if (plan.runtimeState.bypassLan) {
                 val reject = "REJECT --reject-with icmp6-no-route"
                 plan.routeProfileIds.toSortedSet().forEach { profileId ->
@@ -1289,6 +1288,11 @@ class TproxyManager internal constructor(
                 }
             }
             outputReturnedCidrs(tool).forEach { cidr ->
+                add("$tool -t mangle -A $chain -d $cidr -j RETURN")
+            }
+            // Stand down hands everything the other VPN routes, DNS included, to it. The rules below
+            // stay in place, so verification and a later resume see the usual chain.
+            state.standDownRoutes.filter { (':' in it) == (tool == IPV6) }.forEach { cidr ->
                 add("$tool -t mangle -A $chain -d $cidr -j RETURN")
             }
             uidRanges(plan.bypassUids - appUid).forEach { range ->

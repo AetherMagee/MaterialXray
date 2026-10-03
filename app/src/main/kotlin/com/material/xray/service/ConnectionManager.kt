@@ -14,7 +14,7 @@ import com.material.xray.core.xray.XrayApiEndpoint
 import com.material.xray.core.xray.XrayInbound
 import com.material.xray.core.xray.XrayState
 import com.material.xray.core.xray.XraySysStats
-import com.material.xray.core.xray.otherVpnBypassRoutes
+import com.material.xray.core.xray.followingOtherVpn
 import com.material.xray.core.xray.parseXrayApiEndpoint
 import com.material.xray.model.ConnectionProgress
 import com.material.xray.model.ConnectionState
@@ -945,6 +945,9 @@ internal class ConnectionManager(
                 tproxyPlan.runtimeState.otherVpnRoutes.takeIf { it.isNotEmpty() }?.let { routes ->
                     log.append(LogSource.APP, "Left to the other VPN: ${routes.joinToString()}")
                 }
+                tproxyPlan.runtimeState.standDownRoutes.takeIf { it.isNotEmpty() }?.let { routes ->
+                    log.append(LogSource.APP, "Standing down for the other VPN: ${routes.joinToString()}")
+                }
                 log.append(LogSource.APP, "TPROXY routing applied")
                 finishTransitionGuard()
             }
@@ -1301,27 +1304,29 @@ internal class ConnectionManager(
 
     /**
      * Keeps the running TPROXY firewall in step with another app's VPN as it comes, goes or
-     * changes its routes. Neither mode needs the core restarted for that. The mode is the one the
+     * changes its routes. No mode needs the core restarted for that. The mode is the one the
      * firewall was built with; a changed setting arrives with the reconnect it triggers.
      */
     suspend fun followOtherVpnRouting(connectedState: ConnectionState.Connected, runtimeSettings: XrayRuntimeSettings) {
         val persistedState = stateStore.read() ?: return
         if (persistedState.rootConnectionBackend != RootConnectionBackend.Tproxy) return
         val tproxyState = persistedState.tproxy ?: return
-        when (tproxyState.otherVpnMode) {
-            OtherVpnMode.AutoRouting -> {
-                val routes = otherVpnBypassRoutes(
-                    environment.otherVpnRoutes(),
-                    tproxyState.bypassLan,
-                    tproxyState.ipv6Enabled,
-                )
-                if (routes == tproxyState.otherVpnRoutes) return
-                log.append(LogSource.APP, "Other VPN routes changed: ${routes.joinToString().ifEmpty { "none" }}")
-                if (!updateTproxyOutput(connectedState, runtimeSettings, persistedState, tproxyState.copy(otherVpnRoutes = routes))) {
-                    log.append(LogSource.APP, "Could not follow the other VPN's routes")
-                }
-            }
-            OtherVpnMode.TunnelInTunnel -> syncOtherVpnRules(tproxyState)
+        if (tproxyState.otherVpnMode == OtherVpnMode.TunnelInTunnel) {
+            syncOtherVpnRules(tproxyState)
+            return
+        }
+        val next = tproxyState.followingOtherVpn(environment.otherVpnRoutes())
+        if (next == tproxyState) return
+        if (!updateTproxyOutput(connectedState, runtimeSettings, persistedState, next)) {
+            log.append(LogSource.APP, "Could not follow the other VPN's routes")
+            return
+        }
+        if (next.otherVpnRoutes != tproxyState.otherVpnRoutes) {
+            log.append(LogSource.APP, "Other VPN routes changed: ${next.otherVpnRoutes.joinToString().ifEmpty { "none" }}")
+        }
+        if (next.standDownRoutes != tproxyState.standDownRoutes) {
+            val routes = next.standDownRoutes.joinToString()
+            log.append(LogSource.APP, if (routes.isEmpty()) "No longer standing down for the other VPN" else "Standing down for the other VPN: $routes")
         }
     }
 

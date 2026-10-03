@@ -81,6 +81,7 @@ val OtherVpnMode.labelResource: Int
     get() = when (this) {
         OtherVpnMode.AutoRouting -> R.string.other_vpn_mode_auto_routing_label
         OtherVpnMode.TunnelInTunnel -> R.string.other_vpn_mode_tunnel_in_tunnel_label
+        OtherVpnMode.StandDown -> R.string.other_vpn_mode_stand_down_label
     }
 
 @get:StringRes
@@ -88,6 +89,7 @@ val OtherVpnMode.descriptionResource: Int
     get() = when (this) {
         OtherVpnMode.AutoRouting -> R.string.other_vpn_mode_auto_routing_description
         OtherVpnMode.TunnelInTunnel -> R.string.other_vpn_mode_tunnel_in_tunnel_description
+        OtherVpnMode.StandDown -> R.string.other_vpn_mode_stand_down_description
     }
 
 @get:StringRes

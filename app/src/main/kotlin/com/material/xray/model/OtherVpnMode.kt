@@ -10,6 +10,9 @@ enum class OtherVpnMode(val persistedValue: String) {
 
     /** Apps the other VPN covers reach its routes through it, and its own traffic goes through MXray. */
     TunnelInTunnel("tunnel"),
+
+    /** MXray steps aside while the other VPN claims the whole internet, and otherwise auto-routes. */
+    StandDown("stand_down"),
     ;
 
     companion object {

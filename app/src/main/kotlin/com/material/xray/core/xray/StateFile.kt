@@ -30,6 +30,8 @@ data class TproxyRuntimeState(
     val otherVpnMode: OtherVpnMode = OtherVpnMode.default,
     /** Another VPN's own networks, which local apps reach through that VPN rather than the core. */
     val otherVpnRoutes: List<String> = emptyList(),
+    /** What Stand down hands to another VPN claiming the internet: everything it routes, for every app. */
+    val standDownRoutes: List<String> = emptyList(),
 ) {
     val tetherIngress: TetherIngressState
         get() = tetherUpstreamInterface?.let { TetherIngressState.Active(it, dynamicLocalAddresses) }
