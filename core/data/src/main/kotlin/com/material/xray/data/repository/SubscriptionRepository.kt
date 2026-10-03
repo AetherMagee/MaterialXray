@@ -1,11 +1,11 @@
 package com.material.xray.data.repository
 
-import androidx.room.withTransaction
 import com.material.xray.data.db.AppDatabase
 import com.material.xray.data.db.dao.ServerDao
 import com.material.xray.data.db.dao.SubscriptionDao
 import com.material.xray.data.db.entity.ServerEntity
 import com.material.xray.data.db.entity.SubscriptionEntity
+import com.material.xray.data.db.withWriteTransaction
 import com.material.xray.data.parser.FetchedSubscription
 import com.material.xray.data.parser.ShareLinkParser
 import com.material.xray.data.parser.SubscriptionFetcher
@@ -213,8 +213,8 @@ class SubscriptionRepository(
 
     internal suspend fun commitRefresh(prepared: PreparedRefresh): RefreshResult? {
         val subId = prepared.subscriptionId
-        return database.withTransaction {
-            val current = subscriptionDao.getById(subId) ?: return@withTransaction null
+        return database.withWriteTransaction {
+            val current = subscriptionDao.getById(subId) ?: return@withWriteTransaction null
             val existingServers = serverDao.getBySubscription(subId)
             val refreshedServers = carryProfileRoutingOverridesInto(existingServers, prepared.servers, json)
             val finalServers = mergeGuardedServersInto(existingServers, refreshedServers)
@@ -263,8 +263,8 @@ class SubscriptionRepository(
         sub: SubscriptionEntity,
         name: String,
         url: String,
-    ): SubscriptionEntity? = database.withTransaction {
-        val current = subscriptionDao.getById(sub.id) ?: return@withTransaction null
+    ): SubscriptionEntity? = database.withWriteTransaction {
+        val current = subscriptionDao.getById(sub.id) ?: return@withWriteTransaction null
         val updated = current.copy(
             name = name.trim().ifEmpty { nextFallbackName(excludingId = sub.id) },
             url = url.trim(),

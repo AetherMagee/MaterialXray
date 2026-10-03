@@ -2,7 +2,6 @@ package com.material.xray.data.repository
 
 import android.content.Context
 import android.net.Uri
-import androidx.room.withTransaction
 import com.material.xray.core.app.appKey
 import com.material.xray.core.common.connection.AppUpdateScheduling
 import com.material.xray.core.common.connection.ConnectionShutdown
@@ -17,6 +16,7 @@ import com.material.xray.data.db.entity.ServerEntity
 import com.material.xray.data.db.entity.SubscriptionEntity
 import com.material.xray.data.db.entity.routeAssignment
 import com.material.xray.data.db.entity.toAppBypassEntity
+import com.material.xray.data.db.withWriteTransaction
 import com.material.xray.model.BackupData
 import com.material.xray.model.ConnectionState
 import com.material.xray.model.ServerConfig
@@ -107,7 +107,7 @@ class BackupManager(
 
     private suspend fun createSnapshot(): BackupData {
         val settings = settingsRepository.getAllAsMap()
-        val (subscriptions, servers, appRoutes) = database.withTransaction {
+        val (subscriptions, servers, appRoutes) = database.withWriteTransaction {
             Triple(subscriptionDao.getAll(), serverDao.getAll(), appBypassDao.getAll())
         }
         val subscriptionKeyById = subscriptions.associate { subscription ->
@@ -166,7 +166,7 @@ class BackupManager(
 
     private suspend fun applyPlan(plan: BackupImportPlan) {
         var selectedServerId = -1L
-        database.withTransaction {
+        database.withWriteTransaction {
             appBypassDao.deleteAll()
             subscriptionDao.deleteAll()
 
