@@ -2,7 +2,10 @@ package com.material.xray.di
 
 import androidx.work.ListenableWorker
 import com.material.xray.MaterialXrayApp
+import com.material.xray.core.android.data.AndroidSubscriptionDeviceIdentity
+import com.material.xray.core.android.data.ContentResolverBackupStorage
 import com.material.xray.core.android.network.AndroidNetworkLinkProbe
+import com.material.xray.core.android.platform.AndroidAppBuildInfo
 import com.material.xray.core.android.platform.AndroidPlatformInfo
 import com.material.xray.core.android.platform.ElapsedRealtimeClock
 import com.material.xray.core.android.platform.LogcatAppLogger
@@ -10,15 +13,19 @@ import com.material.xray.core.android.xray.AndroidLocalSockets
 import com.material.xray.core.android.xray.AndroidPlatformDns
 import com.material.xray.core.android.xray.AndroidVpnTransportProbe
 import com.material.xray.core.android.xray.AndroidXrayPaths
+import com.material.xray.core.app.AppInventory
+import com.material.xray.core.app.AppInventorySource
 import com.material.xray.core.common.connection.AppUpdateScheduling
 import com.material.xray.core.common.connection.ConnectionShutdown
 import com.material.xray.core.common.connection.RoutingChangeNotifier
 import com.material.xray.core.common.di.ApplicationScope
 import com.material.xray.core.common.log.AppLogger
 import com.material.xray.core.common.log.LogEcho
+import com.material.xray.core.common.platform.AppBuildInfo
 import com.material.xray.core.common.platform.MonotonicClock
 import com.material.xray.core.common.platform.PlatformInfo
 import com.material.xray.core.common.telemetry.DiagnosticsConsentMirroring
+import com.material.xray.core.launcher.LauncherIconManager
 import com.material.xray.core.network.CoreTrafficRoutingSetting
 import com.material.xray.core.network.NetworkLinkProbe
 import com.material.xray.core.xray.GeoDataUrlSettings
@@ -26,6 +33,9 @@ import com.material.xray.core.xray.LocalSockets
 import com.material.xray.core.xray.PlatformDns
 import com.material.xray.core.xray.VpnTransportProbe
 import com.material.xray.core.xray.XrayPaths
+import com.material.xray.data.parser.SubscriptionDeviceIdentity
+import com.material.xray.data.platform.BackupStorage
+import com.material.xray.data.platform.LauncherIconSwitcher
 import com.material.xray.data.repository.SettingsRepository
 import com.material.xray.service.AppUpdateScheduler
 import com.material.xray.service.AppUpdateWorker
@@ -105,6 +115,11 @@ class KoinGraphTest {
             PlatformDns::class to AndroidPlatformDns::class,
             VpnTransportProbe::class to AndroidVpnTransportProbe::class,
             NetworkLinkProbe::class to AndroidNetworkLinkProbe::class,
+            AppBuildInfo::class to AndroidAppBuildInfo::class,
+            SubscriptionDeviceIdentity::class to AndroidSubscriptionDeviceIdentity::class,
+            BackupStorage::class to ContentResolverBackupStorage::class,
+            LauncherIconSwitcher::class to LauncherIconManager::class,
+            AppInventorySource::class to AppInventory::class,
         )
         val definitions = koin.instanceRegistry.instances.values.map { it.beanDefinition }
 

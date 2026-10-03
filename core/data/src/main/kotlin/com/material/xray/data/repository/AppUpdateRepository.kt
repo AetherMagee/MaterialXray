@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.material.xray.core.common.platform.AppBuildInfo
 import com.material.xray.model.AppUpdate
 import com.material.xray.model.AppUpdateCheckStatus
 import com.material.xray.model.isReleaseNewer
@@ -20,12 +21,10 @@ private val Context.appUpdateDataStore by preferencesDataStore(name = "app_updat
 class AppUpdateRepository(
     private val context: Context,
     private val releaseFetcher: GitHubReleaseFetcher,
+    appBuildInfo: AppBuildInfo,
 ) {
     private val store get() = context.appUpdateDataStore
-    private val currentVersionName = runCatching {
-        @Suppress("DEPRECATION")
-        context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty()
-    }.getOrDefault("")
+    private val currentVersionName = appBuildInfo.versionName
     val availableUpdate: Flow<AppUpdate?> = store.data.map { preferences ->
         preferences[AVAILABLE_RELEASE_TAG]
             ?.takeIf { tag -> isReleaseNewer(tag, currentVersionName) }

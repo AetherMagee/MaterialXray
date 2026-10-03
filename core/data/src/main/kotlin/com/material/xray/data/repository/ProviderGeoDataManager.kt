@@ -1,6 +1,5 @@
 package com.material.xray.data.repository
 
-import android.content.Context
 import com.material.xray.core.common.connection.ConnectionStateCoordinator
 import com.material.xray.core.common.di.ApplicationScope
 import com.material.xray.core.common.log.LogBuffer
@@ -13,6 +12,7 @@ import com.material.xray.core.xray.PROVIDER_GEO_DATA_FILE_SUFFIX
 import com.material.xray.core.xray.ProviderGeoDataFailure
 import com.material.xray.core.xray.ProviderGeoDataResolution
 import com.material.xray.core.xray.ProviderGeoDataState
+import com.material.xray.core.xray.XrayPaths
 import com.material.xray.core.xray.isProviderGeoDataFileName
 import com.material.xray.core.xray.providerGeoDataFileName
 import com.material.xray.core.xray.providerGeoDataNeedsDownload
@@ -53,7 +53,7 @@ import org.koin.core.annotation.Singleton
  */
 @Singleton
 class ProviderGeoDataManager(
-    private val context: Context,
+    private val paths: XrayPaths,
     private val httpClient: AppHttpClient,
     private val subscriptionDao: SubscriptionDao,
     private val settingsRepository: SettingsRepository,
@@ -62,7 +62,7 @@ class ProviderGeoDataManager(
     @ApplicationScope private val scope: CoroutineScope,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
-    private val binaryDir get() = File(context.filesDir, "bin")
+    private val binaryDir get() = File(paths.filesDir, "bin")
     private val syncMutex = Mutex()
     private val failures = mutableMapOf<String, ProviderGeoDataFailure>()
     private val codeCache = mutableMapOf<String, CachedCodes>()

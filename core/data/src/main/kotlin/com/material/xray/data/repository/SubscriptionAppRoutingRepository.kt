@@ -1,6 +1,6 @@
 package com.material.xray.data.repository
 
-import com.material.xray.core.app.AppInventory
+import com.material.xray.core.app.AppInventorySource
 import com.material.xray.data.db.dao.AppBypassDao
 import com.material.xray.data.db.dao.SubscriptionDao
 import com.material.xray.data.db.entity.AppBypassEntity
@@ -15,7 +15,7 @@ import org.koin.core.annotation.Singleton
 class SubscriptionAppRoutingRepository(
     private val appBypassDao: AppBypassDao,
     private val subscriptionDao: SubscriptionDao,
-    private val appInventory: AppInventory,
+    private val appInventory: AppInventorySource,
 ) {
     suspend fun apply(routing: SubscriptionAppRouting): Boolean {
         val normalized = routing.normalized() ?: return false

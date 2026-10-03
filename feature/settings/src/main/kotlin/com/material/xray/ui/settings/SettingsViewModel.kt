@@ -477,7 +477,7 @@ class SettingsViewModel(
         if (_backupBusy.value) return
         viewModelScope.launch {
             _backupBusy.value = true
-            val result = runCatching { withContext(ioDispatcher) { backupManager.export(uri) } }
+            val result = runCatching { withContext(ioDispatcher) { backupManager.export(uri.toString()) } }
             result.exceptionOrNull()?.let { error ->
                 if (error is CancellationException) throw error
             }
@@ -500,7 +500,7 @@ class SettingsViewModel(
         if (_backupBusy.value) return
         viewModelScope.launch {
             _backupBusy.value = true
-            val result = runCatching { withContext(ioDispatcher) { backupManager.prepareImport(uri) } }
+            val result = runCatching { withContext(ioDispatcher) { backupManager.prepareImport(uri.toString()) } }
             result.onSuccess { prepared ->
                 preparedBackupImport = prepared
                 _backupImportSummary.value = prepared.summary

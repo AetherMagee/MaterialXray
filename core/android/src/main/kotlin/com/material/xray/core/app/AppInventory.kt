@@ -30,23 +30,24 @@ data class AppInventorySnapshot(
     val profileIds: Set<Int>,
 )
 
-interface AppInventorySource {
-    suspend fun loadSnapshot(): AppInventorySnapshot
-    suspend fun loadRoutingSnapshot(): AppInventorySnapshot = loadSnapshot()
-}
-
-@Singleton
+@Singleton(binds = [AppInventorySource::class])
 class AppInventory(
     private val context: Context,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : AppInventorySource {
     suspend fun loadInstalledApps(): List<InstalledApp> = loadSnapshot().apps
 
-    override suspend fun loadSnapshot(): AppInventorySnapshot = loadSnapshot(includeUiMetadata = true)
+    suspend fun loadSnapshot(): AppInventorySnapshot = loadSnapshot(includeUiMetadata = true)
 
     suspend fun loadSnapshotWithProgress(onProgress: (processed: Int, total: Int) -> Unit): AppInventorySnapshot = loadSnapshot(includeUiMetadata = true, onProgress = onProgress)
 
-    override suspend fun loadRoutingSnapshot(): AppInventorySnapshot = loadSnapshot(includeUiMetadata = false)
+    override suspend fun loadRoutingSnapshot(): RoutableAppSnapshot {
+        val snapshot = loadSnapshot(includeUiMetadata = false)
+        return RoutableAppSnapshot(
+            apps = snapshot.apps.map { RoutableApp(packageName = it.packageName, profileId = it.profileId, uid = it.uid) },
+            profileIds = snapshot.profileIds,
+        )
+    }
 
     private suspend fun loadSnapshot(
         includeUiMetadata: Boolean,

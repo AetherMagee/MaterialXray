@@ -1,5 +1,6 @@
 package com.material.xray.data.parser
 
+import com.material.xray.core.common.platform.PlatformInfo
 import com.material.xray.core.network.DirectHttpClient
 import com.material.xray.model.HAPP_USER_AGENT
 import com.material.xray.model.Protocol
@@ -40,6 +41,16 @@ class SubscriptionFetcherTest {
         override fun appVersion(): String = "test"
 
         override fun hardwareId(): String = "test-hwid"
+    }
+
+    private val testPlatform = object : PlatformInfo {
+        override val sdkInt: Int = 34
+        override val osName: String = "Android"
+        override val osVersion: String = "14"
+        override val manufacturer: String = "Google"
+        override val model: String = "Pixel 8"
+        override val device: String = "shiba"
+        override val processId: Int = 1
     }
 
     @Test
@@ -554,7 +565,7 @@ class SubscriptionFetcherTest {
             server.enqueue(MockResponse(body = "vless://uuid@example.com:443?encryption=none&type=tcp#Node"))
             server.start()
 
-            val subscription = SubscriptionFetcher(DirectHttpClient(OkHttpClient()), testDeviceIdentity).fetchWithMetadata(
+            val subscription = SubscriptionFetcher(DirectHttpClient(OkHttpClient()), testDeviceIdentity, testPlatform).fetchWithMetadata(
                 url = server.url("/sub").toString(),
                 allowInsecureUpdates = true,
             )
@@ -581,7 +592,7 @@ class SubscriptionFetcherTest {
                 .build()
 
             val error = runCatching {
-                SubscriptionFetcher(DirectHttpClient(client), testDeviceIdentity).fetchWithMetadata(server.url("/sub").toString())
+                SubscriptionFetcher(DirectHttpClient(client), testDeviceIdentity, testPlatform).fetchWithMetadata(server.url("/sub").toString())
             }.exceptionOrNull()
 
             assertTrue(error is javax.net.ssl.SSLHandshakeException)
@@ -606,7 +617,7 @@ class SubscriptionFetcherTest {
                 .dns { listOf(InetAddress.getByName("127.0.0.1")) }
                 .build()
 
-            val subscription = SubscriptionFetcher(DirectHttpClient(client), testDeviceIdentity).fetchWithMetadata(
+            val subscription = SubscriptionFetcher(DirectHttpClient(client), testDeviceIdentity, testPlatform).fetchWithMetadata(
                 url = server.url("/sub").toString(),
                 allowInsecureUpdates = true,
             )
@@ -629,7 +640,7 @@ class SubscriptionFetcherTest {
                     .build()
             }
             .build()
-        val fetcher = SubscriptionFetcher(DirectHttpClient(client), testDeviceIdentity)
+        val fetcher = SubscriptionFetcher(DirectHttpClient(client), testDeviceIdentity, testPlatform)
 
         val error = runCatching {
             fetcher.fetchWithMetadata("https://subscriptions.example/sub")
@@ -659,7 +670,7 @@ class SubscriptionFetcherTest {
                     .build()
             }
             .build()
-        return SubscriptionFetcher(DirectHttpClient(client), testDeviceIdentity)
+        return SubscriptionFetcher(DirectHttpClient(client), testDeviceIdentity, testPlatform)
     }
 
     @Test
@@ -670,7 +681,7 @@ class SubscriptionFetcherTest {
         fetcher.fetchWithMetadata("https://subscriptions.example/auto", SubscriptionRequestIdentity())
 
         val request = requireNotNull(capture.request)
-        assertTrue(request.header("User-Agent").orEmpty().startsWith("Material Xray/"))
+        assertEquals("Material Xray/test (Android 14; Google Pixel 8)", request.header("User-Agent"))
         assertEquals("Android", request.header("x-device-os"))
         assertTrue(request.header("x-hwid").orEmpty().isNotBlank())
     }
@@ -971,7 +982,7 @@ class SubscriptionFetcherTest {
             }
             .build()
 
-        val fetched = SubscriptionFetcher(DirectHttpClient(client), testDeviceIdentity).fetchWithMetadata("https://subscriptions.example/precedence")
+        val fetched = SubscriptionFetcher(DirectHttpClient(client), testDeviceIdentity, testPlatform).fetchWithMetadata("https://subscriptions.example/precedence")
 
         assertEquals("Header Title", fetched.metadata.profileTitle)
     }
@@ -1005,7 +1016,7 @@ class SubscriptionFetcherTest {
                     .build()
             }
             .build()
-        return SubscriptionFetcher(DirectHttpClient(client), testDeviceIdentity)
+        return SubscriptionFetcher(DirectHttpClient(client), testDeviceIdentity, testPlatform)
     }
 
     private fun capturingFetcher(
@@ -1026,6 +1037,6 @@ class SubscriptionFetcherTest {
                     .build()
             }
             .build()
-        return SubscriptionFetcher(DirectHttpClient(client), testDeviceIdentity)
+        return SubscriptionFetcher(DirectHttpClient(client), testDeviceIdentity, testPlatform)
     }
 }

@@ -1,8 +1,8 @@
 package com.material.xray.service
 
-import com.material.xray.core.app.AppInventorySnapshot
 import com.material.xray.core.app.AppInventorySource
-import com.material.xray.core.app.InstalledApp
+import com.material.xray.core.app.RoutableApp
+import com.material.xray.core.app.RoutableAppSnapshot
 import com.material.xray.core.common.log.LogBuffer
 import com.material.xray.core.xray.ServerAddressResolver
 import com.material.xray.core.xray.TunManager
@@ -311,9 +311,9 @@ class AppRoutingPlannerTest {
     }
 
     private class FakeAppInventory(
-        private val apps: List<InstalledApp>,
+        private val apps: List<RoutableApp>,
     ) : AppInventorySource {
-        override suspend fun loadSnapshot(): AppInventorySnapshot = AppInventorySnapshot(apps = apps, profileIds = setOf(0))
+        override suspend fun loadRoutingSnapshot(): RoutableAppSnapshot = RoutableAppSnapshot(apps = apps, profileIds = setOf(0))
     }
 
     private companion object {
@@ -336,16 +336,7 @@ class AppRoutingPlannerTest {
             alwaysProxied = alwaysProxied,
         )
 
-        fun app(packageName: String, uid: Int) = InstalledApp(
-            appKey = "0:$packageName",
-            packageName = packageName,
-            name = packageName,
-            uid = uid,
-            icon = null,
-            systemApp = false,
-            profileId = 0,
-            workProfile = false,
-        )
+        fun app(packageName: String, uid: Int) = RoutableApp(packageName = packageName, profileId = 0, uid = uid)
 
         fun server(name: String, address: String) = ServerConfig(
             protocol = Protocol.VLESS,

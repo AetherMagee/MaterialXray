@@ -1,12 +1,10 @@
 package com.material.xray.data.repository
 
-import android.content.Context
-import android.net.Uri
 import com.material.xray.core.app.appKey
 import com.material.xray.core.common.connection.AppUpdateScheduling
 import com.material.xray.core.common.connection.ConnectionShutdown
 import com.material.xray.core.common.connection.ConnectionStateCoordinator
-import com.material.xray.core.launcher.LauncherIconManager
+import com.material.xray.core.xray.XrayPaths
 import com.material.xray.data.db.AppDatabase
 import com.material.xray.data.db.dao.AppBypassDao
 import com.material.xray.data.db.dao.ServerDao
@@ -17,6 +15,8 @@ import com.material.xray.data.db.entity.SubscriptionEntity
 import com.material.xray.data.db.entity.routeAssignment
 import com.material.xray.data.db.entity.toAppBypassEntity
 import com.material.xray.data.db.withWriteTransaction
+import com.material.xray.data.platform.BackupStorage
+import com.material.xray.data.platform.LauncherIconSwitcher
 import com.material.xray.model.BackupData
 import com.material.xray.model.ConnectionState
 import com.material.xray.model.ServerConfig
@@ -36,13 +36,14 @@ import org.koin.core.annotation.Singleton
 
 @Singleton
 class BackupManager(
-    private val context: Context,
+    private val backupStorage: BackupStorage,
+    private val xrayPaths: XrayPaths,
     private val database: AppDatabase,
     private val subscriptionDao: SubscriptionDao,
     private val serverDao: ServerDao,
     private val appBypassDao: AppBypassDao,
     private val settingsRepository: SettingsRepository,
-    private val launcherIconManager: LauncherIconManager,
+    private val launcherIconSwitcher: LauncherIconSwitcher,
     private val appUpdateScheduler: AppUpdateScheduling,
     private val connectionShutdown: ConnectionShutdown,
     private val connectionStateCoordinator: ConnectionStateCoordinator,
@@ -53,12 +54,12 @@ class BackupManager(
         prettyPrint = true
     }
     private val operationMutex = Mutex()
-    private val journalStore = BackupRestoreJournalStore(context.filesDir, json)
+    private val journalStore = BackupRestoreJournalStore(xrayPaths.filesDir, json)
 
-    suspend fun export(uri: Uri): BackupSummary = operationMutex.withLock {
+    suspend fun export(locator: String): BackupSummary = operationMutex.withLock {
         recoverInterruptedRestoreLocked()
         val snapshot = createSnapshot()
-        val output = context.contentResolver.openOutputStream(uri)
+        val output = backupStorage.openOutput(locator)
             ?: throw IOException("Unable to open the selected backup destination")
         output.use { stream ->
             stream.write(json.encodeToString(snapshot).toByteArray(Charsets.UTF_8))
@@ -67,8 +68,8 @@ class BackupManager(
         BackupImportPlanner.create(snapshot).toSummary()
     }
 
-    fun prepareImport(uri: Uri): PreparedBackupImport {
-        val backup = decodeBackup(readBackup(uri))
+    fun prepareImport(locator: String): PreparedBackupImport {
+        val backup = decodeBackup(readBackup(locator))
         return PreparedBackupImport(createImportPlan(backup))
     }
 
@@ -235,7 +236,7 @@ class BackupManager(
     }
 
     private suspend fun applyExternalSettings() {
-        launcherIconManager.apply(settingsRepository.launcherIcon.first())
+        launcherIconSwitcher.apply(settingsRepository.launcherIcon.first())
         appUpdateScheduler.setEnabled(
             settingsRepository.appUpdateChecksEnabled.first(),
             settingsRepository.appUpdateInterval.first(),
@@ -266,8 +267,8 @@ class BackupManager(
         return output.toByteArray()
     }
 
-    private fun readBackup(uri: Uri): ByteArray {
-        val input = context.contentResolver.openInputStream(uri)
+    private fun readBackup(locator: String): ByteArray {
+        val input = backupStorage.openInput(locator)
             ?: throw IOException("Unable to open the selected backup")
         return input.use(::readLimited)
     }

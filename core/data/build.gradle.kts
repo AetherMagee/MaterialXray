@@ -12,7 +12,6 @@ dependencies {
     implementation(project(":core:common"))
     implementation(project(":core:xray"))
     implementation(project(":core:network"))
-    implementation(project(":core:android"))
     implementation(project(":core:database"))
 
     // SettingsRepository's setters return the edited Preferences, so DataStore is part of the API.

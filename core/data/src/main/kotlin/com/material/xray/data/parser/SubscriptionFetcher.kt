@@ -1,6 +1,7 @@
 package com.material.xray.data.parser
 
-import android.os.Build
+import com.material.xray.core.common.platform.PlatformInfo
+import com.material.xray.core.common.platform.deviceModel
 import com.material.xray.core.network.AppHttpClient
 import com.material.xray.model.HAPP_USER_AGENT
 import com.material.xray.model.Protocol
@@ -88,6 +89,7 @@ class SubscriptionFetchException(
 class SubscriptionFetcher(
     private val httpClient: AppHttpClient,
     private val deviceIdentity: SubscriptionDeviceIdentity,
+    private val platformInfo: PlatformInfo,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     private val parser = ShareLinkParser()
@@ -632,9 +634,9 @@ class SubscriptionFetcher(
     ): SubscriptionRequestHeaderValues = SubscriptionRequestHeaderValues(
         userAgent = userAgent,
         hardwareId = if (identity.sendHardwareId) deviceIdentity.hardwareId() else null,
-        deviceOs = "Android",
-        osVersion = buildOsVersion(),
-        deviceModel = buildDeviceModel(),
+        deviceOs = platformInfo.osName,
+        osVersion = platformInfo.osVersion,
+        deviceModel = platformInfo.deviceModel,
     )
 
     private fun customHeaderValues(identity: SubscriptionRequestIdentity): SubscriptionRequestHeaderValues {
@@ -651,18 +653,7 @@ class SubscriptionFetcher(
 
     private fun buildUserAgent(): String {
         val version = deviceIdentity.appVersion()
-        return "Material Xray/$version (Android ${buildOsVersion()}; ${buildDeviceModel()})"
-    }
-
-    private fun buildOsVersion(): String = Build.VERSION.RELEASE ?: Build.VERSION.SDK_INT.toString()
-
-    private fun buildDeviceModel(): String {
-        val manufacturer = Build.MANUFACTURER.orEmpty().trim()
-        val model = Build.MODEL.orEmpty().trim()
-        return listOf(manufacturer, model)
-            .filter { it.isNotBlank() }
-            .joinToString(" ")
-            .ifBlank { Build.DEVICE.orEmpty().ifBlank { "Android" } }
+        return "Material Xray/$version (${platformInfo.osName} ${platformInfo.osVersion}; ${platformInfo.deviceModel})"
     }
 
     private fun parseTransportPath(streamSettings: JsonObject?): String? {
