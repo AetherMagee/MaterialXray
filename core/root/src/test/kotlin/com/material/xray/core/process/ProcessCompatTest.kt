@@ -48,6 +48,7 @@ class ProcessCompatTest {
                 ProcessBuilder("sh", "-c", "printf 'second\\n'"),
                 outputFile,
                 append = true,
+                modernProcessApi = false,
             )
 
             assertTrue(process.waitFor(1, TimeUnit.SECONDS))
@@ -55,5 +56,38 @@ class ProcessCompatTest {
         } finally {
             outputFile.delete()
         }
+    }
+
+    @Test
+    fun `modern redirection appends and truncates process output`() {
+        val outputFile = File.createTempFile("process-compat-", ".log")
+        try {
+            outputFile.writeText("first\n")
+            val appended = RedirectedProcess.start(
+                ProcessBuilder("sh", "-c", "printf 'second\\n'"),
+                outputFile,
+                append = true,
+                modernProcessApi = true,
+            )
+            assertTrue(appended.waitFor(1, TimeUnit.SECONDS))
+            assertEquals("first\nsecond\n", outputFile.readText())
+
+            val truncated = RedirectedProcess.start(
+                ProcessBuilder("sh", "-c", "printf 'third\\n'"),
+                outputFile,
+                append = false,
+                modernProcessApi = true,
+            )
+            assertTrue(truncated.waitFor(1, TimeUnit.SECONDS))
+            assertEquals("third\n", outputFile.readText())
+        } finally {
+            outputFile.delete()
+        }
+    }
+
+    @Test
+    fun `desktop JVM selects the modern process API`() {
+        assertTrue(probeModernProcessApi())
+        assertTrue(hasModernProcessApi)
     }
 }

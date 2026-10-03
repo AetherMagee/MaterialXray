@@ -1,19 +1,39 @@
 package com.material.xray.core.process
 
-import android.os.Build
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 
-internal fun Process.isAliveCompat(): Boolean = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+/**
+ * Whether this runtime has `Process.isAlive()`, `destroyForcibly()`, `waitFor(timeout, unit)` and
+ * `ProcessBuilder.Redirect`. Android added them in API 26 (O), below the app's minSdk of 24; every
+ * desktop JVM has them.
+ *
+ * Probed instead of read from `Build.VERSION.SDK_INT` so this module stays platform-free and the
+ * helpers below need no `PlatformInfo` from their callers. If any member is missing, every helper
+ * takes its legacy path, which works on any runtime.
+ */
+internal val hasModernProcessApi: Boolean by lazy(LazyThreadSafetyMode.PUBLICATION) { probeModernProcessApi() }
+
+internal fun probeModernProcessApi(): Boolean = try {
+    Process::class.java.getMethod("isAlive")
+    Process::class.java.getMethod("destroyForcibly")
+    Process::class.java.getMethod("waitFor", Long::class.javaPrimitiveType, TimeUnit::class.java)
+    Class.forName("java.lang.ProcessBuilder\$Redirect").getMethod("appendTo", File::class.java)
+    true
+} catch (_: ReflectiveOperationException) {
+    false
+}
+
+internal fun Process.isAliveCompat(): Boolean = if (hasModernProcessApi) {
     isAlive
 } else {
     isAliveLegacy()
 }
 
 fun Process.destroyForciblyCompat() {
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+    if (hasModernProcessApi) {
         destroyForcibly()
     } else {
         destroy()
@@ -24,7 +44,7 @@ fun Process.waitForCompat(
     timeout: Long,
     unit: TimeUnit,
 ): Boolean {
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) return waitFor(timeout, unit)
+    if (hasModernProcessApi) return waitFor(timeout, unit)
 
     return waitForLegacy(timeout, unit)
 }
@@ -73,8 +93,15 @@ class RedirectedProcess private constructor(
             builder: ProcessBuilder,
             outputFile: File,
             append: Boolean,
+        ): RedirectedProcess = start(builder, outputFile, append, hasModernProcessApi)
+
+        internal fun start(
+            builder: ProcessBuilder,
+            outputFile: File,
+            append: Boolean,
+            modernProcessApi: Boolean,
         ): RedirectedProcess {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            if (modernProcessApi) {
                 val redirect = if (append) {
                     ProcessBuilder.Redirect.appendTo(outputFile)
                 } else {

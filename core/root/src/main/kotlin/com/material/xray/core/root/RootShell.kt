@@ -1,7 +1,7 @@
 package com.material.xray.core.root
 
-import android.os.Process as AndroidProcess
-import android.util.Log
+import com.material.xray.core.common.log.AppLogger
+import com.material.xray.core.common.log.NoOpAppLogger
 import com.material.xray.core.process.destroyForciblyCompat
 import com.material.xray.core.process.isAliveCompat
 import java.io.BufferedReader
@@ -20,7 +20,8 @@ import kotlinx.coroutines.withContext
  * [close] is reserved for terminal app-process shutdown and cancellation recovery.
  */
 class RootShell(
-    private val appProcessId: Int = AndroidProcess.myPid(),
+    private val appProcessId: Int,
+    private val logger: AppLogger = NoOpAppLogger,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     enum class NetworkNamespace {
@@ -97,10 +98,10 @@ class RootShell(
                     executeInternal(command, resolvedNamespace, timeoutMs).also { result ->
                         val elapsedMs = (System.nanoTime() - startedAt) / NANOS_PER_MILLI
                         if (elapsedMs >= SLOW_COMMAND_LOG_THRESHOLD_MS) {
-                            Log.d(LOG_TAG, "Root command took $elapsedMs ms: ${command.lineSequence().first().take(160)}")
+                            logger.d(LOG_TAG, "Root command took $elapsedMs ms: ${command.lineSequence().first().take(160)}")
                         }
                         if (!result.isSuccess) {
-                            Log.d(LOG_TAG, "Root command failed (${result.exitCode}): ${result.error.ifBlank { result.output }.take(500)}")
+                            logger.d(LOG_TAG, "Root command failed (${result.exitCode}): ${result.error.ifBlank { result.output }.take(500)}")
                         }
                     }
                 } catch (error: InterruptedException) {
