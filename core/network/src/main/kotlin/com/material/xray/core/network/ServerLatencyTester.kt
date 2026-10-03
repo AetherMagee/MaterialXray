@@ -78,7 +78,7 @@ private suspend fun bestAttempt(attempts: Int, probe: suspend () -> ProbeAttempt
     return checkNotNull(best) { "attempts must be positive" }
 }
 
-internal fun describeFailure(error: Throwable): String = buildString {
+fun describeFailure(error: Throwable): String = buildString {
     append(error.message?.takeIf(String::isNotBlank) ?: error.javaClass.simpleName)
     error.cause?.let { cause ->
         append(": ")

@@ -13,7 +13,7 @@ import javax.net.ssl.TrustManagerFactory
 import javax.net.ssl.X509TrustManager
 import okhttp3.OkHttpClient
 
-internal fun OkHttpClient.Builder.addBundledCaFallback(certificateBundle: InputStream): OkHttpClient.Builder = apply {
+fun OkHttpClient.Builder.addBundledCaFallback(certificateBundle: InputStream): OkHttpClient.Builder = apply {
     val trustManager = AdditiveX509TrustManager(
         system = loadSystemTrustManager(),
         fallback = loadX509TrustManager(certificateBundle),
@@ -62,7 +62,7 @@ internal fun loadX509TrustManager(certificateBundle: InputStream): X509TrustMana
     return loadX509TrustManager(keyStore)
 }
 
-internal fun loadX509Certificates(certificateBundle: InputStream): List<X509Certificate> {
+fun loadX509Certificates(certificateBundle: InputStream): List<X509Certificate> {
     val certificateFactory = CertificateFactory.getInstance("X.509")
     val pem = certificateBundle.bufferedReader(StandardCharsets.US_ASCII).use { it.readText() }
     return PEM_CERTIFICATE_PATTERN.findAll(pem).map { match ->
