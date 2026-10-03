@@ -12,7 +12,7 @@ internal fun Process.isAliveCompat(): Boolean = if (Build.VERSION.SDK_INT >= Bui
     isAliveLegacy()
 }
 
-internal fun Process.destroyForciblyCompat() {
+fun Process.destroyForciblyCompat() {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
         destroyForcibly()
     } else {
@@ -20,7 +20,7 @@ internal fun Process.destroyForciblyCompat() {
     }
 }
 
-internal fun Process.waitForCompat(
+fun Process.waitForCompat(
     timeout: Long,
     unit: TimeUnit,
 ): Boolean {
@@ -48,7 +48,7 @@ internal fun Process.waitForLegacy(timeout: Long, unit: TimeUnit): Boolean {
     return true
 }
 
-internal class RedirectedProcess private constructor(
+class RedirectedProcess private constructor(
     private val process: Process,
     private val outputPump: Thread?,
 ) {

@@ -361,4 +361,4 @@ internal fun wrapRootCommand(
     return "nsenter -t $targetPid -n -- sh -c ${shellQuote(command)}"
 }
 
-internal fun shellQuote(value: String): String = "'${value.replace("'", "'\\''")}'"
+fun shellQuote(value: String): String = "'${value.replace("'", "'\\''")}'"

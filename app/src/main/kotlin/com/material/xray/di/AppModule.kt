@@ -14,7 +14,6 @@ import com.material.xray.core.model.di.CoreModelModule
 import com.material.xray.core.navigation.di.CoreNavigationModule
 import com.material.xray.core.network.addBundledCaFallback
 import com.material.xray.core.network.di.CoreNetworkModule
-import com.material.xray.core.root.RootShell
 import com.material.xray.core.root.di.CoreRootModule
 import com.material.xray.core.runtime.di.CoreRuntimeModule
 import com.material.xray.core.telemetry.di.CoreTelemetryModule
@@ -88,9 +87,6 @@ class AppModule {
         }
         return builder.build()
     }
-
-    @Singleton
-    fun rootShell(): RootShell = RootShell()
 
     // The primary constructors of these two take test seams, so the graph uses the secondary ones.
     @Singleton
