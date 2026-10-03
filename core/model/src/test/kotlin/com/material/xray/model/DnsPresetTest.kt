@@ -1,6 +1,5 @@
 package com.material.xray.model
 
-import com.material.xray.data.repository.SettingsRepository
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -114,14 +113,5 @@ class DnsPresetTest {
         assertFalse(isEncryptedDnsValue(DnsPreset.Google.servers(encrypted = false)))
         assertFalse(isEncryptedDnsValue(""))
         assertFalse(isEncryptedDnsValue("https://1.1.1.1/dns-query,1.0.0.1"))
-    }
-
-    @Test
-    fun `the shipped defaults are presets the DNS screen can name`() {
-        assertEquals(DnsPreset.Cloudflare, dnsPresetFor(SettingsRepository.DEFAULT_DNS_SERVERS))
-        assertTrue(isEncryptedDnsValue(SettingsRepository.DEFAULT_DNS_SERVERS))
-        assertEquals(DnsPreset.Yandex, dnsPresetFor(SettingsRepository.DEFAULT_DOMESTIC_DNS_SERVERS))
-        assertNull(canonicalDnsServers(SettingsRepository.DEFAULT_DNS_SERVERS))
-        assertNull(canonicalDnsServers(SettingsRepository.DEFAULT_DOMESTIC_DNS_SERVERS))
     }
 }

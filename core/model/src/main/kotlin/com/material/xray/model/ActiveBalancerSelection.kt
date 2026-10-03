@@ -10,7 +10,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 
 /** The pool eligible for new connections, not a list of servers carrying existing traffic. */
-internal data class ActiveBalancerSelection(
+data class ActiveBalancerSelection(
     val outbounds: List<BalancerOutbound> = emptyList(),
 ) {
     val latencyMs: Long?
@@ -22,12 +22,12 @@ internal data class ActiveBalancerSelection(
         }
 }
 
-internal data class BalancerOutbound(
+data class BalancerOutbound(
     val outboundTag: String,
     val latencyMs: Long?,
 )
 
-internal fun ServerConfig.primaryBalancerTag(): String? {
+fun ServerConfig.primaryBalancerTag(): String? {
     val root = rawConfigRoot() ?: return null
     val routing = root["routing"] as? JsonObject ?: return null
     val balancerTags = (routing["balancers"] as? JsonArray)
@@ -43,7 +43,7 @@ internal fun ServerConfig.primaryBalancerTag(): String? {
         ?: balancerTags.first()
 }
 
-internal fun ServerConfig.matchesBalancerOutbound(outboundTag: String, candidate: ServerConfig): Boolean {
+fun ServerConfig.matchesBalancerOutbound(outboundTag: String, candidate: ServerConfig): Boolean {
     val selectedOutbound = rawProxyOutbounds().firstOrNull { it.string("tag") == outboundTag } ?: return false
     val candidateOutbounds = candidate.rawProxyOutbounds()
     val candidateOutbound = candidateOutbounds.firstOrNull { it.string("tag").equals("proxy", ignoreCase = true) }
@@ -52,7 +52,7 @@ internal fun ServerConfig.matchesBalancerOutbound(outboundTag: String, candidate
     return selectedOutbound.withoutTag() == candidateOutbound.withoutTag()
 }
 
-internal fun ServerConfig.maskedBalancerOutboundAddress(outboundTag: String): String? = rawProxyOutbounds()
+fun ServerConfig.maskedBalancerOutboundAddress(outboundTag: String): String? = rawProxyOutbounds()
     .firstOrNull { it.string("tag") == outboundTag }
     ?.findFirstString("address")
     ?.maskIpAddress()

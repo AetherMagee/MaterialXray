@@ -43,12 +43,12 @@ sealed interface AppUpdateCheckStatus {
     data object Failed : AppUpdateCheckStatus
 }
 
-internal val AppUpdateCheckStatus.isInProgress: Boolean
+val AppUpdateCheckStatus.isInProgress: Boolean
     get() = this !is AppUpdateCheckStatus.UpToDate &&
         this !is AppUpdateCheckStatus.UpdateAvailable &&
         this !is AppUpdateCheckStatus.Failed
 
-internal fun isReleaseNewer(latestTag: String, currentVersion: String): Boolean {
+fun isReleaseNewer(latestTag: String, currentVersion: String): Boolean {
     val latest = latestTag.toReleaseVersion() ?: return false
     val current = currentVersion.toReleaseVersion() ?: return false
     val componentCount = maxOf(latest.size, current.size)
@@ -60,7 +60,7 @@ internal fun isReleaseNewer(latestTag: String, currentVersion: String): Boolean 
     return false
 }
 
-internal fun isUpdateCheckDue(
+fun isUpdateCheckDue(
     lastCheckAtMillis: Long,
     nowMillis: Long,
     minimumIntervalMillis: Long,

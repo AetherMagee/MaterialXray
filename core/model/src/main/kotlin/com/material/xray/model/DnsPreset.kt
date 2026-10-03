@@ -1,8 +1,5 @@
 package com.material.xray.model
 
-import androidx.annotation.StringRes
-import com.material.xray.R
-
 /**
  * A named set of resolvers the DNS screen can write into a DNS setting.
  *
@@ -26,60 +23,44 @@ enum class DnsPreset(
     val ipv4Servers: List<String>,
     val ipv6Servers: List<String>,
     val encryptsIpv6: Boolean,
-    @param:StringRes val labelResource: Int,
-    @param:StringRes val descriptionResource: Int,
 ) {
     /** No resolver of its own. An empty DNS setting makes Xray fall back to the network's resolver. */
     System(
         ipv4Servers = emptyList(),
         ipv6Servers = emptyList(),
         encryptsIpv6 = false,
-        labelResource = R.string.dns_preset_system_label,
-        descriptionResource = R.string.dns_preset_system_description,
     ),
     Cloudflare(
         ipv4Servers = listOf("1.1.1.1", "1.0.0.1"),
         ipv6Servers = listOf("2606:4700:4700::1111", "2606:4700:4700::1001"),
         encryptsIpv6 = true,
-        labelResource = R.string.dns_preset_cloudflare_label,
-        descriptionResource = R.string.dns_preset_cloudflare_description,
     ),
     CloudflareSecurity(
         ipv4Servers = listOf("1.1.1.2", "1.0.0.2"),
         ipv6Servers = listOf("2606:4700:4700::1112", "2606:4700:4700::1002"),
         encryptsIpv6 = true,
-        labelResource = R.string.dns_preset_cloudflare_security_label,
-        descriptionResource = R.string.dns_preset_cloudflare_security_description,
     ),
     Google(
         ipv4Servers = listOf("8.8.8.8", "8.8.4.4"),
         ipv6Servers = listOf("2001:4860:4860::8888", "2001:4860:4860::8844"),
         encryptsIpv6 = true,
-        labelResource = R.string.dns_preset_google_label,
-        descriptionResource = R.string.dns_preset_google_description,
     ),
     Quad9(
         ipv4Servers = listOf("9.9.9.9", "149.112.112.112"),
         ipv6Servers = listOf("2620:fe::fe", "2620:fe::9"),
         encryptsIpv6 = true,
-        labelResource = R.string.dns_preset_quad9_label,
-        descriptionResource = R.string.dns_preset_quad9_description,
     ),
     AdGuard(
         ipv4Servers = listOf("94.140.14.14", "94.140.15.15"),
         ipv6Servers = listOf("2a10:50c0::ad1:ff", "2a10:50c0::ad2:ff"),
         // dns.adguard-dns.com names six IPv4 addresses and no IPv6 address.
         encryptsIpv6 = false,
-        labelResource = R.string.dns_preset_adguard_label,
-        descriptionResource = R.string.dns_preset_adguard_description,
     ),
     Yandex(
         ipv4Servers = listOf("77.88.8.8", "77.88.8.1"),
         ipv6Servers = listOf("2a02:6b8::feed:0ff", "2a02:6b8:0:1::feed:0ff"),
         // The 77.88.8.x certificate names those IPv4 addresses and *.dot.dns.yandex.net, no IPv6.
         encryptsIpv6 = false,
-        labelResource = R.string.dns_preset_yandex_label,
-        descriptionResource = R.string.dns_preset_yandex_description,
     ),
 
     /** Whatever the user typed. Carries no addresses of its own; the stored value is the answer. */
@@ -87,8 +68,6 @@ enum class DnsPreset(
         ipv4Servers = emptyList(),
         ipv6Servers = emptyList(),
         encryptsIpv6 = false,
-        labelResource = R.string.dns_preset_custom_label,
-        descriptionResource = R.string.dns_preset_custom_description,
     ),
     ;
 
@@ -143,7 +122,7 @@ fun dnsPresetFor(servers: String): DnsPreset {
  * This is how a setting written before the addresses moved into the presets picks up the IPv6
  * resolvers it was missing.
  */
-internal fun canonicalDnsServers(servers: String): String? {
+fun canonicalDnsServers(servers: String): String? {
     val preset = dnsPresetFor(servers)
     if (!preset.supportsEncryption) return null
 

@@ -42,6 +42,8 @@ import com.material.xray.ui.components.ReadOnlyDropdownField
 import com.material.xray.ui.components.ScrolledTopAppBar
 import com.material.xray.ui.components.SettingsSwitchRow
 import com.material.xray.ui.components.TooltipIconButton
+import com.material.xray.ui.text.descriptionResource
+import com.material.xray.ui.text.labelResource
 
 /**
  * The DNS settings subpage, reached from the Core section of the settings list.

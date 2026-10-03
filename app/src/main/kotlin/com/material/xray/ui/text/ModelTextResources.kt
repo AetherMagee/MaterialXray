@@ -4,6 +4,7 @@ import androidx.annotation.StringRes
 import com.material.xray.R
 import com.material.xray.core.network.Ipv6SessionState
 import com.material.xray.model.AppUpdateInterval
+import com.material.xray.model.DnsPreset
 import com.material.xray.model.Ipv6Mode
 import com.material.xray.model.LauncherIcon
 import com.material.xray.model.NotificationField
@@ -207,4 +208,30 @@ val NotificationStyle.descriptionResource: Int
     get() = when (this) {
         NotificationStyle.Normal -> R.string.notification_style_normal_description
         NotificationStyle.Compact -> R.string.notification_style_compact_description
+    }
+
+@get:StringRes
+val DnsPreset.labelResource: Int
+    get() = when (this) {
+        DnsPreset.System -> R.string.dns_preset_system_label
+        DnsPreset.Cloudflare -> R.string.dns_preset_cloudflare_label
+        DnsPreset.CloudflareSecurity -> R.string.dns_preset_cloudflare_security_label
+        DnsPreset.Google -> R.string.dns_preset_google_label
+        DnsPreset.Quad9 -> R.string.dns_preset_quad9_label
+        DnsPreset.AdGuard -> R.string.dns_preset_adguard_label
+        DnsPreset.Yandex -> R.string.dns_preset_yandex_label
+        DnsPreset.Custom -> R.string.dns_preset_custom_label
+    }
+
+@get:StringRes
+val DnsPreset.descriptionResource: Int
+    get() = when (this) {
+        DnsPreset.System -> R.string.dns_preset_system_description
+        DnsPreset.Cloudflare -> R.string.dns_preset_cloudflare_description
+        DnsPreset.CloudflareSecurity -> R.string.dns_preset_cloudflare_security_description
+        DnsPreset.Google -> R.string.dns_preset_google_description
+        DnsPreset.Quad9 -> R.string.dns_preset_quad9_description
+        DnsPreset.AdGuard -> R.string.dns_preset_adguard_description
+        DnsPreset.Yandex -> R.string.dns_preset_yandex_description
+        DnsPreset.Custom -> R.string.dns_preset_custom_description
     }

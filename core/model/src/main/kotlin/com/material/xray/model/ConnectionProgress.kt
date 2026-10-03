@@ -1,6 +1,6 @@
 package com.material.xray.model
 
-internal enum class ConnectionProgress {
+enum class ConnectionProgress {
     PreparingRuntime,
     PreparingCore,
     UpdatingRoutingData,

@@ -79,7 +79,7 @@ internal fun formatProxyConfigSummary(config: ProxyConfigDisplay): String = buil
     config.transport.normalizedDisplayPart()?.let(::add)
 }.joinToString(PROXY_CONFIG_SEPARATOR)
 
-internal fun String.normalizedXrayTransportType(): String {
+fun String.normalizedXrayTransportType(): String {
     val transport = trim()
     return if (transport.equals("tcp", ignoreCase = true)) "raw" else transport.lowercase()
 }
@@ -136,29 +136,29 @@ private fun String.takeUnlessNone(): String? = takeUnless { equals("none", ignor
 private val VLESS_ENCRYPTION_METHODS = setOf("native", "xorpub", "random")
 private const val PROXY_CONFIG_SEPARATOR = " • "
 
-internal const val SERVER_EXTRA_XHTTP_EXTRA = "xhttpExtra"
-internal const val SERVER_EXTRA_PROXY_OUTBOUND_COUNT = "proxyOutboundCount"
+const val SERVER_EXTRA_XHTTP_EXTRA = "xhttpExtra"
+const val SERVER_EXTRA_PROXY_OUTBOUND_COUNT = "proxyOutboundCount"
 internal const val SERVER_EXTRA_PQ_ALGORITHM = "pqAlgorithm"
-internal const val SERVER_EXTRA_MLDSA65_VERIFY = "mldsa65Verify"
-internal const val SERVER_EXTRA_SPIDER_X = "spiderX"
-internal const val SERVER_EXTRA_HYSTERIA_INSECURE = "hysteriaInsecure"
-internal const val SERVER_EXTRA_HYSTERIA_PIN_SHA256 = "hysteriaPinSha256"
-internal const val SERVER_EXTRA_HYSTERIA_OBFS = "hysteriaObfs"
-internal const val SERVER_EXTRA_HYSTERIA_OBFS_PASSWORD = "hysteriaObfsPassword"
-internal const val SERVER_EXTRA_HYSTERIA_OBFS_PACKET_SIZE = "hysteriaObfsPacketSize"
-internal const val SERVER_EXTRA_HYSTERIA_UP = "hysteriaUp"
-internal const val SERVER_EXTRA_HYSTERIA_DOWN = "hysteriaDown"
-internal const val SERVER_EXTRA_HYSTERIA_UDP_HOP_PORTS = "hysteriaUdpHopPorts"
-internal const val SERVER_EXTRA_HYSTERIA_UDP_HOP_INTERVAL = "hysteriaUdpHopInterval"
-internal const val SERVER_EXTRA_HYSTERIA_UDP_IDLE_TIMEOUT = "hysteriaUdpIdleTimeout"
-internal const val SERVER_EXTRA_HYSTERIA_CONGESTION = "hysteriaCongestion"
-internal const val SERVER_EXTRA_USERNAME = "username"
-internal const val SERVER_EXTRA_WIREGUARD_PUBLIC_KEY = "wireguardPublicKey"
-internal const val SERVER_EXTRA_WIREGUARD_PRESHARED_KEY = "wireguardPresharedKey"
-internal const val SERVER_EXTRA_WIREGUARD_ADDRESS = "wireguardAddress"
-internal const val SERVER_EXTRA_WIREGUARD_MTU = "wireguardMtu"
-internal const val SERVER_EXTRA_WIREGUARD_RESERVED = "wireguardReserved"
-internal const val SERVER_EXTRA_WIREGUARD_KEEP_ALIVE = "wireguardKeepAlive"
-internal const val SERVER_EXTRA_WIREGUARD_ALLOWED_IPS = "wireguardAllowedIps"
+const val SERVER_EXTRA_MLDSA65_VERIFY = "mldsa65Verify"
+const val SERVER_EXTRA_SPIDER_X = "spiderX"
+const val SERVER_EXTRA_HYSTERIA_INSECURE = "hysteriaInsecure"
+const val SERVER_EXTRA_HYSTERIA_PIN_SHA256 = "hysteriaPinSha256"
+const val SERVER_EXTRA_HYSTERIA_OBFS = "hysteriaObfs"
+const val SERVER_EXTRA_HYSTERIA_OBFS_PASSWORD = "hysteriaObfsPassword"
+const val SERVER_EXTRA_HYSTERIA_OBFS_PACKET_SIZE = "hysteriaObfsPacketSize"
+const val SERVER_EXTRA_HYSTERIA_UP = "hysteriaUp"
+const val SERVER_EXTRA_HYSTERIA_DOWN = "hysteriaDown"
+const val SERVER_EXTRA_HYSTERIA_UDP_HOP_PORTS = "hysteriaUdpHopPorts"
+const val SERVER_EXTRA_HYSTERIA_UDP_HOP_INTERVAL = "hysteriaUdpHopInterval"
+const val SERVER_EXTRA_HYSTERIA_UDP_IDLE_TIMEOUT = "hysteriaUdpIdleTimeout"
+const val SERVER_EXTRA_HYSTERIA_CONGESTION = "hysteriaCongestion"
+const val SERVER_EXTRA_USERNAME = "username"
+const val SERVER_EXTRA_WIREGUARD_PUBLIC_KEY = "wireguardPublicKey"
+const val SERVER_EXTRA_WIREGUARD_PRESHARED_KEY = "wireguardPresharedKey"
+const val SERVER_EXTRA_WIREGUARD_ADDRESS = "wireguardAddress"
+const val SERVER_EXTRA_WIREGUARD_MTU = "wireguardMtu"
+const val SERVER_EXTRA_WIREGUARD_RESERVED = "wireguardReserved"
+const val SERVER_EXTRA_WIREGUARD_KEEP_ALIVE = "wireguardKeepAlive"
+const val SERVER_EXTRA_WIREGUARD_ALLOWED_IPS = "wireguardAllowedIps"
 
 private val SPECIAL_OUTBOUND_PROTOCOLS = setOf("freedom", "blackhole", "dns")
