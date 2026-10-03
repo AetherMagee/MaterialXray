@@ -11,6 +11,8 @@ dependencies {
     implementation(project(":core:network"))
     implementation(project(":core:connection"))
     implementation(project(":core:android"))
+    // Features render and edit the Room entities the repositories return.
+    implementation(project(":core:database"))
     implementation(project(":core:data"))
     implementation(project(":core:runtime"))
     implementation(project(":core:ui"))
