@@ -532,6 +532,25 @@ protobuf {
 }
 
 dependencies {
+    implementation(project(":core:model"))
+    implementation(project(":core:common"))
+    implementation(project(":core:xray"))
+    implementation(project(":core:root"))
+    implementation(project(":core:network"))
+    implementation(project(":core:connection"))
+    implementation(project(":core:android"))
+    implementation(project(":core:database"))
+    implementation(project(":core:data"))
+    implementation(project(":core:telemetry"))
+    implementation(project(":core:runtime"))
+    implementation(project(":core:ui"))
+    implementation(project(":core:navigation"))
+    implementation(project(":feature:home"))
+    implementation(project(":feature:routing"))
+    implementation(project(":feature:logs"))
+    implementation(project(":feature:settings"))
+    implementation(project(":feature:configviewer"))
+
     implementation(libs.activity.compose)
     implementation(libs.appcompat)
     implementation(libs.navigation.compose)

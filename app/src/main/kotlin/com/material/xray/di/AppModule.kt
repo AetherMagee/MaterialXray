@@ -3,14 +3,32 @@ package com.material.xray.di
 import android.content.Context
 import android.os.Build
 import com.material.xray.R
+import com.material.xray.core.android.di.CoreAndroidModule
+import com.material.xray.core.common.di.CoreCommonModule
+import com.material.xray.core.connection.di.CoreConnectionModule
+import com.material.xray.core.data.di.CoreDataModule
+import com.material.xray.core.database.di.CoreDatabaseModule
+import com.material.xray.core.model.di.CoreModelModule
+import com.material.xray.core.navigation.di.CoreNavigationModule
 import com.material.xray.core.network.addBundledCaFallback
+import com.material.xray.core.network.di.CoreNetworkModule
 import com.material.xray.core.root.RootShell
+import com.material.xray.core.root.di.CoreRootModule
+import com.material.xray.core.runtime.di.CoreRuntimeModule
+import com.material.xray.core.telemetry.di.CoreTelemetryModule
+import com.material.xray.core.ui.di.CoreUiModule
+import com.material.xray.core.xray.di.CoreXrayModule
 import com.material.xray.data.db.dao.SubscriptionDao
 import com.material.xray.data.repository.ProviderRoutingCoordinator
 import com.material.xray.data.repository.ServerRepository
 import com.material.xray.data.repository.SettingsRepository
 import com.material.xray.data.repository.SubscriptionAppRoutingRepository
 import com.material.xray.data.repository.SubscriptionRoutingRepository
+import com.material.xray.feature.configviewer.di.FeatureConfigViewerModule
+import com.material.xray.feature.home.di.FeatureHomeModule
+import com.material.xray.feature.logs.di.FeatureLogsModule
+import com.material.xray.feature.routing.di.FeatureRoutingModule
+import com.material.xray.feature.settings.di.FeatureSettingsModule
 import com.material.xray.service.RoutingChangeManager
 import com.material.xray.telemetry.TelemetryClient
 import com.material.xray.telemetry.TelemetryReporter
@@ -25,7 +43,29 @@ import org.koin.core.annotation.Configuration
 import org.koin.core.annotation.Module
 import org.koin.core.annotation.Singleton
 
-@Module(includes = [DatabaseModule::class])
+@Module(
+    includes = [
+        DatabaseModule::class,
+        CoreModelModule::class,
+        CoreCommonModule::class,
+        CoreXrayModule::class,
+        CoreRootModule::class,
+        CoreNetworkModule::class,
+        CoreConnectionModule::class,
+        CoreAndroidModule::class,
+        CoreDatabaseModule::class,
+        CoreDataModule::class,
+        CoreTelemetryModule::class,
+        CoreRuntimeModule::class,
+        CoreUiModule::class,
+        CoreNavigationModule::class,
+        FeatureHomeModule::class,
+        FeatureRoutingModule::class,
+        FeatureLogsModule::class,
+        FeatureSettingsModule::class,
+        FeatureConfigViewerModule::class,
+    ],
+)
 @Configuration
 @ComponentScan("com.material.xray")
 class AppModule {
