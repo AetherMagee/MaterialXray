@@ -1,14 +1,10 @@
 package com.material.xray.core.network
 
-import android.content.Context
-import android.net.ConnectivityManager
-import android.net.LinkProperties
-import android.net.Network
-import android.net.NetworkCapabilities
-import android.os.SystemClock
 import com.material.xray.core.common.di.ApplicationScope
 import com.material.xray.core.common.log.LogBuffer
 import com.material.xray.core.common.log.LogSource
+import com.material.xray.core.common.platform.MonotonicClock
+import com.material.xray.core.common.platform.elapsedMillis
 import com.material.xray.core.xray.PlatformDns
 import com.material.xray.core.xray.ServerAddressResolver
 import com.material.xray.core.xray.XrayInbound
@@ -78,16 +74,17 @@ data class Ipv6Decision(
  */
 @Singleton
 class Ipv6Detector(
-    private val context: Context,
+    private val linkProbe: NetworkLinkProbe,
     private val ephemeralCore: EphemeralXrayCore,
     private val baseClient: OkHttpClient,
     private val logBuffer: LogBuffer,
     platformDns: PlatformDns,
+    private val clock: MonotonicClock,
     @ApplicationScope scope: CoroutineScope,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     private val serverAddressResolver = ServerAddressResolver(platformDns)
-    private val verdicts = Ipv6VerdictCache(scope, SystemClock::elapsedRealtime)
+    private val verdicts = Ipv6VerdictCache(scope) { clock.elapsedMillis() }
     private val mutableSessionState = MutableStateFlow<Ipv6SessionState?>(null)
 
     /** What the running Auto session does with IPv6; the service keeps it current. */
@@ -140,51 +137,22 @@ class Ipv6Detector(
         confirmed = confirmed,
     )
 
-    private suspend fun directVerdict(network: Network, key: String): Boolean = verdicts.verdict("$key|direct") { probe("Direct IPv6 check") { directProbeFailure(network) } }
+    private suspend fun directVerdict(network: NetworkLink, key: String): Boolean = verdicts.verdict("$key|direct") { probe("Direct IPv6 check") { directProbeFailure(network) } }
 
     private fun serverKey(network: String, server: ServerConfig): String = "$network|${server.protocol}|${server.address}|${server.port}|${server.rawConfigJson.hashCode()}"
 
-    @Suppress("DEPRECATION")
-    private fun physicalNetwork(): Network? {
-        val connectivityManager = context.getSystemService(ConnectivityManager::class.java) ?: return null
-        // While our VPN is up it is the active network, so fall back to the network it runs over.
-        return connectivityManager.activeNetwork?.takeIf { it.isPhysicalInternet(connectivityManager) }
-            ?: connectivityManager.allNetworks
-                .filter { it.isPhysicalInternet(connectivityManager) }
-                .maxByOrNull { it.preference(connectivityManager) }
-    }
+    private fun physicalNetwork(): NetworkLink? = linkProbe.links().physicalLink()
 
-    private fun currentNetwork(): Pair<Network, String>? {
-        val connectivityManager = context.getSystemService(ConnectivityManager::class.java) ?: return null
+    private fun currentNetwork(): Pair<NetworkLink, String>? {
         val network = physicalNetwork() ?: return null
-        val linkProperties = connectivityManager.getLinkProperties(network) ?: return null
-        val key = ipv6NetworkKey(
-            addresses = linkProperties.linkAddresses.map { it.address },
-            hasIpv6DefaultRoute = linkProperties.hasIpv6DefaultRoute(),
-        ) ?: return null
+        val key = ipv6NetworkKey(network.addresses, network.hasIpv6DefaultRoute) ?: return null
         return network to key
     }
 
-    private fun Network.isPhysicalInternet(connectivityManager: ConnectivityManager): Boolean {
-        val capabilities = connectivityManager.getNetworkCapabilities(this) ?: return false
-        return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
-            !capabilities.hasTransport(NetworkCapabilities.TRANSPORT_VPN)
-    }
-
-    /** Android's own pick: validated first, then unmetered over cellular. */
-    private fun Network.preference(connectivityManager: ConnectivityManager): Int {
-        val capabilities = connectivityManager.getNetworkCapabilities(this) ?: return 0
-        val validated = capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
-        val cellular = capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)
-        return (if (validated) 2 else 0) + (if (cellular) 0 else 1)
-    }
-
-    private fun LinkProperties.hasIpv6DefaultRoute(): Boolean = routes.any { it.isDefaultRoute && it.destination.address is Inet6Address }
-
     private suspend fun probe(label: String, failureOf: suspend () -> String): Boolean {
-        val startedAt = SystemClock.elapsedRealtime()
+        val startedAt = clock.elapsedMillis()
         val failure = withTimeoutOrNull(PROBE_TIMEOUT_MS) { failureOf() } ?: "timed out"
-        val elapsedMs = SystemClock.elapsedRealtime() - startedAt
+        val elapsedMs = clock.elapsedMillis() - startedAt
         val works = failure.isEmpty()
         logBuffer.append(
             LogSource.APP,
@@ -194,7 +162,7 @@ class Ipv6Detector(
     }
 
     /** Fetches over the physical network itself, so neither the tunnel nor Xray is involved. */
-    private suspend fun directProbeFailure(network: Network): String {
+    private suspend fun directProbeFailure(network: NetworkLink): String {
         val client = baseClient.newBuilder()
             .socketFactory(network.socketFactory)
             .proxy(Proxy.NO_PROXY)

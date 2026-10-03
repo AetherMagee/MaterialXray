@@ -2,6 +2,7 @@ package com.material.xray.di
 
 import androidx.work.ListenableWorker
 import com.material.xray.MaterialXrayApp
+import com.material.xray.core.android.network.AndroidNetworkLinkProbe
 import com.material.xray.core.android.platform.AndroidPlatformInfo
 import com.material.xray.core.android.platform.ElapsedRealtimeClock
 import com.material.xray.core.android.platform.LogcatAppLogger
@@ -19,6 +20,7 @@ import com.material.xray.core.common.platform.MonotonicClock
 import com.material.xray.core.common.platform.PlatformInfo
 import com.material.xray.core.common.telemetry.DiagnosticsConsentMirroring
 import com.material.xray.core.network.CoreTrafficRoutingSetting
+import com.material.xray.core.network.NetworkLinkProbe
 import com.material.xray.core.xray.GeoDataUrlSettings
 import com.material.xray.core.xray.LocalSockets
 import com.material.xray.core.xray.PlatformDns
@@ -102,6 +104,7 @@ class KoinGraphTest {
             LocalSockets::class to AndroidLocalSockets::class,
             PlatformDns::class to AndroidPlatformDns::class,
             VpnTransportProbe::class to AndroidVpnTransportProbe::class,
+            NetworkLinkProbe::class to AndroidNetworkLinkProbe::class,
         )
         val definitions = koin.instanceRegistry.instances.values.map { it.beanDefinition }
 

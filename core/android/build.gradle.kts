@@ -14,6 +14,7 @@ dependencies {
     implementation(project(":core:model"))
     implementation(project(":core:common"))
     implementation(project(":core:xray"))
+    implementation(project(":core:network"))
 
     implementation(libs.androidx.annotation)
     implementation(libs.appcompat)
