@@ -20,9 +20,12 @@
 - Main boundaries: `core/xray` builds Xray config/TUN/routing, `core/root` wraps root shell execution, `data` holds Room/repositories/subscription parsing, and `ui` holds Compose screens.
 
 ## Native Assets
-- Only arm64 is wired: `abiFilters += "arm64-v8a"`. Both modes run the official Android Xray build as `libxray.so` from `nativeLibraryDir`.
-- No Xray binary is committed. The `downloadXray` task fetches the release recorded in `third_party/xray/VERSION` and fails unless the archive and executable match `third_party/xray/CHECKSUMS.sha256`, so building an APK needs network access once per Xray version.
-- Switch Xray versions with `./scripts/change-xray-ver.sh <tag>`; it verifies the upstream digests and rewrites the version, commit, license and checksums under `third_party/xray/`.
+- The APK is universal: arm64-v8a, x86_64 and armeabi-v7a. Both modes run an Android Xray build as `libxray.so` from `nativeLibraryDir`.
+- No Xray binary is committed, so building an APK needs network access once per Xray version:
+  - `downloadXray` fetches upstream's arm64-v8a and x86_64 Android builds for `third_party/xray/VERSION` and fails unless the archive and executable match `third_party/xray/CHECKSUMS.sha256`.
+  - `buildXray` compiles armeabi-v7a, which upstream does not publish for Android, from `third_party/xray/COMMIT` with upstream's Android flags and the Go toolchain in `third_party/xray/GO_TOOLCHAIN`. It needs Go 1.21+ on `PATH` (Go fetches the pinned toolchain) and takes about a minute on a cold cache.
+  - Both tasks are cacheable, so a `clean` restores them from the build cache.
+- Switch Xray versions with `./scripts/change-xray-ver.sh <tag>`; it verifies the upstream digests and rewrites the version, commit, Go toolchain, license and checksums under `third_party/xray/`.
 - The Android build only adopts a TUN as an open fd (`xray.tun.fd`). Rootless mode starts Xray through `app/src/main/cpp/xray_launcher.c` (`System.loadLibrary("xray_launcher")`) with the VpnService fd; root TUN mode execs it through `app/src/main/cpp/xray_tun_exec.c`, built as the executable `libxraytun.so` so the installer extracts it. Native changes need an Android build, not only JVM tests.
 
 ## Data And Generated Code

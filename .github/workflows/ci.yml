@@ -25,6 +25,13 @@ jobs:
           java-version: "21"
           cache: gradle
 
+      # The build compiles Xray for armeabi-v7a, which upstream publishes no Android build for.
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: "1.27.x"
+          cache: false
+
       - name: Set up Android SDK
         uses: android-actions/setup-android@v4
         with:

@@ -17,7 +17,7 @@ The release workflow publishes Material Xray's source archive and an `Xray-core-
 
 ## Xray-core
 
-- Component: Xray-core, Linux and Android arm64 executables; `third_party/xray/VERSION` identifies the version
+- Component: Xray-core Android executables: the official arm64-v8a and x86_64 builds, and an armeabi-v7a build compiled from the same source; `third_party/xray/VERSION` identifies the version
 - Project: https://github.com/XTLS/Xray-core
 - Source tags: https://github.com/XTLS/Xray-core/tags
 - License: Mozilla Public License 2.0; see `third_party/xray/LICENSE`

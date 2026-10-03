@@ -1,7 +1,8 @@
 #!/bin/bash
 # Points the build at another Xray release. The Gradle build downloads the binaries itself; this
-# script records what it may accept: the version, its source commit and license, and the SHA-256 of
-# every official archive and of the executable inside it.
+# script records what it may accept: the version, its source commit and license, the SHA-256 of
+# every official archive and of the executable inside it, and the Go toolchain upstream built with,
+# which the build reuses for the ABIs upstream publishes no Android build for.
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -11,6 +12,7 @@ VERSION_FILE="third_party/xray/VERSION"
 CHECKSUM_FILE="third_party/xray/CHECKSUMS.sha256"
 LICENSE_FILE="third_party/xray/LICENSE"
 COMMIT_FILE="third_party/xray/COMMIT"
+GO_TOOLCHAIN_FILE="third_party/xray/GO_TOOLCHAIN"
 VERSION="${1:-}"
 if [[ ! "${VERSION}" =~ ^v[0-9]+([.][0-9]+)*$ ]]; then
   echo "Usage: $0 <Xray release tag, e.g. v26.9.30>" >&2
@@ -76,6 +78,13 @@ echo "Verifying xray-core ${VERSION}..."
 # Both modes run the Android build. It only adopts a TUN as an open fd via xray.tun.fd: rootless
 # mode hands it VpnService's, root mode creates one with the libxraytun.so launcher.
 verify_xray "Xray-android-arm64-v8a.zip" "arm64-v8a"
+verify_xray "Xray-android-amd64.zip" "x86_64"
+
+GO_TOOLCHAIN="$(go version "${WORK_DIR}/Xray-android-arm64-v8a/xray" | awk '{print $2}')"
+if [[ ! "${GO_TOOLCHAIN}" =~ ^go[0-9]+([.][0-9]+)+$ ]]; then
+  echo "Unable to read the Go toolchain of the official build: ${GO_TOOLCHAIN}" >&2
+  exit 1
+fi
 
 XRAY_COMMIT=""
 while read -r commit ref; do
@@ -100,6 +109,7 @@ fi
 cp "${WORK_DIR}/xray-license" "${LICENSE_FILE}"
 printf '%s\n' "${VERSION}" > "${VERSION_FILE}"
 printf '%s\n' "${XRAY_COMMIT}" > "${COMMIT_FILE}"
+printf '%s\n' "${GO_TOOLCHAIN}" > "${GO_TOOLCHAIN_FILE}"
 printf '%s\n' "${ARCHIVE_CHECKSUMS[@]}" "${BINARY_CHECKSUMS[@]}" > "${CHECKSUM_FILE}"
 
 echo "Recorded Xray ${VERSION}."

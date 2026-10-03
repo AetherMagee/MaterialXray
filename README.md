@@ -17,7 +17,7 @@
 
 ## Get started
 
-You'll need Android 7.0 or newer on an arm64 device, plus a proxy server or subscription of your own. Material Xray is a client, not a service that provides servers.
+You'll need Android 7.0 or newer on an arm64, armv7 or x86_64 device, plus a proxy server or subscription of your own. Material Xray is a client, not a service that provides servers.
 
 1. Download the APK from the [latest release](https://github.com/AetherMagee/MaterialXray/releases/latest) and install it. Android may ask you to allow installation from your browser or file manager.
 2. Open the app and choose **Add new server or subscription**. Paste a link, scan a QR code, or enter it manually.
@@ -62,7 +62,7 @@ Material Xray is a single-module Kotlin Android app using Jetpack Compose, Koin,
 
 ### Build and install
 
-Use JDK 21 and the Android SDK. The current build uses Android platform 37.0 and CMake 3.31.6, matching [CI](.github/workflows/ci.yml). Set your SDK path through `ANDROID_HOME` or `sdk.dir` in `local.properties`.
+Use JDK 21, the Android SDK, Go 1.21 or newer, and Git. The current build uses Android platform 37.0 and CMake 3.31.6, matching [CI](.github/workflows/ci.yml). Set your SDK path through `ANDROID_HOME` or `sdk.dir` in `local.properties`.
 
 Run from the repository root:
 
@@ -70,7 +70,7 @@ Run from the repository root:
 ./gradlew :app:assembleDebug
 ```
 
-The APK is written to `app/build/outputs/apk/debug/app-debug.apk`. To install it on a connected arm64 device or emulator:
+The APK is written to `app/build/outputs/apk/debug/app-debug.apk`. To install it on a connected device or emulator:
 
 ```sh
 ./gradlew :app:installDebug
@@ -118,19 +118,19 @@ Releases before `v0.5.0` do not have attestations.
 
 ### Runtime and native assets
 
-Only `arm64-v8a` is currently packaged. Both modes run the official Android Xray build, which the Gradle build downloads and packages as `libxray.so`. Rootless mode launches it through the JNI shim in `app/src/main/cpp/xray_launcher.c`; root TUN mode launches it through `app/src/main/cpp/xray_tun_exec.c`, which creates the TUN interface and hands Xray its descriptor.
+The APK packages `arm64-v8a`, `x86_64` and `armeabi-v7a`. Both modes run an Android Xray build, packaged as `libxray.so`. For `arm64-v8a` and `x86_64` the Gradle build downloads the official one. Upstream publishes no Android `armeabi-v7a` build, so the Gradle build compiles it from the pinned Xray commit with upstream's Android flags and Go toolchain; building an APK therefore needs Go 1.21 or newer. Rootless mode launches it through the JNI shim in `app/src/main/cpp/xray_launcher.c`; root TUN mode launches it through `app/src/main/cpp/xray_tun_exec.c`, which creates the TUN interface and hands Xray its descriptor.
 
 Each APK build downloads the latest `geoip.dat` and `geosite.dat` from `v2fly/geoip` and `v2fly/domain-list-community` and bundles them as assets. On first use, the app copies the bundled files into Xray's data directory, so a new installation can connect without downloading geodata. The app also queues a one-time background sync on first launch; its download does not delay tunnel startup. Later updates and custom download URLs remain available in Settings. APK builds require access to those release assets.
 
 In rootful TUN mode, the service manages the tunnel interface and routing. Every per-app proxy group shares that one interface: each group's routing table gives its traffic a distinct source address, and Xray routes on that address. Rootful mode binds outbound connections to the physical network interface to avoid routing loops, watches Wi-Fi and cellular changes, and retargets the connection when needed. Rootless mode passes Android's VPN TUN file descriptor to Xray and excludes Material Xray itself from the VPN to prevent routing loops, relying on Android's network routing rather than the rootful retargeting logic.
 
-No Xray binary is committed. APK builds download the release recorded in `third_party/xray/VERSION` and refuse any archive or executable that does not match `third_party/xray/CHECKSUMS.sha256`. Switch Xray versions with:
+No Xray binary is committed. APK builds download the release recorded in `third_party/xray/VERSION`, refusing any archive or executable that does not match `third_party/xray/CHECKSUMS.sha256`, and compile `armeabi-v7a` from `third_party/xray/COMMIT`. Switch Xray versions with:
 
 ```sh
 ./scripts/change-xray-ver.sh v26.9.30
 ```
 
-The script verifies the published SHA-256 digests of the Android builds, preserves Xray's license, and records the version, source commit and hashes under `third_party/xray/`.
+The script verifies the published SHA-256 digests of the Android builds, preserves Xray's license, and records the version, source commit, upstream's Go toolchain and hashes under `third_party/xray/`.
 
 ### Project layout
 
