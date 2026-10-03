@@ -24,7 +24,6 @@ import org.gradle.process.ExecOperations
 plugins {
     id("materialxray.android.application")
     id("materialxray.android.compose")
-    id("com.google.devtools.ksp")
     id("org.jetbrains.kotlin.plugin.serialization")
     alias(libs.plugins.sentry.android)
 }
@@ -459,19 +458,6 @@ sentry {
     includeNativeSources.set(sentryAuthToken.map { true }.orElse(false))
 }
 
-// Room exports one JSON schema per database version. They are committed so that
-// DatabaseMigrationChainTest can replay the migration chain and compare the result against the
-// schema Room generates from the entities.
-val roomSchemaDirectory = layout.projectDirectory.dir("schemas")
-
-ksp {
-    arg("room.schemaLocation", roomSchemaDirectory.asFile.path)
-}
-
-tasks.withType<Test>().configureEach {
-    systemProperty("room.schemaLocation", roomSchemaDirectory.asFile.path)
-}
-
 androidComponents {
     onVariants { variant ->
         variant.sources.assets?.addGeneratedSourceDirectory(
@@ -533,9 +519,6 @@ dependencies {
     implementation(libs.koin.androidx.compose)
     implementation(libs.koin.androidx.workmanager)
 
-    implementation(libs.room.runtime)
-    ksp(libs.room.compiler)
-
     implementation(libs.datastore.preferences)
 
     implementation(libs.okhttp)
@@ -546,6 +529,5 @@ dependencies {
 
     testImplementation(libs.okhttp.mockwebserver)
     testImplementation(libs.okhttp.tls)
-    testImplementation(libs.sqlite.jdbc)
     androidTestImplementation(libs.androidx.test.runner)
 }

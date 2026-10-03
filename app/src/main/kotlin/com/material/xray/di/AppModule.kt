@@ -43,7 +43,6 @@ import org.koin.core.annotation.Singleton
 
 @Module(
     includes = [
-        DatabaseModule::class,
         CoreModelModule::class,
         CoreCommonModule::class,
         CoreXrayModule::class,

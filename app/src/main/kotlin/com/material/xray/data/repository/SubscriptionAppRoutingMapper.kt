@@ -11,11 +11,12 @@ private val subscriptionRoutingJson = Json { ignoreUnknownKeys = true }
 
 fun SubscriptionEntity.toSubscriptionAppRouting(): SubscriptionAppRouting? {
     val mode = SubscriptionAppRoutingMode.fromPersisted(appRoutingMode) ?: return null
+    val persistedPackages = appRoutingPackages
     val packages = runCatching {
-        if (appRoutingPackages.isNullOrBlank()) {
+        if (persistedPackages.isNullOrBlank()) {
             emptyList()
         } else {
-            subscriptionRoutingJson.decodeFromString(ListSerializer(String.serializer()), appRoutingPackages)
+            subscriptionRoutingJson.decodeFromString(ListSerializer(String.serializer()), persistedPackages)
         }
     }.getOrDefault(emptyList())
     return SubscriptionAppRouting(packages, mode, appRoutingInverted).normalized()

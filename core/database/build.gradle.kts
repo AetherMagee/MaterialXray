@@ -1,6 +1,8 @@
 plugins {
     id("materialxray.android.library")
     id("com.google.devtools.ksp")
+    // DatabaseMigrationChainTest decodes the exported schema JSON.
+    id("org.jetbrains.kotlin.plugin.serialization")
 }
 
 android {
@@ -24,8 +26,11 @@ dependencies {
     implementation(project(":core:model"))
     implementation(project(":core:common"))
 
-    implementation(libs.room.runtime)
+    // AppDatabase extends RoomDatabase and the DAOs return Flows, so both are part of the API.
+    api(libs.room.runtime)
+    api(libs.coroutines.core)
     ksp(libs.room.compiler)
 
+    testImplementation(libs.serialization.json)
     testImplementation(libs.sqlite.jdbc)
 }
