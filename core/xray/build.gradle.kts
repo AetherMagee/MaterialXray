@@ -1,11 +1,7 @@
 plugins {
-    id("materialxray.android.library")
+    id("materialxray.jvm.library")
     id("org.jetbrains.kotlin.plugin.serialization")
     alias(libs.plugins.protobuf)
-}
-
-android {
-    namespace = "com.material.xray.core.xray"
 }
 
 protobuf {
@@ -20,8 +16,9 @@ protobuf {
     }
     generateProtoTasks {
         all().forEach { task ->
+            // A JVM project already has the java builtin; it only needs the lite flavour.
             task.builtins {
-                create("java") {
+                named("java") {
                     option("lite")
                 }
             }
@@ -39,7 +36,6 @@ dependencies {
     implementation(project(":core:common"))
     implementation(project(":core:root"))
 
-    implementation(libs.androidx.annotation)
     implementation(libs.coroutines.core)
     implementation(libs.serialization.json)
     implementation(libs.okhttp)
