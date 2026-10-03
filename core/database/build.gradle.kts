@@ -1,12 +1,6 @@
 plugins {
-    id("materialxray.android.library")
+    id("materialxray.jvm.library")
     id("com.google.devtools.ksp")
-    // DatabaseMigrationChainTest decodes the exported schema JSON.
-    id("org.jetbrains.kotlin.plugin.serialization")
-}
-
-android {
-    namespace = "com.material.xray.core.database"
 }
 
 // Room exports one JSON schema per database version. They are committed so that
@@ -18,6 +12,11 @@ ksp {
     arg("room.schemaLocation", roomSchemaDirectory.asFile.path)
 }
 
+// KSP adds Room's generated implementations to the main source set; only hand-written code is analysed.
+tasks.withType<dev.detekt.gradle.Detekt>().configureEach {
+    exclude { it.file.path.contains("/build/generated/") }
+}
+
 tasks.withType<Test>().configureEach {
     systemProperty("room.schemaLocation", roomSchemaDirectory.asFile.path)
 }
@@ -26,11 +25,12 @@ dependencies {
     implementation(project(":core:model"))
     implementation(project(":core:common"))
 
-    // AppDatabase extends RoomDatabase and the DAOs return Flows, so both are part of the API.
+    // AppDatabase extends RoomDatabase, the DAOs return Flows and the migrations and callbacks
+    // receive driver connections, so all three are part of the API.
     api(libs.room.runtime)
+    api(libs.sqlite)
     api(libs.coroutines.core)
     ksp(libs.room.compiler)
 
-    testImplementation(libs.serialization.json)
-    testImplementation(libs.sqlite.jdbc)
+    testImplementation(libs.sqlite.bundled)
 }

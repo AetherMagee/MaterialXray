@@ -1,6 +1,7 @@
 package com.material.xray.data.db
 
-import android.util.Log
+import androidx.room.useWriterConnection
+import com.material.xray.core.common.log.AppLogger
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -12,6 +13,7 @@ import org.koin.core.annotation.Singleton
 @Singleton
 class DatabaseOpenChecker(
     private val database: AppDatabase,
+    private val logger: AppLogger,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     private val mutex = Mutex()
@@ -22,13 +24,15 @@ class DatabaseOpenChecker(
             try {
                 // Opening runs Room migrations and schema validation; the query also verifies
                 // that the main user-data table can be read before any screen uses it.
-                database.openHelper.writableDatabase.query("SELECT 1 FROM servers LIMIT 1").use { it.moveToFirst() }
+                database.useWriterConnection { connection ->
+                    connection.usePrepared("SELECT 1 FROM servers LIMIT 1") { it.step() }
+                }
                 true
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Exception) {
                 // Room reports schema and SQLite failures with different exception types.
-                Log.e(LOG_TAG, "Unable to open app database", error)
+                logger.e(LOG_TAG, "Unable to open app database", error)
                 false
             }
         }.also { result = it }

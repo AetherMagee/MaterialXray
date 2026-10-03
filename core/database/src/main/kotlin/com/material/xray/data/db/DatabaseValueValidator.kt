@@ -1,39 +1,43 @@
 package com.material.xray.data.db
 
-import androidx.sqlite.db.SupportSQLiteDatabase
+import androidx.sqlite.SQLiteConnection
+import androidx.sqlite.execSQL
 import com.material.xray.data.db.entity.DatabaseMetadataEntity
 
 internal object DatabaseValueValidator {
     internal const val CURRENT_REVISION = 2
 
-    fun validateIfNeeded(db: SupportSQLiteDatabase): Boolean {
-        if (!shouldValidate(readRevision(db))) return false
-        repair(db)
+    fun validateIfNeeded(connection: SQLiteConnection): Boolean {
+        if (!shouldValidate(readRevision(connection))) return false
+        repair(connection)
         return true
     }
 
-    fun repair(db: SupportSQLiteDatabase) {
-        db.beginTransaction()
+    /** Rewrites invalid values in one transaction; Room calls `onOpen` outside of one. */
+    fun repair(connection: SQLiteConnection) {
+        connection.execSQL("BEGIN EXCLUSIVE TRANSACTION")
+        var committed = false
         try {
-            statements.forEach(db::execSQL)
-            db.execSQL(
+            statements.forEach(connection::execSQL)
+            connection.execSQL(
                 """
                 INSERT OR REPLACE INTO database_metadata (id, valueValidationRevision)
                 VALUES (${DatabaseMetadataEntity.SINGLETON_ID}, $CURRENT_REVISION)
                 """.trimIndent(),
             )
-            db.setTransactionSuccessful()
+            connection.execSQL("END TRANSACTION")
+            committed = true
         } finally {
-            db.endTransaction()
+            if (!committed) connection.execSQL("ROLLBACK TRANSACTION")
         }
     }
 
     internal fun shouldValidate(revision: Int?): Boolean = revision == null || revision < CURRENT_REVISION
 
-    private fun readRevision(db: SupportSQLiteDatabase): Int? = db.query(
+    private fun readRevision(connection: SQLiteConnection): Int? = connection.prepare(
         "SELECT valueValidationRevision FROM database_metadata WHERE id = ${DatabaseMetadataEntity.SINGLETON_ID}",
-    ).use { cursor ->
-        if (cursor.moveToFirst()) cursor.getInt(0) else null
+    ).use { statement ->
+        if (statement.step()) statement.getInt(0) else null
     }
 
     internal val statements = listOf(

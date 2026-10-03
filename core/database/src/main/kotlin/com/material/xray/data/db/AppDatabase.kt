@@ -2,7 +2,7 @@ package com.material.xray.data.db
 
 import androidx.room.Database
 import androidx.room.RoomDatabase
-import androidx.sqlite.db.SupportSQLiteDatabase
+import androidx.sqlite.SQLiteConnection
 import com.material.xray.data.db.dao.AppBypassDao
 import com.material.xray.data.db.dao.ServerDao
 import com.material.xray.data.db.dao.SubscriptionDao
@@ -25,8 +25,8 @@ abstract class AppDatabase : RoomDatabase() {
         const val DATABASE_NAME = "material-xray.db"
 
         val VALUE_VALIDATION_CALLBACK = object : Callback() {
-            override fun onOpen(db: SupportSQLiteDatabase) {
-                DatabaseValueValidator.validateIfNeeded(db)
+            override fun onOpen(connection: SQLiteConnection) {
+                DatabaseValueValidator.validateIfNeeded(connection)
             }
         }
     }

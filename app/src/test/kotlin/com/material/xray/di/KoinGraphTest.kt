@@ -110,4 +110,20 @@ class KoinGraphTest {
             assertEquals("${contract.simpleName} providers", setOf(implementation), providers)
         }
     }
+
+    // Building the database needs an Android Context, so only the definitions are checked here.
+    @OptIn(KoinInternalApi::class)
+    @Test
+    fun `the database and its DAOs each have exactly one definition`() {
+        val primaryTypes = koin.instanceRegistry.instances.values.map { it.beanDefinition }.distinct().map { it.primaryType }
+
+        listOf(
+            com.material.xray.data.db.AppDatabase::class,
+            com.material.xray.data.db.dao.ServerDao::class,
+            com.material.xray.data.db.dao.SubscriptionDao::class,
+            com.material.xray.data.db.dao.AppBypassDao::class,
+        ).forEach { type ->
+            assertEquals("${type.simpleName} definitions", 1, primaryTypes.count { it == type })
+        }
+    }
 }

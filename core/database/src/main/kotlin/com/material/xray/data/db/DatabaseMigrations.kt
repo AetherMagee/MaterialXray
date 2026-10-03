@@ -1,7 +1,8 @@
 package com.material.xray.data.db
 
 import androidx.room.migration.Migration
-import androidx.sqlite.db.SupportSQLiteDatabase
+import androidx.sqlite.SQLiteConnection
+import androidx.sqlite.execSQL
 
 /**
  * Every schema step of [AppDatabase], expressed as plain SQL.
@@ -14,7 +15,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  * Each entry migrates from its key to the following version. The keys must stay contiguous and end
  * at the version before the one declared on [AppDatabase]; the test enforces both.
  */
-internal object DatabaseMigrations {
+object DatabaseMigrations {
     val sqlByStartVersion: Map<Int, List<String>> = mapOf(
         1 to listOf(
             "ALTER TABLE subscriptions ADD COLUMN contentDisposition TEXT",
@@ -198,8 +199,8 @@ internal object DatabaseMigrations {
         endVersion: Int,
         private val statements: List<String>,
     ) : Migration(startVersion, endVersion) {
-        override fun migrate(db: SupportSQLiteDatabase) {
-            statements.forEach(db::execSQL)
+        override fun migrate(connection: SQLiteConnection) {
+            statements.forEach(connection::execSQL)
         }
     }
 }

@@ -509,6 +509,8 @@ dependencies {
     implementation(libs.core.ktx)
     implementation(libs.core.splashscreen)
     implementation(libs.work.runtime.ktx)
+    // DatabaseModule opens the database with the platform SQLite engine.
+    implementation(libs.sqlite.framework)
 
     implementation(platform(libs.koin.bom))
     implementation(libs.koin.android)
