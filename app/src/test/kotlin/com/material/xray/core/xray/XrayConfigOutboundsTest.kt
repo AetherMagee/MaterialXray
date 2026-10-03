@@ -56,12 +56,22 @@ class XrayConfigOutboundsTest {
         assertEquals("UseIPv4", withInterface.getValue("domainStrategy").jsonPrimitive.content)
         assertEquals("wlan0", withInterface.getValue("interface").jsonPrimitive.content)
 
+        assertFalse("happyEyeballs" in withInterface)
+
         val withoutInterface = buildSockopt(fwmark = 7, physicalInterface = "")
         assertEquals("7", withoutInterface.getValue("mark").jsonPrimitive.content)
         assertFalse("interface" in withoutInterface)
 
         val withIpv6 = buildSockopt(fwmark = 0, physicalInterface = null, allowIpv6 = true)
         assertEquals("UseIP", withIpv6.getValue("domainStrategy").jsonPrimitive.content)
+        assertEquals(
+            "250",
+            withIpv6.getValue("happyEyeballs").jsonObject.getValue("tryDelayMs").jsonPrimitive.content,
+        )
+        assertEquals(
+            "true",
+            withIpv6.getValue("happyEyeballs").jsonObject.getValue("prioritizeIPv6").jsonPrimitive.content,
+        )
     }
 
     @Test

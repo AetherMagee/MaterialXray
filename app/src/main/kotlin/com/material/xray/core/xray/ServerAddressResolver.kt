@@ -7,6 +7,7 @@ import android.os.Build
 import android.os.CancellationSignal
 import android.os.Looper
 import androidx.annotation.RequiresApi
+import com.material.xray.model.Protocol
 import com.material.xray.model.ServerConfig
 import java.io.File
 import java.net.IDN
@@ -53,7 +54,16 @@ class ServerAddressResolver(
     private val successfulLookups = ConcurrentHashMap<String, CachedLookup>()
     private val lastKnownAddresses by lazy { ConcurrentHashMap(readLastKnownAddresses()) }
 
-    suspend fun resolve(server: ServerConfig, allowIpv6: Boolean = false): Result = withContext(ioDispatcher) {
+    /**
+     * Resolves [server]'s hostname. The hostname is kept and its addresses handed to Xray's DNS, so
+     * Xray can race them; [pinAddress] instead swaps in one address for a core that resolves nothing
+     * itself. WireGuard stays pinned: it dials one UDP endpoint per session, so it has nothing to race.
+     */
+    suspend fun resolve(
+        server: ServerConfig,
+        allowIpv6: Boolean = false,
+        pinAddress: Boolean = false,
+    ): Result = withContext(ioDispatcher) {
         if (server.rawConfigJson.isNotBlank()) {
             return@withContext resolveRawConfig(server, allowIpv6)
         }
@@ -71,9 +81,21 @@ class ServerAddressResolver(
             return@withContext Result(server, attempted = true, selectedAddress = null, candidates = emptyList())
         }
 
+        val hostServer = server.withHostDefaults(host)
+        // Xray matches hosts entries against the normalised name, so "proxy.example." needs the bare key.
+        val hostsKey = endpointHostname(host)
+        if (!pinAddress && server.protocol != Protocol.WIREGUARD && hostsKey != null) {
+            return@withContext Result(
+                server = hostServer.copy(bootstrapDnsHosts = mapOf(hostsKey to candidates)),
+                attempted = true,
+                selectedAddress = candidates.first(),
+                candidates = candidates,
+            )
+        }
+
         val selectedAddress = candidates.random(Random(System.nanoTime()))
         Result(
-            server = server.withResolvedAddress(selectedAddress, originalHost = host),
+            server = hostServer.copy(address = selectedAddress),
             attempted = true,
             selectedAddress = selectedAddress,
             candidates = candidates,
@@ -87,7 +109,7 @@ class ServerAddressResolver(
      */
     suspend fun resolveOrNull(server: ServerConfig, allowIpv6: Boolean): ServerConfig? {
         if (server.rawConfigJson.isNotBlank()) return server
-        val resolved = resolve(server, allowIpv6)
+        val resolved = resolve(server, allowIpv6, pinAddress = true)
         if (resolved.attempted && resolved.selectedAddress == null) return null
         return resolved.server
     }
@@ -183,7 +205,8 @@ class ServerAddressResolver(
         fallbackLookup = { resolveWithOkHttpDns(host) },
     )
 
-    private fun ServerConfig.withResolvedAddress(address: String, originalHost: String): ServerConfig {
+    /** Names the original host where TLS or the transport would otherwise fall back to a pinned address. */
+    private fun ServerConfig.withHostDefaults(originalHost: String): ServerConfig {
         val resolvedSecurity = if (security.sni.isEmpty() && security.type in setOf("tls", "reality")) {
             security.copy(sni = originalHost)
         } else {
@@ -196,7 +219,7 @@ class ServerAddressResolver(
             transport
         }
 
-        return copy(address = address, security = resolvedSecurity, transport = resolvedTransport)
+        return copy(security = resolvedSecurity, transport = resolvedTransport)
     }
 
     private fun isNumericAddress(host: String): Boolean {

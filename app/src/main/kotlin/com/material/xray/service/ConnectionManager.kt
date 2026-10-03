@@ -619,8 +619,9 @@ internal class ConnectionManager(
         if (resolvedServer.server.bootstrapDnsHosts.isNotEmpty()) {
             log.append(
                 LogSource.APP,
-                "Resolved ${resolvedServer.server.bootstrapDnsHosts.size} raw config endpoint hostname(s) " +
-                    "(${resolvedServer.candidates.size} candidates)",
+                "Resolved " + resolvedServer.server.bootstrapDnsHosts.entries.joinToString("; ") { (host, addresses) ->
+                    "$host to [${addresses.joinToString()}]"
+                },
             )
         } else if (resolvedServer.selectedAddress != null) {
             log.append(

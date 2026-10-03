@@ -213,6 +213,9 @@ internal fun buildCoreOutbounds(
 // other apps' VPNs and follow the underlying default network.
 internal const val PROTECTED_FROM_VPN_MARK = 0x20000
 
+// RFC 8305's recommended connection attempt delay.
+private const val HAPPY_EYEBALLS_TRY_DELAY_MS = 250
+
 internal fun buildSockopt(
     fwmark: Int,
     physicalInterface: String?,
@@ -223,6 +226,17 @@ internal fun buildSockopt(
         put("mark", fwmark)
     }
     put("domainStrategy", domainStrategyOverride ?: if (allowIpv6) "UseIP" else "UseIPv4")
+    if (allowIpv6) {
+        // Without this Xray dials one of a host's addresses at random, so a lossy IPv6 path stalls
+        // half the connections for seconds. Racing them caps that at the try delay.
+        put(
+            "happyEyeballs",
+            buildJsonObject {
+                put("tryDelayMs", HAPPY_EYEBALLS_TRY_DELAY_MS)
+                put("prioritizeIPv6", true)
+            },
+        )
+    }
     if (!physicalInterface.isNullOrBlank()) {
         put("interface", physicalInterface)
     }

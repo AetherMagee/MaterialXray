@@ -194,6 +194,50 @@ class ServerAddressResolverTest {
         assertEquals(1, lookups)
     }
 
+    @Test
+    fun `server keeps its hostname and hands every address to Xray`() = runTest {
+        val resolver = ServerAddressResolver(hostLookup = { listOf("192.0.2.1", "2001:db8::1") })
+
+        val result = resolver.resolve(server(Protocol.VLESS), allowIpv6 = true)
+
+        assertEquals("proxy.example", result.server.address)
+        assertEquals("proxy.example", result.server.security.sni)
+        assertEquals(mapOf("proxy.example" to listOf("192.0.2.1", "2001:db8::1")), result.server.bootstrapDnsHosts)
+        assertEquals(listOf("192.0.2.1", "2001:db8::1"), result.candidates)
+    }
+
+    @Test
+    fun `a trailing-dot hostname maps under the name Xray looks up`() = runTest {
+        val resolver = ServerAddressResolver(hostLookup = { listOf("192.0.2.1") })
+
+        val result = resolver.resolve(server(Protocol.VLESS).copy(address = "Proxy.Example."))
+
+        assertEquals(mapOf("proxy.example" to listOf("192.0.2.1")), result.server.bootstrapDnsHosts)
+    }
+
+    @Test
+    fun `pinned and WireGuard servers swap in one address`() = runTest {
+        val resolver = ServerAddressResolver(hostLookup = { listOf("192.0.2.1", "2001:db8::1") })
+
+        val pinned = resolver.resolve(server(Protocol.VLESS), allowIpv6 = false, pinAddress = true)
+        val wireGuard = resolver.resolve(server(Protocol.WIREGUARD), allowIpv6 = false)
+
+        for (result in listOf(pinned, wireGuard)) {
+            assertEquals("192.0.2.1", result.server.address)
+            assertTrue(result.server.bootstrapDnsHosts.isEmpty())
+        }
+        assertEquals("proxy.example", pinned.server.security.sni)
+    }
+
+    private fun server(protocol: Protocol): ServerConfig = ServerConfig(
+        protocol = protocol,
+        name = "Server",
+        address = "proxy.example",
+        port = 443,
+        password = "",
+        security = ServerConfig.Security(type = "tls"),
+    )
+
     private fun rawServer(vararg addresses: String): ServerConfig = ServerConfig(
         protocol = Protocol.RAW,
         name = "Raw",
