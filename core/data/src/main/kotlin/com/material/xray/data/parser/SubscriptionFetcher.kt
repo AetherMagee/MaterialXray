@@ -111,7 +111,7 @@ class SubscriptionFetcher(
      * raw config updates its protocol, address, port, transport and security instead of keeping the
      * values the provider originally shipped. Null when [body] is not a usable JSON config.
      */
-    internal fun parseJsonConfig(body: String): ServerConfig? = parseJsonSubscription(body).firstOrNull()
+    fun parseJsonConfig(body: String): ServerConfig? = parseJsonSubscription(body).firstOrNull()
 
     suspend fun fetchWithMetadata(
         url: String,

@@ -1,5 +1,6 @@
 plugins {
     id("materialxray.android.library")
+    id("org.jetbrains.kotlin.plugin.serialization")
 }
 
 android {
@@ -13,4 +14,13 @@ dependencies {
     implementation(project(":core:network"))
     implementation(project(":core:android"))
     implementation(project(":core:database"))
+
+    // SettingsRepository's setters return the edited Preferences, so DataStore is part of the API.
+    api(libs.datastore.preferences)
+    implementation(libs.coroutines.core)
+    implementation(libs.okhttp)
+    implementation(libs.serialization.json)
+
+    testImplementation(libs.okhttp.mockwebserver)
+    testImplementation(libs.okhttp.tls)
 }

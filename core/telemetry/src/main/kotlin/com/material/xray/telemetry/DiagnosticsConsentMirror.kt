@@ -1,6 +1,7 @@
 package com.material.xray.telemetry
 
 import android.content.Context
+import com.material.xray.core.common.telemetry.DiagnosticsConsentMirroring
 import java.io.File
 
 /**
@@ -9,12 +10,12 @@ import java.io.File
  */
 class DiagnosticsConsentMirror(
     private val file: File,
-) {
+) : DiagnosticsConsentMirroring {
     constructor(context: Context) : this(context.noBackupFilesDir.resolve(FILE_NAME))
 
     fun isEnabled(): Boolean = runCatching { file.readText().trim() == ENABLED_VALUE }.getOrDefault(false)
 
-    fun setEnabled(enabled: Boolean) {
+    override fun setEnabled(enabled: Boolean) {
         runCatching { file.writeText(if (enabled) ENABLED_VALUE else DISABLED_VALUE) }
     }
 

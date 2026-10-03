@@ -7,6 +7,7 @@ import com.material.xray.core.common.connection.ConnectionShutdown
 import com.material.xray.core.common.connection.RoutingChangeNotifier
 import com.material.xray.core.common.di.ApplicationScope
 import com.material.xray.core.common.log.LogEcho
+import com.material.xray.core.common.telemetry.DiagnosticsConsentMirroring
 import com.material.xray.core.network.CoreTrafficRoutingSetting
 import com.material.xray.core.xray.GeoDataUrlSettings
 import com.material.xray.data.repository.SettingsRepository
@@ -17,6 +18,7 @@ import com.material.xray.service.GeoDataUpdateWorker
 import com.material.xray.service.LogcatEcho
 import com.material.xray.service.RoutingChangeManager
 import com.material.xray.service.SubscriptionUpdateWorker
+import com.material.xray.telemetry.DiagnosticsConsentMirror
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.cancel
 import org.junit.After
@@ -78,6 +80,7 @@ class KoinGraphTest {
             AppUpdateScheduling::class to AppUpdateScheduler::class,
             CoreTrafficRoutingSetting::class to SettingsRepository::class,
             GeoDataUrlSettings::class to SettingsRepository::class,
+            DiagnosticsConsentMirroring::class to DiagnosticsConsentMirror::class,
         )
         val definitions = koin.instanceRegistry.instances.values.map { it.beanDefinition }
 

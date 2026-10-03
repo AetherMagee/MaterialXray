@@ -18,7 +18,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.koin.core.annotation.Singleton
 
-internal data class GitHubRelease(
+data class GitHubRelease(
     val tagName: String,
     val apkDownloadUrl: String,
 )
@@ -30,7 +30,7 @@ class GitHubReleaseFetcher(
 ) {
     private val json = Json { ignoreUnknownKeys = true }
 
-    internal suspend fun fetchLatestRelease(
+    suspend fun fetchLatestRelease(
         currentVersionName: String,
         onStatus: suspend (AppUpdateCheckStatus) -> Unit = {},
     ): GitHubRelease = httpClient.use { client ->
@@ -206,7 +206,7 @@ class GitHubReleaseFetcher(
     ) : IOException(message, cause)
 }
 
-internal fun githubMirrorUrls(officialUrl: String): List<String> = listOf(
+fun githubMirrorUrls(officialUrl: String): List<String> = listOf(
     officialUrl,
     "https://ghfile.geekertao.top/$officialUrl",
     "https://github.dpik.top/$officialUrl",

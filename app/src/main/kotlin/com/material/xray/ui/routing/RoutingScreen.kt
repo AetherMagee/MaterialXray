@@ -234,12 +234,13 @@ fun RoutingScreen(
                     requestProviderRuleAction(ProviderRoutingRuleAction.ToggleSubscription(rule, enabled))
                 },
                 onProfileRuleClick = { rule ->
-                    if (rule.orphaned || rule.editableRule == null) {
+                    val editableRule = rule.editableRule
+                    if (rule.orphaned || editableRule == null) {
                         onViewRule(rule.toViewerRequest())
                     } else {
                         onEditRule(
                             EditableRoutingRule(
-                                rule = rule.editableRule,
+                                rule = editableRule,
                                 isNew = false,
                                 profileOriginalRuleJson = rule.originalRuleJson,
                                 profileOriginalIndex = rule.originalIndex,

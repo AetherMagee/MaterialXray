@@ -13,13 +13,13 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 
-internal data class ProfileRouting(
+data class ProfileRouting(
     val rules: List<ProfileRoutingRule>,
     val domainStrategy: String?,
     val domainMatcher: String?,
 )
 
-internal data class ProfileRoutingRule(
+data class ProfileRoutingRule(
     val id: String,
     val name: String,
     val target: ProfileRoutingTarget?,
@@ -38,7 +38,7 @@ internal data class ProfileRoutingRule(
     val orphaned: Boolean,
 )
 
-internal sealed interface ProfileRoutingTarget {
+sealed interface ProfileRoutingTarget {
     val tag: String
 
     data class Outbound(override val tag: String) : ProfileRoutingTarget
@@ -47,7 +47,7 @@ internal sealed interface ProfileRoutingTarget {
 }
 
 /** Read-only description of routing that remains owned and executed by a raw JSON profile. */
-internal object ProfileRoutingInspector {
+object ProfileRoutingInspector {
     private val json = Json { ignoreUnknownKeys = true }
     private val prettyJson = Json { prettyPrint = true }
     private val ordinaryFields = setOf(

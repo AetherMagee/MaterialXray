@@ -519,15 +519,11 @@ dependencies {
     implementation(libs.koin.androidx.compose)
     implementation(libs.koin.androidx.workmanager)
 
-    implementation(libs.datastore.preferences)
-
     implementation(libs.okhttp)
     implementation(libs.serialization.json)
     implementation(libs.coroutines.android)
     implementation(libs.zxing.core)
     implementation(libs.sentry.android)
 
-    testImplementation(libs.okhttp.mockwebserver)
-    testImplementation(libs.okhttp.tls)
     androidTestImplementation(libs.androidx.test.runner)
 }

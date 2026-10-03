@@ -23,9 +23,6 @@ import okhttp3.Request
 import okhttp3.ResponseBody
 import org.koin.core.annotation.Singleton
 
-internal const val GEOIP_FILE_NAME = "geoip.dat"
-internal const val GEOSITE_FILE_NAME = "geosite.dat"
-
 internal fun normalizeGeoDataUrl(url: String): String = url.trim()
 
 internal fun geoDataUpdatedAt(targetFile: File, updatedAtFile: File): Long? {

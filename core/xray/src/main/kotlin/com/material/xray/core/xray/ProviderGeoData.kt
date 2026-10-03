@@ -10,6 +10,10 @@ import java.security.MessageDigest
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 
+/** The bundled geodata files Xray loads from its working directory. */
+const val GEOIP_FILE_NAME = "geoip.dat"
+const val GEOSITE_FILE_NAME = "geosite.dat"
+
 internal val PROVIDER_GEO_DATA_STALE_AFTER_MS = TimeUnit.HOURS.toMillis(48)
 internal val PROVIDER_GEO_DATA_RETRY_AFTER_MS = TimeUnit.HOURS.toMillis(4)
 private const val PROVIDER_GEO_DATA_FILE_PREFIX = "provider-"

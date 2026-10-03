@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.material.xray.core.common.telemetry.DiagnosticsConsentMirroring
 import com.material.xray.core.network.CoreTrafficRoutingSetting
 import com.material.xray.core.xray.GeoDataDefaults
 import com.material.xray.core.xray.GeoDataUrlSettings
@@ -29,7 +30,6 @@ import com.material.xray.model.SubscriptionRouting
 import com.material.xray.model.XrayLogLevel
 import com.material.xray.model.XrayOutbound
 import com.material.xray.model.XrayRuntimeSettings
-import com.material.xray.telemetry.DiagnosticsConsentMirror
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
@@ -86,11 +86,11 @@ private val Context.dataStore by preferencesDataStore(
 @Singleton(binds = [CoreTrafficRoutingSetting::class, GeoDataUrlSettings::class])
 class SettingsRepository(
     private val context: Context,
+    private val diagnosticsConsentMirror: DiagnosticsConsentMirroring,
 ) : CoreTrafficRoutingSetting,
     GeoDataUrlSettings {
     private val store get() = context.dataStore
     private val json = Json { ignoreUnknownKeys = true }
-    private val diagnosticsConsentMirror = DiagnosticsConsentMirror(context)
 
     companion object {
         val TUN_NAME = stringPreferencesKey("tun_name")

@@ -133,7 +133,7 @@ class ProviderGeoDataManager(
         }
     }
 
-    internal suspend fun resolve(rules: List<RoutingRule>): ProviderGeoDataResolution = withContext(ioDispatcher) {
+    suspend fun resolve(rules: List<RoutingRule>): ProviderGeoDataResolution = withContext(ioDispatcher) {
         if (rules.none { it.geoData != null }) {
             _state.update { it.copy(activeUnavailableUrls = emptySet()) }
             return@withContext ProviderGeoDataResolution(rules)
