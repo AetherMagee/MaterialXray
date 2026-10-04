@@ -799,7 +799,7 @@ class XrayService(
             server = config,
             runtimeSettings = effectiveRuntimeSettings,
             establishVpnInterface = {
-                setupVpnInterface(effectiveRuntimeSettings, requireNotNull(rootlessNetworkPlan))
+                setupVpnInterface(effectiveRuntimeSettings, requireNotNull(rootlessNetworkPlan))?.fd
             },
             syntheticDnsAddress = rootlessNetworkPlan?.syntheticDnsAddress,
             transitionState = transitionState,

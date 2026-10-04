@@ -1,6 +1,5 @@
 package com.material.xray.service
 
-import android.os.ParcelFileDescriptor
 import com.material.xray.core.xray.XRAY_API_SOCKET_NAME_PREFIX
 import com.material.xray.core.xray.XrayApiEndpoint
 import kotlinx.coroutines.CoroutineDispatcher
@@ -55,14 +54,14 @@ internal interface XrayRuntimeStrategy : XrayRuntimeProcess {
     suspend fun prepareLogFile()
 
     /**
-     * Launches the core. [vpnInterface] stays owned by the caller, so an implementation that needs
+     * Launches the core. [vpnInterfaceFd] stays owned by the caller, so an implementation that needs
      * it must not suspend before the descriptor has been handed to the child. [tun] is the TUN
      * interface a root-managed core creates for itself; the rootless core is handed its interface
      * instead.
      */
     suspend fun startProcess(
         binDir: String,
-        vpnInterface: ParcelFileDescriptor?,
+        vpnInterfaceFd: Int?,
         primaryGid: Int? = null,
         tun: RootTunDevice? = null,
     ): Int
@@ -100,7 +99,7 @@ internal class RootXrayRuntimeStrategy(
 
     override suspend fun startProcess(
         binDir: String,
-        vpnInterface: ParcelFileDescriptor?,
+        vpnInterfaceFd: Int?,
         primaryGid: Int?,
         tun: RootTunDevice?,
     ): Int = processSupervisor.start(binDir, primaryGid, tun)
@@ -152,7 +151,7 @@ internal class VpnServiceXrayRuntimeStrategy(
     // The caller still owns the descriptor, so it is handed over without suspending first.
     override suspend fun startProcess(
         binDir: String,
-        vpnInterface: ParcelFileDescriptor?,
+        vpnInterfaceFd: Int?,
         primaryGid: Int?,
         tun: RootTunDevice?,
     ): Int {
@@ -160,7 +159,7 @@ internal class VpnServiceXrayRuntimeStrategy(
         require(tun == null) { "A rootless runtime cannot create its own TUN interface" }
         return processSupervisor.start(
             binDir = binDir,
-            tunFd = requireNotNull(vpnInterface) { "A rootless runtime cannot start without a tunnel" }.fd,
+            tunFd = requireNotNull(vpnInterfaceFd) { "A rootless runtime cannot start without a tunnel" },
         )
     }
 

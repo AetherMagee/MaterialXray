@@ -1,10 +1,8 @@
 package com.material.xray.service
 
-import android.os.ParcelFileDescriptor
 import com.material.xray.core.common.connection.ConnectionStateCoordinator
 import com.material.xray.core.common.log.LogBuffer
 import com.material.xray.core.common.log.LogSource
-import com.material.xray.core.ui.R
 import com.material.xray.core.xray.ConfigGenerator
 import com.material.xray.core.xray.OtherVpnDns
 import com.material.xray.core.xray.PROTECTED_FROM_VPN_MARK
@@ -121,7 +119,7 @@ internal class ConnectionManager(
     suspend fun connect(
         server: ServerConfig,
         runtimeSettings: XrayRuntimeSettings,
-        establishVpnInterface: suspend () -> ParcelFileDescriptor? = { null },
+        establishVpnInterface: suspend () -> Int? = { null },
         syntheticDnsAddress: String? = null,
         transitionState: ConnectionState = ConnectionState.Connecting,
         preparation: ConnectionPreparation = ConnectionPreparation.Full,
@@ -234,7 +232,7 @@ internal class ConnectionManager(
                 ) ?: run {
                     val error = stateCoordinator.state.value as? ConnectionState.Error
                     fail(
-                        error?.message ?: environment.localizedString(R.string.connection_error_vpn_permission_required),
+                        error?.message ?: environment.describe(ConnectionError.VpnPermissionRequired),
                         retryable = error?.retryable ?: false,
                     )
                     return
@@ -250,7 +248,7 @@ internal class ConnectionManager(
             )
 
             if (pid <= 0) {
-                fail(environment.localizedString(R.string.connection_error_missing_process_id))
+                fail(environment.describe(ConnectionError.MissingProcessId))
                 return
             }
             runtimeState = XrayRuntimeState.Active(
@@ -272,13 +270,13 @@ internal class ConnectionManager(
             withContext(NonCancellable) { cleanCancelledConnectionAttempt() }
             throw error
         } catch (error: IOException) {
-            fail(error.message ?: environment.localizedString(R.string.error_unknown))
+            fail(error.message ?: environment.describe(ConnectionError.Unknown))
         } catch (error: SecurityException) {
-            fail(error.message ?: environment.localizedString(R.string.error_unknown))
+            fail(error.message ?: environment.describe(ConnectionError.Unknown))
         } catch (error: IllegalArgumentException) {
-            fail(error.message ?: environment.localizedString(R.string.error_unknown))
+            fail(error.message ?: environment.describe(ConnectionError.Unknown))
         } catch (error: IllegalStateException) {
-            fail(error.message ?: environment.localizedString(R.string.error_unknown))
+            fail(error.message ?: environment.describe(ConnectionError.Unknown))
         }
     }
 
@@ -316,7 +314,7 @@ internal class ConnectionManager(
                     ),
                 )
                 if (!cleaned) {
-                    fail(environment.localizedString(R.string.connection_error_cleanup_failed), cleanState = false)
+                    fail(environment.describe(ConnectionError.CleanupFailed), cleanState = false)
                     return null
                 }
             }
@@ -346,7 +344,7 @@ internal class ConnectionManager(
                 log.append(LogSource.APP, "Selected available TUN interface name $selectedName")
             } ?: run {
                 fail(
-                    environment.localizedString(R.string.connection_error_tun_name_detection),
+                    environment.describe(ConnectionError.TunNameDetection),
                     cleanState = false,
                 )
                 return null
@@ -429,7 +427,7 @@ internal class ConnectionManager(
             ),
         )
         if (!rootGranted) {
-            fail(environment.localizedString(R.string.connection_error_root_access_denied))
+            fail(environment.describe(ConnectionError.RootAccessDenied))
             return false
         }
         log.append(
@@ -454,7 +452,7 @@ internal class ConnectionManager(
     private suspend fun prepareRootApiAccess(endpoint: XrayApiEndpoint): Boolean {
         if (endpoint !is XrayApiEndpoint.LoopbackTcp) return true
         if (rootRuntime.protectLoopbackApi(endpoint.port, environment.appUid)) return true
-        fail(environment.localizedString(R.string.connection_error_secure_xray_api))
+        fail(environment.describe(ConnectionError.SecureXrayApi))
         return false
     }
 
@@ -501,7 +499,7 @@ internal class ConnectionManager(
             strategy.prepareBinary(verifyAvailable = false)
         }
         if (activeBinaryPath == null) {
-            fail(environment.localizedString(R.string.connection_error_xray_binary_not_found))
+            fail(environment.describe(ConnectionError.XrayBinaryNotFound))
             return null
         }
         log.append(LogSource.APP, "xray binary ready at $activeBinaryPath")
@@ -578,7 +576,7 @@ internal class ConnectionManager(
             ),
         )
         if (route == null) {
-            fail(environment.localizedString(R.string.connection_error_physical_route_not_found))
+            fail(environment.describe(ConnectionError.PhysicalRouteNotFound))
             return PhysicalRouteResult(success = false, route = null)
         }
         log.append(
@@ -616,7 +614,7 @@ internal class ConnectionManager(
         )
         if (resolvedServer.attempted && resolvedServer.selectedAddress == null) {
             val unresolvedHost = resolvedServer.unresolvedHosts.firstOrNull() ?: server.address
-            fail(environment.localizedString(R.string.connection_error_server_address_unresolved, unresolvedHost))
+            fail(environment.describe(ConnectionError.ServerAddressUnresolved(unresolvedHost)))
             return null
         }
         if (resolvedServer.server.bootstrapDnsHosts.isNotEmpty()) {
@@ -819,7 +817,7 @@ internal class ConnectionManager(
 
     private suspend fun startXrayProcess(
         strategy: XrayRuntimeStrategy,
-        vpnInterface: ParcelFileDescriptor?,
+        vpnInterface: Int?,
         primaryGid: Int? = null,
         tun: RootTunDevice? = null,
     ): Int {
@@ -833,7 +831,7 @@ internal class ConnectionManager(
                 action = {
                     strategy.startProcess(
                         binDir = environment.binDir,
-                        vpnInterface = vpnInterface,
+                        vpnInterfaceFd = vpnInterface,
                         primaryGid = primaryGid,
                         tun = tun,
                     )
@@ -939,7 +937,7 @@ internal class ConnectionManager(
                 if (!verification.success) {
                     diagnostics.logTproxyDiagnostics("tproxy-health-failure", tproxyPlan.runtimeState, pid)
                     log.append(LogSource.APP, "ERROR: ${verification.error}")
-                    fail(environment.localizedString(R.string.connection_error_tproxy_health_check))
+                    fail(environment.describe(ConnectionError.TproxyHealthCheck))
                     return@coroutineScope false
                 }
                 lastTproxyAuditAt = environment.elapsedRealtime()
@@ -1002,7 +1000,7 @@ internal class ConnectionManager(
             ),
         )
         if (!removed) {
-            fail(environment.localizedString(R.string.connection_error_cleanup_failed))
+            fail(environment.describe(ConnectionError.CleanupFailed))
             return false
         }
         transitionGuardInstalled = false
@@ -1015,10 +1013,7 @@ internal class ConnectionManager(
 
     private suspend fun failRouting(result: TunManager.RoutingResult) {
         fail(
-            environment.localizedString(
-                R.string.connection_error_apply_ip_routing,
-                result.error ?: environment.localizedString(R.string.error_unknown),
-            ),
+            environment.describe(ConnectionError.ApplyIpRouting(result.error)),
         )
     }
 
@@ -1031,11 +1026,11 @@ internal class ConnectionManager(
         val stage = if (tunSetup.processExited) "$diagnosticsStage-exit" else "$diagnosticsStage-failure"
         diagnostics.logNamespaceDiagnostics(stage = stage, tunName = tunName, xrayPid = pid)
         if (tunSetup.processExited) {
-            fail(environment.localizedString(R.string.connection_error_xray_crashed, readCrashReason()))
+            fail(environment.describe(ConnectionError.XrayCrashed(readCrashReason())))
         } else {
             fail(
                 tunSetup.error
-                    ?: environment.localizedString(R.string.connection_error_tun_timeout, tunName),
+                    ?: environment.describe(ConnectionError.TunTimeout(tunName)),
             )
         }
     }
@@ -1086,10 +1081,7 @@ internal class ConnectionManager(
         )
         if (!routingResult.success) {
             fail(
-                environment.localizedString(
-                    R.string.connection_error_apply_ip_routing,
-                    routingResult.error ?: environment.localizedString(R.string.error_unknown),
-                ),
+                environment.describe(ConnectionError.ApplyIpRouting(routingResult.error)),
             )
             return false
         }
@@ -1124,18 +1116,18 @@ internal class ConnectionManager(
     private suspend fun finishXrayApiReadiness(readiness: XrayApiReadiness): Boolean = when (readiness) {
         XrayApiReadiness.Ready -> true
         XrayApiReadiness.ProcessExited -> {
-            fail(environment.localizedString(R.string.connection_error_xray_crashed, readCrashReason()))
+            fail(environment.describe(ConnectionError.XrayCrashed(readCrashReason())))
             false
         }
         XrayApiReadiness.TimedOut -> {
-            fail(environment.localizedString(R.string.connection_error_xray_api_not_ready))
+            fail(environment.describe(ConnectionError.XrayApiNotReady))
             false
         }
     }
 
     private suspend fun ensureProcessAliveAfterSetup(pid: Int): Boolean {
         if (isProcessAlive(pid)) return true
-        fail(environment.localizedString(R.string.connection_error_xray_crashed, readCrashReason()))
+        fail(environment.describe(ConnectionError.XrayCrashed(readCrashReason())))
         return false
     }
 
@@ -1571,7 +1563,7 @@ internal class ConnectionManager(
             },
         )
         if (!cleaned) {
-            stateCoordinator.markError(environment.localizedString(R.string.connection_error_cleanup_failed))
+            stateCoordinator.markError(environment.describe(ConnectionError.CleanupFailed))
             return false
         }
         if (!preserveTproxyGuard) {
@@ -1643,7 +1635,7 @@ internal class ConnectionManager(
         if (rootRuntimeKnownClean) cleanup.recordKnownCleanState()
         runtimeState = XrayRuntimeState.Inactive
         activeGeneratedConfig = null
-        if (!cleaned) stateCoordinator.markError(environment.localizedString(R.string.connection_error_cleanup_failed))
+        if (!cleaned) stateCoordinator.markError(environment.describe(ConnectionError.CleanupFailed))
         return cleaned
     }
 
@@ -1663,12 +1655,12 @@ internal class ConnectionManager(
         var finalMessage = message
         if (cleanState) {
             if (!releaseStartedRuntime(preserveGuardOnFailure)) {
-                finalMessage = environment.localizedString(R.string.connection_error_cleanup_failed)
+                finalMessage = environment.describe(ConnectionError.CleanupFailed)
                 log.append(LogSource.APP, "ERROR: $finalMessage")
             }
             if (transitionGuardInstalled && !preserveGuardOnFailure) {
                 if (!tproxyGateway.removeGuard()) {
-                    finalMessage = environment.localizedString(R.string.connection_error_cleanup_failed)
+                    finalMessage = environment.describe(ConnectionError.CleanupFailed)
                     log.append(LogSource.APP, "ERROR: $finalMessage")
                 } else {
                     transitionGuardInstalled = false

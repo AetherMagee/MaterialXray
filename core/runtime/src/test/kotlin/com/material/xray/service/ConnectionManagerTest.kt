@@ -2,7 +2,6 @@ package com.material.xray.service
 
 import com.material.xray.core.common.connection.ConnectionStateCoordinator
 import com.material.xray.core.common.log.LogBuffer
-import com.material.xray.core.ui.R
 import com.material.xray.core.xray.ConfigGenerator
 import com.material.xray.core.xray.GeoDataStatus
 import com.material.xray.core.xray.OtherVpnDns
@@ -27,6 +26,7 @@ import com.material.xray.model.ServerConfig
 import com.material.xray.model.XrayLogLevel
 import com.material.xray.model.XrayOutbound
 import com.material.xray.model.XrayRuntimeSettings
+import kotlin.reflect.KClass
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
@@ -54,7 +54,7 @@ class ConnectionManagerTest {
         assertEquals(0, harness.rootProcess.startCalls)
         assertEquals(0, harness.userProcess.stopCalls)
         assertEquals(
-            ConnectionState.Error(harness.environment.message(R.string.connection_error_xray_binary_not_found)),
+            ConnectionState.Error(harness.environment.message(ConnectionError.XrayBinaryNotFound::class)),
             harness.stateCoordinator.state.value,
         )
     }
@@ -72,7 +72,7 @@ class ConnectionManagerTest {
         assertEquals(1, harness.cleanup.cleanCalls)
         assertEquals(0, harness.tunGateway.applyCalls)
         assertEquals(
-            ConnectionState.Error(harness.environment.message(R.string.connection_error_xray_crashed)),
+            ConnectionState.Error(harness.environment.message(ConnectionError.XrayCrashed::class)),
             harness.stateCoordinator.state.value,
         )
     }
@@ -88,7 +88,7 @@ class ConnectionManagerTest {
         assertEquals(1, harness.tunGateway.applyCalls)
         assertEquals(1, harness.cleanup.cleanCalls)
         assertEquals(
-            ConnectionState.Error(harness.environment.message(R.string.connection_error_apply_ip_routing)),
+            ConnectionState.Error(harness.environment.message(ConnectionError.ApplyIpRouting::class)),
             harness.stateCoordinator.state.value,
         )
     }
@@ -172,7 +172,7 @@ class ConnectionManagerTest {
 
         assertFalse(disconnected)
         assertEquals(
-            ConnectionState.Error(harness.environment.message(R.string.connection_error_cleanup_failed)),
+            ConnectionState.Error(harness.environment.message(ConnectionError.CleanupFailed::class)),
             harness.stateCoordinator.state.value,
         )
         assertEquals(42, harness.stateStore.state?.xrayPid)
@@ -187,7 +187,7 @@ class ConnectionManagerTest {
 
         assertEquals(0, harness.rootProcess.startCalls)
         assertEquals(
-            ConnectionState.Error(harness.environment.message(R.string.connection_error_cleanup_failed)),
+            ConnectionState.Error(harness.environment.message(ConnectionError.CleanupFailed::class)),
             harness.stateCoordinator.state.value,
         )
     }
@@ -871,7 +871,7 @@ class ConnectionManagerTest {
         harness.manager.connect(server(), runtimeSettings(), preparation = ConnectionPreparation.ReusePreparedRuntime)
 
         assertEquals(
-            ConnectionState.Error(harness.environment.message(R.string.connection_error_xray_api_not_ready)),
+            ConnectionState.Error(harness.environment.message(ConnectionError.XrayApiNotReady::class)),
             harness.stateCoordinator.state.value,
         )
         assertEquals(1, harness.cleanup.cleanCalls)
@@ -896,7 +896,7 @@ class ConnectionManagerTest {
         assertEquals(1, harness.tunGateway.applyCalls)
         assertEquals(1, harness.cleanup.cleanCalls)
         assertEquals(
-            ConnectionState.Error(harness.environment.message(R.string.connection_error_xray_crashed)),
+            ConnectionState.Error(harness.environment.message(ConnectionError.XrayCrashed::class)),
             harness.stateCoordinator.state.value,
         )
     }
@@ -1035,7 +1035,7 @@ class ConnectionManagerTest {
         assertEquals(0, harness.rootProcess.startCalls)
         assertEquals(1, harness.cleanup.cleanCalls)
         assertEquals(
-            ConnectionState.Error(harness.environment.message(R.string.connection_error_secure_xray_api)),
+            ConnectionState.Error(harness.environment.message(ConnectionError.SecureXrayApi::class)),
             harness.stateCoordinator.state.value,
         )
     }
@@ -1151,7 +1151,7 @@ class ConnectionManagerTest {
         assertNull(harness.stateStore.state)
         assertEquals(
             ConnectionState.Error(
-                harness.environment.message(R.string.connection_error_vpn_permission_required),
+                harness.environment.message(ConnectionError.VpnPermissionRequired::class),
                 retryable = false,
             ),
             harness.stateCoordinator.state.value,
@@ -1236,9 +1236,9 @@ class ConnectionManagerTest {
             clock += durationMs
         }
 
-        override fun localizedString(resourceId: Int, vararg arguments: Any): String = message(resourceId)
+        override fun describe(error: ConnectionError): String = message(error::class)
 
-        fun message(resourceId: Int): String = "message:$resourceId"
+        fun message(error: KClass<out ConnectionError>): String = "message:${error.simpleName}"
 
         var vpnDns: OtherVpnDns? = null
         override fun otherVpnDns(): OtherVpnDns? = vpnDns

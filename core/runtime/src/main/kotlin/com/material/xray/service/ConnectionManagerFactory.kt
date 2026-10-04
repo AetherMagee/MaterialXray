@@ -71,7 +71,7 @@ internal interface ConnectionEnvironment {
 
     fun allocateLoopbackApiPort(): Int
     fun elapsedRealtime(): Long
-    fun localizedString(@StringRes resourceId: Int, vararg arguments: Any): String
+    fun describe(error: ConnectionError): String
 
     /** The private DNS zone of a VPN another app runs; root mode never owns a VPN itself. */
     fun otherVpnDns(): OtherVpnDns?
@@ -100,7 +100,28 @@ internal class AndroidConnectionEnvironment(
 
     override fun elapsedRealtime(): Long = SystemClock.elapsedRealtime()
 
-    override fun localizedString(resourceId: Int, vararg arguments: Any): String = context.localizedString(resourceId, *arguments)
+    override fun describe(error: ConnectionError): String = when (error) {
+        ConnectionError.Unknown -> localized(R.string.error_unknown)
+        ConnectionError.VpnPermissionRequired -> localized(R.string.connection_error_vpn_permission_required)
+        ConnectionError.MissingProcessId -> localized(R.string.connection_error_missing_process_id)
+        ConnectionError.CleanupFailed -> localized(R.string.connection_error_cleanup_failed)
+        ConnectionError.TunNameDetection -> localized(R.string.connection_error_tun_name_detection)
+        ConnectionError.RootAccessDenied -> localized(R.string.connection_error_root_access_denied)
+        ConnectionError.SecureXrayApi -> localized(R.string.connection_error_secure_xray_api)
+        ConnectionError.XrayBinaryNotFound -> localized(R.string.connection_error_xray_binary_not_found)
+        ConnectionError.PhysicalRouteNotFound -> localized(R.string.connection_error_physical_route_not_found)
+        is ConnectionError.ServerAddressUnresolved -> localized(R.string.connection_error_server_address_unresolved, error.host)
+        ConnectionError.TproxyHealthCheck -> localized(R.string.connection_error_tproxy_health_check)
+        is ConnectionError.ApplyIpRouting -> localized(
+            R.string.connection_error_apply_ip_routing,
+            error.detail ?: localized(R.string.error_unknown),
+        )
+        is ConnectionError.XrayCrashed -> localized(R.string.connection_error_xray_crashed, error.reason)
+        is ConnectionError.TunTimeout -> localized(R.string.connection_error_tun_timeout, error.tunName)
+        ConnectionError.XrayApiNotReady -> localized(R.string.connection_error_xray_api_not_ready)
+    }
+
+    private fun localized(@StringRes resourceId: Int, vararg arguments: Any): String = context.localizedString(resourceId, *arguments)
 
     override fun otherVpnDns(): OtherVpnDns? {
         val (netId, linkProperties) = newestVpn() ?: return null
