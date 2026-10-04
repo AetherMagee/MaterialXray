@@ -1,6 +1,6 @@
 package com.material.xray.core.xray
 
-import com.material.xray.model.isIpv6DnsServerLiteral
+import com.material.xray.core.model.isIpv6DnsServerLiteral
 
 /**
  * The private DNS zone another app's VPN publishes, such as Tailscale's MagicDNS: its search

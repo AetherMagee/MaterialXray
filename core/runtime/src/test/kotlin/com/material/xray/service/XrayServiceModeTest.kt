@@ -1,10 +1,11 @@
 package com.material.xray.service
 
+import com.material.xray.core.connection.VPN_SERVICE_INTERFACE_LABEL
+import com.material.xray.core.model.PingMethod
+import com.material.xray.core.model.RootConnectionBackend
 import com.material.xray.core.xray.TproxyCompatibility
 import com.material.xray.core.xray.XrayState
 import com.material.xray.core.xray.XrayStateReadResult
-import com.material.xray.model.PingMethod
-import com.material.xray.model.RootConnectionBackend
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse

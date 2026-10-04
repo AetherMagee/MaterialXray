@@ -1,6 +1,6 @@
 package com.material.xray.core.xray
 
-import com.material.xray.model.XrayLogLevel
+import com.material.xray.core.model.XrayLogLevel
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 

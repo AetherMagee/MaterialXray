@@ -1,11 +1,11 @@
 package com.material.xray.core.xray
 
-import com.material.xray.model.ProfileRoutingOverride
-import com.material.xray.model.Protocol
-import com.material.xray.model.RoutingRuleCatalog
-import com.material.xray.model.ServerConfig
-import com.material.xray.model.XrayLogLevel
-import com.material.xray.model.XrayOutbound
+import com.material.xray.core.model.ProfileRoutingOverride
+import com.material.xray.core.model.Protocol
+import com.material.xray.core.model.RoutingRuleCatalog
+import com.material.xray.core.model.ServerConfig
+import com.material.xray.core.model.XrayLogLevel
+import com.material.xray.core.model.XrayOutbound
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.boolean

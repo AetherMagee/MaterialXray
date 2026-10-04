@@ -1,6 +1,6 @@
 package com.material.xray.core.network
 
-import com.material.xray.core.process.RedirectedProcess
+import com.material.xray.core.root.process.RedirectedProcess
 import com.material.xray.core.xray.LocalSockets
 import com.material.xray.core.xray.XrayBinary
 import com.material.xray.core.xray.XrayInbound

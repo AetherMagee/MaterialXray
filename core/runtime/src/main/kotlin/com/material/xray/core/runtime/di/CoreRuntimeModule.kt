@@ -4,5 +4,5 @@ import org.koin.core.annotation.ComponentScan
 import org.koin.core.annotation.Module
 
 @Module
-@ComponentScan("com.material.xray.service", "com.material.xray.core.xray")
+@ComponentScan("com.material.xray.core.runtime", "com.material.xray.service")
 class CoreRuntimeModule

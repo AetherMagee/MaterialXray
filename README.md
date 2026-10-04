@@ -134,7 +134,7 @@ The script verifies the published SHA-256 digests of the Android builds, preserv
 
 ### Project layout
 
-Kotlin packages are unchanged across modules; only the Gradle module boundaries and Android namespaces differ.
+Kotlin packages follow the modules (`:core:xray` is `com.material.xray.core.xray`), except the service, tile, boot receiver and workers, which stay in `com.material.xray.service` because Android and WorkManager persist their class names.
 
 ```text
 build-logic/        Gradle convention plugins shared by every module

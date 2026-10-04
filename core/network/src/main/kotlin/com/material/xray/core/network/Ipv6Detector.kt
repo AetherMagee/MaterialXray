@@ -5,14 +5,14 @@ import com.material.xray.core.common.log.LogBuffer
 import com.material.xray.core.common.log.LogSource
 import com.material.xray.core.common.platform.MonotonicClock
 import com.material.xray.core.common.platform.elapsedMillis
+import com.material.xray.core.model.ServerConfig
+import com.material.xray.core.model.proxyOutboundCount
 import com.material.xray.core.xray.PlatformDns
 import com.material.xray.core.xray.ServerAddressResolver
 import com.material.xray.core.xray.XrayInbound
 import com.material.xray.core.xray.buildDns
 import com.material.xray.core.xray.buildProxyOutbound
 import com.material.xray.core.xray.toJson
-import com.material.xray.model.ServerConfig
-import com.material.xray.model.proxyOutboundCount
 import java.net.Inet6Address
 import java.net.InetAddress
 import java.net.Proxy

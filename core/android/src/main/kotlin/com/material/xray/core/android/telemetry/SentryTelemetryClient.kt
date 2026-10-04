@@ -2,10 +2,10 @@ package com.material.xray.core.android.telemetry
 
 import android.content.Context
 import android.content.pm.ApplicationInfo
-import com.material.xray.telemetry.TelemetryClient
-import com.material.xray.telemetry.TelemetrySpan
-import com.material.xray.telemetry.TelemetryStatus
-import com.material.xray.telemetry.TelemetryTransaction
+import com.material.xray.core.telemetry.TelemetryClient
+import com.material.xray.core.telemetry.TelemetrySpan
+import com.material.xray.core.telemetry.TelemetryStatus
+import com.material.xray.core.telemetry.TelemetryTransaction
 import io.sentry.Breadcrumb
 import io.sentry.Sentry
 import io.sentry.SentryEvent

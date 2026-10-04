@@ -2,14 +2,14 @@ package com.material.xray.core.network
 
 import com.material.xray.core.common.log.xrayTimestampPrefix
 import com.material.xray.core.common.platform.MonotonicClock
+import com.material.xray.core.model.PingMethod
+import com.material.xray.core.model.ServerConfig
 import com.material.xray.core.xray.PlatformDns
 import com.material.xray.core.xray.ServerAddressResolver
 import com.material.xray.core.xray.XrayInbound
 import com.material.xray.core.xray.buildDns
 import com.material.xray.core.xray.buildProxyOutbound
 import com.material.xray.core.xray.toJson
-import com.material.xray.model.PingMethod
-import com.material.xray.model.ServerConfig
 import java.io.File
 import java.net.InetSocketAddress
 import java.net.Socket

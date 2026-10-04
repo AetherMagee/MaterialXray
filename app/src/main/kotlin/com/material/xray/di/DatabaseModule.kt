@@ -3,8 +3,8 @@ package com.material.xray.di
 import android.content.Context
 import androidx.room.Room
 import androidx.sqlite.driver.AndroidSQLiteDriver
-import com.material.xray.data.db.AppDatabase
-import com.material.xray.data.db.DatabaseMigrations
+import com.material.xray.core.database.AppDatabase
+import com.material.xray.core.database.DatabaseMigrations
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import org.koin.core.annotation.Module

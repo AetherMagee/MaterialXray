@@ -1,7 +1,6 @@
 package com.material.xray.core.android.xray
 
 import android.net.LocalSocketAddress
-import com.material.xray.core.xray.AndroidLocalSocketFactory
 import com.material.xray.core.xray.LocalSockets
 import javax.net.SocketFactory
 import org.koin.core.annotation.Singleton

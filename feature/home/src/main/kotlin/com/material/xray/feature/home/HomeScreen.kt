@@ -1,0 +1,3221 @@
+package com.material.xray.feature.home
+
+import android.Manifest
+import android.content.ActivityNotFoundException
+import android.content.ClipboardManager
+import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.net.VpnService
+import android.provider.Settings
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.StringRes
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateBounds
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.LocalIndication
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.indication
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.TextAutoSize
+import androidx.compose.foundation.text.input.TextFieldLineLimits
+import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.foundation.text.input.rememberTextFieldState
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.RestartAlt
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.SystemUpdate
+import androidx.compose.material.icons.outlined.Dns
+import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.NetworkPing
+import androidx.compose.material.icons.outlined.Shield
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButtonDefaults
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberTopAppBarState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.Stable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.SnapshotStateList
+import androidx.compose.runtime.toMutableStateList
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.InputMode
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.LookaheadScope
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalInputModeManager
+import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.text.LinkInteractionListener
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLinkStyles
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.zIndex
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
+import com.material.xray.core.common.connection.ConnectionEvent
+import com.material.xray.core.data.repository.ProviderRoutingAvailability
+import com.material.xray.core.database.entity.ServerEntity
+import com.material.xray.core.database.entity.SubscriptionEntity
+import com.material.xray.core.model.AppUpdate
+import com.material.xray.core.model.ConnectionProgress
+import com.material.xray.core.model.ConnectionState
+import com.material.xray.core.model.PingMethod
+import com.material.xray.core.model.RoutingPolicyControl
+import com.material.xray.core.model.ServerConfig
+import com.material.xray.core.model.SessionTrafficMetrics
+import com.material.xray.core.model.SubscriptionUserAgentMode
+import com.material.xray.core.runtime.AppUpdateInstallProgress
+import com.material.xray.core.runtime.AppUpdateInstallStage
+import com.material.xray.core.ui.R
+import com.material.xray.core.ui.adaptive.SinglePaneMaxWidth
+import com.material.xray.core.ui.adaptive.TwoPaneMinWidth
+import com.material.xray.core.ui.components.AnimatedDropdownMenu
+import com.material.xray.core.ui.components.DropdownOption
+import com.material.xray.core.ui.components.ExpansionArrow
+import com.material.xray.core.ui.components.FadingOutlinedTextField as OutlinedTextField
+import com.material.xray.core.ui.components.ReadOnlyDropdownField
+import com.material.xray.core.ui.components.ScrolledTopAppBar
+import com.material.xray.core.ui.components.SelectableOptionRow
+import com.material.xray.core.ui.components.SettingsSwitchRow
+import com.material.xray.core.ui.components.TooltipIconButton
+import com.material.xray.core.ui.components.rememberSystemState
+import com.material.xray.core.ui.text.descriptionResource
+import com.material.xray.core.ui.text.labelResource
+import java.util.Locale
+import kotlin.math.roundToInt
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.StateFlow
+import org.koin.compose.viewmodel.koinViewModel
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun HomeScreen(
+    showTitleBarLogo: Boolean,
+    floatingConnectButton: Boolean,
+    pendingSubscriptionLink: String?,
+    onSubscriptionLinkHandled: () -> Unit,
+    onOpenServerConfig: (Long, String) -> Unit,
+    onViewRunningConfig: () -> Unit,
+    addSubscriptionFocusRequester: FocusRequester,
+    viewModel: HomeViewModel = koinViewModel(),
+) {
+    val uiState = collectHomeUiState(viewModel)
+    val connectionUiState = buildConnectionUiState(
+        connectionState = uiState.connectionState,
+        selectedServer = uiState.selectedServer,
+        alwaysOnVpn = uiState.alwaysOnVpn,
+    )
+
+    LaunchedEffect(pendingSubscriptionLink) {
+        pendingSubscriptionLink?.let {
+            onSubscriptionLinkHandled()
+            viewModel.addLink(it)
+        }
+    }
+
+    var showAddDialog by rememberSaveable { mutableStateOf(false) }
+    var showQrScanner by remember { mutableStateOf(false) }
+    var keepQrScannerDialog by remember { mutableStateOf(false) }
+    var editingSubscriptionId by rememberSaveable { mutableStateOf<Long?>(null) }
+    val editingSubscription = uiState.subscriptions?.find { it.id == editingSubscriptionId }
+    // Drop a parked edit id once the loaded list no longer contains it, so a later subscription
+    // that happens to reuse the row id does not spontaneously reopen the edit dialog. A null list
+    // means the data has not loaded yet and cannot say anything about the id.
+    LaunchedEffect(uiState.subscriptions, editingSubscriptionId) {
+        val id = editingSubscriptionId ?: return@LaunchedEffect
+        val subscriptions = uiState.subscriptions ?: return@LaunchedEffect
+        if (subscriptions.none { it.id == id }) {
+            editingSubscriptionId = null
+        }
+    }
+    var removeSubscriptionRequest by remember { mutableStateOf<Pair<SubscriptionEntity, Int>?>(null) }
+    var showRootFallbackDialog by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val collapsedSubscriptionIds = remember(context) {
+        context.collapsedSubscriptionIds().toMutableStateList()
+    }
+    val subscriptionOrder = remember(uiState.subscriptions?.map { it.id }) {
+        uiState.subscriptions.orEmpty().map { it.id }.toMutableStateList()
+    }
+    val subscriptionFocus = remember(addSubscriptionFocusRequester) {
+        SubscriptionFocusRequesters(afterLast = addSubscriptionFocusRequester)
+    }
+    LaunchedEffect(uiState.subscriptions, subscriptionFocus.pendingRemoval) {
+        subscriptionFocus.focusAfterRemoval(uiState.subscriptions)
+    }
+    val removeSubscription = { subscription: SubscriptionEntity ->
+        subscriptionFocus.onRemoving(subscription.id, subscriptionOrder)
+        viewModel.deleteSubscription(subscription)
+    }
+    val listState = rememberLazyListState()
+    val hapticFeedback = LocalHapticFeedback.current
+    var draggingSubscriptionId by remember { mutableStateOf<Long?>(null) }
+    var dragOffsetY by remember { mutableFloatStateOf(0f) }
+    val subscriptionSpacingPx = with(LocalDensity.current) { 10.dp.toPx() }
+    val finishSubscriptionDrag = {
+        persistSubscriptionOrderIfChanged(
+            draggingSubscriptionId,
+            subscriptionOrder,
+            uiState.subscriptions.orEmpty(),
+            viewModel::reorderSubscriptions,
+        )
+        draggingSubscriptionId = null
+        dragOffsetY = 0f
+    }
+    LaunchedEffect(uiState.subscriptions) {
+        val currentIds = uiState.subscriptions?.mapTo(mutableSetOf()) { it.id } ?: return@LaunchedEffect
+        if (collapsedSubscriptionIds.removeAll { it !in currentIds }) {
+            context.setCollapsedSubscriptionIds(collapsedSubscriptionIds)
+        }
+    }
+    val unableToFetchLinkText = stringResource(R.string.home_unable_to_fetch_link)
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val topAppBarScrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
+    val vpnPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult(),
+    ) { result ->
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
+            viewModel.connect()
+        }
+    }
+    val openQrScanner = QrScannerPermissionGate { showQrScanner = true }
+    val startRootlessConnection = {
+        val vpnPermissionIntent = VpnService.prepare(context)
+        if (vpnPermissionIntent != null) {
+            vpnPermissionLauncher.launch(vpnPermissionIntent)
+        } else {
+            viewModel.connect()
+        }
+    }
+    val pasteFromClipboard = {
+        val link = context.clipboardText()
+        if (link == null) {
+            Toast.makeText(context, unableToFetchLinkText, Toast.LENGTH_SHORT).show()
+        } else {
+            viewModel.addLink(link)
+        }
+    }
+    LaunchedEffect(viewModel) {
+        viewModel.refreshTunnelInterfaceState()
+        viewModel.checkForAppUpdateIfDue()
+    }
+
+    LaunchedEffect(viewModel, lifecycleOwner) {
+        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            viewModel.connectionEvents.collect { event ->
+                when (event) {
+                    ConnectionEvent.RootUnavailableFallback -> showRootFallbackDialog = true
+                }
+            }
+        }
+    }
+
+    LaunchedEffect(viewModel, lifecycleOwner) {
+        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            viewModel.uiEvents.collect { event ->
+                when (event) {
+                    is HomeUiEvent.Toast -> Toast.makeText(context, event.message, Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+
+    LaunchedEffect(showQrScanner) {
+        if (showQrScanner) {
+            keepQrScannerDialog = true
+        } else {
+            delay(QR_SCANNER_TRANSITION_MS.toLong())
+            keepQrScannerDialog = false
+        }
+    }
+
+    DisposableEffect(lifecycleOwner, viewModel) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_RESUME -> {
+                    viewModel.refreshTunnelInterfaceState()
+                    viewModel.resumePendingAppUpdateInstall()
+                }
+                Lifecycle.Event.ON_STOP -> {
+                    showQrScanner = false
+                    keepQrScannerDialog = false
+                }
+                else -> Unit
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
+    val onConnectionClick = {
+        connectionUiState.handleClick(
+            context = context,
+            useRootService = uiState.useRootService,
+            disconnect = viewModel::disconnect,
+            connectRoot = viewModel::connect,
+            connectVpn = startRootlessConnection,
+        )
+    }
+
+    val connectionDetails = ConnectionDetails(
+        connectionState = uiState.connectionState,
+        connectionProgress = uiState.connectionProgress,
+        geoDataDownloadFraction = uiState.geoDataDownloadFraction,
+        showProgressDetails = uiState.showAdvancedOptions,
+        activeBalancer = uiState.activeBalancer,
+        pingMs = viewModel.activeServerPingMs,
+        sessionTraffic = viewModel.sessionTraffic,
+    )
+    val errorMessage = (uiState.connectionState as? ConnectionState.Error)?.message
+    val updateItem: LazyListScope.() -> Unit = {
+        uiState.availableUpdate?.let { update ->
+            item(contentType = "appUpdate") {
+                AppUpdateBanner(
+                    update = update,
+                    installProgress = uiState.appUpdateInstallProgress,
+                    onInstall = { viewModel.installAppUpdate(update) },
+                )
+            }
+        }
+    }
+    val subscriptionItems: LazyListScope.() -> Unit = {
+        val subscriptions = uiState.subscriptions?.associateBy { it.id }
+            ?.let { byId -> subscriptionOrder.mapNotNull(byId::get) }
+        when {
+            // Not loaded yet. The splash screen normally covers this state on cold start; if
+            // loading is unusually slow, a blank list beats a misleading empty-state card.
+            subscriptions == null -> Unit
+            subscriptions.isEmpty() -> item {
+                EmptySubscriptionsCard(
+                    addFocusRequester = addSubscriptionFocusRequester,
+                    onPasteFromClipboard = pasteFromClipboard,
+                    onScanQrCode = openQrScanner,
+                    onAddManually = { showAddDialog = true },
+                )
+            }
+            else -> {
+                items(
+                    items = subscriptions,
+                    key = { it.id },
+                    contentType = { "subscription" },
+                ) { subscription ->
+                    val servers = uiState.serversBySubscription[subscription.id].orEmpty()
+                    val manualRouting = subscription.manualRoutingData(
+                        policy = uiState.routingPolicyControl,
+                        selectedProvider = uiState.providerRoutingAvailability,
+                    )
+                    SubscriptionCard(
+                        modifier = Modifier.subscriptionDragVisual(
+                            subscription.id,
+                            draggingSubscriptionId,
+                            dragOffsetY,
+                        ),
+                        subscription = subscription,
+                        isRefreshing = subscription.id in uiState.refreshingSubscriptionIds,
+                        servers = servers,
+                        selectedServerId = uiState.selectedServerId,
+                        defaultPingMethod = uiState.defaultPingMethod,
+                        showBothLatencyResults = uiState.showBothLatencyResults,
+                        canApplyRouting = manualRouting.appRouting != null || manualRouting.routing != null,
+                        canCollapse = subscriptions.size > 1,
+                        expanded = subscription.id !in collapsedSubscriptionIds,
+                        canReorder = subscriptions.size > 1,
+                        focusRequester = subscriptionFocus.forSubscription(subscription.id),
+                        actions = SubscriptionCardActions(
+                            onDragStart = {
+                                hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                                draggingSubscriptionId = subscription.id
+                                dragOffsetY = 0f
+                            },
+                            onDrag = { delta ->
+                                dragOffsetY = reorderSubscriptionDuringDrag(
+                                    subscriptionOrder,
+                                    listState,
+                                    subscription.id,
+                                    delta,
+                                    dragOffsetY,
+                                    subscriptionSpacingPx,
+                                )
+                            },
+                            onDragFinished = finishSubscriptionDrag,
+                            onExpandedChange = { expanded ->
+                                context.setSubscriptionExpanded(
+                                    collapsedSubscriptionIds,
+                                    subscription.id,
+                                    expanded,
+                                )
+                            },
+                            onDelete = {
+                                if (servers.isEmpty()) {
+                                    removeSubscription(subscription)
+                                } else {
+                                    removeSubscriptionRequest = subscription to servers.size
+                                }
+                            },
+                            onEdit = { editingSubscriptionId = subscription.id },
+                            onRefresh = { viewModel.refreshSubscription(subscription) },
+                            onTestAll = { viewModel.testSubscriptionLatencies(subscription) },
+                            onDefaultPingMethodSelected = { viewModel.setDefaultPingMethod(it) },
+                            onShowBothLatencyResultsChange = viewModel::setShowBothLatencyResults,
+                            onApplyRouting = { viewModel.requestApplySubscriptionRouting(subscription) },
+                            onDescriptionHiddenChange = { hidden ->
+                                viewModel.setSubscriptionDescriptionHidden(subscription.id, hidden)
+                            },
+                            onServerSelected = { viewModel.selectServer(it) },
+                            onTestLatency = { viewModel.testLatency(it) },
+                            onOpenServerConfig = onOpenServerConfig,
+                        ),
+                    )
+                }
+                item(contentType = "addSubscription") {
+                    AddSubscriptionActionButton(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .focusRequester(addSubscriptionFocusRequester),
+                        onPasteFromClipboard = pasteFromClipboard,
+                        onScanQrCode = openQrScanner,
+                        onAddManually = { showAddDialog = true },
+                    )
+                }
+            }
+        }
+    }
+
+    BoxWithConstraints {
+        val screenWidth = maxWidth
+        val twoPane = screenWidth >= TwoPaneMinWidth
+        Scaffold(
+            modifier = Modifier.nestedScroll(topAppBarScrollBehavior.nestedScrollConnection),
+            contentWindowInsets = WindowInsets(0.dp),
+            topBar = {
+                ScrolledTopAppBar(
+                    title = stringResource(R.string.app_name),
+                    scrollBehavior = topAppBarScrollBehavior,
+                    showLogo = showTitleBarLogo,
+                )
+            },
+            floatingActionButton = {
+                // The two-pane layout always has room for the full power button, so the corner
+                // button would only duplicate it.
+                ConnectionFab(
+                    visible = floatingConnectButton && !twoPane,
+                    state = connectionUiState,
+                    canStart = uiState.selectedServer != null,
+                    onClick = onConnectionClick,
+                    onViewConfig = onViewRunningConfig,
+                )
+            },
+        ) { padding ->
+            if (twoPane) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding),
+                ) {
+                    ConnectionPane(
+                        state = connectionUiState,
+                        details = connectionDetails,
+                        errorMessage = errorMessage,
+                        canStart = uiState.selectedServer != null,
+                        onClick = onConnectionClick,
+                        onViewConfig = onViewRunningConfig,
+                        modifier = Modifier
+                            .width((screenWidth * CONNECTION_PANE_WIDTH_FRACTION).coerceIn(ConnectionPaneMinWidth, ConnectionPaneMaxWidth))
+                            .fillMaxHeight()
+                            .padding(start = 16.dp, top = 14.dp, bottom = 14.dp),
+                    )
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight(),
+                        contentPadding = PaddingValues(start = 16.dp, top = 14.dp, end = 16.dp, bottom = 14.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        updateItem()
+                        subscriptionItems()
+                    }
+                }
+            } else {
+                // Past a phone's width the single column stops growing and centres, so cards and
+                // server rows keep a readable line length on a tablet in portrait.
+                val sideGutter = ((screenWidth - SinglePaneMaxWidth) / 2).coerceAtLeast(0.dp)
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding),
+                    contentPadding = homeListContentPadding(floatingConnectButton, sideGutter),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    item {
+                        ConnectionPanel(
+                            state = connectionUiState,
+                            details = connectionDetails,
+                            canStart = uiState.selectedServer != null,
+                            compact = floatingConnectButton,
+                            onClick = onConnectionClick,
+                            onViewConfig = onViewRunningConfig,
+                        )
+                    }
+                    updateItem()
+                    errorItem(errorMessage)
+                    subscriptionItems()
+                }
+            }
+        }
+    }
+
+    AddSubscriptionDialogHost(
+        visible = showAddDialog,
+        onDismiss = { showAddDialog = false },
+        onConfirm = { name, url, preferJson, allowInsecureUpdates, userAgentMode, customUserAgent, customHeaders ->
+            viewModel.addSubscription(
+                name,
+                url,
+                preferJson,
+                allowInsecureUpdates,
+                userAgentMode,
+                customUserAgent,
+                customHeaders,
+            )
+            showAddDialog = false
+        },
+    )
+    QrScannerDialogHost(
+        keepDialog = keepQrScannerDialog,
+        visible = showQrScanner,
+        onVisibleChange = { showQrScanner = it },
+        onLinkScanned = { link ->
+            val trimmed = link.trim()
+            if (trimmed.isEmpty()) {
+                Toast.makeText(context, unableToFetchLinkText, Toast.LENGTH_SHORT).show()
+            } else {
+                viewModel.addLink(trimmed)
+            }
+        },
+    )
+    ApplySubscriptionRoutingDialogHost(
+        visible = uiState.pendingSubscriptionRouting != null,
+        onDismiss = viewModel::dismissPendingSubscriptionRouting,
+        onConfirm = viewModel::applyPendingSubscriptionRouting,
+    )
+    RootFallbackDialogHost(
+        visible = showRootFallbackDialog,
+        onDismiss = { showRootFallbackDialog = false },
+        onConfirm = {
+            showRootFallbackDialog = false
+            startRootlessConnection()
+        },
+    )
+    RemoveSubscriptionDialogHost(
+        request = removeSubscriptionRequest,
+        onDismiss = { removeSubscriptionRequest = null },
+        onConfirm = { subscription ->
+            removeSubscription(subscription)
+            removeSubscriptionRequest = null
+        },
+    )
+    EditSubscriptionDialogHost(
+        subscription = editingSubscription,
+        onDismiss = { editingSubscriptionId = null },
+        onConfirm = { subscription, name, url, preferJson, allowInsecureUpdates, autoUpdateIntervalHours, userAgentMode, customUserAgent, customHeaders ->
+            viewModel.updateSubscription(
+                subscription,
+                name,
+                url,
+                preferJson,
+                allowInsecureUpdates,
+                autoUpdateIntervalHours,
+                userAgentMode,
+                customUserAgent,
+                customHeaders,
+            )
+            editingSubscriptionId = null
+        },
+    )
+    InstallPermissionRationaleDialogHost(
+        visible = uiState.showInstallPermissionRationale,
+        onDismiss = viewModel::dismissInstallPermissionRationale,
+        onConfirm = viewModel::confirmInstallPermissionRationale,
+    )
+    DiscardEditedActiveConfigDialogHost(
+        visible = uiState.pendingServerSelection != null,
+        onDismiss = viewModel::dismissDiscardEditedActiveConfig,
+        onConfirm = viewModel::confirmDiscardEditedActiveConfig,
+    )
+    HwidRequiredDialogHost(
+        visible = uiState.pendingHwidServerSelection != null,
+        onDismiss = viewModel::dismissHwidRequiredSelection,
+        onConfirm = viewModel::confirmHwidRequiredSelection,
+    )
+}
+
+@Composable
+private fun HwidRequiredDialogHost(
+    visible: Boolean,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    if (!visible) return
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                stringResource(R.string.home_hwid_required_title),
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = TextAlign.Center,
+            )
+        },
+        text = { Text(stringResource(R.string.home_hwid_required_body)) },
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text(stringResource(R.string.home_hwid_required_confirm))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.home_hwid_required_cancel))
+            }
+        },
+    )
+}
+
+@Composable
+private fun DiscardEditedActiveConfigDialogHost(
+    visible: Boolean,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    if (!visible) return
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.home_discard_edited_config_title)) },
+        text = { Text(stringResource(R.string.home_discard_edited_config_body)) },
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text(stringResource(R.string.home_discard_edited_config_confirm))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.home_discard_edited_config_cancel))
+            }
+        },
+    )
+}
+
+@Composable
+private fun AddSubscriptionDialogHost(
+    visible: Boolean,
+    onDismiss: () -> Unit,
+    onConfirm: (String, String, Boolean, Boolean, SubscriptionUserAgentMode, String, String) -> Unit,
+) {
+    if (!visible) return
+
+    AddSubscriptionDialog(
+        onDismiss = onDismiss,
+        onConfirm = onConfirm,
+    )
+}
+
+@Composable
+private fun QrScannerDialogHost(
+    keepDialog: Boolean,
+    visible: Boolean,
+    onVisibleChange: (Boolean) -> Unit,
+    onLinkScanned: (String) -> Unit,
+) {
+    if (!keepDialog) return
+
+    Dialog(
+        onDismissRequest = { onVisibleChange(false) },
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false,
+        ),
+    ) {
+        AnimatedVisibility(
+            visible = visible,
+            enter = fadeIn(animationSpec = tween(durationMillis = QR_SCANNER_TRANSITION_MS)),
+            exit = fadeOut(animationSpec = tween(durationMillis = QR_SCANNER_TRANSITION_MS)),
+        ) {
+            QrScannerOverlay(
+                onQrCodeScanned = { link ->
+                    onVisibleChange(false)
+                    onLinkScanned(link)
+                },
+                onClose = { onVisibleChange(false) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun QrScannerPermissionGate(onGranted: () -> Unit): () -> Unit {
+    val context = LocalContext.current
+    var promptAccess by remember { mutableStateOf<CameraPermissionAccess?>(null) }
+    val accessState = rememberSystemState { cameraPermissionAccess(it) }
+    val access = accessState.value
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        context.recordCameraPermissionRequest()
+        accessState.refresh()
+        if (granted) {
+            promptAccess = null
+            onGranted()
+        } else {
+            promptAccess = cameraPermissionAccess(context)
+        }
+    }
+
+    promptAccess?.let { requestedAccess ->
+        AlertDialog(
+            onDismissRequest = { promptAccess = null },
+            title = { Text(stringResource(R.string.home_camera_permission_title)) },
+            text = { Text(stringResource(R.string.home_camera_permission_message)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        promptAccess = null
+                        if (requestedAccess == CameraPermissionAccess.SystemSettings) {
+                            context.openAppSettings()
+                        } else {
+                            permissionLauncher.launch(Manifest.permission.CAMERA)
+                        }
+                    },
+                ) {
+                    Text(
+                        stringResource(
+                            if (requestedAccess == CameraPermissionAccess.SystemSettings) {
+                                R.string.home_open_app_settings
+                            } else {
+                                R.string.home_allow_camera
+                            },
+                        ),
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { promptAccess = null }) {
+                    Text(stringResource(R.string.home_action_cancel))
+                }
+            },
+        )
+    }
+
+    return {
+        when (access) {
+            CameraPermissionAccess.Granted -> onGranted()
+            else -> promptAccess = access
+        }
+    }
+}
+
+private fun cameraPermissionAccess(context: Context): CameraPermissionAccess {
+    val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+    val activity = context as? android.app.Activity
+    return resolveCameraPermissionAccess(
+        granted = granted,
+        shouldShowRationale = activity != null &&
+            ActivityCompat.shouldShowRequestPermissionRationale(activity, Manifest.permission.CAMERA),
+        permissionRequested = context.wasCameraPermissionRequested(),
+    )
+}
+
+internal fun resolveCameraPermissionAccess(
+    granted: Boolean,
+    shouldShowRationale: Boolean,
+    permissionRequested: Boolean,
+): CameraPermissionAccess = when {
+    granted -> CameraPermissionAccess.Granted
+    shouldShowRationale -> CameraPermissionAccess.Rationale
+    permissionRequested -> CameraPermissionAccess.SystemSettings
+    else -> CameraPermissionAccess.Requestable
+}
+
+private fun Context.openAppSettings() {
+    startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName")))
+}
+
+private fun Context.recordCameraPermissionRequest() {
+    getSharedPreferences(CAMERA_PERMISSION_PREFS, Context.MODE_PRIVATE)
+        .edit()
+        .putBoolean(CAMERA_PERMISSION_REQUESTED, true)
+        .apply()
+}
+
+private fun Context.wasCameraPermissionRequested(): Boolean = getSharedPreferences(
+    CAMERA_PERMISSION_PREFS,
+    Context.MODE_PRIVATE,
+).getBoolean(CAMERA_PERMISSION_REQUESTED, false)
+
+private fun Context.collapsedSubscriptionIds(): List<Long> = getSharedPreferences(
+    HOME_UI_PREFS,
+    Context.MODE_PRIVATE,
+).getStringSet(COLLAPSED_SUBSCRIPTION_IDS, emptySet())
+    .orEmpty()
+    .mapNotNull(String::toLongOrNull)
+
+private fun Context.setCollapsedSubscriptionIds(ids: Collection<Long>) {
+    getSharedPreferences(HOME_UI_PREFS, Context.MODE_PRIVATE)
+        .edit()
+        .putStringSet(COLLAPSED_SUBSCRIPTION_IDS, ids.mapTo(mutableSetOf(), Long::toString))
+        .apply()
+}
+
+private fun Context.setSubscriptionExpanded(
+    collapsedIds: SnapshotStateList<Long>,
+    subscriptionId: Long,
+    expanded: Boolean,
+) {
+    if (expanded) {
+        collapsedIds.remove(subscriptionId)
+    } else if (subscriptionId !in collapsedIds) {
+        collapsedIds.add(subscriptionId)
+    }
+    setCollapsedSubscriptionIds(collapsedIds)
+}
+
+internal enum class CameraPermissionAccess {
+    Granted,
+    Requestable,
+    Rationale,
+    SystemSettings,
+}
+
+@Composable
+private fun ApplySubscriptionRoutingDialogHost(
+    visible: Boolean,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    if (!visible) return
+
+    ApplySubscriptionRoutingDialog(
+        onDismiss = onDismiss,
+        onConfirm = onConfirm,
+    )
+}
+
+@Composable
+private fun RootFallbackDialogHost(
+    visible: Boolean,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    if (!visible) return
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        text = { Text(stringResource(R.string.home_root_fallback_message)) },
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text(stringResource(R.string.home_action_continue))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.home_action_cancel))
+            }
+        },
+    )
+}
+
+@Composable
+private fun RemoveSubscriptionDialogHost(
+    request: Pair<SubscriptionEntity, Int>?,
+    onDismiss: () -> Unit,
+    onConfirm: (SubscriptionEntity) -> Unit,
+) {
+    val (subscription, serverCount) = request ?: return
+
+    RemoveSubscriptionDialog(
+        serverCount = serverCount,
+        onDismiss = onDismiss,
+        onConfirm = { onConfirm(subscription) },
+    )
+}
+
+@Composable
+private fun EditSubscriptionDialogHost(
+    subscription: SubscriptionEntity?,
+    onDismiss: () -> Unit,
+    onConfirm: (SubscriptionEntity, String, String, Boolean, Boolean, Int, SubscriptionUserAgentMode, String, String) -> Unit,
+) {
+    subscription ?: return
+
+    EditSubscriptionDialog(
+        subscription = subscription,
+        onDismiss = onDismiss,
+        onConfirm = { name, url, preferJson, allowInsecureUpdates, autoUpdateIntervalHours, userAgentMode, customUserAgent, customHeaders ->
+            onConfirm(
+                subscription,
+                name,
+                url,
+                preferJson,
+                allowInsecureUpdates,
+                autoUpdateIntervalHours,
+                userAgentMode,
+                customUserAgent,
+                customHeaders,
+            )
+        },
+    )
+}
+
+@Composable
+private fun InstallPermissionRationaleDialogHost(
+    visible: Boolean,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    if (!visible) return
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.home_app_update_permission_title)) },
+        text = { Text(stringResource(R.string.home_app_update_permission_message)) },
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text(stringResource(R.string.home_app_update_permission_continue))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.home_app_update_permission_not_now))
+            }
+        },
+    )
+}
+
+@Composable
+private fun collectHomeUiState(viewModel: HomeViewModel): HomeUiState {
+    val connectionState by viewModel.connectionState.collectAsStateWithLifecycle()
+    val connectionProgress by viewModel.connectionProgress.collectAsStateWithLifecycle()
+    val geoDataDownloadFraction by viewModel.geoDataDownloadFraction.collectAsStateWithLifecycle()
+    val alwaysOnVpn by viewModel.alwaysOnVpn.collectAsStateWithLifecycle()
+    val selectedServer by viewModel.selectedServer.collectAsStateWithLifecycle()
+    val activeBalancer by viewModel.activeBalancer.collectAsStateWithLifecycle()
+    val selectedServerId by viewModel.selectedServerId.collectAsStateWithLifecycle()
+    val useRootService by viewModel.useRootService.collectAsStateWithLifecycle()
+    val showAdvancedOptions by viewModel.showAdvancedOptions.collectAsStateWithLifecycle()
+    val subscriptions by viewModel.subscriptions.collectAsStateWithLifecycle()
+    val serversBySubscription by viewModel.serversBySubscription.collectAsStateWithLifecycle()
+    val refreshingSubscriptionIds by viewModel.refreshingSubscriptionIds.collectAsStateWithLifecycle()
+    val defaultPingMethod by viewModel.defaultPingMethod.collectAsStateWithLifecycle()
+    val showBothLatencyResults by viewModel.showBothLatencyResults.collectAsStateWithLifecycle()
+    val routingPolicyControl by viewModel.routingPolicyControl.collectAsStateWithLifecycle()
+    val providerRoutingAvailability by viewModel.providerRoutingAvailability.collectAsStateWithLifecycle()
+    val pendingSubscriptionRouting by viewModel.pendingSubscriptionRouting.collectAsStateWithLifecycle()
+    val availableUpdate by viewModel.availableUpdate.collectAsStateWithLifecycle()
+    val appUpdateInstallProgress by viewModel.appUpdateInstallProgress.collectAsStateWithLifecycle()
+    val showInstallPermissionRationale by viewModel.showInstallPermissionRationale.collectAsStateWithLifecycle()
+    val pendingServerSelection by viewModel.pendingServerSelection.collectAsStateWithLifecycle()
+    val pendingHwidServerSelection by viewModel.pendingHwidServerSelection.collectAsStateWithLifecycle()
+
+    return HomeUiState(
+        connectionState = connectionState,
+        connectionProgress = connectionProgress,
+        geoDataDownloadFraction = geoDataDownloadFraction,
+        alwaysOnVpn = alwaysOnVpn,
+        selectedServer = selectedServer,
+        activeBalancer = activeBalancer,
+        selectedServerId = selectedServerId,
+        useRootService = useRootService,
+        showAdvancedOptions = showAdvancedOptions,
+        subscriptions = subscriptions,
+        serversBySubscription = serversBySubscription,
+        refreshingSubscriptionIds = refreshingSubscriptionIds,
+        defaultPingMethod = defaultPingMethod,
+        showBothLatencyResults = showBothLatencyResults,
+        routingPolicyControl = routingPolicyControl,
+        providerRoutingAvailability = providerRoutingAvailability,
+        pendingSubscriptionRouting = pendingSubscriptionRouting,
+        availableUpdate = availableUpdate,
+        appUpdateInstallProgress = appUpdateInstallProgress,
+        showInstallPermissionRationale = showInstallPermissionRationale,
+        pendingServerSelection = pendingServerSelection,
+        pendingHwidServerSelection = pendingHwidServerSelection,
+    )
+}
+
+@Composable
+private fun buildConnectionUiState(
+    connectionState: ConnectionState,
+    selectedServer: ServerConfig?,
+    alwaysOnVpn: Boolean,
+): ConnectionUiState {
+    val isConnected = connectionState is ConnectionState.Connected
+    val isRestartRequired = connectionState is ConnectionState.RestartRequired
+    val isInterfaceBusy = connectionState is ConnectionState.InterfaceBusy
+    val isTransitioning = connectionState is ConnectionState.Connecting ||
+        connectionState is ConnectionState.ApplyingRoutingChanges ||
+        connectionState is ConnectionState.UpdatingRoutingData ||
+        connectionState is ConnectionState.Disconnecting
+    val selectedServerName = selectedServer?.name ?: stringResource(R.string.home_no_server_selected)
+    val stopLike = isConnected && !alwaysOnVpn || isRestartRequired || isInterfaceBusy
+
+    return ConnectionUiState(
+        isConnected = isConnected,
+        isRestartRequired = isRestartRequired,
+        isInterfaceBusy = isInterfaceBusy,
+        isTransitioning = isTransitioning,
+        isAlwaysOnVpn = alwaysOnVpn,
+        buttonColor = when {
+            stopLike -> MaterialTheme.colorScheme.error
+            isTransitioning -> MaterialTheme.colorScheme.tertiary
+            else -> MaterialTheme.colorScheme.primary
+        },
+        // The compact button fills with the role colour itself rather than the softer *Container
+        // pair: it is small and floats over scrolling content, so it needs the contrast.
+        fabContentColor = when {
+            stopLike -> MaterialTheme.colorScheme.onError
+            isTransitioning -> MaterialTheme.colorScheme.onTertiary
+            else -> MaterialTheme.colorScheme.onPrimary
+        },
+        displayServerName = (connectionState as? ConnectionState.Connected)?.serverName ?: selectedServerName,
+    )
+}
+
+private data class HomeUiState(
+    val connectionState: ConnectionState,
+    val connectionProgress: ConnectionProgress?,
+    val geoDataDownloadFraction: Float?,
+    val alwaysOnVpn: Boolean,
+    val selectedServer: ServerConfig?,
+    val activeBalancer: ActiveBalancerState?,
+    val selectedServerId: Long,
+    val useRootService: Boolean,
+    val showAdvancedOptions: Boolean,
+    /** `null` until the home data snapshot has loaded; distinct from a loaded empty list. */
+    val subscriptions: List<SubscriptionEntity>?,
+    val serversBySubscription: Map<Long, List<ServerListItem>>,
+    val refreshingSubscriptionIds: Set<Long>,
+    val defaultPingMethod: PingMethod,
+    val showBothLatencyResults: Boolean,
+    val routingPolicyControl: RoutingPolicyControl,
+    val providerRoutingAvailability: ProviderRoutingAvailability?,
+    val pendingSubscriptionRouting: SubscriptionRoutingData?,
+    val availableUpdate: AppUpdate?,
+    val appUpdateInstallProgress: AppUpdateInstallProgress?,
+    val showInstallPermissionRationale: Boolean,
+    /** Server awaiting confirmation because switching to it discards an edited active config. */
+    val pendingServerSelection: Long?,
+    /** Server awaiting confirmation because its subscription requires the hardware ID. */
+    val pendingHwidServerSelection: Long?,
+)
+
+private data class ConnectionUiState(
+    val isConnected: Boolean,
+    val isRestartRequired: Boolean,
+    val isInterfaceBusy: Boolean,
+    val isTransitioning: Boolean,
+    val isAlwaysOnVpn: Boolean,
+    val buttonColor: Color,
+    val fabContentColor: Color,
+    val displayServerName: String,
+)
+
+/** Connection state that the status text, stats and power button all read from. */
+private class ConnectionDetails(
+    val connectionState: ConnectionState,
+    val connectionProgress: ConnectionProgress?,
+    val geoDataDownloadFraction: Float?,
+    val showProgressDetails: Boolean,
+    val activeBalancer: ActiveBalancerState?,
+    val pingMs: StateFlow<Int?>,
+    val sessionTraffic: StateFlow<SessionTrafficMetrics?>,
+)
+
+@Composable
+private fun ConnectionPanel(
+    state: ConnectionUiState,
+    details: ConnectionDetails,
+    canStart: Boolean,
+    compact: Boolean,
+    onClick: () -> Unit,
+    onViewConfig: () -> Unit,
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        // The status line is normally held open even when empty so the panel does not jump as
+        // progress text and uptime come and go. Idle-and-disconnected has nothing coming, so the
+        // compact layout drops it rather than leave a gap.
+        ConnectionStatusText(
+            state = state,
+            details = details,
+            reserveStatusLine = !compact || details.connectionState !is ConnectionState.Disconnected,
+        )
+
+        if (!compact) {
+            Spacer(modifier = Modifier.height(24.dp))
+            ConnectionButton(
+                state = state,
+                canStart = canStart,
+                size = ConnectionButtonSize,
+                onClick = onClick,
+                onViewConfig = onViewConfig,
+            )
+        }
+
+        AnimatedVisibility(visible = details.connectionState.showsConnectionStats()) {
+            ConnectionStatsBanner(
+                activeBalancer = details.activeBalancer,
+                pingMs = details.pingMs,
+                sessionTraffic = details.sessionTraffic,
+                modifier = Modifier.padding(top = 16.dp),
+            )
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+    }
+}
+
+/**
+ * The connection side of the two-pane home layout. It has a whole column to itself, so besides the
+ * status and a larger power button it keeps the connection error and the live stats in view, where
+ * a narrow column would scroll them away with the list.
+ */
+@Composable
+private fun ConnectionPane(
+    state: ConnectionUiState,
+    details: ConnectionDetails,
+    errorMessage: String?,
+    canStart: Boolean,
+    onClick: () -> Unit,
+    onViewConfig: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier,
+        shape = MaterialTheme.shapes.extraLarge,
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+    ) {
+        BoxWithConstraints {
+            val buttonSize = if (maxHeight < LargeConnectionButtonMinPaneHeight) {
+                ConnectionButtonSize
+            } else {
+                LargeConnectionButtonSize
+            }
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .heightIn(min = maxHeight)
+                    .padding(20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.SpaceBetween,
+            ) {
+                ConnectionStatusText(state = state, details = details, reserveStatusLine = true)
+                Box(modifier = Modifier.padding(vertical = 24.dp)) {
+                    ConnectionButton(
+                        state = state,
+                        canStart = canStart,
+                        size = buttonSize,
+                        onClick = onClick,
+                        onViewConfig = onViewConfig,
+                    )
+                }
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    if (errorMessage != null) {
+                        ErrorCard(message = errorMessage)
+                    }
+                    // Always shown here, with dashes until a connection supplies readings, so the
+                    // pane keeps its shape instead of reflowing on every connect and disconnect.
+                    ConnectionStatsBanner(
+                        // The balancer pool describes a running tunnel; offline it would claim to
+                        // be checking servers that nothing is checking.
+                        activeBalancer = details.activeBalancer.takeIf {
+                            details.connectionState.showsConnectionStats()
+                        },
+                        pingMs = details.pingMs,
+                        sessionTraffic = details.sessionTraffic,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ConnectionStatusText(
+    state: ConnectionUiState,
+    details: ConnectionDetails,
+    reserveStatusLine: Boolean,
+) {
+    val connectionState = details.connectionState
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            text = connectionHeading(connectionState, details.geoDataDownloadFraction),
+            modifier = Modifier.fillMaxWidth(),
+            style = MaterialTheme.typography.titleLarge,
+            textAlign = TextAlign.Center,
+            color = when {
+                state.isConnected -> MaterialTheme.colorScheme.primary
+                state.isRestartRequired || state.isInterfaceBusy -> MaterialTheme.colorScheme.error
+                connectionState is ConnectionState.Error -> MaterialTheme.colorScheme.error
+                else -> MaterialTheme.colorScheme.onSurface
+            },
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Text(
+            text = when {
+                state.isInterfaceBusy -> stringResource(R.string.home_connection_interface_busy_detail)
+                state.isRestartRequired -> stringResource(R.string.home_connection_restart_required_detail)
+                else -> state.displayServerName
+            },
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = if (state.isRestartRequired || state.isInterfaceBusy) 4 else 1,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center,
+        )
+        if (reserveStatusLine) {
+            Box(
+                modifier = Modifier.height(
+                    with(LocalDensity.current) { MaterialTheme.typography.bodySmall.lineHeight.toDp() },
+                ),
+                contentAlignment = Alignment.Center,
+            ) {
+                val progress = details.connectionProgress
+                when {
+                    details.showProgressDetails && progress != null -> Text(
+                        text = connectionProgressText(progress),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Center,
+                    )
+                    connectionState is ConnectionState.Connected -> CoreUptime(startTime = connectionState.startTime)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ConnectionButton(
+    state: ConnectionUiState,
+    canStart: Boolean,
+    size: Dp,
+    onClick: () -> Unit,
+    onViewConfig: () -> Unit,
+) {
+    val buttonColor = state.buttonColor
+    val buttonEnabled = (canStart || state.isConnected || state.isRestartRequired || state.isInterfaceBusy) &&
+        !state.isTransitioning
+    val containerColor = if (buttonEnabled) {
+        buttonColor.copy(alpha = 0.15f)
+    } else {
+        buttonColor.copy(alpha = 0.10f)
+    }
+    val contentColor = if (buttonEnabled) {
+        buttonColor
+    } else {
+        buttonColor.copy(alpha = 0.75f)
+    }
+    // Label and spinner grow with the button, so a larger one in a tablet pane is not a small
+    // word floating in a big circle.
+    val scale = size / ConnectionButtonSize
+
+    Surface(
+        color = containerColor,
+        contentColor = contentColor,
+        shape = CircleShape,
+        modifier = Modifier
+            .size(size)
+            .clip(CircleShape)
+            .combinedClickable(
+                enabled = buttonEnabled,
+                onClick = onClick,
+                onLongClick = {
+                    if (state.isConnected) {
+                        onViewConfig()
+                    }
+                },
+            ),
+    ) {
+        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+            if (state.isTransitioning) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(54.dp * scale),
+                    strokeWidth = 4.dp,
+                    color = buttonColor,
+                )
+            } else {
+                val maxFontSize = MaterialTheme.typography.titleLarge.fontSize * scale
+                Text(
+                    text = stringResource(
+                        connectionActionLabel(
+                            isConnected = state.isConnected,
+                            isAlwaysOnVpn = state.isAlwaysOnVpn,
+                            isRestartRequired = state.isRestartRequired,
+                            isInterfaceBusy = state.isInterfaceBusy,
+                        ),
+                    ),
+                    modifier = Modifier.padding(horizontal = 8.dp * scale),
+                    style = MaterialTheme.typography.titleLarge.copy(
+                        fontSize = maxFontSize,
+                        lineHeight = MaterialTheme.typography.titleLarge.lineHeight * scale,
+                    ),
+                    textAlign = TextAlign.Center,
+                    color = contentColor,
+                    maxLines = 1,
+                    autoSize = TextAutoSize.StepBased(
+                        minFontSize = 10.sp,
+                        maxFontSize = maxFontSize,
+                        stepSize = 1.sp,
+                    ),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun connectionHeading(connectionState: ConnectionState, geoDataDownloadFraction: Float?): String = when (connectionState) {
+    is ConnectionState.Connected -> stringResource(R.string.home_connection_connected)
+    is ConnectionState.Connecting -> stringResource(R.string.home_connection_connecting)
+    ConnectionState.ApplyingRoutingChanges -> stringResource(R.string.home_connection_applying_routing)
+    ConnectionState.UpdatingRoutingData -> geoDataDownloadFraction?.let { fraction ->
+        stringResource(
+            R.string.home_connection_updating_routing_percent,
+            (fraction * 100).roundToInt(),
+        )
+    } ?: stringResource(R.string.home_connection_updating_routing)
+    is ConnectionState.RestartRequired -> stringResource(R.string.home_connection_restart_required)
+    is ConnectionState.InterfaceBusy -> stringResource(R.string.home_connection_interface_busy)
+    is ConnectionState.Disconnecting -> stringResource(R.string.home_connection_disconnecting)
+    is ConnectionState.Error -> stringResource(R.string.home_connection_error)
+    ConnectionState.Disconnected -> stringResource(R.string.home_connection_disconnected)
+}
+
+private fun ConnectionState.showsConnectionStats(): Boolean = this is ConnectionState.Connected ||
+    this == ConnectionState.ApplyingRoutingChanges
+
+/**
+ * Compact alternative to the large power button, anchored in the corner of the home screen.
+ * Kept as a [Surface] rather than a [androidx.compose.material3.FloatingActionButton] so it can
+ * express a disabled state and keep the long-press shortcut to the running config.
+ */
+@Composable
+private fun ConnectionFab(
+    visible: Boolean,
+    state: ConnectionUiState,
+    canStart: Boolean,
+    onClick: () -> Unit,
+    onViewConfig: () -> Unit,
+) {
+    if (!visible) return
+    val enabled = (canStart || state.isConnected || state.isRestartRequired || state.isInterfaceBusy) &&
+        !state.isTransitioning
+    val actionLabel = stringResource(
+        connectionActionLabel(
+            isConnected = state.isConnected,
+            isAlwaysOnVpn = state.isAlwaysOnVpn,
+            isRestartRequired = state.isRestartRequired,
+            isInterfaceBusy = state.isInterfaceBusy,
+        ),
+    )
+    val shape = FloatingActionButtonDefaults.shape
+
+    Surface(
+        color = if (enabled) state.buttonColor else MaterialTheme.colorScheme.surfaceContainerHighest,
+        contentColor = if (enabled) {
+            state.fabContentColor
+        } else {
+            MaterialTheme.colorScheme.onSurface.copy(alpha = DISABLED_FAB_CONTENT_ALPHA)
+        },
+        shape = shape,
+        shadowElevation = 6.dp,
+        modifier = Modifier
+            .size(64.dp)
+            .clip(shape)
+            .combinedClickable(
+                enabled = enabled,
+                role = Role.Button,
+                onClickLabel = actionLabel,
+                onClick = onClick,
+                onLongClick = {
+                    if (state.isConnected) {
+                        onViewConfig()
+                    }
+                },
+            ),
+    ) {
+        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+            if (state.isTransitioning) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(26.dp),
+                    strokeWidth = 3.dp,
+                    color = state.fabContentColor,
+                )
+            } else {
+                Icon(
+                    imageVector = connectionActionIcon(
+                        isConnected = state.isConnected,
+                        isAlwaysOnVpn = state.isAlwaysOnVpn,
+                        isRestartRequired = state.isRestartRequired,
+                        isInterfaceBusy = state.isInterfaceBusy,
+                    ),
+                    contentDescription = actionLabel,
+                    modifier = Modifier.size(30.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun connectionProgressText(progress: ConnectionProgress): String = when (progress) {
+    ConnectionProgress.PreparingRuntime -> stringResource(R.string.home_connection_progress_preparing_runtime)
+    ConnectionProgress.PreparingCore -> stringResource(R.string.home_connection_progress_preparing_core)
+    ConnectionProgress.UpdatingRoutingData -> stringResource(R.string.home_connection_progress_updating_routing_data)
+    ConnectionProgress.ResolvingEntryServer -> stringResource(R.string.home_connection_progress_resolving_entry_server)
+    ConnectionProgress.GeneratingConfiguration -> stringResource(R.string.home_connection_progress_generating_configuration)
+    ConnectionProgress.StartingCore -> stringResource(R.string.home_connection_progress_starting_core)
+    ConnectionProgress.ConfiguringTunnel -> stringResource(R.string.home_connection_progress_configuring_tunnel)
+    ConnectionProgress.ConfiguringRouting -> stringResource(R.string.home_connection_progress_configuring_routing)
+    ConnectionProgress.WaitingForCore -> stringResource(R.string.home_connection_progress_waiting_for_core)
+    ConnectionProgress.StoppingCore -> stringResource(R.string.home_connection_progress_stopping_core)
+    ConnectionProgress.CleaningRuntime -> stringResource(R.string.home_connection_progress_cleaning_runtime)
+    ConnectionProgress.InspectingSavedRuntime -> stringResource(R.string.home_connection_progress_inspecting_saved_runtime)
+    ConnectionProgress.VerifyingRuntime -> stringResource(R.string.home_connection_progress_verifying_runtime)
+    ConnectionProgress.RestoringControlApi -> stringResource(R.string.home_connection_progress_restoring_control_api)
+    ConnectionProgress.UpdatingNetworkRoute -> stringResource(R.string.home_connection_progress_updating_network_route)
+    ConnectionProgress.UpdatingAppRouting -> stringResource(R.string.home_connection_progress_updating_app_routing)
+}
+
+@Composable
+private fun CoreUptime(startTime: Long) {
+    val lifecycleOwner = LocalLifecycleOwner.current
+    var currentTime by remember(startTime) { mutableLongStateOf(System.currentTimeMillis()) }
+
+    LaunchedEffect(startTime, lifecycleOwner) {
+        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            while (true) {
+                currentTime = System.currentTimeMillis()
+                delay(CORE_UPTIME_REFRESH_INTERVAL_MS)
+            }
+        }
+    }
+
+    Text(
+        text = formatCoreUptime(currentTime - startTime),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        maxLines = 1,
+    )
+}
+
+internal fun formatCoreUptime(elapsedMillis: Long): String {
+    val totalSeconds = elapsedMillis.coerceAtLeast(0L) / 1_000L
+    val days = totalSeconds / 86_400L
+    val hours = totalSeconds % 86_400L / 3_600L
+    val minutes = totalSeconds % 3_600L / 60L
+    val seconds = totalSeconds % 60L
+    return when {
+        days > 0L -> String.format(Locale.ROOT, "%02d:%02d:%02d:%02d", days, hours, minutes, seconds)
+        hours > 0L -> String.format(Locale.ROOT, "%02d:%02d:%02d", hours, minutes, seconds)
+        else -> String.format(Locale.ROOT, "%02d:%02d", minutes, seconds)
+    }
+}
+
+private fun ConnectionUiState.handleClick(
+    context: Context,
+    useRootService: Boolean,
+    disconnect: () -> Unit,
+    connectRoot: () -> Unit,
+    connectVpn: () -> Unit,
+) {
+    when {
+        // Android TV has no VPN settings screen to send the user to.
+        isConnected && isAlwaysOnVpn -> try {
+            context.startActivity(Intent(Settings.ACTION_VPN_SETTINGS))
+        } catch (_: ActivityNotFoundException) {
+            disconnect()
+        }
+        isConnected -> disconnect()
+        !isTransitioning && useRootService -> connectRoot()
+        !isTransitioning -> connectVpn()
+    }
+}
+
+@StringRes
+private fun connectionActionLabel(
+    isConnected: Boolean,
+    isAlwaysOnVpn: Boolean,
+    isRestartRequired: Boolean,
+    isInterfaceBusy: Boolean,
+): Int = when {
+    isConnected && isAlwaysOnVpn -> R.string.home_action_always_on
+    isConnected -> R.string.home_action_stop
+    isRestartRequired || isInterfaceBusy -> R.string.home_action_restart
+    else -> R.string.home_action_start
+}
+
+/** Icon counterpart to [connectionActionLabel], for the compact button that has no room for text. */
+private fun connectionActionIcon(
+    isConnected: Boolean,
+    isAlwaysOnVpn: Boolean,
+    isRestartRequired: Boolean,
+    isInterfaceBusy: Boolean,
+): ImageVector = when {
+    isConnected && isAlwaysOnVpn -> Icons.Default.Settings
+    isConnected -> Icons.Default.Stop
+    isRestartRequired || isInterfaceBusy -> Icons.Default.RestartAlt
+    else -> Icons.Default.PlayArrow
+}
+
+/** The floating button overlays the list, so the last item needs room to scroll clear of it. */
+private fun homeListContentPadding(floatingConnectButton: Boolean, sideGutter: Dp) = PaddingValues(
+    start = 16.dp + sideGutter,
+    top = 14.dp,
+    end = 16.dp + sideGutter,
+    bottom = if (floatingConnectButton) 14.dp + FloatingConnectButtonClearance else 14.dp,
+)
+
+private fun LazyListScope.errorItem(message: String?) {
+    if (message != null) {
+        item(contentType = "error") {
+            ErrorCard(message = message)
+        }
+    }
+}
+
+@Composable
+private fun ErrorCard(message: String) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Text(
+            text = message,
+            modifier = Modifier.padding(16.dp),
+            color = MaterialTheme.colorScheme.onErrorContainer,
+        )
+    }
+}
+
+@Composable
+private fun AppUpdateBanner(
+    update: AppUpdate,
+    installProgress: AppUpdateInstallProgress?,
+    onInstall: () -> Unit,
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(enabled = installProgress == null, onClick = onInstall),
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Icon(Icons.Default.SystemUpdate, contentDescription = null)
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.home_app_update_title),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    text = stringResource(R.string.home_app_update_message, update.tagName),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                if (installProgress != null) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = appUpdateInstallProgressText(installProgress),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f),
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    val fraction = installProgress.fraction
+                    if (fraction == null) {
+                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                    } else {
+                        LinearProgressIndicator(
+                            progress = { fraction },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun appUpdateInstallProgressText(progress: AppUpdateInstallProgress): String = when (progress.stage) {
+    AppUpdateInstallStage.ResolvingRelease -> stringResource(R.string.home_app_update_progress_resolving)
+    AppUpdateInstallStage.Connecting -> stringResource(R.string.home_app_update_progress_connecting)
+    AppUpdateInstallStage.Downloading -> progress.fraction?.let { fraction ->
+        stringResource(R.string.home_app_update_progress_downloading_percent, (fraction * 100).roundToInt())
+    } ?: stringResource(R.string.home_app_update_progress_downloading)
+    AppUpdateInstallStage.Verifying -> stringResource(R.string.home_app_update_progress_verifying)
+    AppUpdateInstallStage.PreparingInstallation -> stringResource(R.string.home_app_update_progress_preparing)
+    AppUpdateInstallStage.OpeningInstaller -> stringResource(R.string.home_app_update_progress_opening_installer)
+    AppUpdateInstallStage.InstallingWithRoot -> stringResource(R.string.home_app_update_progress_installing_root)
+}
+
+@Composable
+private fun EmptySubscriptionsCard(
+    addFocusRequester: FocusRequester,
+    onPasteFromClipboard: () -> Unit,
+    onScanQrCode: () -> Unit,
+    onAddManually: () -> Unit,
+) {
+    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(
+                stringResource(R.string.home_no_subscriptions_title),
+                style = MaterialTheme.typography.titleMedium,
+            )
+            Text(
+                stringResource(R.string.home_no_subscriptions_message),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            AddSubscriptionActionButton(
+                modifier = Modifier.focusRequester(addFocusRequester),
+                onPasteFromClipboard = onPasteFromClipboard,
+                onScanQrCode = onScanQrCode,
+                onAddManually = onAddManually,
+            )
+        }
+    }
+}
+
+@Composable
+private fun AddSubscriptionActionButton(
+    modifier: Modifier = Modifier,
+    onPasteFromClipboard: () -> Unit,
+    onScanQrCode: () -> Unit,
+    onAddManually: () -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val hasCamera = remember(context) { context.packageManager.hasSystemFeature(PackageManager.FEATURE_CAMERA_ANY) }
+
+    Box(modifier = modifier) {
+        OutlinedButton(
+            onClick = { expanded = true },
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(stringResource(R.string.home_add_server_or_subscription))
+        }
+        AnimatedDropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+        ) {
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.home_paste_from_clipboard)) },
+                leadingIcon = {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_content_paste_24),
+                        contentDescription = null,
+                    )
+                },
+                onClick = {
+                    expanded = false
+                    onPasteFromClipboard()
+                },
+            )
+            if (hasCamera) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.home_scan_qr_code)) },
+                    leadingIcon = {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_qr_code_scanner_24),
+                            contentDescription = null,
+                        )
+                    },
+                    onClick = {
+                        expanded = false
+                        onScanQrCode()
+                    },
+                )
+            }
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.home_add_manually)) },
+                leadingIcon = {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_add_24),
+                        contentDescription = null,
+                    )
+                },
+                onClick = {
+                    expanded = false
+                    onAddManually()
+                },
+            )
+        }
+    }
+}
+
+/** Everything a subscription card and its header menu can trigger. */
+private data class SubscriptionCardActions(
+    val onDragStart: () -> Unit,
+    val onDrag: (Float) -> Unit,
+    val onDragFinished: () -> Unit,
+    val onExpandedChange: (Boolean) -> Unit,
+    val onDelete: () -> Unit,
+    val onEdit: () -> Unit,
+    val onRefresh: () -> Unit,
+    val onTestAll: () -> Unit,
+    val onDefaultPingMethodSelected: (PingMethod) -> Unit,
+    val onShowBothLatencyResultsChange: (Boolean) -> Unit,
+    val onApplyRouting: () -> Unit,
+    val onDescriptionHiddenChange: (Boolean) -> Unit,
+    val onServerSelected: (Long) -> Unit,
+    val onTestLatency: (ServerEntity) -> Unit,
+    val onOpenServerConfig: (Long, String) -> Unit,
+)
+
+@Composable
+private fun SubscriptionCard(
+    modifier: Modifier = Modifier,
+    subscription: SubscriptionEntity,
+    isRefreshing: Boolean,
+    servers: List<ServerListItem>,
+    selectedServerId: Long,
+    defaultPingMethod: PingMethod,
+    showBothLatencyResults: Boolean,
+    canApplyRouting: Boolean,
+    canCollapse: Boolean,
+    expanded: Boolean,
+    canReorder: Boolean,
+    focusRequester: FocusRequester,
+    actions: SubscriptionCardActions,
+) {
+    val currentOnDragStart by rememberUpdatedState(actions.onDragStart)
+    val currentOnDrag by rememberUpdatedState(actions.onDrag)
+    val currentOnDragFinished by rememberUpdatedState(actions.onDragFinished)
+    val resources = LocalResources.current
+    val locale = resources.configuration.locales[0]
+    val metadata = remember(
+        subscription.announce,
+        subscription.subscriptionUploadBytes,
+        subscription.subscriptionDownloadBytes,
+        subscription.subscriptionTotalBytes,
+        subscription.subscriptionExpireAt,
+        subscription.autoUpdateIntervalHours,
+        locale,
+    ) {
+        buildSubscriptionMetadataUiState(subscription, resources)
+    }
+
+    val reorderModifier = if (canReorder && !expanded) {
+        Modifier.pointerInput(subscription.id) {
+            detectDragGesturesAfterLongPress(
+                onDragStart = { currentOnDragStart() },
+                onDragEnd = { currentOnDragFinished() },
+                onDragCancel = { currentOnDragFinished() },
+                onDrag = { change, amount ->
+                    change.consume()
+                    currentOnDrag(amount.y)
+                },
+            )
+        }
+    } else {
+        Modifier
+    }
+
+    val subscriptionElevation by animateDpAsState(
+        targetValue = if (!canCollapse || expanded) 1.dp else 0.dp,
+        animationSpec = tween(durationMillis = SUBSCRIPTION_EXPANSION_MS),
+        label = "subscriptionShadow",
+    )
+
+    // Focus lands on the first server, or on the header when no server is shown.
+    val serversShown = (!canCollapse || expanded) && servers.isNotEmpty()
+    Surface(
+        modifier = modifier
+            .fillMaxWidth()
+            .then(if (serversShown) Modifier else Modifier.focusRequester(focusRequester)),
+        shape = CardDefaults.elevatedShape,
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        shadowElevation = subscriptionElevation,
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            SubscriptionHeader(
+                subscription = subscription,
+                isRefreshing = isRefreshing,
+                metadata = metadata,
+                defaultPingMethod = defaultPingMethod,
+                showBothLatencyResults = showBothLatencyResults,
+                canCollapse = canCollapse,
+                expanded = expanded,
+                reorderModifier = reorderModifier,
+                canApplyRouting = canApplyRouting,
+                actions = actions,
+            )
+            AnimatedVisibility(
+                visible = !canCollapse || expanded,
+                enter = fadeIn(tween(SUBSCRIPTION_EXPANSION_MS)) + expandVertically(tween(SUBSCRIPTION_EXPANSION_MS)),
+                exit = fadeOut(tween(SUBSCRIPTION_EXPANSION_MS)) + shrinkVertically(tween(SUBSCRIPTION_EXPANSION_MS)),
+            ) {
+                Column {
+                    // The section collapses as a whole when its only content, the description, is hidden;
+                    // otherwise its spacer and bottom padding would linger around an empty column.
+                    AnimatedVisibility(
+                        visible = metadata.hasVisibleSubscriptionSection(subscription.descriptionHidden),
+                        enter = fadeIn(animationSpec = tween(durationMillis = 120)) +
+                            expandVertically(animationSpec = tween(durationMillis = 180)),
+                        exit = fadeOut(animationSpec = tween(durationMillis = 90)) +
+                            shrinkVertically(animationSpec = tween(durationMillis = 180)),
+                    ) {
+                        Column {
+                            Spacer(modifier = Modifier.height(SubscriptionBlockGap))
+                            SubscriptionMetadataSection(
+                                subscription = subscription,
+                                metadata = metadata,
+                            )
+                        }
+                    }
+
+                    if (servers.isEmpty()) {
+                        Text(
+                            stringResource(R.string.home_no_servers_in_subscription),
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    } else {
+                        LookaheadScope {
+                            Column(modifier = if (serversShown) Modifier.focusRequester(focusRequester) else Modifier) {
+                                servers.forEachIndexed { index, server ->
+                                    key(server.entity.id) {
+                                        Column(modifier = Modifier.animateBounds(this@LookaheadScope)) {
+                                            if (index > 0) {
+                                                HorizontalDivider(
+                                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f),
+                                                )
+                                            }
+                                            ServerRow(
+                                                server = server,
+                                                isSelected = server.entity.id == selectedServerId,
+                                                onClick = { actions.onServerSelected(server.entity.id) },
+                                                onTestLatency = { actions.onTestLatency(server.entity) },
+                                                onOpenConfig = {
+                                                    actions.onOpenServerConfig(server.entity.id, server.entity.name)
+                                                },
+                                                contentPadding = ServerRowDefaults.contentPadding,
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Where remote focus goes in the subscription list. Removing a subscription takes its focused menu
+ * button with it, and Android would then hand focus to the first thing on screen, so focus moves to
+ * whatever followed the removed subscription instead.
+ */
+@Stable
+private class SubscriptionFocusRequesters(private val afterLast: FocusRequester) {
+    private val requesters = mutableMapOf<Long, FocusRequester>()
+
+    var pendingRemoval by mutableStateOf<Pair<Long, FocusRequester>?>(null)
+        private set
+
+    fun forSubscription(id: Long): FocusRequester = requesters.getOrPut(id) { FocusRequester() }
+
+    fun onRemoving(id: Long, order: List<Long>) {
+        val nextId = order.getOrNull(order.indexOf(id) + 1)
+        pendingRemoval = id to (nextId?.let(::forSubscription) ?: afterLast)
+    }
+
+    suspend fun focusAfterRemoval(subscriptions: List<SubscriptionEntity>?) {
+        val (removedId, target) = pendingRemoval ?: return
+        if (subscriptions?.none { it.id == removedId } != true) return
+        // Let the list place the subscription that moved up before focusing it. Clearing the
+        // pending removal only afterwards matters: it restarts the effect that runs this.
+        withFrameNanos { }
+        target.requestFocus()
+        pendingRemoval = null
+        requesters.remove(removedId)
+    }
+}
+
+@Composable
+private fun SubscriptionMetadataSection(
+    subscription: SubscriptionEntity,
+    metadata: SubscriptionMetadataUiState,
+) {
+    val limitedTraffic = metadata.traffic?.takeUnless { it.quotaText == null }
+
+    val hasVisibleMetadata = metadata.announcement.isNotEmpty() ||
+        limitedTraffic != null
+    if (!hasVisibleMetadata) return
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .animateContentSize(animationSpec = tween(durationMillis = 180))
+            .padding(start = 16.dp, top = 0.dp, end = 16.dp, bottom = SubscriptionMetadataGap),
+        verticalArrangement = Arrangement.spacedBy(SubscriptionMetadataGap),
+    ) {
+        AnimatedVisibility(
+            visible = metadata.announcement.isNotEmpty() && !subscription.descriptionHidden,
+            enter = fadeIn(animationSpec = tween(durationMillis = 120)),
+            exit = fadeOut(animationSpec = tween(durationMillis = 90)),
+        ) {
+            SubscriptionDescriptionText(description = metadata.announcement)
+        }
+
+        if (limitedTraffic != null) {
+            SubscriptionTrafficUsage(
+                state = limitedTraffic,
+                expiry = metadata.expiry,
+            )
+        }
+    }
+}
+
+private fun SubscriptionMetadataUiState.hasVisibleSubscriptionSection(descriptionHidden: Boolean): Boolean {
+    val limitedTraffic = traffic?.takeUnless { it.quotaText == null }
+    return (announcement.isNotEmpty() && !descriptionHidden) ||
+        limitedTraffic != null
+}
+
+@Composable
+private fun SubscriptionTrafficUsage(
+    state: SubscriptionTrafficUiState,
+    expiry: SubscriptionExpiryUiState?,
+) {
+    val expiredStatusText = stringResource(R.string.home_subscription_expired_inline)
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(5.dp),
+    ) {
+        Text(
+            text = state.summary,
+            modifier = Modifier.fillMaxWidth(),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurface,
+            fontWeight = FontWeight.Medium,
+            textAlign = TextAlign.Center,
+        )
+        LinearProgressIndicator(
+            progress = { state.progress },
+            modifier = Modifier.fillMaxWidth(),
+        )
+        if (expiry != null) {
+            Text(
+                text = remember(expiry.standaloneText, expiredStatusText) {
+                    expiry.standaloneText.withMetadataEmphasis(expiredStatusText)
+                },
+                modifier = Modifier.align(Alignment.End),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun SubscriptionHeader(
+    subscription: SubscriptionEntity,
+    isRefreshing: Boolean,
+    metadata: SubscriptionMetadataUiState,
+    defaultPingMethod: PingMethod,
+    showBothLatencyResults: Boolean,
+    canCollapse: Boolean,
+    expanded: Boolean,
+    reorderModifier: Modifier,
+    canApplyRouting: Boolean,
+    actions: SubscriptionCardActions,
+) {
+    var showMenu by remember { mutableStateOf(false) }
+    var showPingMethodDialog by remember { mutableStateOf(false) }
+    val resources = LocalResources.current
+    val uriHandler = LocalUriHandler.current
+    val supportUrl = subscription.supportUrl?.trim().orEmpty()
+    val hasDescription = subscription.announce?.trim()?.isNotEmpty() == true
+    val headerDetailText = metadata.headerDetailText(resources)
+    val expiredStatusText = stringResource(R.string.home_subscription_expired_inline)
+    val expansionActionDescription = if (canCollapse) {
+        stringResource(
+            if (expanded) R.string.home_subscription_collapse else R.string.home_subscription_expand,
+            subscription.name,
+        )
+    } else {
+        null
+    }
+    val arrowInteractionSource = remember { MutableInteractionSource() }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = if (canCollapse) 0.dp else 16.dp, top = 6.dp, end = 8.dp, bottom = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(0.dp),
+    ) {
+        if (canCollapse) {
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clickable(
+                        interactionSource = arrowInteractionSource,
+                        indication = null,
+                        role = Role.Button,
+                        onClickLabel = expansionActionDescription,
+                    ) { actions.onExpandedChange(!expanded) },
+                contentAlignment = Alignment.Center,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .indication(arrowInteractionSource, LocalIndication.current),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    ExpansionArrow(
+                        expanded = expanded,
+                        contentDescription = expansionActionDescription,
+                        modifier = Modifier.size(24.dp),
+                    )
+                }
+            }
+        }
+        val titleInteractionSource = remember { MutableInteractionSource() }
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .heightIn(min = 48.dp)
+                .then(reorderModifier)
+                .then(
+                    if (canCollapse) {
+                        // The arrow already offers this to a remote, with a visible focus ring.
+                        Modifier.focusProperties { canFocus = false }.clickable(
+                            interactionSource = titleInteractionSource,
+                            indication = null,
+                            role = Role.Button,
+                            onClickLabel = expansionActionDescription,
+                        ) { actions.onExpandedChange(!expanded) }
+                    } else {
+                        Modifier
+                    },
+                ),
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Text(
+                text = subscription.name,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (!headerDetailText.isNullOrBlank()) {
+                Text(
+                    text = remember(headerDetailText, expiredStatusText) {
+                        headerDetailText.withMetadataEmphasis(expiredStatusText)
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+        TooltipIconButton(tooltip = stringResource(R.string.home_subscription_refresh_content_description, subscription.name), onClick = actions.onRefresh, enabled = !isRefreshing) {
+            if (isRefreshing) {
+                val updatingDescription = stringResource(
+                    R.string.home_subscription_updating_content_description,
+                    subscription.name,
+                )
+                CircularProgressIndicator(
+                    modifier = Modifier
+                        .size(24.dp)
+                        .semantics { contentDescription = updatingDescription },
+                    strokeWidth = 2.dp,
+                )
+            } else {
+                Icon(
+                    Icons.Default.Refresh,
+                    contentDescription = stringResource(
+                        R.string.home_subscription_refresh_content_description,
+                        subscription.name,
+                    ),
+                )
+            }
+        }
+        Box(
+            modifier = Modifier
+                .size(48.dp)
+                .clip(CircleShape)
+                .combinedClickable(
+                    role = Role.Button,
+                    onClick = actions.onTestAll,
+                    onLongClick = { showPingMethodDialog = true },
+                ),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                Icons.Default.Speed,
+                contentDescription = stringResource(
+                    R.string.home_subscription_test_content_description,
+                    subscription.name,
+                    defaultPingMethod.value,
+                ),
+            )
+        }
+        Box {
+            TooltipIconButton(tooltip = stringResource(R.string.home_subscription_menu_content_description), onClick = { showMenu = true }) {
+                Icon(
+                    Icons.Default.MoreVert,
+                    contentDescription = stringResource(R.string.home_subscription_menu_content_description),
+                )
+            }
+            AnimatedDropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.home_action_edit)) },
+                    leadingIcon = {
+                        Icon(painterResource(R.drawable.edit_24px), contentDescription = null)
+                    },
+                    onClick = {
+                        showMenu = false
+                        actions.onEdit()
+                    },
+                )
+                if (supportUrl.isNotEmpty()) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.home_action_support)) },
+                        leadingIcon = {
+                            Icon(painterResource(R.drawable.support_24px), contentDescription = null)
+                        },
+                        onClick = {
+                            showMenu = false
+                            uriHandler.openUri(supportUrl)
+                        },
+                    )
+                }
+                if (hasDescription) {
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                stringResource(
+                                    if (subscription.descriptionHidden) {
+                                        R.string.home_subscription_show_description
+                                    } else {
+                                        R.string.home_subscription_hide_description
+                                    },
+                                ),
+                            )
+                        },
+                        leadingIcon = {
+                            Icon(
+                                painterResource(
+                                    if (subscription.descriptionHidden) {
+                                        R.drawable.visibility_24px
+                                    } else {
+                                        R.drawable.visibility_off_24px
+                                    },
+                                ),
+                                contentDescription = null,
+                            )
+                        },
+                        onClick = {
+                            showMenu = false
+                            actions.onDescriptionHiddenChange(!subscription.descriptionHidden)
+                        },
+                    )
+                }
+                if (canApplyRouting) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.home_subscription_apply_routing)) },
+                        leadingIcon = {
+                            Icon(painterResource(R.drawable.cloud_download_24px), contentDescription = null)
+                        },
+                        onClick = {
+                            showMenu = false
+                            actions.onApplyRouting()
+                        },
+                    )
+                }
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.home_action_remove)) },
+                    leadingIcon = {
+                        Icon(painterResource(R.drawable.delete_forever_24px), contentDescription = null)
+                    },
+                    onClick = {
+                        showMenu = false
+                        actions.onDelete()
+                    },
+                )
+            }
+        }
+    }
+
+    if (showPingMethodDialog) {
+        PingMethodDialog(
+            selectedMethod = defaultPingMethod,
+            testBoth = showBothLatencyResults,
+            onTestBothChange = actions.onShowBothLatencyResultsChange,
+            onDismiss = { showPingMethodDialog = false },
+            onSelected = { method ->
+                actions.onDefaultPingMethodSelected(method)
+                showPingMethodDialog = false
+            },
+        )
+    }
+}
+
+@Composable
+private fun PingMethodDialog(
+    selectedMethod: PingMethod,
+    testBoth: Boolean,
+    onTestBothChange: (Boolean) -> Unit,
+    onDismiss: () -> Unit,
+    onSelected: (PingMethod) -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.home_action_close))
+            }
+        },
+        title = { Text(stringResource(R.string.home_choose_ping_method_title)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                PingMethod.entries.forEach { method ->
+                    SelectableOptionRow(
+                        title = stringResource(method.labelResource),
+                        description = stringResource(method.descriptionResource),
+                        selected = method == selectedMethod,
+                        enabled = !testBoth,
+                        onSelected = { onSelected(method) },
+                    )
+                }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 48.dp)
+                        .toggleable(
+                            value = testBoth,
+                            role = Role.Checkbox,
+                            onValueChange = onTestBothChange,
+                        )
+                        .padding(vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Checkbox(
+                        checked = testBoth,
+                        onCheckedChange = null,
+                        modifier = Modifier.size(20.dp),
+                    )
+                    Text(stringResource(R.string.home_test_both_latency_types_title))
+                }
+            }
+        },
+    )
+}
+
+@Composable
+private fun SubscriptionDescriptionText(description: String) {
+    val linkColor = MaterialTheme.colorScheme.primary
+    val textColor = MaterialTheme.colorScheme.onSurfaceVariant
+    val uriHandler = LocalUriHandler.current
+    var pendingUrl by remember(description) { mutableStateOf<String?>(null) }
+    // Selection and links are focus stops that draw nothing, so a remote would lose focus in the
+    // announcement. Without touch it is plain text; the links keep their look.
+    val touch = LocalInputModeManager.current.inputMode == InputMode.Touch
+    val annotatedDescription = remember(description, linkColor, touch) {
+        description.withUrlLinks(linkColor, onUrlClick = if (touch) { url -> pendingUrl = url } else null)
+    }
+    val descriptionText = @Composable {
+        Text(
+            text = annotatedDescription,
+            style = MaterialTheme.typography.bodySmall,
+            color = textColor,
+        )
+    }
+
+    if (touch) SelectionContainer(content = descriptionText) else descriptionText()
+
+    pendingUrl?.let { url ->
+        AlertDialog(
+            onDismissRequest = { pendingUrl = null },
+            title = { Text(stringResource(R.string.home_open_link_title)) },
+            text = {
+                SelectionContainer {
+                    Text(
+                        text = url,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        pendingUrl = null
+                        uriHandler.openUri(url)
+                    },
+                ) {
+                    Text(stringResource(R.string.home_action_open))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingUrl = null }) {
+                    Text(stringResource(R.string.home_action_cancel))
+                }
+            },
+        )
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun ServerRow(
+    server: ServerListItem,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    onTestLatency: () -> Unit,
+    onOpenConfig: () -> Unit,
+    contentPadding: PaddingValues = ServerRowDefaults.contentPadding,
+) {
+    val latency = server.latency
+    val latencyColor = if (latency?.let(::latencyShowsError) == true) {
+        MaterialTheme.colorScheme.error
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
+
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .combinedClickable(onClick = onClick, onLongClick = onTestLatency),
+        color = if (isSelected) {
+            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f)
+        } else {
+            MaterialTheme.colorScheme.surfaceContainer
+        },
+    ) {
+        // IntrinsicSize.Min gives the row a height the chevron can fill, so its tap target and
+        // ripple cover the whole strip at the row's end instead of a small circle inside it.
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(IntrinsicSize.Min),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(contentPadding),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                CompactSelectionDot(isSelected = isSelected)
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        Text(
+                            text = server.entity.name,
+                            modifier = Modifier.weight(1f, fill = false),
+                            style = MaterialTheme.typography.titleMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        if (server.entity.edited) {
+                            ServerStateBadge(Icons.Outlined.Edit, R.string.home_server_edited)
+                        }
+                        if (server.entity.guarded) {
+                            ServerStateBadge(Icons.Outlined.Shield, R.string.home_server_guarded)
+                        }
+                    }
+                    Text(
+                        text = server.endpointSummary,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                if (latency != null) {
+                    Surface(
+                        shape = MaterialTheme.shapes.small,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                        color = MaterialTheme.colorScheme.surface,
+                    ) {
+                        LatencyBadgeContent(
+                            latency = latency,
+                            color = latencyColor,
+                        )
+                    }
+                }
+            }
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .clickable(
+                        onClick = onOpenConfig,
+                        onClickLabel = stringResource(R.string.config_viewer_open),
+                    )
+                    .padding(horizontal = ServerRowDefaults.chevronHorizontalPadding),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = stringResource(R.string.config_viewer_open),
+                    modifier = Modifier.size(ServerRowDefaults.chevronIconSize),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ServerStateBadge(icon: ImageVector, @StringRes descriptionRes: Int) {
+    Icon(
+        imageVector = icon,
+        contentDescription = stringResource(descriptionRes),
+        modifier = Modifier.size(14.dp),
+        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
+
+@Composable
+private fun LatencyBadgeContent(
+    latency: ServerLatencyState,
+    color: Color,
+) {
+    val tcpingLatencyMs = latency.tcpingLatencyMs
+    val httpingLatencyMs = latency.httpingLatencyMs
+    if (latency.latencyMs == LATENCY_TESTING) {
+        ShimmeringText(
+            text = stringResource(R.string.home_latency_testing),
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            color = color,
+            style = MaterialTheme.typography.labelMedium,
+        )
+    } else if (tcpingLatencyMs != null && httpingLatencyMs != null) {
+        Row(
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(1.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            LatencyValue(tcpingLatencyMs, PingMethod.Tcping, Icons.Outlined.NetworkPing, color)
+            Text(
+                text = ",",
+                color = color,
+                style = MaterialTheme.typography.labelMedium.copy(letterSpacing = (-0.25).sp),
+            )
+            LatencyValue(httpingLatencyMs, PingMethod.Httping, Icons.Outlined.Dns, color)
+        }
+    } else {
+        Text(
+            text = if (latency.latencyMs < 0) {
+                stringResource(R.string.home_latency_not_available)
+            } else {
+                stringResource(R.string.home_latency_milliseconds, latency.latencyMs)
+            },
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            color = color,
+            style = MaterialTheme.typography.labelMedium,
+        )
+    }
+}
+
+@Composable
+private fun ShimmeringText(
+    text: String,
+    color: Color,
+    style: TextStyle,
+    modifier: Modifier = Modifier,
+) {
+    val transition = rememberInfiniteTransition(label = "latency-shimmer")
+    val progress by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = LATENCY_SHIMMER_DURATION_MS, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart,
+        ),
+        label = "latency-shimmer-progress",
+    )
+    val shimmerWidth = with(LocalDensity.current) { 32.dp.toPx() }
+    val travelDistance = with(LocalDensity.current) { 120.dp.toPx() }
+    val startX = -shimmerWidth + progress * (travelDistance + shimmerWidth)
+    val brush = Brush.linearGradient(
+        colors = listOf(color.copy(alpha = 0.45f), color, color.copy(alpha = 0.45f)),
+        start = Offset(startX, 0f),
+        end = Offset(startX + shimmerWidth, 0f),
+    )
+
+    Text(
+        text = text,
+        modifier = modifier,
+        style = style.copy(brush = brush),
+    )
+}
+
+@Composable
+private fun LatencyValue(
+    latencyMs: Int,
+    method: PingMethod?,
+    icon: ImageVector,
+    color: Color,
+) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(1.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = if (latencyMs < 0) {
+                stringResource(R.string.home_latency_not_available)
+            } else {
+                stringResource(R.string.home_latency_milliseconds_compact, latencyMs)
+            },
+            color = color,
+            style = MaterialTheme.typography.labelMedium.copy(letterSpacing = (-0.25).sp),
+        )
+        Icon(
+            imageVector = icon,
+            contentDescription = method?.let { stringResource(it.labelResource) },
+            modifier = Modifier.size(13.dp),
+            tint = color,
+        )
+    }
+}
+
+internal fun latencyShowsError(latency: ServerLatencyState): Boolean {
+    val httpingLatencyMs = latency.httpingLatencyMs
+    if (latency.latencyMs == LATENCY_TESTING) return false
+    return if (latency.tcpingLatencyMs != null && httpingLatencyMs != null) {
+        httpingLatencyMs < 0
+    } else {
+        latency.latencyMs < 0
+    }
+}
+
+private object ServerRowDefaults {
+    // No end padding: the chevron's own strip supplies the row's end inset.
+    val contentPadding = PaddingValues(start = 12.dp, top = 10.dp, end = 0.dp, bottom = 10.dp)
+
+    val chevronHorizontalPadding = 7.dp
+    val chevronIconSize = 20.dp
+}
+
+private const val LATENCY_SHIMMER_DURATION_MS = 850
+
+@Composable
+private fun CompactSelectionDot(isSelected: Boolean) {
+    Surface(
+        modifier = Modifier.size(18.dp),
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(
+            width = 2.dp,
+            color = if (isSelected) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.outline
+            },
+        ),
+    ) {
+        if (isSelected) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(4.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primary),
+            )
+        }
+    }
+}
+
+private fun String.withMetadataEmphasis(expiredStatusText: String) = buildAnnotatedString {
+    metadataTextSegments(this@withMetadataEmphasis, expiredStatusText).forEach { segment ->
+        if (segment.emphasized) {
+            withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
+                append(segment.value)
+            }
+        } else {
+            append(segment.value)
+        }
+    }
+}
+
+private fun String.withUrlLinks(
+    linkColor: Color,
+    onUrlClick: ((String) -> Unit)?,
+): AnnotatedString = buildAnnotatedString {
+    var cursor = 0
+    val linkStyle = SpanStyle(
+        color = linkColor,
+        textDecoration = TextDecoration.Underline,
+    )
+
+    subscriptionUrlRegex.findAll(this@withUrlLinks).forEach { match ->
+        val start = match.range.first
+        val end = this@withUrlLinks.trimmedUrlEnd(match)
+        if (end <= start) return@forEach
+
+        if (cursor < start) {
+            append(this@withUrlLinks.substring(cursor, start))
+        }
+
+        val url = this@withUrlLinks.substring(start, end)
+        val linkStart = length
+        append(url)
+        if (onUrlClick == null) {
+            addStyle(linkStyle, start = linkStart, end = length)
+        } else {
+            addLink(
+                LinkAnnotation.Clickable(
+                    tag = url.normalizedSubscriptionUrl(),
+                    styles = TextLinkStyles(style = linkStyle),
+                    linkInteractionListener = LinkInteractionListener { link ->
+                        (link as? LinkAnnotation.Clickable)?.tag?.let(onUrlClick)
+                    },
+                ),
+                start = linkStart,
+                end = length,
+            )
+        }
+        cursor = end
+    }
+
+    if (cursor < this@withUrlLinks.length) {
+        append(this@withUrlLinks.substring(cursor))
+    }
+}
+
+private fun String.trimmedUrlEnd(match: MatchResult): Int {
+    var end = match.range.last + 1
+    while (end > match.range.first && this[end - 1] in trailingUrlPunctuation) {
+        end--
+    }
+    return end
+}
+
+private fun String.normalizedSubscriptionUrl(): String = if (startsWith("http://", ignoreCase = true) || startsWith("https://", ignoreCase = true)) {
+    this
+} else {
+    "https://$this"
+}
+
+private val subscriptionUrlRegex = Regex(
+    pattern = """(?i)(?<![@\w])(?:https?://[^\s<>"']+|(?:www\.|(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,})(?:/[^\s<>"']*)?)""",
+)
+private val trailingUrlPunctuation = setOf('.', ',', ';', ':', '!', '?', ')', ']', '}')
+private val SubscriptionBlockGap = 6.dp
+private val SubscriptionMetadataGap = 10.dp
+
+private val ConnectionButtonSize = 124.dp
+private val LargeConnectionButtonSize = 168.dp
+
+/** Below this the pane keeps the phone-sized button so status and details still fit unscrolled. */
+private val LargeConnectionButtonMinPaneHeight = 560.dp
+private const val CONNECTION_PANE_WIDTH_FRACTION = 0.36f
+private val ConnectionPaneMinWidth = 320.dp
+private val ConnectionPaneMaxWidth = 440.dp
+
+/** 64dp button plus its 16dp scaffold inset, so list content can scroll clear of it. */
+private val FloatingConnectButtonClearance = 80.dp
+private const val DISABLED_FAB_CONTENT_ALPHA = 0.38f
+private const val QR_SCANNER_TRANSITION_MS = 180
+private const val SUBSCRIPTION_EXPANSION_MS = 180
+private const val CORE_UPTIME_REFRESH_INTERVAL_MS = 1_000L
+private const val CAMERA_PERMISSION_PREFS = "camera_permission"
+private const val CAMERA_PERMISSION_REQUESTED = "requested"
+private const val HOME_UI_PREFS = "home_ui"
+private fun Modifier.subscriptionDragVisual(id: Long, draggingId: Long?, offset: Float): Modifier = zIndex(if (id == draggingId) 1f else 0f).graphicsLayer {
+    translationY = if (id == draggingId) offset else 0f
+}
+
+private fun persistSubscriptionOrderIfChanged(
+    draggingId: Long?,
+    order: List<Long>,
+    subscriptions: List<SubscriptionEntity>,
+    persist: (List<Long>) -> Unit,
+) {
+    if (draggingId != null && order != subscriptions.map { it.id }) persist(order.toList())
+}
+
+private fun reorderSubscriptionDuringDrag(
+    order: SnapshotStateList<Long>,
+    listState: LazyListState,
+    subscriptionId: Long,
+    delta: Float,
+    currentOffset: Float,
+    spacingPx: Float,
+): Float {
+    val offset = currentOffset + delta
+    val current = order.indexOf(subscriptionId)
+    if (current < 0) return offset
+    val next = current + if (delta > 0f) 1 else -1
+    if (next !in order.indices) return offset
+
+    val neighbor = listState.layoutInfo.visibleItemsInfo.firstOrNull { it.key == order[next] } ?: return offset
+    val movingDown = delta > 0f
+    val crossedMidpoint = if (movingDown) offset > neighbor.size / 2f else -offset > neighbor.size / 2f
+    if (!crossedMidpoint) return offset
+
+    order.add(next, order.removeAt(current))
+    return offset + if (movingDown) -(neighbor.size + spacingPx) else neighbor.size + spacingPx
+}
+
+private const val COLLAPSED_SUBSCRIPTION_IDS = "collapsed_subscription_ids"
+
+private fun Context.clipboardText(): String? {
+    val clipboard = getSystemService(ClipboardManager::class.java) ?: return null
+    val clip = clipboard.primaryClip ?: return null
+    if (clip.itemCount <= 0) return null
+    return clip.getItemAt(0)
+        ?.coerceToText(this)
+        ?.toString()
+        ?.trim()
+        ?.takeIf { it.isNotEmpty() }
+}
+
+private data class AutoUpdateIntervalOption(
+    val intervalHours: Int,
+)
+
+private val autoUpdateIntervalOptions = listOf(
+    AutoUpdateIntervalOption(1),
+    AutoUpdateIntervalOption(3),
+    AutoUpdateIntervalOption(6),
+    AutoUpdateIntervalOption(24),
+    AutoUpdateIntervalOption(72),
+    AutoUpdateIntervalOption(0),
+)
+
+@Composable
+private fun autoUpdateIntervalLabel(intervalHours: Int): String = when (intervalHours) {
+    0 -> stringResource(R.string.home_duration_manual)
+    24, 72 -> {
+        val days = intervalHours / 24
+        pluralStringResource(R.plurals.home_duration_days, days, days)
+    }
+    else -> pluralStringResource(R.plurals.home_duration_hours, intervalHours, intervalHours)
+}
+
+@Composable
+private fun EditSubscriptionDialog(
+    subscription: SubscriptionEntity,
+    onDismiss: () -> Unit,
+    onConfirm: (String, String, Boolean, Boolean, Int, SubscriptionUserAgentMode, String, String) -> Unit,
+) {
+    var advancedExpanded by rememberSaveable(subscription.id) { mutableStateOf(false) }
+    val name = rememberSaveable(subscription.id, saver = TextFieldState.Saver) { TextFieldState(subscription.name) }
+    val url = rememberSaveable(subscription.id, saver = TextFieldState.Saver) { TextFieldState(subscription.url) }
+    var preferJson by rememberSaveable(subscription.id) { mutableStateOf(subscription.preferJson ?: true) }
+    var allowInsecureUpdates by rememberSaveable(subscription.id) {
+        mutableStateOf(subscription.allowInsecureUpdates)
+    }
+    var autoUpdateIntervalHours by rememberSaveable(subscription.id) {
+        mutableStateOf(subscription.autoUpdateIntervalHours)
+    }
+    var userAgentMode by rememberSaveable(subscription.id) {
+        mutableStateOf(SubscriptionUserAgentMode.fromValue(subscription.userAgentMode))
+    }
+    val customUserAgent = rememberSaveable(subscription.id, saver = TextFieldState.Saver) {
+        TextFieldState(subscription.customUserAgent.orEmpty())
+    }
+    val customHeaders = rememberSaveable(subscription.id, saver = TextFieldState.Saver) {
+        TextFieldState(subscription.customHeaders.orEmpty())
+    }
+    val hasChanges = name.text.toString().trim() != subscription.name ||
+        url.text.toString().trim() != subscription.url ||
+        preferJson != (subscription.preferJson ?: true) ||
+        allowInsecureUpdates != subscription.allowInsecureUpdates ||
+        autoUpdateIntervalHours != subscription.autoUpdateIntervalHours ||
+        userAgentMode != SubscriptionUserAgentMode.fromValue(subscription.userAgentMode) ||
+        customUserAgent.text.toString().trim().ifBlank { null } != subscription.customUserAgent ||
+        customHeaders.text.toString().trim().ifBlank { null } != subscription.customHeaders
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.home_edit_subscription_title)) },
+        text = {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+            ) {
+                OutlinedTextField(
+                    state = name,
+                    label = { Text(stringResource(R.string.home_field_name)) },
+                    lineLimits = TextFieldLineLimits.SingleLine,
+                    modifier = Modifier.fillMaxWidth(),
+                    supportingText = { Text(stringResource(R.string.home_name_from_provider_hint)) },
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    state = url,
+                    label = { Text(stringResource(R.string.home_field_url)) },
+                    lineLimits = TextFieldLineLimits.SingleLine,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                key(subscription.id) {
+                    ReadOnlyDropdownField(
+                        label = stringResource(R.string.home_auto_update_label),
+                        selectedText = autoUpdateIntervalLabel(autoUpdateIntervalHours),
+                        options = autoUpdateIntervalOptions.map { option ->
+                            DropdownOption(
+                                value = option.intervalHours,
+                                label = autoUpdateIntervalLabel(option.intervalHours),
+                            )
+                        },
+                        onSelected = { autoUpdateIntervalHours = it },
+                    )
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                SubscriptionAdvancedOptions(
+                    expanded = advancedExpanded,
+                    onExpandedChange = { advancedExpanded = it },
+                    preferJson = preferJson,
+                    onPreferJsonChange = { preferJson = it },
+                    allowInsecureUpdates = allowInsecureUpdates,
+                    onAllowInsecureUpdatesChange = { allowInsecureUpdates = it },
+                    userAgentMode = userAgentMode,
+                    customUserAgent = customUserAgent,
+                    customHeaders = customHeaders,
+                    onUserAgentModeChange = { userAgentMode = it },
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    onConfirm(
+                        name.text.toString().trim(),
+                        url.text.toString().trim(),
+                        preferJson,
+                        allowInsecureUpdates,
+                        autoUpdateIntervalHours,
+                        userAgentMode,
+                        customUserAgent.text.toString(),
+                        customHeaders.text.toString(),
+                    )
+                },
+                enabled = url.text.isNotBlank() && hasChanges,
+            ) {
+                Text(stringResource(R.string.home_action_save))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.home_action_cancel))
+            }
+        },
+    )
+}
+
+@Composable
+private fun ApplySubscriptionRoutingDialog(
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.home_apply_subscription_routing_title)) },
+        text = { Text(stringResource(R.string.home_apply_subscription_routing_message)) },
+        confirmButton = {
+            Button(onClick = onConfirm) {
+                Text(stringResource(R.string.home_apply_subscription_routing_confirm))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.home_apply_subscription_routing_dismiss))
+            }
+        },
+    )
+}
+
+@Composable
+private fun RemoveSubscriptionDialog(
+    serverCount: Int,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.home_remove_subscription_title)) },
+        text = {
+            Text(
+                pluralStringResource(
+                    R.plurals.home_remove_subscription_message,
+                    serverCount,
+                    serverCount,
+                ),
+            )
+        },
+        confirmButton = {
+            Button(onClick = onConfirm) {
+                Text(stringResource(R.string.home_action_remove))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.home_action_cancel))
+            }
+        },
+    )
+}
+
+@Composable
+private fun AddSubscriptionDialog(
+    onDismiss: () -> Unit,
+    onConfirm: (String, String, Boolean, Boolean, SubscriptionUserAgentMode, String, String) -> Unit,
+) {
+    var advancedExpanded by rememberSaveable { mutableStateOf(false) }
+    val name = rememberTextFieldState()
+    val url = rememberTextFieldState()
+    var preferJson by rememberSaveable { mutableStateOf(true) }
+    var allowInsecureUpdates by rememberSaveable { mutableStateOf(false) }
+    var userAgentMode by rememberSaveable { mutableStateOf(SubscriptionUserAgentMode.default) }
+    val customUserAgent = rememberTextFieldState()
+    val customHeaders = rememberTextFieldState()
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.home_add_manually)) },
+        text = {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+            ) {
+                OutlinedTextField(
+                    state = url,
+                    label = { Text(stringResource(R.string.home_field_url)) },
+                    lineLimits = TextFieldLineLimits.SingleLine,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    state = name,
+                    label = { Text(stringResource(R.string.home_field_name)) },
+                    lineLimits = TextFieldLineLimits.SingleLine,
+                    modifier = Modifier.fillMaxWidth(),
+                    supportingText = { Text(stringResource(R.string.home_name_from_provider_hint)) },
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                SubscriptionAdvancedOptions(
+                    expanded = advancedExpanded,
+                    onExpandedChange = { advancedExpanded = it },
+                    preferJson = preferJson,
+                    onPreferJsonChange = { preferJson = it },
+                    allowInsecureUpdates = allowInsecureUpdates,
+                    onAllowInsecureUpdatesChange = { allowInsecureUpdates = it },
+                    userAgentMode = userAgentMode,
+                    customUserAgent = customUserAgent,
+                    customHeaders = customHeaders,
+                    onUserAgentModeChange = { userAgentMode = it },
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    onConfirm(
+                        name.text.toString().trim(),
+                        url.text.toString().trim(),
+                        preferJson,
+                        allowInsecureUpdates,
+                        userAgentMode,
+                        customUserAgent.text.toString(),
+                        customHeaders.text.toString(),
+                    )
+                },
+                enabled = url.text.isNotBlank(),
+            ) {
+                Text(stringResource(R.string.home_action_add))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.home_action_cancel))
+            }
+        },
+    )
+}
+
+@Composable
+private fun SubscriptionAdvancedOptions(
+    expanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
+    preferJson: Boolean,
+    onPreferJsonChange: (Boolean) -> Unit,
+    allowInsecureUpdates: Boolean,
+    onAllowInsecureUpdatesChange: (Boolean) -> Unit,
+    userAgentMode: SubscriptionUserAgentMode,
+    customUserAgent: TextFieldState,
+    customHeaders: TextFieldState,
+    onUserAgentModeChange: (SubscriptionUserAgentMode) -> Unit,
+) {
+    TextButton(
+        onClick = { onExpandedChange(!expanded) },
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Text(
+            text = stringResource(R.string.home_advanced),
+            modifier = Modifier.weight(1f),
+            textAlign = TextAlign.Start,
+        )
+        ExpansionArrow(
+            expanded = expanded,
+            contentDescription = stringResource(
+                if (expanded) R.string.home_collapse_advanced else R.string.home_expand_advanced,
+            ),
+        )
+    }
+    AnimatedVisibility(
+        visible = expanded,
+        enter = fadeIn() + expandVertically(expandFrom = Alignment.Top),
+        exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut(),
+    ) {
+        Column {
+            Spacer(modifier = Modifier.height(8.dp))
+            SubscriptionFetchTypeDropdown(
+                preferJson = preferJson,
+                onPreferJsonChange = onPreferJsonChange,
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            SubscriptionUserAgentSection(
+                selectedMode = userAgentMode,
+                customUserAgent = customUserAgent,
+                customHeaders = customHeaders,
+                onModeChange = onUserAgentModeChange,
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            SettingsSwitchRow(
+                title = stringResource(R.string.home_allow_insecure_updates),
+                description = stringResource(R.string.home_allow_insecure_updates_description),
+                checked = allowInsecureUpdates,
+                onCheckedChange = onAllowInsecureUpdatesChange,
+            )
+        }
+    }
+}
+
+@Composable
+private fun SubscriptionFetchTypeDropdown(
+    preferJson: Boolean,
+    onPreferJsonChange: (Boolean) -> Unit,
+) {
+    val jsonFirst = stringResource(R.string.home_fetch_type_json_first)
+    val compatibility = stringResource(R.string.home_fetch_type_compatibility)
+
+    ReadOnlyDropdownField(
+        label = stringResource(R.string.home_fetch_type_label),
+        selectedText = if (preferJson) jsonFirst else compatibility,
+        options = listOf(
+            DropdownOption(
+                value = true,
+                label = jsonFirst,
+                description = stringResource(R.string.home_fetch_type_json_first_description),
+            ),
+            DropdownOption(
+                value = false,
+                label = compatibility,
+                description = stringResource(R.string.home_fetch_type_compatibility_description),
+            ),
+        ),
+        onSelected = onPreferJsonChange,
+    )
+}
+
+@Composable
+private fun SubscriptionUserAgentSection(
+    selectedMode: SubscriptionUserAgentMode,
+    customUserAgent: TextFieldState,
+    customHeaders: TextFieldState,
+    onModeChange: (SubscriptionUserAgentMode) -> Unit,
+) {
+    ReadOnlyDropdownField(
+        label = stringResource(R.string.home_field_user_agent),
+        selectedText = stringResource(selectedMode.labelResource),
+        options = SubscriptionUserAgentMode.entries.map { mode ->
+            DropdownOption(
+                value = mode,
+                label = stringResource(mode.labelResource),
+                description = stringResource(mode.descriptionResource),
+            )
+        },
+        onSelected = onModeChange,
+    )
+    if (selectedMode == SubscriptionUserAgentMode.CUSTOM) {
+        Spacer(modifier = Modifier.height(8.dp))
+        OutlinedTextField(
+            state = customUserAgent,
+            label = { Text(stringResource(R.string.home_field_user_agent)) },
+            placeholder = {
+                Text(
+                    stringResource(
+                        R.string.home_user_agent_example,
+                        stringResource(R.string.home_user_agent_example_value),
+                    ),
+                )
+            },
+            lineLimits = TextFieldLineLimits.SingleLine,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        OutlinedTextField(
+            state = customHeaders,
+            label = { Text(stringResource(R.string.home_field_headers)) },
+            lineLimits = TextFieldLineLimits.MultiLine(minHeightInLines = 3),
+            modifier = Modifier.fillMaxWidth(),
+            supportingText = { Text(stringResource(R.string.home_headers_example)) },
+        )
+    }
+}

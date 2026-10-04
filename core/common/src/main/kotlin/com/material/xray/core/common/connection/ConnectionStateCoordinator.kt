@@ -1,9 +1,9 @@
 package com.material.xray.core.common.connection
 
-import com.material.xray.model.ActiveBalancerSelection
-import com.material.xray.model.ConnectionProgress
-import com.material.xray.model.ConnectionState
-import com.material.xray.model.SessionTrafficMetrics
+import com.material.xray.core.model.ActiveBalancerSelection
+import com.material.xray.core.model.ConnectionProgress
+import com.material.xray.core.model.ConnectionState
+import com.material.xray.core.model.SessionTrafficMetrics
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow

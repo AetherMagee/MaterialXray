@@ -1,8 +1,8 @@
 package com.material.xray.core.common.connection
 
-import com.material.xray.model.ConnectionProgress
-import com.material.xray.model.ConnectionState
-import com.material.xray.model.SessionTrafficMetrics
+import com.material.xray.core.model.ConnectionProgress
+import com.material.xray.core.model.ConnectionState
+import com.material.xray.core.model.SessionTrafficMetrics
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch

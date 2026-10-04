@@ -86,7 +86,7 @@ static char **copy_env(JNIEnv *env, jobjectArray values, jsize count, const char
 }
 
 JNIEXPORT jint JNICALL
-Java_com_material_xray_service_AndroidUserXrayProcessLauncher_nativeStart(
+Java_com_material_xray_core_runtime_AndroidUserXrayProcessLauncher_nativeStart(
         JNIEnv *env,
         jclass clazz,
         jstring binary_path,
@@ -200,7 +200,7 @@ cleanup:
 }
 
 JNIEXPORT jboolean JNICALL
-Java_com_material_xray_service_AndroidUserXrayProcessLauncher_nativeIsAlive(
+Java_com_material_xray_core_runtime_AndroidUserXrayProcessLauncher_nativeIsAlive(
         JNIEnv *env,
         jclass clazz,
         jint pid) {
@@ -217,7 +217,7 @@ Java_com_material_xray_service_AndroidUserXrayProcessLauncher_nativeIsAlive(
 }
 
 JNIEXPORT jboolean JNICALL
-Java_com_material_xray_service_AndroidUserXrayProcessLauncher_nativeKill(
+Java_com_material_xray_core_runtime_AndroidUserXrayProcessLauncher_nativeKill(
         JNIEnv *env,
         jclass clazz,
         jint pid,

@@ -1,6 +1,6 @@
 package com.material.xray.service
 
-import com.material.xray.core.xray.TunManager
+import com.material.xray.core.connection.routing.TunManager
 import com.material.xray.core.xray.XrayState
 import org.junit.Assert.assertEquals
 import org.junit.Test

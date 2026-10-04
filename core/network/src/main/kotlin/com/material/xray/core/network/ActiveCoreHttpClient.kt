@@ -1,11 +1,11 @@
 package com.material.xray.core.network
 
 import com.material.xray.core.common.connection.ConnectionStateCoordinator
+import com.material.xray.core.model.ConnectionState
 import com.material.xray.core.xray.ACTIVE_CONFIG_FILE
 import com.material.xray.core.xray.LocalSockets
 import com.material.xray.core.xray.XRAY_APP_HTTP_INBOUND_TAG
 import com.material.xray.core.xray.XrayPaths
-import com.material.xray.model.ConnectionState
 import java.io.File
 import java.io.IOException
 import java.net.InetSocketAddress

@@ -1,6 +1,6 @@
 package com.material.xray.core.xray
 
-import com.material.xray.model.ServerConfig
+import com.material.xray.core.model.ServerConfig
 
 /**
  * An app group's route to its own outbound. Under TPROXY the group has an inbound of its own,

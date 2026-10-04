@@ -5,9 +5,9 @@ import android.content.Context
 import android.content.Intent
 import android.net.VpnService
 import android.util.Log
-import com.material.xray.core.xray.StateFile
+import com.material.xray.core.data.repository.SettingsRepository
+import com.material.xray.core.runtime.appStateFile
 import com.material.xray.core.xray.XrayStateReadResult
-import com.material.xray.data.repository.SettingsRepository
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -39,7 +39,7 @@ class BootReceiver(
     private suspend fun autoConnectIfConfigured(context: Context, action: String?) {
         val autoConnect = settingsRepo.autoConnect.first()
         val hasRecordedRuntime = action == Intent.ACTION_MY_PACKAGE_REPLACED &&
-            StateFile(context).readResult() !is XrayStateReadResult.Absent
+            appStateFile(context).readResult() !is XrayStateReadResult.Absent
         val recoverAfterReplacement = shouldRecoverAfterPackageReplacement(
             action = action,
             autoConnect = autoConnect,

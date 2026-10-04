@@ -1,9 +1,9 @@
 package com.material.xray.core.database.di
 
-import com.material.xray.data.db.AppDatabase
-import com.material.xray.data.db.dao.AppBypassDao
-import com.material.xray.data.db.dao.ServerDao
-import com.material.xray.data.db.dao.SubscriptionDao
+import com.material.xray.core.database.AppDatabase
+import com.material.xray.core.database.dao.AppBypassDao
+import com.material.xray.core.database.dao.ServerDao
+import com.material.xray.core.database.dao.SubscriptionDao
 import org.koin.core.annotation.ComponentScan
 import org.koin.core.annotation.Factory
 import org.koin.core.annotation.Module
@@ -13,7 +13,7 @@ import org.koin.core.annotation.Module
  * which owns the file location and the SQLite driver.
  */
 @Module
-@ComponentScan("com.material.xray.data.db")
+@ComponentScan("com.material.xray.core.database")
 class CoreDatabaseModule {
 
     @Factory

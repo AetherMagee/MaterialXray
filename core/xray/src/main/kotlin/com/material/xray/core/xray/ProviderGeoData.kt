@@ -1,7 +1,7 @@
 package com.material.xray.core.xray
 
-import com.material.xray.model.RoutingRule
-import com.material.xray.model.RoutingRuleOperator
+import com.material.xray.core.model.RoutingRule
+import com.material.xray.core.model.RoutingRuleOperator
 import java.io.EOFException
 import java.io.File
 import java.io.IOException

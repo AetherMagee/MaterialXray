@@ -1,6 +1,6 @@
 package com.material.xray.core.xray
 
-import com.material.xray.model.RootConnectionBackend
+import com.material.xray.core.model.RootConnectionBackend
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse

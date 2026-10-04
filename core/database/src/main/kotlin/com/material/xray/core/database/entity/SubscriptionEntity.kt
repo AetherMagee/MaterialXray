@@ -1,0 +1,38 @@
+package com.material.xray.core.database.entity
+
+import androidx.room.Entity
+import androidx.room.PrimaryKey
+
+@Entity(tableName = "subscriptions")
+data class SubscriptionEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val name: String,
+    val url: String,
+    val preferJson: Boolean? = true,
+    val lastUpdated: Long = 0,
+    val lastAutoRefreshFailureAt: Long = 0,
+    val contentDisposition: String? = null,
+    val contentType: String? = null,
+    val profileTitle: String? = null,
+    val profileUpdateIntervalHours: Int? = null,
+    val autoUpdateIntervalHours: Int = 1,
+    val subscriptionUploadBytes: Long? = null,
+    val subscriptionDownloadBytes: Long? = null,
+    val subscriptionTotalBytes: Long? = null,
+    val subscriptionExpireAt: Long? = null,
+    val profileWebPageUrl: String? = null,
+    val announce: String? = null,
+    val supportUrl: String? = null,
+    val fallbackUrl: String? = null,
+    val requiresHardwareId: Boolean = false,
+    val descriptionHidden: Boolean = false,
+    val userAgentMode: String? = null,
+    val customUserAgent: String? = null,
+    val customHeaders: String? = null,
+    val allowInsecureUpdates: Boolean = false,
+    val appRoutingPackages: String? = null,
+    val appRoutingMode: String? = null,
+    val appRoutingInverted: Boolean = false,
+    val providerRouting: String? = null,
+    val sortOrder: Int = 0,
+)

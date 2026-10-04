@@ -3,9 +3,9 @@ package com.material.xray.di
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
-import com.material.xray.data.repository.AppUpdateDataStore
-import com.material.xray.data.repository.PreferenceDataStores
-import com.material.xray.data.repository.SettingsDataStore
+import com.material.xray.core.data.repository.AppUpdateDataStore
+import com.material.xray.core.data.repository.PreferenceDataStores
+import com.material.xray.core.data.repository.SettingsDataStore
 import java.io.File
 import org.koin.core.annotation.Module
 import org.koin.core.annotation.Singleton

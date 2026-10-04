@@ -3,8 +3,8 @@ package com.material.xray.core.android.data
 import android.content.Context
 import android.provider.Settings
 import com.material.xray.core.common.platform.AppBuildInfo
-import com.material.xray.data.parser.SubscriptionDeviceIdentity
-import com.material.xray.data.parser.resolveSubscriptionHardwareId
+import com.material.xray.core.data.parser.SubscriptionDeviceIdentity
+import com.material.xray.core.data.parser.resolveSubscriptionHardwareId
 import org.koin.core.annotation.Factory
 
 /**

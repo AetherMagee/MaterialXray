@@ -1,0 +1,111 @@
+package com.material.xray.core.data.repository
+
+import com.material.xray.core.database.entity.SubscriptionEntity
+import com.material.xray.core.model.SubscriptionMetadata
+import com.material.xray.core.model.SubscriptionUserInfo
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Test
+
+class SubscriptionMetadataMapperTest {
+    @Test
+    fun toSubscriptionMetadataNormalizesBlankEntityValues() {
+        val entity = SubscriptionEntity(
+            name = "Sub",
+            url = "https://example.com/sub",
+            contentDisposition = " ",
+            contentType = " application/json ",
+            profileTitle = " Provider ",
+            profileUpdateIntervalHours = 0,
+            subscriptionUploadBytes = -1,
+            subscriptionDownloadBytes = 1024,
+            subscriptionTotalBytes = null,
+            subscriptionExpireAt = 0,
+            announce = " hello ",
+        )
+
+        assertEquals(
+            SubscriptionMetadata(
+                contentType = "application/json",
+                profileTitle = "Provider",
+                subscriptionUserInfo = SubscriptionUserInfo(download = 1024),
+                announce = "hello",
+            ),
+            entity.toSubscriptionMetadata(),
+        )
+    }
+
+    @Test
+    fun withSubscriptionMetadataClearsMissingMetadataFields() {
+        val entity = SubscriptionEntity(
+            name = "Old",
+            url = "https://old.example",
+            contentType = "text/plain",
+            subscriptionDownloadBytes = 100,
+            announce = "old",
+        )
+
+        val updated = entity.withSubscriptionMetadata(
+            metadata = SubscriptionMetadata(
+                profileTitle = " Provider ",
+                subscriptionUserInfo = SubscriptionUserInfo(total = 200),
+            ),
+            resolvedName = "New",
+            resolvedUrl = "https://new.example",
+            lastUpdated = 123,
+        )
+
+        assertEquals("New", updated.name)
+        assertEquals("https://new.example", updated.url)
+        assertEquals(123, updated.lastUpdated)
+        assertNull(updated.contentType)
+        assertEquals("Provider", updated.profileTitle)
+        assertNull(updated.subscriptionDownloadBytes)
+        assertEquals(200L, updated.subscriptionTotalBytes)
+        assertNull(updated.announce)
+        assertNull(updated.fallbackUrl)
+    }
+
+    @Test
+    fun fallbackUrlRoundTripsThroughMetadata() {
+        val entity = SubscriptionEntity(
+            name = "Sub",
+            url = "https://example.com/sub",
+            fallbackUrl = " https://backup.example/sub ",
+        )
+
+        assertEquals("https://backup.example/sub", entity.toSubscriptionMetadata()?.fallbackUrl)
+
+        val updated = SubscriptionEntity(
+            name = "Sub",
+            url = "https://example.com/sub",
+        ).withSubscriptionMetadata(
+            metadata = SubscriptionMetadata(fallbackUrl = " https://backup.example/sub "),
+        )
+
+        assertEquals("https://backup.example/sub", updated.fallbackUrl)
+    }
+
+    @Test
+    fun requiresHardwareIdRoundTripsThroughMetadata() {
+        val entity = SubscriptionEntity(
+            name = "Sub",
+            url = "https://example.com/sub",
+            requiresHardwareId = true,
+        )
+
+        assertEquals(true, entity.toSubscriptionMetadata()?.requiresHardwareId)
+
+        val cleared = entity.withSubscriptionMetadata(
+            metadata = SubscriptionMetadata(profileTitle = "Provider"),
+        )
+
+        assertEquals(false, cleared.requiresHardwareId)
+
+        val required = entity.withSubscriptionMetadata(
+            metadata = SubscriptionMetadata(requiresHardwareId = true),
+        )
+
+        assertEquals(true, required.requiresHardwareId)
+    }
+}

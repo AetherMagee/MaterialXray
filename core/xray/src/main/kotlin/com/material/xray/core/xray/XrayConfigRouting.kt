@@ -1,11 +1,11 @@
 package com.material.xray.core.xray
 
-import com.material.xray.model.RoutingRule
-import com.material.xray.model.SubscriptionRouting
-import com.material.xray.model.isIpv4DnsServerLiteral
-import com.material.xray.model.isIpv6DnsServerLiteral
-import com.material.xray.model.resolveDnsServersForIpv6
-import com.material.xray.model.toXrayRules
+import com.material.xray.core.model.RoutingRule
+import com.material.xray.core.model.SubscriptionRouting
+import com.material.xray.core.model.isIpv4DnsServerLiteral
+import com.material.xray.core.model.isIpv6DnsServerLiteral
+import com.material.xray.core.model.resolveDnsServersForIpv6
+import com.material.xray.core.model.toXrayRules
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive

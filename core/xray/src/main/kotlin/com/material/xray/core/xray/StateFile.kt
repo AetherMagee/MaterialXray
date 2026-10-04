@@ -3,8 +3,8 @@ package com.material.xray.core.xray
 import com.material.xray.core.common.io.AtomicFile
 import com.material.xray.core.common.log.AppLogger
 import com.material.xray.core.common.log.NoOpAppLogger
-import com.material.xray.model.OtherVpnMode
-import com.material.xray.model.RootConnectionBackend
+import com.material.xray.core.model.OtherVpnMode
+import com.material.xray.core.model.RootConnectionBackend
 import java.io.File
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable

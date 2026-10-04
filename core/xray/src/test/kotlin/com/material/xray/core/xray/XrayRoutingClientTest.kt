@@ -1,7 +1,7 @@
 package com.material.xray.core.xray
 
-import com.material.xray.model.ActiveBalancerSelection
-import com.material.xray.model.BalancerOutbound
+import com.material.xray.core.model.ActiveBalancerSelection
+import com.material.xray.core.model.BalancerOutbound
 import com.xray.app.observatory.HealthPingMeasurementResult
 import com.xray.app.observatory.OutboundStatus
 import com.xray.app.router.command.BalancerMsg

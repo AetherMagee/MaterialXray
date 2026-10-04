@@ -1,6 +1,6 @@
 package com.material.xray.core.xray
 
-import com.material.xray.model.XrayRuntimeSettings
+import com.material.xray.core.model.XrayRuntimeSettings
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.add

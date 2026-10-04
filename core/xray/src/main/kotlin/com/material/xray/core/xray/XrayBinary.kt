@@ -1,7 +1,7 @@
 package com.material.xray.core.xray
 
-import com.material.xray.core.process.destroyForciblyCompat
-import com.material.xray.core.process.waitForCompat
+import com.material.xray.core.root.process.destroyForciblyCompat
+import com.material.xray.core.root.process.waitForCompat
 import java.io.File
 import java.util.concurrent.TimeUnit
 

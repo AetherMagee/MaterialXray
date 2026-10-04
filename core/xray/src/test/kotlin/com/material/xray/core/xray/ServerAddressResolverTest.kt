@@ -1,7 +1,7 @@
 package com.material.xray.core.xray
 
-import com.material.xray.model.Protocol
-import com.material.xray.model.ServerConfig
+import com.material.xray.core.model.Protocol
+import com.material.xray.core.model.ServerConfig
 import java.io.File
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first

@@ -1,8 +1,8 @@
 package com.material.xray.core.xray
 
-import com.material.xray.model.RoutingGeoData
-import com.material.xray.model.RoutingRule
-import com.material.xray.model.RoutingRuleOperator
+import com.material.xray.core.model.RoutingGeoData
+import com.material.xray.core.model.RoutingRule
+import com.material.xray.core.model.RoutingRuleOperator
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.IOException

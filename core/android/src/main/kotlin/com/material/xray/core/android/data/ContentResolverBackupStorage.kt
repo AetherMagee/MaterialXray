@@ -2,7 +2,7 @@ package com.material.xray.core.android.data
 
 import android.content.Context
 import androidx.core.net.toUri
-import com.material.xray.data.platform.BackupStorage
+import com.material.xray.core.data.platform.BackupStorage
 import java.io.InputStream
 import java.io.OutputStream
 import org.koin.core.annotation.Singleton

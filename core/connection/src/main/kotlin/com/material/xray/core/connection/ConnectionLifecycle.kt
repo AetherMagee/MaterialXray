@@ -1,0 +1,146 @@
+package com.material.xray.core.connection
+
+import com.material.xray.core.model.ConnectionState
+import com.material.xray.core.model.ServerConfig
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+
+data class ConnectionRequest(
+    val config: ServerConfig,
+    val transitionState: ConnectionState = ConnectionState.Connecting,
+    val preparation: ConnectionPreparation = ConnectionPreparation.Full,
+)
+
+enum class ConnectionPreparation {
+    Full,
+    ReusePreparedRuntime,
+    FastServerSwitch,
+    ;
+
+    val cleansPreviousState: Boolean
+        get() = this == Full
+
+    val reusesStaticRuntime: Boolean
+        get() = this == FastServerSwitch
+}
+
+data class ConnectionFailure(
+    val message: String,
+    val retryable: Boolean,
+)
+
+class ConnectionLifecycle(
+    private val scope: CoroutineScope,
+    private val beforeCommand: () -> Unit,
+    private val afterCommand: () -> Unit,
+    private val runAttempt: suspend (ConnectionRequest) -> Boolean,
+    private val currentFailure: () -> ConnectionFailure,
+    private val onConnected: () -> Unit,
+    private val onExhausted: suspend (ConnectionFailure) -> Unit,
+    private val onCommandFailure: suspend (Throwable) -> Unit,
+    private val onIdle: () -> Unit,
+) {
+    private val commandMutex = Mutex()
+    private val latestCommandVersion = AtomicLong()
+    private val outstandingCommands = AtomicInteger()
+
+    /**
+     * True from the moment a command is requested until it has finished, including while it waits
+     * for the lock or its settle delay. [onIdle] runs whenever this turns false again.
+     */
+    val isBusy: Boolean
+        get() = outstandingCommands.get() > 0
+
+    @Volatile
+    var activeConfig: ServerConfig? = null
+        private set
+
+    fun updateActiveConfig(config: ServerConfig?) {
+        activeConfig = config
+    }
+
+    /**
+     * Runs [block] as a serialized command.
+     *
+     * A command owns the tunnel while it runs, so an unexpected throwable must not escape into the
+     * dispatcher's uncaught handler: that would kill the process with the tunnel still established
+     * and skip every teardown. [onCommandFailure] therefore runs while the command lock and the
+     * command wake lock are still held, which lets it tear the runtime down safely.
+     */
+    // Catching Throwable is the point here: this is the last barrier before the dispatcher's
+    // uncaught handler, which would kill the process with the tunnel still established.
+    fun launch(block: suspend () -> Unit) {
+        launchTracked {
+            serialized { runCommand(block) }
+        }
+    }
+
+    fun launchLatest(settleDelayMillis: Long = 0, block: suspend () -> Unit) {
+        val version = latestCommandVersion.incrementAndGet()
+        launchTracked {
+            if (settleDelayMillis > 0) delay(settleDelayMillis)
+            serialized {
+                if (version == latestCommandVersion.get()) runCommand(block)
+            }
+        }
+    }
+
+    suspend fun <T> serialized(block: suspend () -> T): T {
+        outstandingCommands.incrementAndGet()
+        try {
+            return commandMutex.withLock {
+                beforeCommand()
+                try {
+                    block()
+                } finally {
+                    afterCommand()
+                }
+            }
+        } finally {
+            finishCommand()
+        }
+    }
+
+    // The command is counted before the coroutine is dispatched, so a caller that requests one and
+    // then inspects the service state in the same main-thread turn already sees it as pending.
+    private fun launchTracked(block: suspend () -> Unit) {
+        outstandingCommands.incrementAndGet()
+        scope.launch {
+            try {
+                block()
+            } finally {
+                finishCommand()
+            }
+        }
+    }
+
+    private fun finishCommand() {
+        if (outstandingCommands.decrementAndGet() == 0) onIdle()
+    }
+
+    private suspend fun runCommand(block: suspend () -> Unit) {
+        try {
+            block()
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Throwable) {
+            onCommandFailure(error)
+        }
+    }
+
+    suspend fun connect(request: ConnectionRequest): Boolean {
+        if (runAttempt(request)) {
+            onConnected()
+            return true
+        }
+
+        onExhausted(currentFailure())
+        return false
+    }
+}

@@ -3,8 +3,10 @@ package com.material.xray.di
 import androidx.datastore.core.DataStore
 import androidx.work.ListenableWorker
 import com.material.xray.MaterialXrayApp
+import com.material.xray.core.android.app.AppInventory
 import com.material.xray.core.android.data.AndroidSubscriptionDeviceIdentity
 import com.material.xray.core.android.data.ContentResolverBackupStorage
+import com.material.xray.core.android.launcher.LauncherIconManager
 import com.material.xray.core.android.network.AndroidNetworkLinkProbe
 import com.material.xray.core.android.platform.AndroidAppBuildInfo
 import com.material.xray.core.android.platform.AndroidPlatformInfo
@@ -16,8 +18,6 @@ import com.material.xray.core.android.xray.AndroidPlatformDns
 import com.material.xray.core.android.xray.AndroidVpnTransportProbe
 import com.material.xray.core.android.xray.AndroidXrayPaths
 import com.material.xray.core.android.xray.SharedPreferencesTproxyCompatibilityCache
-import com.material.xray.core.app.AppInventory
-import com.material.xray.core.app.AppInventorySource
 import com.material.xray.core.common.connection.AppUpdateScheduling
 import com.material.xray.core.common.connection.ConnectionShutdown
 import com.material.xray.core.common.connection.RoutingChangeNotifier
@@ -28,30 +28,30 @@ import com.material.xray.core.common.platform.AppBuildInfo
 import com.material.xray.core.common.platform.MonotonicClock
 import com.material.xray.core.common.platform.PlatformInfo
 import com.material.xray.core.common.telemetry.DiagnosticsConsentMirroring
-import com.material.xray.core.launcher.LauncherIconManager
+import com.material.xray.core.data.app.AppInventorySource
+import com.material.xray.core.data.parser.SubscriptionDeviceIdentity
+import com.material.xray.core.data.platform.BackupStorage
+import com.material.xray.core.data.platform.LauncherIconSwitcher
+import com.material.xray.core.data.repository.AppUpdateDataStore
+import com.material.xray.core.data.repository.SettingsDataStore
+import com.material.xray.core.data.repository.SettingsRepository
 import com.material.xray.core.network.CoreTrafficRoutingSetting
 import com.material.xray.core.network.NetworkLinkProbe
+import com.material.xray.core.runtime.AppUpdateScheduler
+import com.material.xray.core.runtime.ConnectionShutdownManager
+import com.material.xray.core.runtime.LogcatEcho
+import com.material.xray.core.runtime.RoutingChangeManager
+import com.material.xray.core.telemetry.DiagnosticsConsentMirror
+import com.material.xray.core.telemetry.TelemetryClient
 import com.material.xray.core.xray.GeoDataUrlSettings
 import com.material.xray.core.xray.LocalSockets
 import com.material.xray.core.xray.PlatformDns
 import com.material.xray.core.xray.TproxyCompatibilityCache
 import com.material.xray.core.xray.VpnTransportProbe
 import com.material.xray.core.xray.XrayPaths
-import com.material.xray.data.parser.SubscriptionDeviceIdentity
-import com.material.xray.data.platform.BackupStorage
-import com.material.xray.data.platform.LauncherIconSwitcher
-import com.material.xray.data.repository.AppUpdateDataStore
-import com.material.xray.data.repository.SettingsDataStore
-import com.material.xray.data.repository.SettingsRepository
-import com.material.xray.service.AppUpdateScheduler
 import com.material.xray.service.AppUpdateWorker
-import com.material.xray.service.ConnectionShutdownManager
 import com.material.xray.service.GeoDataUpdateWorker
-import com.material.xray.service.LogcatEcho
-import com.material.xray.service.RoutingChangeManager
 import com.material.xray.service.SubscriptionUpdateWorker
-import com.material.xray.telemetry.DiagnosticsConsentMirror
-import com.material.xray.telemetry.TelemetryClient
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.cancel
 import org.junit.After
@@ -158,10 +158,10 @@ class KoinGraphTest {
         val primaryTypes = koin.instanceRegistry.instances.values.map { it.beanDefinition }.distinct().map { it.primaryType }
 
         listOf(
-            com.material.xray.data.db.AppDatabase::class,
-            com.material.xray.data.db.dao.ServerDao::class,
-            com.material.xray.data.db.dao.SubscriptionDao::class,
-            com.material.xray.data.db.dao.AppBypassDao::class,
+            com.material.xray.core.database.AppDatabase::class,
+            com.material.xray.core.database.dao.ServerDao::class,
+            com.material.xray.core.database.dao.SubscriptionDao::class,
+            com.material.xray.core.database.dao.AppBypassDao::class,
         ).forEach { type ->
             assertEquals("${type.simpleName} definitions", 1, primaryTypes.count { it == type })
         }

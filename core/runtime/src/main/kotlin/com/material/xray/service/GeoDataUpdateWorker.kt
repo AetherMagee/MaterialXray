@@ -3,8 +3,8 @@ package com.material.xray.service
 import android.content.Context
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
-import com.material.xray.core.xray.GeoDataManager
-import com.material.xray.data.repository.SettingsRepository
+import com.material.xray.core.data.repository.SettingsRepository
+import com.material.xray.core.runtime.GeoDataManager
 import kotlinx.coroutines.flow.first
 import org.koin.android.annotation.KoinWorker
 

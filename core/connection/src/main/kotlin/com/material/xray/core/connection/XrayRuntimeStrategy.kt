@@ -1,0 +1,204 @@
+package com.material.xray.core.connection
+
+import com.material.xray.core.xray.XRAY_API_SOCKET_NAME_PREFIX
+import com.material.xray.core.xray.XrayApiEndpoint
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+
+/**
+ * Questions that can be asked about a core a runtime has started.
+ *
+ * A root-managed core is reached through the root shell, while a rootless core is a child of this
+ * process, so even reading its memory use is runtime-specific.
+ */
+internal interface XrayRuntimeProcess {
+    suspend fun isAlive(pid: Int): Boolean
+
+    suspend fun kill(pid: Int, signal: Int): Boolean
+
+    suspend fun readResidentMemoryMb(pid: Int): Long?
+
+    suspend fun readActiveConnectionCount(pid: Int): Int?
+
+    suspend fun readProcessMetrics(pid: Int): ProcessMetrics?
+
+    suspend fun readCrashReason(): String
+}
+
+/**
+ * The lifecycle operations that differ between a core managed through the root shell and one this
+ * process launched itself.
+ *
+ * A root-managed core is an ordinary system process that outlives the app and owns routing state
+ * installed outside it, while the rootless core is a child of this process holding a tunnel
+ * descriptor. Resolving which of the two owns the runtime once, when it starts, is what keeps
+ * every caller that merely wants to ask a question about "the core" from having to re-derive it.
+ */
+internal interface XrayRuntimeStrategy : XrayRuntimeProcess {
+    /**
+     * Whether this runtime installs routing outside the process: TUN interfaces, ip rules and a
+     * bypass route for the physical link. The rootless runtime gets all of that from Android's
+     * VpnService instead, so every step guarded by this property has nothing to do there.
+     */
+    val managesSystemRouting: Boolean
+
+    /**
+     * Reports the path the core is launched from, or null when it is not available.
+     *
+     * [verifyAvailable] is false for a reconnect that reuses an already-prepared runtime, where
+     * the executable was checked moments ago.
+     */
+    suspend fun prepareBinary(verifyAvailable: Boolean): String?
+
+    suspend fun prepareLogFile()
+
+    /**
+     * Launches the core. [vpnInterfaceFd] stays owned by the caller, so an implementation that needs
+     * it must not suspend before the descriptor has been handed to the child. [tun] is the TUN
+     * interface a root-managed core creates for itself; the rootless core is handed its interface
+     * instead.
+     */
+    suspend fun startProcess(
+        binDir: String,
+        vpnInterfaceFd: Int?,
+        primaryGid: Int? = null,
+        tun: RootTunDevice? = null,
+    ): Int
+
+    /** Picks an address for the core's API that this runtime can actually reach. */
+    fun nextApiEndpoint(environment: ConnectionEnvironment): XrayApiEndpoint
+
+    /**
+     * Stops the core and removes everything this runtime installed outside the process.
+     *
+     * [fastCleanup] permits removing only what the recorded state describes, which is enough when
+     * that state is known to be current. Returns false when the cleanup itself failed, which is a
+     * condition the next connection attempt has to repair.
+     */
+    suspend fun release(fastCleanup: Boolean, preserveTproxyGuard: Boolean = false): Boolean
+
+    /** Stops the core without waiting, for use while the owning service is being destroyed. */
+    fun requestStop()
+}
+
+internal class RootXrayRuntimeStrategy(
+    private val processSupervisor: RootXrayProcessController,
+    private val rootRuntime: ConnectionRootRuntime,
+    private val cleanup: ConnectionCleanup,
+    private val xrayBinary: ConnectionXrayBinary,
+) : XrayRuntimeStrategy {
+    override val managesSystemRouting = true
+
+    override suspend fun prepareBinary(verifyAvailable: Boolean): String? {
+        if (verifyAvailable && !xrayBinary.ensureAvailable()) return null
+        return xrayBinary.binaryPath
+    }
+
+    override suspend fun prepareLogFile() = processSupervisor.prepareLogFile()
+
+    override suspend fun startProcess(
+        binDir: String,
+        vpnInterfaceFd: Int?,
+        primaryGid: Int?,
+        tun: RootTunDevice?,
+    ): Int = processSupervisor.start(binDir, primaryGid, tun)
+
+    // The root shell reaches the core over the loopback interface, which is then firewalled to
+    // this app's uid.
+    override fun nextApiEndpoint(environment: ConnectionEnvironment): XrayApiEndpoint = XrayApiEndpoint.LoopbackTcp(environment.allocateLoopbackApiPort())
+
+    override suspend fun isAlive(pid: Int): Boolean = processSupervisor.isAlive(pid)
+
+    override suspend fun kill(pid: Int, signal: Int): Boolean = processSupervisor.kill(pid, signal)
+
+    override suspend fun readResidentMemoryMb(pid: Int): Long? = processSupervisor.readResidentMemoryMb(pid)
+
+    override suspend fun readActiveConnectionCount(pid: Int): Int? = rootRuntime.readActiveConnectionCount(pid)
+
+    override suspend fun readProcessMetrics(pid: Int): ProcessMetrics? = rootRuntime.readProcessMetrics(pid)
+
+    override suspend fun readCrashReason(): String = processSupervisor.readCrashReason()
+
+    override suspend fun release(fastCleanup: Boolean, preserveTproxyGuard: Boolean): Boolean = if (
+        fastCleanup && cleanup.ensureKnownStateStopped(preserveTproxyGuard = preserveTproxyGuard)
+    ) {
+        true
+    } else {
+        cleanup.ensureCleanState(preserveTproxyGuard = preserveTproxyGuard)
+    }
+
+    // The core is not a child of this process, so there is no signal to send from a service that
+    // is going away; the recorded state is what a later connection reconciles against.
+    override fun requestStop() = Unit
+}
+
+internal class VpnServiceXrayRuntimeStrategy(
+    private val processSupervisor: UserXrayProcessController,
+    private val stateStore: ConnectionStateStore,
+    private val xrayBinary: ConnectionXrayBinary,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+) : XrayRuntimeStrategy {
+    override val managesSystemRouting = false
+
+    override suspend fun prepareBinary(verifyAvailable: Boolean): String? {
+        if (verifyAvailable && !xrayBinary.ensureAvailable()) return null
+        return xrayBinary.binaryPath
+    }
+
+    override suspend fun prepareLogFile() = processSupervisor.prepareLogFile()
+
+    // The caller still owns the descriptor, so it is handed over without suspending first.
+    override suspend fun startProcess(
+        binDir: String,
+        vpnInterfaceFd: Int?,
+        primaryGid: Int?,
+        tun: RootTunDevice?,
+    ): Int {
+        require(primaryGid == null) { "A rootless runtime cannot change its process group" }
+        require(tun == null) { "A rootless runtime cannot create its own TUN interface" }
+        return processSupervisor.start(
+            binDir = binDir,
+            tunFd = requireNotNull(vpnInterfaceFd) { "A rootless runtime cannot start without a tunnel" },
+        )
+    }
+
+    // A private filesystem socket is reachable by both the app's gRPC clients and Xray's own CLI,
+    // which compiles JSON routing rules for live updates. The containing app directory is private.
+    override fun nextApiEndpoint(environment: ConnectionEnvironment): XrayApiEndpoint = XrayApiEndpoint.FileSystemUnixSocket(
+        "${environment.binDir}/$XRAY_API_SOCKET_NAME_PREFIX-${environment.processId}-${environment.elapsedRealtime()}.sock",
+    )
+
+    override suspend fun isAlive(pid: Int): Boolean = processSupervisor.isAlive(pid)
+
+    override suspend fun kill(pid: Int, signal: Int): Boolean = processSupervisor.kill(pid, signal)
+
+    override suspend fun readResidentMemoryMb(pid: Int): Long? = processSupervisor.readResidentMemoryMb(pid)
+
+    override suspend fun readActiveConnectionCount(pid: Int): Int? = withContext(ioDispatcher) {
+        processSupervisor.readActiveConnectionCount(pid)
+    }
+
+    override suspend fun readProcessMetrics(pid: Int): ProcessMetrics = ProcessMetrics(
+        residentMemoryMb = readResidentMemoryMb(pid),
+        activeConnectionCount = readActiveConnectionCount(pid),
+    )
+
+    override suspend fun readCrashReason(): String = processSupervisor.readCrashReason()
+
+    // Nothing is installed outside the process, so stopping the child and dropping the record it
+    // left behind is the whole teardown.
+    override suspend fun release(fastCleanup: Boolean, preserveTproxyGuard: Boolean): Boolean {
+        processSupervisor.stop()
+        if (!preserveTproxyGuard) stateStore.delete()
+        return true
+    }
+
+    override fun requestStop() = processSupervisor.requestStop()
+}
+
+/**
+ * Recorded in place of a physical interface by a runtime that has none, so a state file written by
+ * an earlier process still identifies which runtime created it.
+ */
+const val VPN_SERVICE_INTERFACE_LABEL = "VpnService"

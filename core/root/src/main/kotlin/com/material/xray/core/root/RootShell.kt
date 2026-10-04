@@ -2,8 +2,8 @@ package com.material.xray.core.root
 
 import com.material.xray.core.common.log.AppLogger
 import com.material.xray.core.common.log.NoOpAppLogger
-import com.material.xray.core.process.destroyForciblyCompat
-import com.material.xray.core.process.isAliveCompat
+import com.material.xray.core.root.process.destroyForciblyCompat
+import com.material.xray.core.root.process.isAliveCompat
 import java.io.BufferedReader
 import java.io.OutputStreamWriter
 import java.util.concurrent.LinkedBlockingQueue
