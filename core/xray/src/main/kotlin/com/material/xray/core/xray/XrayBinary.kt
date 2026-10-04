@@ -6,20 +6,24 @@ import java.io.File
 import java.util.concurrent.TimeUnit
 
 /**
- * The Android Xray build, which both runtimes launch from the installer-extracted native library
- * directory, plus the helper that hands it a TUN interface in root mode.
+ * The Android Xray build both runtimes launch, plus the helper that hands it a TUN interface in
+ * root mode. That is the core the installer extracted into the native library directory, unless
+ * the user selected one from [XrayCoreStore].
  */
 class XrayBinary(
     private val paths: XrayPaths,
 ) {
     private val binaryDir = File(paths.filesDir, "bin")
+    private val cores = XrayCoreStore(paths)
 
     /** The core's own file, which a root shell executes directly. */
-    val binaryPath: String? get() = nativeExecutablePath(XRAY_EXECUTABLE_NAME)
+    val binaryPath: String? get() = cores.selectedExecutable()?.absolutePath ?: bundledPath
 
     /** The command that starts the core as this app's own uid, to be followed by Xray's arguments. */
-    val userCommand: List<String>? get() = binaryPath?.let(::listOf)
+    val userCommand: List<String>?
+        get() = cores.selectedExecutable()?.let(::xrayUserCommand) ?: bundledPath?.let(::listOf)
     val tunLauncherPath: String? get() = nativeExecutablePath(TUN_LAUNCHER_LIBRARY_NAME)
+    private val bundledPath: String? get() = nativeExecutablePath(XRAY_EXECUTABLE_NAME)
 
     fun ensureAvailable(): Boolean {
         binaryDir.mkdirs()
@@ -27,28 +31,16 @@ class XrayBinary(
         return binaryPath != null && tunLauncherPath != null
     }
 
+    /** The version of the core that would run now. */
     fun readVersion(): String? {
         binaryDir.mkdirs()
-        val command = userCommand ?: return null
+        return readXrayVersion(userCommand ?: return null, binaryDir)
+    }
 
-        return runCatching {
-            val process = ProcessBuilder(command + "version")
-                .directory(binaryDir)
-                .redirectErrorStream(true)
-                .apply {
-                    environment()["xray.location.asset"] = binaryDir.absolutePath
-                    environment()["XRAY_LOCATION_ASSET"] = binaryDir.absolutePath
-                }
-                .start()
-
-            if (!process.waitForCompat(VERSION_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
-                process.destroyForciblyCompat()
-                return@runCatching null
-            }
-
-            val output = process.inputStream.bufferedReader().use { it.readText() }
-            if (process.exitValue() == 0) parseXrayVersion(output) else null
-        }.getOrNull()
+    /** The version of the core shipped in the APK, regardless of the selection. */
+    fun readBundledVersion(): String? {
+        binaryDir.mkdirs()
+        return readXrayVersion(listOf(bundledPath ?: return null), binaryDir)
     }
 
     fun configPath(): String = File(paths.filesDir, ACTIVE_CONFIG_FILE).absolutePath
@@ -83,7 +75,6 @@ class XrayBinary(
     }
 
     private companion object {
-        private const val VERSION_TIMEOUT_SECONDS = 2L
         private const val TUN_LAUNCHER_LIBRARY_NAME = "libxraytun.so"
     }
 }
@@ -101,3 +92,25 @@ internal const val ACTIVE_CONFIG_OVERRIDE_FILE = "config_override.json"
 internal fun parseXrayVersion(output: String): String? = output.lineSequence()
     .mapNotNull { line -> XRAY_VERSION_REGEX.find(line.trim())?.groupValues?.getOrNull(1) }
     .firstOrNull()
+
+/** Runs `[command] version` in [workingDir] and returns the version it reports, without a `v`. */
+fun readXrayVersion(command: List<String>, workingDir: File, timeoutSeconds: Long = VERSION_TIMEOUT_SECONDS): String? = runCatching {
+    val process = ProcessBuilder(command + "version")
+        .directory(workingDir)
+        .redirectErrorStream(true)
+        .apply {
+            environment()["xray.location.asset"] = workingDir.absolutePath
+            environment()["XRAY_LOCATION_ASSET"] = workingDir.absolutePath
+        }
+        .start()
+
+    if (!process.waitForCompat(timeoutSeconds, TimeUnit.SECONDS)) {
+        process.destroyForciblyCompat()
+        return@runCatching null
+    }
+
+    val output = process.inputStream.bufferedReader().use { it.readText() }
+    if (process.exitValue() == 0) parseXrayVersion(output) else null
+}.getOrNull()
+
+private const val VERSION_TIMEOUT_SECONDS = 2L
