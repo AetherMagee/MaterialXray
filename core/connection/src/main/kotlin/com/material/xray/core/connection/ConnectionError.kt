@@ -14,8 +14,6 @@ sealed interface ConnectionError {
 
     data object RootAccessDenied : ConnectionError
 
-    data object SecureXrayApi : ConnectionError
-
     data object XrayBinaryNotFound : ConnectionError
 
     data object PhysicalRouteNotFound : ConnectionError

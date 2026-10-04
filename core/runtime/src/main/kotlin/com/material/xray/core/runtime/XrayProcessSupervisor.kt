@@ -13,7 +13,10 @@ import com.material.xray.core.connection.UserXrayProcessController
 import com.material.xray.core.connection.XrayProcessBinary
 import com.material.xray.core.root.RootShell
 import com.material.xray.core.root.shellQuote
+import com.material.xray.core.xray.CORE_SOCKET_DIR
+import com.material.xray.core.xray.CORE_WORKING_DIR
 import com.material.xray.core.xray.XRAY_EXECUTABLE_NAME
+import com.material.xray.core.xray.coreWorkingDirPath
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
@@ -90,41 +93,29 @@ internal class XrayProcessSupervisor(
         }
     }
 
-    override suspend fun start(binDir: String, primaryGid: Int?, tun: RootTunDevice?): Int {
-        require(primaryGid == null || primaryGid > 0)
+    override suspend fun start(binDir: String, tun: RootTunDevice?): Int {
         val binaryPath = requireNotNull(xrayBinary.binaryPath) { "xray binary is unavailable" }
-        val certificateBundleFile = environment.filesDir.resolve(XRAY_CERTIFICATE_BUNDLE_FILE)
+        val launcherPath = requireNotNull(xrayBinary.rootLauncherPath) { "Root launcher is unavailable" }
+        val appGid = environment.packageUid
+        require(appGid > 0)
+        // A fast server switch skips the binary check that otherwise creates it.
+        withContext(ioDispatcher) { File(binDir, CORE_SOCKET_DIR).mkdirs() }
         val xrayCommand = buildString {
             // Not env: the installer's library path contains '=', which env would take for another
             // assignment. Xray falls back from every xray.* name to its XRAY_* spelling, so the
             // names a shell can export carry the whole environment.
             append("cd ${shellQuote(binDir)} && export")
-            xrayEnvironment(binDir, certificateBundleFile.absolutePath)
+            xrayEnvironment(CORE_WORKING_DIR, coreWorkingDirPath(XRAY_CERTIFICATE_BUNDLE_FILE))
                 .filterKeys { SHELL_VARIABLE_NAME.matches(it) }
                 .forEach { (key, value) -> append(" $key=${shellQuote(value)}") }
-            append(" && exec ")
-            if (tun != null) {
-                val launcherPath = requireNotNull(xrayBinary.tunLauncherPath) { "TUN launcher is unavailable" }
-                append("${shellQuote(launcherPath)} ${shellQuote(tun.name)} ${tun.mtu} ")
-            }
-            append("${shellQuote(binaryPath)} run -c ${shellQuote(xrayBinary.configPath())}")
+            append(" && exec ${shellQuote(launcherPath)} $ROOT_CORE_UID $appGid ${shellQuote(xrayBinary.configPath())} ")
+            append(if (tun != null) "${shellQuote(tun.name)} ${tun.mtu} " else "- - ")
+            append("${shellQuote(binaryPath)} run -c stdin:")
         }
         val command = buildString {
-            append("config=${shellQuote(xrayBinary.configPath())}; ")
-            if (primaryGid != null) {
-                append("su -g $primaryGid 0 -c ${shellQuote(xrayCommand)}")
-            } else {
-                append("$xrayCommand")
-            }
-            append(" > ${shellQuote(logFile)} 2>&1 & ")
+            append("if ${rootCoreAccessCommand(binDir, binaryPath)}; then $xrayCommand > ${shellQuote(logFile)} 2>&1 & fi; ")
+            append(rootCoreOwnershipFunction(xrayBinary.configPath(), appGid))
             append("found=\"\"; ")
-            append("is_owned() { [ -r \"/proc/\$1/cmdline\" ] || return 1; ")
-            append("cmdline=\$(cat -v \"/proc/\$1/cmdline\" 2>/dev/null) || return 1; ")
-            append("case \"\$cmdline\" in *\"\$config\"*) true;; *) return 1;; esac; ")
-            if (primaryGid != null) {
-                append("[ \"\$(awk '/^Gid:/ { print \$3 \":\" \$5; exit }' \"/proc/\$1/status\" 2>/dev/null)\" = \"$primaryGid:$primaryGid\" ] || return 1; ")
-            }
-            append("return 0; }; ")
             append("i=0; ")
             append("while [ \$i -lt 20 ]; do ")
             append("for pid in \$(pidof $XRAY_EXECUTABLE_NAME 2>/dev/null); do ")
@@ -137,17 +128,32 @@ internal class XrayProcessSupervisor(
             append("printf '%s' \"\$found\"")
         }
         val result = commandRunner.execute(command)
-        return result.output.trim().toIntOrNull() ?: -1
+        val pid = result.output.trim().toIntOrNull() ?: -1
+        // The core's own log stays empty when the shell never got as far as starting it.
+        if (pid <= 0 && result.error.isNotBlank()) log.append(LogSource.APP, "Root core launch: ${result.error.trim()}")
+        return pid
+    }
+
+    /**
+     * The core runs as [ROOT_CORE_UID] with the app's gid, so the working directory has to admit the
+     * group: read-only, apart from the socket directory. A core the user installed lives in the
+     * app's private storage too, and the launcher execs it through its directory.
+     */
+    private fun rootCoreAccessCommand(binDir: String, binaryPath: String): String = buildString {
+        val socketDir = File(binDir, CORE_SOCKET_DIR).absolutePath
+        append("chmod -R g+rX ${shellQuote(binDir)} && chmod g-w ${shellQuote(binDir)} && chmod g+w ${shellQuote(socketDir)}")
+        val binary = File(binaryPath)
+        if (binary.startsWith(environment.filesDir)) {
+            append(" && chmod g+x ${shellQuote(binary.parent)} ${shellQuote(binaryPath)}")
+        }
     }
 
     override suspend fun isAlive(pid: Int): Boolean {
         if (pid <= 0) return false
-        val configPath = shellQuote(xrayBinary.configPath())
-        val command = "config=$configPath; " +
+        val command = rootCoreOwnershipFunction(xrayBinary.configPath(), environment.packageUid) +
             "kill -0 $pid 2>/dev/null && " +
             "[ \"\$(awk '/^State:/ { print \$2 }' /proc/$pid/status 2>/dev/null)\" != Z ] && " +
-            "cmdline=\$(cat -v /proc/$pid/cmdline 2>/dev/null) && " +
-            "case \"\$cmdline\" in *\"\$config\"*) true;; *) false;; esac"
+            "is_owned $pid"
         return commandRunner.execute(command).isSuccess
     }
 
@@ -251,8 +257,6 @@ internal class UserXrayProcessSupervisor(
     private var pid: Int = -1
     private val logFile: File
         get() = environment.filesDir.resolve(XRAY_LOG_FILE_NAME)
-    private val certificateBundleFile: File
-        get() = environment.filesDir.resolve(XRAY_CERTIFICATE_BUNDLE_FILE)
 
     override suspend fun prepareLogFile() {
         withContext(ioDispatcher) { FileOutputStream(logFile, false).use { } }
@@ -264,13 +268,15 @@ internal class UserXrayProcessSupervisor(
     // execve do not wait on IO, so there is nothing to move off the caller's thread anyway.
     override fun start(binDir: String, tunFd: Int): Int {
         val command = requireNotNull(xrayBinary.userCommand) { "xray binary is unavailable" }
+        // A fast server switch skips the binary check that otherwise creates it.
+        File(binDir, CORE_SOCKET_DIR).mkdirs()
         pid = processLauncher.start(
             command = command,
             configPath = xrayBinary.configPath(),
             workingDir = binDir,
             logPath = logFile.absolutePath,
             tunFd = tunFd,
-            environment = xrayEnvironment(binDir, certificateBundleFile.absolutePath),
+            environment = xrayEnvironment(binDir, File(binDir, XRAY_CERTIFICATE_BUNDLE_FILE).absolutePath),
         )
         return pid
     }
@@ -459,6 +465,27 @@ internal fun shellQuote(value: String): String = "'${value.replace("'", "'\\''")
 
 internal const val XRAY_LOG_FILE_NAME = "xray.log"
 internal const val XRAY_CERTIFICATE_BUNDLE_FILE = "xray-ca-certificates.pem"
+
+/**
+ * The uid the root-mode core runs as. Android names no uid here, and a uid below 10000 counts as a
+ * system one, which the app-standby and background firewall chains always let through.
+ */
+internal const val ROOT_CORE_UID = 9990
+
+/**
+ * Defines `is_owned <pid>`, true for this app's root-mode core. A sandboxed core runs as
+ * [ROOT_CORE_UID], or as uid 0 where the kernel cannot hand it capabilities otherwise, with the
+ * app's gid, which nothing else outside the app has. One started before the sandbox existed is
+ * recognised by its config path.
+ */
+internal fun rootCoreOwnershipFunction(configPath: String, appGid: Int): String = buildString {
+    append("is_owned() { [ -r \"/proc/\$1/status\" ] || return 1; ")
+    append("ids=\$(awk '/^Uid:/ { u = \$2 } /^Gid:/ { g = \$2 \":\" \$3 } END { print u \":\" g }' \"/proc/\$1/status\" 2>/dev/null) || return 1; ")
+    append("case \"\$ids\" in $ROOT_CORE_UID:$appGid:$appGid|0:$appGid:$appGid) return 0;; esac; ")
+    // Unlike Toybox tr, cat terminates if a procfs read races with process exit.
+    append("cmdline=\$(cat -v \"/proc/\$1/cmdline\" 2>/dev/null) || return 1; ")
+    append("case \"\$cmdline\" in *${shellQuote(configPath)}*) return 0;; *) return 1;; esac; }; ")
+}
 
 private const val BYTES_PER_KILOBYTE = 1024L
 private const val STATM_BUFFER_SIZE = 128

@@ -19,16 +19,18 @@ sealed interface XrayInbound {
         val acceptNonLoopback: Boolean = false,
     ) : XrayInbound
 
+    /** Listens on [listenPath], the core's own name for the socket the app reaches at [path]. */
     data class PrivateHttp(
         val path: String,
         override val tag: String = XRAY_APP_HTTP_INBOUND_TAG,
+        val listenPath: String = path,
     ) : XrayInbound
 }
 
 fun XrayInbound.toJson(): JsonObject = when (this) {
     is XrayInbound.Tun -> buildTunInbound(name, tag, mtu)
     is XrayInbound.Tproxy -> buildTproxyInbound(port, tag, allowIpv6, acceptNonLoopback)
-    is XrayInbound.PrivateHttp -> buildPrivateHttpInbound(path, tag)
+    is XrayInbound.PrivateHttp -> buildPrivateHttpInbound(listenPath, tag)
 }
 
 const val XRAY_APP_HTTP_INBOUND_TAG = "mxray-http-in"

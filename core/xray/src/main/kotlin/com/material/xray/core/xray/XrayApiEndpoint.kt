@@ -7,9 +7,11 @@ import io.grpc.okhttp.OkHttpChannelBuilder
 sealed interface XrayApiEndpoint {
     data class UnixSocket(val name: String) : XrayApiEndpoint
 
-    data class FileSystemUnixSocket(val path: String) : XrayApiEndpoint {
+    /** The app connects to [path]; the core listens on [listenPath], its own name for the same socket. */
+    data class FileSystemUnixSocket(val path: String, val listenPath: String = path) : XrayApiEndpoint {
         init {
             require(path.startsWith('/')) { "Xray API socket path must be absolute: $path" }
+            require(listenPath.startsWith('/')) { "Xray API socket path must be absolute: $listenPath" }
         }
     }
 

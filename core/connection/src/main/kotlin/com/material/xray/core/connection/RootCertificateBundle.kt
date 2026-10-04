@@ -68,6 +68,8 @@ class AndroidRootCertificateBundle(
         val temporaryFile = File.createTempFile("${file.name}.", ".tmp", parent)
         try {
             temporaryFile.writeBytes(pem)
+            // The root-mode core reads it as the app's group; the app's directories keep everyone else out.
+            temporaryFile.setReadable(true, false)
             Files.move(
                 temporaryFile.toPath(),
                 file.toPath(),

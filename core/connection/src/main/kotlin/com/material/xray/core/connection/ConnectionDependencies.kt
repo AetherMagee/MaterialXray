@@ -36,7 +36,6 @@ interface ConnectionEnvironment {
     val processId: Int
     val appInstallTime: Long
 
-    fun allocateLoopbackApiPort(): Int
     fun elapsedRealtime(): Long
     fun describe(error: ConnectionError): String
 
@@ -118,8 +117,8 @@ class XrayBinaryConnectionAdapter(
         get() = binary.binaryPath
     override val userCommand: List<String>?
         get() = binary.userCommand
-    override val tunLauncherPath: String?
-        get() = binary.tunLauncherPath
+    override val rootLauncherPath: String?
+        get() = binary.rootLauncherPath
 
     override fun configPath(): String = binary.configPath()
 

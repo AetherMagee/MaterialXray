@@ -130,10 +130,10 @@ internal fun buildTproxyInbound(
     put("tag", tag)
 }
 
-/** The socket is inside the app-private directory; 0666 lets the root core serve the app UID. */
+/** The socket is inside the app-private directory; group access lets the app reach a root-mode core, which shares its gid. */
 internal fun buildPrivateHttpInbound(path: String, tag: String) = buildJsonObject {
     require(path.startsWith('/') && ',' !in path) { "Private HTTP socket path must be absolute" }
-    put("listen", "$path,0666")
+    put("listen", "$path,$PRIVATE_HTTP_SOCKET_MODE")
     put("protocol", "http")
     put("settings", buildJsonObject { put("allowTransparent", false) })
     put("tag", tag)
@@ -585,3 +585,5 @@ private fun ServerConfig.rawUriQueryParam(name: String): String? = runCatching {
         }
         .firstOrNull { it.isNotBlank() }
 }.getOrNull()
+
+const val PRIVATE_HTTP_SOCKET_MODE = "0660"

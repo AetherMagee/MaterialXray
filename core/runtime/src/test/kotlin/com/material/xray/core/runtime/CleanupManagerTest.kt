@@ -8,20 +8,21 @@ import org.junit.Test
 class CleanupManagerTest {
     @Test
     fun `owned process cleanup is valid shell syntax`() {
-        val command = ownedProcessStopCommand("/data/user/0/app/files/config.json", persistedPid = 42)
+        val command = ownedProcessStopCommand("/data/user/0/app/files/config.json", appGid = 10123, persistedPid = 42)
 
         assertEquals(0, ProcessBuilder("sh", "-n", "-c", command).start().waitFor())
     }
 
     @Test
     fun `cleanup verifies config ownership before signaling candidate pids`() {
-        val command = ownedProcessStopCommand("/data/user/0/app/files/config.json", persistedPid = 42)
+        val command = ownedProcessStopCommand("/data/user/0/app/files/config.json", appGid = 10123, persistedPid = 42)
 
         assertTrue(command.indexOf("kill \"\$pid\"") > command.indexOf("is_owned()"))
         assertTrue(command.contains("/proc/\$1/cmdline"))
         assertTrue(command.contains("cat -v \"/proc/\$1/cmdline\""))
         assertFalse(command.contains("tr "))
-        assertTrue(command.contains("*\"\$config\"*"))
+        assertTrue(command.contains("*'/data/user/0/app/files/config.json'*"))
+        assertTrue(command.contains("$ROOT_CORE_UID:10123:10123|0:10123:10123) return 0"))
         assertTrue(command.contains("candidates='42'"))
         assertFalse(command.contains("return 2"))
         assertTrue(command.contains("if is_owned \"\$pid\"; then kill"))
@@ -30,14 +31,33 @@ class CleanupManagerTest {
 
     @Test
     fun `cleanup also finds a core started by a release that ran the extracted binary`() {
-        val command = ownedProcessStopCommand("/data/user/0/app/files/config.json", persistedPid = null)
+        val command = ownedProcessStopCommand("/data/user/0/app/files/config.json", appGid = 10123, persistedPid = null)
 
         assertTrue(command.contains("pidof libxray.so xray "))
     }
 
     @Test
+    fun `ownership check recognises a core started before the sandbox by its config path`() {
+        val config = "/tmp/mxray test/files/config.json"
+        val core = ProcessBuilder("sh", "-c", "echo \$\$; sleep 30; : '$config'").start()
+        try {
+            val pid = core.inputStream.bufferedReader().readLine()
+            fun owns(path: String): Boolean = ProcessBuilder(
+                "sh",
+                "-c",
+                rootCoreOwnershipFunction(path, appGid = 10123) + "is_owned $pid",
+            ).start().waitFor() == 0
+
+            assertTrue(owns(config))
+            assertFalse(owns("/tmp/other app/files/config.json"))
+        } finally {
+            core.destroyForcibly()
+        }
+    }
+
+    @Test
     fun `cleanup never signals the persisted pid directly`() {
-        val command = ownedProcessStopCommand("/data/user/0/app/files/config.json", persistedPid = 42)
+        val command = ownedProcessStopCommand("/data/user/0/app/files/config.json", appGid = 10123, persistedPid = 42)
 
         assertFalse(command.contains("kill 42"))
         assertFalse(command.contains("kill -9 42"))

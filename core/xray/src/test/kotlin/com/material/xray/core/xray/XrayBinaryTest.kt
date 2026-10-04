@@ -14,14 +14,14 @@ class XrayBinaryTest {
     fun `ensureAvailable finds the core and TUN launcher in the native library directory`() = withTempDir { dir ->
         val nativeDir = File(dir, "lib").apply { mkdirs() }
         val core = nativeExecutable(nativeDir, "libxray.so")
-        val launcher = nativeExecutable(nativeDir, "libxraytun.so")
+        val launcher = nativeExecutable(nativeDir, "libxrayroot.so")
         val xrayBinary = XrayBinary(FakeEnvironment(filesDir = dir, nativeLibraryDir = nativeDir))
 
         assertTrue(xrayBinary.ensureAvailable())
 
         assertEquals(core.absolutePath, xrayBinary.binaryPath)
         assertEquals(listOf(core.absolutePath), xrayBinary.userCommand)
-        assertEquals(launcher.absolutePath, xrayBinary.tunLauncherPath)
+        assertEquals(launcher.absolutePath, xrayBinary.rootLauncherPath)
         assertTrue(File(dir, "bin").isDirectory)
     }
 

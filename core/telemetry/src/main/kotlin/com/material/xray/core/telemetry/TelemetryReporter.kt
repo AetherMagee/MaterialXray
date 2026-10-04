@@ -40,7 +40,6 @@ enum class ConnectionFailureReason(val value: String) {
     RuntimeLogPreparationFailed("runtime_log_preparation_failed"),
     CertificateBundlePreparationFailed("certificate_bundle_preparation_failed"),
     TproxyGuardInstallFailed("tproxy_guard_install_failed"),
-    ApiAccessSetupFailed("api_access_setup_failed"),
     CoreBinarySetupFailed("core_binary_setup_failed"),
     RoutingDataSetupFailed("routing_data_setup_failed"),
     PhysicalRouteDetectionFailed("physical_route_detection_failed"),
@@ -101,7 +100,6 @@ enum class ConnectionTelemetryStep(
         ConnectionFailureStage.Routing,
         ConnectionFailureReason.TproxyGuardInstallFailed,
     ),
-    PrepareApiAccess("api.access.prepare", ConnectionFailureStage.Api, ConnectionFailureReason.ApiAccessSetupFailed),
     PrepareCoreBinary("core.binary.prepare", ConnectionFailureStage.Core, ConnectionFailureReason.CoreBinarySetupFailed),
     PrepareRoutingData(
         "routing.data.prepare",

@@ -144,7 +144,7 @@ class ConfigGeneratorTest {
 
         assertEquals("http", inbound.getValue("protocol").jsonPrimitive.content)
         assertEquals(
-            "/data/user/0/com.material.xray/files/bin/mxray-http.sock,0666",
+            "/data/user/0/com.material.xray/files/bin/mxray-http.sock,0660",
             inbound.getValue("listen").jsonPrimitive.content,
         )
         assertTrue("port" !in inbound)

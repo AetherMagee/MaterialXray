@@ -76,7 +76,7 @@ verify_xray() {
 echo "Verifying xray-core ${VERSION}..."
 
 # Both modes run the Android build. It only adopts a TUN as an open fd via xray.tun.fd: rootless
-# mode hands it VpnService's, root mode creates one with the libxraytun.so launcher.
+# mode hands it VpnService's, root mode creates one with the libxrayroot.so launcher.
 verify_xray "Xray-android-arm64-v8a.zip" "arm64-v8a"
 verify_xray "Xray-android-amd64.zip" "x86_64"
 

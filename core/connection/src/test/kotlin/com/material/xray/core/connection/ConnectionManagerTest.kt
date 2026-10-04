@@ -193,14 +193,40 @@ class ConnectionManagerTest {
     }
 
     @Test
-    fun `successful root connection persists its protected loopback API port`() = runTest {
+    fun `root connection serves its API on a socket the core names through its working directory`() = runTest {
         val harness = Harness()
 
         harness.manager.connect(server(), runtimeSettings(), preparation = ConnectionPreparation.ReusePreparedRuntime)
 
-        assertEquals(XrayApiEndpoint.LoopbackTcp(48_123), harness.createdApiEndpoints.single())
-        assertEquals(48_123, harness.stateStore.state?.xrayApiPort)
-        assertEquals(listOf(48_123 to harness.environment.appUid), harness.rootRuntime.protectedApis)
+        val endpoint = harness.createdApiEndpoints.single() as XrayApiEndpoint.FileSystemUnixSocket
+        val name = endpoint.path.substringAfterLast('/')
+        assertEquals("/tmp/xray/bin/sockets/$name", endpoint.path)
+        assertEquals("/proc/self/cwd/sockets/$name", endpoint.listenPath)
+        assertNull(harness.stateStore.state?.xrayApiPort)
+        assertTrue(harness.rootRuntime.protectedApis.isEmpty())
+        val config = Json.parseToJsonElement(requireNotNull(harness.binary.configJson)).jsonObject
+        assertEquals(endpoint.listenPath, config.getValue("api").jsonObject.getValue("listen").jsonPrimitive.content)
+        val httpListen = config.getValue("inbounds").jsonArray
+            .map { it.jsonObject }
+            .single { it["tag"]?.jsonPrimitive?.content == "mxray-http-in" }
+            .getValue("listen").jsonPrimitive.content
+        assertTrue(httpListen.startsWith("/proc/self/cwd/sockets/mxray-http-"))
+        assertTrue(httpListen.endsWith(".sock,0660"))
+    }
+
+    @Test
+    fun `restored root connection reattaches to its working directory API socket`() = runTest {
+        val harness = Harness()
+        harness.binary.configJson = """{"api":{"listen":"/proc/self/cwd/sockets/api.sock"}}"""
+        harness.stateStore.state = XrayState(xrayPid = 42)
+
+        assertTrue(harness.manager.restoreRootApiClients())
+
+        assertEquals(
+            listOf(XrayApiEndpoint.FileSystemUnixSocket("/tmp/xray/bin/sockets/api.sock", "/proc/self/cwd/sockets/api.sock")),
+            harness.createdApiEndpoints,
+        )
+        assertTrue(harness.rootRuntime.protectedApis.isEmpty())
     }
 
     @Test
@@ -1027,20 +1053,6 @@ class ConnectionManagerTest {
     }
 
     @Test
-    fun `root connection fails closed when API firewall cannot be installed`() = runTest {
-        val harness = Harness().apply { rootRuntime.apiProtectionReady = false }
-
-        harness.manager.connect(server(), runtimeSettings(), preparation = ConnectionPreparation.ReusePreparedRuntime)
-
-        assertEquals(0, harness.rootProcess.startCalls)
-        assertEquals(1, harness.cleanup.cleanCalls)
-        assertEquals(
-            ConnectionState.Error(harness.environment.message(ConnectionError.SecureXrayApi::class)),
-            harness.stateCoordinator.state.value,
-        )
-    }
-
-    @Test
     fun `root connection resolves an empty TUN name to an available wlan name`() = runTest {
         val harness = Harness().apply { tunGateway.availableWlanName = "wlan2" }
 
@@ -1228,7 +1240,6 @@ class ConnectionManagerTest {
         override val appUid = 10_123
         override val processId = 123
         override val appInstallTime = 600L
-        override fun allocateLoopbackApiPort(): Int = 48_123
         private var clock = 0L
 
         override fun elapsedRealtime(): Long = clock.also { clock += 250L }
@@ -1268,7 +1279,7 @@ class ConnectionManagerTest {
     private class FakeXrayBinary : ConnectionXrayBinary {
         override val binaryPath = "/tmp/xray/libxray.so"
         override val userCommand = listOf(binaryPath)
-        override val tunLauncherPath = "/tmp/xray/libxraytun.so"
+        override val rootLauncherPath = "/tmp/xray/libxrayroot.so"
         var ready = true
         var configJson: String? = null
         var overrideConfigJson: String? = null
@@ -1516,7 +1527,7 @@ class ConnectionManagerTest {
 
         override suspend fun prepareLogFile() = Unit
 
-        override suspend fun start(binDir: String, primaryGid: Int?, tun: RootTunDevice?): Int {
+        override suspend fun start(binDir: String, tun: RootTunDevice?): Int {
             startCalls += 1
             lastTun = tun
             return 42

@@ -51,10 +51,7 @@ import com.material.xray.core.xray.OtherVpnDns
 import com.material.xray.core.xray.ProviderGeoDataResolution
 import com.material.xray.core.xray.ServerAddressResolver
 import com.material.xray.core.xray.TproxyPortAllocator
-import com.material.xray.core.xray.XRAY_API_LOOPBACK_ADDRESS
 import java.io.File
-import java.net.InetAddress
-import java.net.ServerSocket
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -73,12 +70,6 @@ internal class AndroidConnectionEnvironment(
     override val appInstallTime: Long
         get() = context.packageManager.getPackageInfo(context.packageName, 0).lastUpdateTime
 
-    override fun allocateLoopbackApiPort(): Int = ServerSocket(
-        0,
-        1,
-        InetAddress.getByName(XRAY_API_LOOPBACK_ADDRESS),
-    ).use { it.localPort }
-
     override fun elapsedRealtime(): Long = SystemClock.elapsedRealtime()
 
     override fun describe(error: ConnectionError): String = when (error) {
@@ -88,7 +79,6 @@ internal class AndroidConnectionEnvironment(
         ConnectionError.CleanupFailed -> localized(R.string.connection_error_cleanup_failed)
         ConnectionError.TunNameDetection -> localized(R.string.connection_error_tun_name_detection)
         ConnectionError.RootAccessDenied -> localized(R.string.connection_error_root_access_denied)
-        ConnectionError.SecureXrayApi -> localized(R.string.connection_error_secure_xray_api)
         ConnectionError.XrayBinaryNotFound -> localized(R.string.connection_error_xray_binary_not_found)
         ConnectionError.PhysicalRouteNotFound -> localized(R.string.connection_error_physical_route_not_found)
         is ConnectionError.ServerAddressUnresolved -> localized(R.string.connection_error_server_address_unresolved, error.host)
@@ -246,7 +236,7 @@ class ConnectionManagerFactory(
                 binDir = environment.binDir,
             ),
             prepareCertificateBundle = {
-                rootCertificateBundle.prepare(context.filesDir.resolve(XRAY_CERTIFICATE_BUNDLE_FILE))
+                rootCertificateBundle.prepare(File(environment.binDir, XRAY_CERTIFICATE_BUNDLE_FILE))
             },
             startTelemetrySpan = telemetryReporter::startConnectionStep,
             recordTelemetryStepFailure = telemetryReporter::recordConnectionStepFailure,

@@ -20,21 +20,16 @@ class XrayProcessSupervisorTest {
         val commands = FakeRootCommandRunner(
             resultForCommand = { command ->
                 assertTrue(command.contains("cd '/tmp/xray bin'"))
-                assertTrue(command.contains("export XRAY_LOCATION_ASSET='/tmp/xray bin'"))
-                assertTrue(command.contains("SSL_CERT_FILE='/tmp/runtime dir/xray-ca-certificates.pem'"))
+                assertTrue(command.contains("export XRAY_LOCATION_ASSET='/proc/self/cwd'"))
+                assertTrue(command.contains("SSL_CERT_FILE='/proc/self/cwd/xray-ca-certificates.pem'"))
                 assertFalse(command.contains("xray.location.asset"))
                 assertFalse(command.contains(" env "))
-                assertTrue(command.contains("config='/tmp/config dir/config.json'"))
-                assertTrue(command.contains("'/tmp/native lib==/libxray.so' run -c '/tmp/config dir/config.json'"))
-                assertTrue(command.contains("> '/tmp/runtime dir/xray.log' 2>&1 &"))
+                assertTrue(command.contains("> '/tmp/runtime dir/xray.log' 2>&1 & fi"))
                 assertFalse(command.contains("su -g"))
-                assertFalse(command.contains("launcher=\$!"))
-                assertFalse(command.contains("is_owned \"\$launcher\""))
                 assertTrue(command.contains("pidof libxray.so"))
                 assertTrue(command.contains("cat -v \"/proc/\$1/cmdline\""))
                 assertFalse(command.contains("tr "))
                 assertTrue(command.contains("printf '%s' \"\$found\""))
-                assertFalse(command.contains("\${found:-\$launcher}"))
                 RootShell.Result(exitCode = 0, output = "1234", error = "")
             },
         )
@@ -43,33 +38,73 @@ class XrayProcessSupervisorTest {
         val pid = supervisor.start("/tmp/xray bin")
 
         assertEquals(1234, pid)
+        assertEquals(0, ProcessBuilder("sh", "-n", "-c", commands.commands.single()).start().waitFor())
     }
 
     @Test
-    fun `tproxy start changes primary group and verifies launched process group`() = runTest {
+    fun `start sandboxes the core as its own uid with the app gid and the config as stdin`() = runTest {
         val commands = FakeRootCommandRunner(
-            resultForCommand = { command ->
-                assertTrue(command.contains("su -g 12345 0 -c"))
-                assertTrue(command.contains("/tmp/xray bin"))
-                assertTrue(command.contains("&& exec "))
-                assertTrue(command.contains("/^Gid:/"))
-                assertTrue(command.contains("= \"12345:12345\""))
-                RootShell.Result(exitCode = 0, output = "4321", error = "")
-            },
+            resultForCommand = { RootShell.Result(exitCode = 0, output = "1234", error = "") },
         )
 
-        val pid = supervisor(commandRunner = commands).start("/tmp/xray bin", primaryGid = 12345)
+        supervisor(commandRunner = commands).start("/tmp/xray bin")
 
-        assertEquals(4321, pid)
+        val command = commands.commands.single()
+        assertTrue(
+            command.contains(
+                "exec '/tmp/native lib==/libxrayroot.so' $ROOT_CORE_UID 12345 '/tmp/config dir/config.json' - - " +
+                    "'/tmp/native lib==/libxray.so' run -c stdin:",
+            ),
+        )
+        assertTrue(command.contains("$ROOT_CORE_UID:12345:12345|0:12345:12345) return 0"))
     }
 
     @Test
-    fun `TUN start execs the core through the TUN launcher`() = runTest {
+    fun `start opens the working directory to the core read-only apart from its sockets`() = runTest {
+        val commands = FakeRootCommandRunner(
+            resultForCommand = { RootShell.Result(exitCode = 0, output = "1234", error = "") },
+        )
+
+        supervisor(commandRunner = commands).start("/tmp/xray bin")
+
+        val command = commands.commands.single()
+        assertTrue(
+            command.startsWith(
+                "if chmod -R g+rX '/tmp/xray bin' && chmod g-w '/tmp/xray bin' && chmod g+w '/tmp/xray bin/sockets'; then ",
+            ),
+        )
+        // The bundled core sits in the installer's library directory, which needs no grant.
+        assertFalse(command.contains("libxray.so' && "))
+        assertFalse(command.contains("chmod g+x"))
+    }
+
+    @Test
+    fun `start lets the core exec a core installed in the app's storage`() = runTest {
+        val commands = FakeRootCommandRunner(
+            resultForCommand = { RootShell.Result(exitCode = 0, output = "1234", error = "") },
+        )
+        val supervisor = supervisor(
+            commandRunner = commands,
+            xrayBinary = FakeXrayProcessBinary(binaryPath = "/tmp/runtime dir/cores/v1/libxray.so"),
+        )
+
+        supervisor.start("/tmp/xray bin")
+
+        assertTrue(
+            commands.commands.single().contains(
+                "chmod g+x '/tmp/runtime dir/cores/v1' '/tmp/runtime dir/cores/v1/libxray.so'; then ",
+            ),
+        )
+    }
+
+    @Test
+    fun `TUN start has the root launcher create the interface`() = runTest {
         val commands = FakeRootCommandRunner(
             resultForCommand = { command ->
                 assertTrue(
                     command.contains(
-                        "'/tmp/native lib==/libxraytun.so' 'wlan1' 1400 '/tmp/native lib==/libxray.so' run -c '/tmp/config dir/config.json'",
+                        "'/tmp/native lib==/libxrayroot.so' $ROOT_CORE_UID 12345 '/tmp/config dir/config.json' 'wlan1' 1400 " +
+                            "'/tmp/native lib==/libxray.so' run -c stdin:",
                     ),
                 )
                 RootShell.Result(exitCode = 0, output = "1234", error = "")
@@ -101,10 +136,10 @@ class XrayProcessSupervisorTest {
         assertTrue(command.contains("kill -0 42"))
         assertTrue(command.contains("/^State:/"))
         assertTrue(command.contains("!= Z"))
-        assertTrue(command.contains("config='/tmp/config dir/config.json'"))
-        assertTrue(command.contains("/proc/42/cmdline"))
-        assertTrue(command.contains("cat -v /proc/42/cmdline"))
+        assertTrue(command.endsWith("is_owned 42"))
+        assertTrue(command.contains("*'/tmp/config dir/config.json'*"))
         assertFalse(command.contains("tr "))
+        assertEquals(0, ProcessBuilder("sh", "-n", "-c", command).start().waitFor())
     }
 
     @Test
@@ -219,7 +254,7 @@ class XrayProcessSupervisorTest {
             supervisor.start(binDir = "/tmp/xray bin", tunFd = 89)
 
             assertEquals(
-                directory.resolve(XRAY_CERTIFICATE_BUNDLE_FILE).absolutePath,
+                File("/tmp/xray bin", XRAY_CERTIFICATE_BUNDLE_FILE).absolutePath,
                 launcher.startedEnvironment?.get("SSL_CERT_FILE"),
             )
         } finally {
@@ -280,10 +315,11 @@ class XrayProcessSupervisorTest {
         environment: XrayRuntimeEnvironment = FakeRuntimeEnvironment(),
         commandRunner: FakeRootCommandRunner = FakeRootCommandRunner(),
         log: LogBuffer = LogBuffer(),
+        xrayBinary: XrayProcessBinary = FakeXrayProcessBinary(),
     ) = XrayProcessSupervisor(
         environment = environment,
         commandRunner = commandRunner,
-        xrayBinary = FakeXrayProcessBinary(),
+        xrayBinary = xrayBinary,
         log = log,
     )
 
@@ -309,11 +345,12 @@ class XrayProcessSupervisorTest {
         }
     }
 
-    private class FakeXrayProcessBinary : XrayProcessBinary {
+    private class FakeXrayProcessBinary(
         // Installer paths contain '=', which the launch command must not mistake for assignments.
-        override val binaryPath: String = "/tmp/native lib==/libxray.so"
+        override val binaryPath: String = "/tmp/native lib==/libxray.so",
+    ) : XrayProcessBinary {
         override val userCommand: List<String> = listOf(binaryPath)
-        override val tunLauncherPath: String = "/tmp/native lib==/libxraytun.so"
+        override val rootLauncherPath: String = "/tmp/native lib==/libxrayroot.so"
 
         override fun configPath(): String = "/tmp/config dir/config.json"
     }

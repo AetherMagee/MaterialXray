@@ -11,10 +11,11 @@ interface RootXrayProcessController : XrayProcessProbe {
     suspend fun prepareLogFile()
 
     /**
-     * Starts the core as root. A non-null [tun] is created by the TUN launcher and handed to the
-     * core as an open descriptor, so the interface lives exactly as long as the core does.
+     * Starts the core from root, sandboxed as its own uid with the app's gid. A non-null [tun] is
+     * created by the root launcher and handed to the core as an open descriptor, so the interface
+     * lives exactly as long as the core does.
      */
-    suspend fun start(binDir: String, primaryGid: Int? = null, tun: RootTunDevice? = null): Int
+    suspend fun start(binDir: String, tun: RootTunDevice? = null): Int
     suspend fun kill(pid: Int, signal: Int = 15): Boolean
     suspend fun readResidentMemoryMb(pid: Int): Long?
     suspend fun readCrashReason(lines: Int = 80): String
@@ -41,6 +42,6 @@ interface UserXrayProcessController : XrayProcessProbe {
 interface XrayProcessBinary {
     val binaryPath: String?
     val userCommand: List<String>?
-    val tunLauncherPath: String?
+    val rootLauncherPath: String?
     fun configPath(): String
 }

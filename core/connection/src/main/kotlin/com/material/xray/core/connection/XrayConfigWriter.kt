@@ -17,6 +17,7 @@ import com.material.xray.core.xray.PROTECTED_FROM_VPN_MARK
 import com.material.xray.core.xray.TUN_INBOUND_TAG
 import com.material.xray.core.xray.XrayApiEndpoint
 import com.material.xray.core.xray.XrayInbound
+import com.material.xray.core.xray.coreSocket
 import java.io.IOException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
@@ -86,9 +87,8 @@ internal class XrayConfigWriter(
         val effectiveInbounds = if (runtimeSettings.routeMxrayTrafficThroughXray) {
             val trafficInbounds: List<XrayInbound> = tproxyInbounds
                 ?: listOf(XrayInbound.Tun(runtimeSettings.tunName, TUN_INBOUND_TAG, runtimeSettings.tunMtu))
-            trafficInbounds + XrayInbound.PrivateHttp(
-                path = "${environment.binDir}/mxray-http-${java.util.UUID.randomUUID().toString().take(12)}.sock",
-            )
+            val socket = coreSocket(environment.binDir, "mxray-http-${java.util.UUID.randomUUID().toString().take(12)}.sock")
+            trafficInbounds + XrayInbound.PrivateHttp(path = socket.path, listenPath = socket.listenPath)
         } else {
             tproxyInbounds
         }

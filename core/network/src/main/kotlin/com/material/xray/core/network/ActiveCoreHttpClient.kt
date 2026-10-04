@@ -3,9 +3,12 @@ package com.material.xray.core.network
 import com.material.xray.core.common.connection.ConnectionStateCoordinator
 import com.material.xray.core.model.ConnectionState
 import com.material.xray.core.xray.ACTIVE_CONFIG_FILE
+import com.material.xray.core.xray.CORE_SOCKET_DIR
 import com.material.xray.core.xray.LocalSockets
+import com.material.xray.core.xray.PRIVATE_HTTP_SOCKET_MODE
 import com.material.xray.core.xray.XRAY_APP_HTTP_INBOUND_TAG
 import com.material.xray.core.xray.XrayPaths
+import com.material.xray.core.xray.resolveCorePath
 import java.io.File
 import java.io.IOException
 import java.net.InetSocketAddress
@@ -82,8 +85,15 @@ internal fun privateHttpSocketPath(config: String, privateDir: File): String? = 
         ?.firstOrNull { it["tag"]?.jsonPrimitive?.contentOrNull == XRAY_APP_HTTP_INBOUND_TAG }
         ?.get("listen")?.jsonPrimitive?.contentOrNull
         ?: return@runCatching null
-    if (!listen.endsWith(",0666")) return@runCatching null
-    val path = listen.removeSuffix(",0666")
+    // Cores started before the socket became group-only still listen on a world-writable one.
+    val listenPath = PRIVATE_HTTP_SOCKET_MODES.firstNotNullOfOrNull { mode ->
+        listen.removeSuffix(",$mode").takeIf { it != listen }
+    } ?: return@runCatching null
+    val path = resolveCorePath(listenPath, privateDir)
     val file = File(path)
-    path.takeIf { file.isAbsolute && file.parentFile?.canonicalFile == privateDir.canonicalFile }
+    // Cores started before the socket directory existed listen in the working directory itself.
+    val socketDirs = listOf(File(privateDir, CORE_SOCKET_DIR), privateDir).map(File::getCanonicalFile)
+    path.takeIf { file.isAbsolute && file.parentFile?.canonicalFile in socketDirs }
 }.getOrNull()
+
+private val PRIVATE_HTTP_SOCKET_MODES = listOf(PRIVATE_HTTP_SOCKET_MODE, "0666")

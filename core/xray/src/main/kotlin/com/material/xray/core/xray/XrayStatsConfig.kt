@@ -1,6 +1,7 @@
 package com.material.xray.core.xray
 
 import com.material.xray.core.model.XrayRuntimeSettings
+import java.io.File
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.add
@@ -22,7 +23,7 @@ internal fun buildStatsApi(
     put("tag", XRAY_API_TAG)
     when (endpoint) {
         is XrayApiEndpoint.UnixSocket -> put("listen", "@${endpoint.name}")
-        is XrayApiEndpoint.FileSystemUnixSocket -> put("listen", endpoint.path)
+        is XrayApiEndpoint.FileSystemUnixSocket -> put("listen", endpoint.listenPath)
         is XrayApiEndpoint.LoopbackTcp -> put("listen", "$XRAY_API_LOOPBACK_ADDRESS:${endpoint.port}")
     }
     put(
@@ -62,7 +63,8 @@ internal fun buildStatsPolicy(
 
 internal fun buildStatsConfig() = buildJsonObject { }
 
-fun parseXrayApiEndpoint(configJson: String): XrayApiEndpoint? = runCatching {
+/** Reads the API endpoint from a config whose core runs in [workingDir]. */
+fun parseXrayApiEndpoint(configJson: String, workingDir: File): XrayApiEndpoint? = runCatching {
     val root = Json.parseToJsonElement(configJson) as? JsonObject
     val api = root?.get("api") as? JsonObject
     val listen = api
@@ -73,7 +75,7 @@ fun parseXrayApiEndpoint(configJson: String): XrayApiEndpoint? = runCatching {
         listen?.startsWith('@') == true -> listen.drop(1)
             .takeIf { it.isNotBlank() }
             ?.let { XrayApiEndpoint.UnixSocket(it) }
-        listen?.startsWith('/') == true -> XrayApiEndpoint.FileSystemUnixSocket(listen)
+        listen?.startsWith('/') == true -> XrayApiEndpoint.FileSystemUnixSocket(resolveCorePath(listen, workingDir), listen)
         listen?.startsWith("$XRAY_API_LOOPBACK_ADDRESS:") == true ->
             listen
                 .removePrefix("$XRAY_API_LOOPBACK_ADDRESS:")

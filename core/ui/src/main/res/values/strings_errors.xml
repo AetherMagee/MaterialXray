@@ -14,7 +14,6 @@
     <string name="connection_error_xray_api_not_ready">Xray control API did not become ready</string>
     <string name="connection_error_tun_timeout">TUN interface %1$s did not come up within the time limit</string>
     <string name="connection_error_apply_ip_routing">Failed to apply IP routing: %1$s</string>
-    <string name="connection_error_secure_xray_api">Could not secure the Xray control API</string>
     <string name="connection_error_cleanup_failed">Could not fully stop the previous Xray runtime</string>
     <string name="connection_error_stop_runtime">Could not stop the active Xray connection</string>
     <string name="connection_error_tproxy_unsupported">TPROXY is not supported: %1$s</string>

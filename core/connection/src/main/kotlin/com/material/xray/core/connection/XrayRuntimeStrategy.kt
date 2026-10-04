@@ -2,6 +2,7 @@ package com.material.xray.core.connection
 
 import com.material.xray.core.xray.XRAY_API_SOCKET_NAME_PREFIX
 import com.material.xray.core.xray.XrayApiEndpoint
+import com.material.xray.core.xray.coreSocket
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -62,7 +63,6 @@ internal interface XrayRuntimeStrategy : XrayRuntimeProcess {
     suspend fun startProcess(
         binDir: String,
         vpnInterfaceFd: Int?,
-        primaryGid: Int? = null,
         tun: RootTunDevice? = null,
     ): Int
 
@@ -100,13 +100,11 @@ internal class RootXrayRuntimeStrategy(
     override suspend fun startProcess(
         binDir: String,
         vpnInterfaceFd: Int?,
-        primaryGid: Int?,
         tun: RootTunDevice?,
-    ): Int = processSupervisor.start(binDir, primaryGid, tun)
+    ): Int = processSupervisor.start(binDir, tun)
 
-    // The root shell reaches the core over the loopback interface, which is then firewalled to
-    // this app's uid.
-    override fun nextApiEndpoint(environment: ConnectionEnvironment): XrayApiEndpoint = XrayApiEndpoint.LoopbackTcp(environment.allocateLoopbackApiPort())
+    // The socket is group-only, and the core shares only its gid with this app.
+    override fun nextApiEndpoint(environment: ConnectionEnvironment): XrayApiEndpoint = workingDirApiEndpoint(environment)
 
     override suspend fun isAlive(pid: Int): Boolean = processSupervisor.isAlive(pid)
 
@@ -152,10 +150,8 @@ internal class VpnServiceXrayRuntimeStrategy(
     override suspend fun startProcess(
         binDir: String,
         vpnInterfaceFd: Int?,
-        primaryGid: Int?,
         tun: RootTunDevice?,
     ): Int {
-        require(primaryGid == null) { "A rootless runtime cannot change its process group" }
         require(tun == null) { "A rootless runtime cannot create its own TUN interface" }
         return processSupervisor.start(
             binDir = binDir,
@@ -163,11 +159,7 @@ internal class VpnServiceXrayRuntimeStrategy(
         )
     }
 
-    // A private filesystem socket is reachable by both the app's gRPC clients and Xray's own CLI,
-    // which compiles JSON routing rules for live updates. The containing app directory is private.
-    override fun nextApiEndpoint(environment: ConnectionEnvironment): XrayApiEndpoint = XrayApiEndpoint.FileSystemUnixSocket(
-        "${environment.binDir}/$XRAY_API_SOCKET_NAME_PREFIX-${environment.processId}-${environment.elapsedRealtime()}.sock",
-    )
+    override fun nextApiEndpoint(environment: ConnectionEnvironment): XrayApiEndpoint = workingDirApiEndpoint(environment)
 
     override suspend fun isAlive(pid: Int): Boolean = processSupervisor.isAlive(pid)
 
@@ -202,3 +194,12 @@ internal class VpnServiceXrayRuntimeStrategy(
  * an earlier process still identifies which runtime created it.
  */
 const val VPN_SERVICE_INTERFACE_LABEL = "VpnService"
+
+/**
+ * A private filesystem socket is reachable by both the app's gRPC clients and Xray's own CLI, which
+ * compiles JSON routing rules for live updates. The containing app directory is private.
+ */
+private fun workingDirApiEndpoint(environment: ConnectionEnvironment): XrayApiEndpoint.FileSystemUnixSocket {
+    val socket = coreSocket(environment.binDir, "$XRAY_API_SOCKET_NAME_PREFIX-${environment.processId}-${environment.elapsedRealtime()}.sock")
+    return XrayApiEndpoint.FileSystemUnixSocket(socket.path, socket.listenPath)
+}

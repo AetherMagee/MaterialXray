@@ -17,6 +17,7 @@ import com.material.xray.core.xray.XrayApiEndpoint
 import com.material.xray.core.xray.XrayState
 import com.material.xray.core.xray.XraySysStats
 import com.material.xray.core.xray.parseXrayApiEndpoint
+import java.io.File
 import java.io.IOException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
@@ -179,7 +180,6 @@ class ConnectionManager(
             }
 
             val xrayApiEndpoint = strategy.nextApiEndpoint(environment)
-            if (!prepareXrayApiAccess(xrayApiEndpoint)) return
             executeStep(
                 ConnectionStep(
                     "Create Xray control API clients",
@@ -236,7 +236,6 @@ class ConnectionManager(
             val pid = startXrayProcess(
                 strategy = strategy,
                 vpnInterface = vpnInterface,
-                primaryGid = environment.appUid.takeIf { rootBackend == RootConnectionBackend.Tproxy },
                 // Matches XrayConfigWriter.write, which gives the core a TUN inbound exactly when there is
                 // no TPROXY plan to give it TPROXY inbounds instead.
                 tun = RootTunDevice(tunName, runtimeSettings.tunMtu).takeIf { managesSystemRouting && tproxyPlan == null },
@@ -444,27 +443,6 @@ class ConnectionManager(
         return true
     }
 
-    private suspend fun prepareRootApiAccess(endpoint: XrayApiEndpoint): Boolean {
-        if (endpoint !is XrayApiEndpoint.LoopbackTcp) return true
-        if (rootRuntime.protectLoopbackApi(endpoint.port, environment.appUid)) return true
-        fail(environment.describe(ConnectionError.SecureXrayApi))
-        return false
-    }
-
-    private suspend fun prepareXrayApiAccess(endpoint: XrayApiEndpoint): Boolean = if (endpoint is XrayApiEndpoint.LoopbackTcp) {
-        executeStep(
-            ConnectionStep(
-                "Xray API firewall setup",
-                ConnectionProgress.PreparingCore,
-                telemetryStep = ConnectionTelemetryStep.PrepareApiAccess,
-                isSuccessful = { it },
-                action = { prepareRootApiAccess(endpoint) },
-            ),
-        )
-    } else {
-        prepareRootApiAccess(endpoint)
-    }
-
     private suspend fun cleanOrphanedVpnServiceRuntime() {
         val staleState = stateStore.read()
             ?.takeIf { it.physicalInterface == VPN_SERVICE_INTERFACE_LABEL }
@@ -623,7 +601,6 @@ class ConnectionManager(
     private suspend fun startXrayProcess(
         strategy: XrayRuntimeStrategy,
         vpnInterface: Int?,
-        primaryGid: Int? = null,
         tun: RootTunDevice? = null,
     ): Int {
         log.append(LogSource.APP, "Starting xray process...")
@@ -637,7 +614,6 @@ class ConnectionManager(
                     strategy.startProcess(
                         binDir = environment.binDir,
                         vpnInterfaceFd = vpnInterface,
-                        primaryGid = primaryGid,
                         tun = tun,
                     )
                 },
@@ -1112,18 +1088,20 @@ class ConnectionManager(
         // A record left by the rootless runtime describes a core that died with its process, so
         // there is nothing here to reattach to.
         if (state.physicalInterface == VPN_SERVICE_INTERFACE_LABEL) return false
-        val endpoint = when (val configuredEndpoint = xrayBinary.readConfig()?.let(::parseXrayApiEndpoint)) {
-            is XrayApiEndpoint.LoopbackTcp -> configuredEndpoint
+        val configuredEndpoint = xrayBinary.readConfig()?.let { parseXrayApiEndpoint(it, File(environment.binDir)) }
+        val endpoint = when (configuredEndpoint) {
             is XrayApiEndpoint.FileSystemUnixSocket,
-            is XrayApiEndpoint.UnixSocket,
-            -> return false
+            is XrayApiEndpoint.LoopbackTcp,
+            -> configuredEndpoint
+            is XrayApiEndpoint.UnixSocket -> return false
             null ->
                 state.xrayApiPort
                     ?.takeIf { it in 1..65_535 }
                     ?.let { XrayApiEndpoint.LoopbackTcp(it) }
                     ?: return false
         }
-        if (!rootRuntime.protectLoopbackApi(endpoint.port, environment.appUid)) return false
+        // Cores started before the root core moved to a Unix socket still listen on loopback.
+        if (endpoint is XrayApiEndpoint.LoopbackTcp && !rootRuntime.protectLoopbackApi(endpoint.port, environment.appUid)) return false
         runtimeState = XrayRuntimeState.Active(
             strategy = rootStrategy,
             pid = state.xrayPid,

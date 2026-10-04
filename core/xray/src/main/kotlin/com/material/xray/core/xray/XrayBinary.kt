@@ -22,13 +22,13 @@ class XrayBinary(
     /** The command that starts the core as this app's own uid, to be followed by Xray's arguments. */
     val userCommand: List<String>?
         get() = cores.selectedExecutable()?.let(::xrayUserCommand) ?: bundledPath?.let(::listOf)
-    val tunLauncherPath: String? get() = nativeExecutablePath(TUN_LAUNCHER_LIBRARY_NAME)
+    val rootLauncherPath: String? get() = nativeExecutablePath(ROOT_LAUNCHER_LIBRARY_NAME)
     private val bundledPath: String? get() = nativeExecutablePath(XRAY_EXECUTABLE_NAME)
 
     fun ensureAvailable(): Boolean {
-        binaryDir.mkdirs()
+        File(binaryDir, CORE_SOCKET_DIR).mkdirs()
         removeLegacyRootBinary()
-        return binaryPath != null && tunLauncherPath != null
+        return binaryPath != null && rootLauncherPath != null
     }
 
     /** The version of the core that would run now. */
@@ -68,14 +68,20 @@ class XrayBinary(
         ?.absolutePath
 
     // Versions that ran root mode on a separate Linux build extracted it here, along with the
-    // install stamp that versioned it. Nothing reads either any more.
+    // install stamp that versioned it. Nothing reads either any more. The CA bundle moved into the
+    // working directory, which is all the root-mode core can see; moving it keeps the cached
+    // bundle, which can take long to rebuild on a throttled device.
     private fun removeLegacyRootBinary() {
         File(binaryDir, "xray").delete()
         File(binaryDir, "version").delete()
+        val legacyBundle = File(paths.filesDir, LEGACY_CERTIFICATE_BUNDLE_NAME)
+        val bundle = File(binaryDir, LEGACY_CERTIFICATE_BUNDLE_NAME)
+        if (bundle.exists() || !legacyBundle.renameTo(bundle)) legacyBundle.delete()
     }
 
     private companion object {
-        private const val TUN_LAUNCHER_LIBRARY_NAME = "libxraytun.so"
+        private const val ROOT_LAUNCHER_LIBRARY_NAME = "libxrayroot.so"
+        private const val LEGACY_CERTIFICATE_BUNDLE_NAME = "xray-ca-certificates.pem"
     }
 }
 

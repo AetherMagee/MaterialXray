@@ -42,14 +42,24 @@ class ActiveCoreHttpClientTest {
         assertNull(privateHttpSocketPath(config(path, tag = "other-inbound"), privateDir))
     }
 
-    private fun config(path: String, tag: String = "mxray-http-in"): String = buildJsonObject {
+    @Test
+    fun `maps the core's working directory name for its socket back to the private directory`() {
+        val privateDir = File("/data/user/0/com.material.xray/files/bin")
+        val config = config("/proc/self/cwd/sockets/mxray-http.sock", mode = "0660")
+
+        assertEquals(File(privateDir, "sockets/mxray-http.sock").path, privateHttpSocketPath(config, privateDir))
+        assertNull(privateHttpSocketPath(config("/proc/self/cwd/../mxray-http.sock", mode = "0660"), privateDir))
+        assertNull(privateHttpSocketPath(config("/proc/self/cwd/sockets/mxray-http.sock", mode = "0600"), privateDir))
+    }
+
+    private fun config(path: String, tag: String = "mxray-http-in", mode: String = "0666"): String = buildJsonObject {
         put(
             "inbounds",
             buildJsonArray {
                 add(
                     buildJsonObject {
                         put("tag", tag)
-                        put("listen", "$path,0666")
+                        put("listen", "$path,$mode")
                     },
                 )
             },

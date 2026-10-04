@@ -47,7 +47,7 @@ class CleanupManager(
     }
 
     private fun cleanupStages(state: XrayState?, fallbackTunName: String, preserveTproxyGuard: Boolean): List<CleanupStage> = buildList {
-        add(CleanupStage("processes", ownedProcessStopCommand(configPath, state?.xrayPid)))
+        add(CleanupStage("processes", ownedProcessStopCommand(configPath, appUid, state?.xrayPid)))
         add(CleanupStage("API firewall", apiFirewall.removeCommand(appUid)))
         add(CleanupStage("legacy nftables", nftablesRemovalCommand()))
         if (state?.rootConnectionBackend != RootConnectionBackend.Tproxy) {
@@ -124,12 +124,9 @@ internal fun parseCleanupStageReports(output: String): Map<Int, CleanupStageRepo
 private const val CLEANUP_STAGE_MARKER = "__MXRAY_CLEANUP_STAGE__"
 private val CLEANUP_STAGE_REPORT = Regex("$CLEANUP_STAGE_MARKER (\\d+) (\\d+) (\\d+)")
 
-internal fun ownedProcessStopCommand(configPath: String, persistedPid: Int?): String = buildString {
-    append("config=${shellQuote(configPath)}; candidates=${shellQuote(persistedPid?.takeIf { it > 0 }?.toString().orEmpty())}; ")
-    append("is_owned() { [ -e \"/proc/\$1\" ] || return 1; [ -r \"/proc/\$1/cmdline\" ] || return 1; ")
-    // Unlike Toybox tr, cat terminates if a procfs read races with process exit.
-    append("cmdline=\$(cat -v \"/proc/\$1/cmdline\" 2>/dev/null) || return 1; ")
-    append("case \"\$cmdline\" in *\"\$config\"*) return 0;; *) return 1;; esac; }; ")
+internal fun ownedProcessStopCommand(configPath: String, appGid: Int, persistedPid: Int?): String = buildString {
+    append("candidates=${shellQuote(persistedPid?.takeIf { it > 0 }?.toString().orEmpty())}; ")
+    append(rootCoreOwnershipFunction(configPath, appGid))
     append("for pid in \$(pidof $XRAY_EXECUTABLE_NAME $LEGACY_ROOT_EXECUTABLE_NAME 2>/dev/null); do case \" \$candidates \" in *\" \$pid \"*) ;; ")
     append("*) candidates=\"\$candidates \$pid\";; esac; done; owned=''; ")
     append("for pid in \$candidates; do case \"\$pid\" in ''|*[!0-9]*) continue;; esac; ")
