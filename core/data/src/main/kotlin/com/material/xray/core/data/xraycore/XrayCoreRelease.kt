@@ -45,14 +45,16 @@ internal fun fetchXrayCoreReleases(client: OkHttpClient, abi: String): List<Xray
 }
 
 internal fun parseXrayCoreReleases(body: String, assetName: String): List<XrayCoreRelease> {
+    // Any JSON of an unexpected shape, not only malformed JSON, surfaces as IllegalArgumentException.
     val releases = try {
-        Json.parseToJsonElement(body).jsonArray.map { it.jsonObject }
+        Json.parseToJsonElement(body).jsonArray
+            .map { it.jsonObject }
+            .filterNot { it.boolean("draft") }
+            .mapNotNull { release -> parseRelease(release, assetName) }
     } catch (error: IllegalArgumentException) {
         throw IOException("GitHub releases response was not valid", error)
     }
     return releases
-        .filterNot { it.boolean("draft") }
-        .mapNotNull { release -> parseRelease(release, assetName) }
         .filter { isSupportedXrayVersion(it.tag) }
         .sortedWith { left, right -> compareXrayVersions(right.tag, left.tag) ?: right.publishedAt.compareTo(left.publishedAt) }
 }

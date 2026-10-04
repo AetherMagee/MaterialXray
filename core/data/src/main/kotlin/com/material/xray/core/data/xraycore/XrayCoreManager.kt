@@ -76,6 +76,7 @@ class XrayCoreManager(
     private val workingDir get() = File(paths.filesDir, "bin").apply { mkdirs() }
     private val _state = MutableStateFlow(XrayCoreState())
     private var job: Job? = null
+    private val initialization: Job
 
     val state: StateFlow<XrayCoreState> = _state.asStateFlow()
 
@@ -83,7 +84,7 @@ class XrayCoreManager(
     val canDownload: Boolean get() = xrayReleaseAssetName(platformInfo.primaryAbi) != null
 
     init {
-        scope.launch(ioDispatcher) {
+        initialization = scope.launch(ioDispatcher) {
             store.removeAbandonedStaging()
             val bundledVersion = XrayBinary(paths).readBundledVersion()
             publishInstalled()
@@ -101,7 +102,7 @@ class XrayCoreManager(
         }
     }
 
-    fun install(release: XrayCoreRelease) = launchOperation {
+    fun install(release: XrayCoreRelease) = launchOperation(XrayCoreOperation.Downloading(release.tag, 0, null)) {
         val stagingDir = store.createStagingDir()
         stage(stagingDir) {
             val archive = File(stagingDir, "release.zip")
@@ -115,14 +116,13 @@ class XrayCoreManager(
             extractXrayExecutable(archive, executable)
             archive.delete()
             val version = verifyExecutable(executable)
-            if (version != normalizeXrayVersion(release.tag)) throw XrayCoreException(XrayCoreFailure.Broken)
+            if (compareXrayVersions(version, release.tag) != 0) throw XrayCoreException(XrayCoreFailure.Broken)
             store.commit(stagingDir, InstalledXrayCore(release.tag, version, release.assetSha256, XrayCoreSource.Release))
         }
     }
 
     /** Installs the executable, or release zip, that [open] reads. */
-    fun installFromFile(open: () -> InputStream) = launchOperation {
-        _state.update { it.copy(operation = XrayCoreOperation.Verifying) }
+    fun installFromFile(open: () -> InputStream) = launchOperation(XrayCoreOperation.Verifying) {
         val stagingDir = store.createStagingDir()
         stage(stagingDir) {
             val upload = File(stagingDir, "upload")
@@ -159,9 +159,13 @@ class XrayCoreManager(
         publishInstalled()
     }
 
-    private fun launchOperation(block: suspend () -> InstalledXrayCore) {
+    /** Starts [block] unless an install is running. Callers are on the main thread, so the check and the busy state cannot interleave. */
+    private fun launchOperation(initial: XrayCoreOperation, block: suspend () -> InstalledXrayCore) {
         if (_state.value.isBusy) return
+        _state.update { it.copy(operation = initial) }
         job = scope.launch(ioDispatcher) {
+            // Staging cleanup from a previous run must not delete this install's directory.
+            initialization.join()
             val result = try {
                 XrayCoreOperation.Installed(block())
             } catch (error: CancellationException) {
@@ -200,7 +204,7 @@ class XrayCoreManager(
     }
 
     private fun publishInstalled() {
-        val installed = store.installed()
+        val installed = store.installed().sortedWith { left, right -> compareXrayVersions(right.version, left.version) ?: left.id.compareTo(right.id) }
         val selectedId = store.selectedId()?.takeIf { id -> installed.any { it.id == id } }
         _state.update { it.copy(installed = installed, selectedId = selectedId) }
     }

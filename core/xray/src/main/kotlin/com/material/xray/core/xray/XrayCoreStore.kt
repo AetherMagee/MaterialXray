@@ -32,7 +32,6 @@ class XrayCoreStore(paths: XrayPaths) {
         .orEmpty()
         .filter { it.isDirectory && isValidCoreId(it.name) }
         .mapNotNull(::readManifest)
-        .sortedBy { it.id }
 
     fun selectedId(): String? = runCatching { selectionFile.readText().trim() }
         .getOrNull()
@@ -74,17 +73,19 @@ class XrayCoreStore(paths: XrayPaths) {
     fun stagedExecutable(stagingDir: File): File = File(stagingDir, XRAY_EXECUTABLE_NAME)
 
     /**
-     * Writes [core]'s manifest into [stagingDir] and moves it into place, replacing an earlier
-     * install of the same id unless that one is selected.
+     * Writes [core]'s manifest into [stagingDir] and moves it into place. An id names one build (a
+     * release tag or a file's hash), so when that id is already installed the existing copy stays
+     * and the staged one is discarded.
      */
     fun commit(stagingDir: File, core: InstalledXrayCore): InstalledXrayCore {
-        require(isValidCoreId(core.id)) { "Invalid core id" }
-        File(stagingDir, MANIFEST_FILE).writeText(json.encodeToString(InstalledXrayCore.serializer(), core))
+        if (!isValidCoreId(core.id)) throw IOException("Invalid core id ${core.id}")
         val destination = File(coresDir, core.id)
-        if (destination.exists()) {
-            check(selectedId() != core.id) { "The selected core cannot be replaced" }
-            destination.deleteRecursively()
+        if (readManifest(destination) != null) {
+            stagingDir.deleteRecursively()
+            return core
         }
+        destination.deleteRecursively()
+        File(stagingDir, MANIFEST_FILE).writeText(json.encodeToString(InstalledXrayCore.serializer(), core))
         if (!stagingDir.renameTo(destination)) throw IOException("Could not install core ${core.id}")
         return core
     }

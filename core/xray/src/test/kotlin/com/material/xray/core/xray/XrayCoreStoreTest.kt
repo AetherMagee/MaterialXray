@@ -37,17 +37,31 @@ class XrayCoreStoreTest {
     }
 
     @Test
-    fun `the selected core can be neither deleted nor replaced`() = withPaths { paths ->
+    fun `the selected core cannot be deleted`() = withPaths { paths ->
         val store = XrayCoreStore(paths)
         install(store, "v26.9.9")
         store.select("v26.9.9")
 
         assertThrows(IllegalStateException::class.java) { store.delete("v26.9.9") }
-        assertThrows(IllegalStateException::class.java) { install(store, "v26.9.9") }
 
         store.select(null)
         store.delete("v26.9.9")
         assertTrue(store.installed().isEmpty())
+    }
+
+    @Test
+    fun `installing an id that is already installed keeps the existing copy`() = withPaths { paths ->
+        val store = XrayCoreStore(paths)
+        install(store, "v26.9.9")
+        store.select("v26.9.9")
+        val staging = store.createStagingDir()
+        store.stagedExecutable(staging).writeText("other")
+
+        store.commit(staging, InstalledXrayCore("v26.9.9", "26.9.9", "cd".repeat(32), XrayCoreSource.Release))
+
+        assertFalse(staging.exists())
+        assertEquals("core", File(paths.filesDir, "cores/v26.9.9/libxray.so").readText())
+        assertEquals("ab".repeat(32), store.installed().single().sha256)
     }
 
     @Test

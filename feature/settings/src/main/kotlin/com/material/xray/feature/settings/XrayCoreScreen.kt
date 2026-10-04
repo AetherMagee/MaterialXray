@@ -291,7 +291,7 @@ private fun OperationCard(operation: XrayCoreOperation, onCancel: () -> Unit, on
                     if (total == null) {
                         LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                     } else {
-                        LinearProgressIndicator(progress = { operation.downloaded.toFloat() / total }, modifier = Modifier.fillMaxWidth())
+                        LinearProgressIndicator(progress = { (operation.downloaded.toFloat() / total).coerceAtMost(1f) }, modifier = Modifier.fillMaxWidth())
                     }
                     TextButton(onClick = onCancel, modifier = Modifier.align(Alignment.End)) {
                         Text(stringResource(R.string.settings_xray_core_cancel))

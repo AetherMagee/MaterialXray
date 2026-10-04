@@ -1,7 +1,9 @@
 package com.material.xray.core.data.xraycore
 
+import java.io.IOException
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -32,6 +34,13 @@ class XrayCoreReleasesTest {
     @Test
     fun `releases without this device's asset are skipped`() {
         assertTrue(parseXrayCoreReleases("[${release("v26.9.30", "2026-09-30")}]", "Xray-android-amd64.zip").isEmpty())
+    }
+
+    @Test
+    fun `unexpected JSON shapes are reported as IO failures`() {
+        listOf("{}", "[1]", """[{"tag_name": "v26.9.30", "assets": {}}]""", "not json").forEach { body ->
+            assertThrows(IOException::class.java) { parseXrayCoreReleases(body, ASSET) }
+        }
     }
 
     @Test
