@@ -5,24 +5,15 @@ import com.material.xray.core.common.log.LogBuffer
 import com.material.xray.core.common.log.LogSource
 import com.material.xray.core.connection.routing.TproxyTrafficPlan
 import com.material.xray.core.connection.routing.TunManager
-import com.material.xray.core.connection.routing.followingOtherVpn
 import com.material.xray.core.model.ConnectionProgress
 import com.material.xray.core.model.ConnectionState
 import com.material.xray.core.model.OtherVpnMode
 import com.material.xray.core.model.RootConnectionBackend
-import com.material.xray.core.model.RoutingRule
 import com.material.xray.core.model.ServerConfig
-import com.material.xray.core.model.XrayOutbound
 import com.material.xray.core.model.XrayRuntimeSettings
 import com.material.xray.core.telemetry.ConnectionTelemetryStep
 import com.material.xray.core.xray.ConfigGenerator
-import com.material.xray.core.xray.OtherVpnDns
-import com.material.xray.core.xray.PROTECTED_FROM_VPN_MARK
-import com.material.xray.core.xray.TUN_INBOUND_TAG
-import com.material.xray.core.xray.TetherIngressState
-import com.material.xray.core.xray.TproxyRuntimeState
 import com.material.xray.core.xray.XrayApiEndpoint
-import com.material.xray.core.xray.XrayInbound
 import com.material.xray.core.xray.XrayState
 import com.material.xray.core.xray.XraySysStats
 import com.material.xray.core.xray.parseXrayApiEndpoint
@@ -34,10 +25,7 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
 
 @Suppress("LargeClass")
 class ConnectionManager(
@@ -54,7 +42,6 @@ class ConnectionManager(
     private val serverResolver = dependencies.serverResolver
     private val tunGateway = dependencies.tunGateway
     private val tproxyGateway = dependencies.tproxyGateway
-    private val tetherIngress = TetherIngressController(tproxyGateway, log)
     private val cleanup = dependencies.cleanup
     private val stateStore = dependencies.stateStore
     private val processSupervisor = dependencies.rootProcess
@@ -62,8 +49,6 @@ class ConnectionManager(
     private val diagnostics = dependencies.diagnostics
     private val appRoutingPlanner = dependencies.routingPlanBuilder
     private val activeRouting = dependencies.activeRouting
-    private val apiClientFactory = dependencies.apiClientFactory
-    private val xrayRoutingUpdater = dependencies.xrayRoutingUpdater
     private val prepareCertificateBundle = dependencies.prepareCertificateBundle
     private val stepExecutor = ConnectionStepExecutor(
         elapsedRealtime = environment::elapsedRealtime,
@@ -86,19 +71,31 @@ class ConnectionManager(
         xrayBinary = xrayBinary,
     )
 
-    @Volatile private var xrayStatsClient: ConnectionStatsClient? = null
+    private val apiClients = XrayApiClients(dependencies.apiClientFactory)
 
-    @Volatile private var xrayRoutingClient: ConnectionRoutingClient? = null
+    private val configWriter = XrayConfigWriter(
+        configGenerator = configGenerator,
+        environment = environment,
+        xrayBinary = xrayBinary,
+        routingData = routingData,
+        routingUpdater = dependencies.xrayRoutingUpdater,
+        log = log,
+        stepExecutor = stepExecutor,
+        defaultDispatcher = defaultDispatcher,
+    )
 
-    private val xrayApiMutex = Mutex()
-
-    private val xrayApiCloseGate = Any()
-
-    private var xrayApiShutdownRequested = false
+    private val tproxyRouting = ActiveTproxyRouting(
+        gateway = tproxyGateway,
+        stateStore = stateStore,
+        appRoutingPlanner = appRoutingPlanner,
+        environment = environment,
+        log = log,
+        stepExecutor = stepExecutor,
+        isProcessAlive = ::isProcessAlive,
+        isRootProcessAlive = processSupervisor::isAlive,
+    )
 
     @Volatile private var runtimeState: XrayRuntimeState = XrayRuntimeState.Inactive
-
-    private var activeGeneratedConfig: GeneratedXrayConfig? = null
 
     @Volatile private var transitionGuardInstalled = false
 
@@ -107,8 +104,6 @@ class ConnectionManager(
     @Volatile private var rootRuntimeKnownClean = false
 
     private var rootRoutingKnownCleanForConnect = false
-
-    private var lastTproxyAuditAt = 0L
 
     // Root is the only runtime that installs routing outside the process; the rootless runtime
     // gets it from Android's VpnService.
@@ -125,7 +120,7 @@ class ConnectionManager(
         preparation: ConnectionPreparation = ConnectionPreparation.Full,
     ) {
         stateCoordinator.startConnection(transitionState)
-        activeGeneratedConfig = null
+        configWriter.active = null
         rootRoutingKnownCleanForConnect = false
         val connectStartedAt = environment.elapsedRealtime()
         val routeTable = runtimeSettings.routeTable
@@ -147,7 +142,7 @@ class ConnectionManager(
             prepareRoutingData(preparation, transitionState)
             val effectiveRuntimeSettings = runtimeSettings.copy(
                 tunName = tunName,
-                routingRules = resolveProviderRoutingRules(runtimeSettings.routingRules),
+                routingRules = configWriter.resolveProviderRoutingRules(runtimeSettings.routingRules),
             )
 
             val physicalRouteResult = detectPhysicalRoute(managesSystemRouting, tunName)
@@ -191,7 +186,7 @@ class ConnectionManager(
                     ConnectionProgress.PreparingCore,
                     telemetryStep = ConnectionTelemetryStep.CreateApiClients,
                 ) {
-                    replaceXrayApiClients(xrayApiEndpoint)
+                    apiClients.replace(xrayApiEndpoint)
                 },
             )
             val setup = ConnectionSetup(
@@ -207,7 +202,7 @@ class ConnectionManager(
             )
             if (!prepareTproxyInterception(setup)) return
 
-            val generatedConfig = writeXrayConfig(
+            val generatedConfig = configWriter.write(
                 xrayServer,
                 effectiveRuntimeSettings,
                 managesSystemRouting,
@@ -242,7 +237,7 @@ class ConnectionManager(
                 strategy = strategy,
                 vpnInterface = vpnInterface,
                 primaryGid = environment.appUid.takeIf { rootBackend == RootConnectionBackend.Tproxy },
-                // Matches writeXrayConfig, which gives the core a TUN inbound exactly when there is
+                // Matches XrayConfigWriter.write, which gives the core a TUN inbound exactly when there is
                 // no TPROXY plan to give it TPROXY inbounds instead.
                 tun = RootTunDevice(tunName, runtimeSettings.tunMtu).takeIf { managesSystemRouting && tproxyPlan == null },
             )
@@ -263,7 +258,7 @@ class ConnectionManager(
 
             if (!finishRuntimeSetup(setup, pid)) return
 
-            activeGeneratedConfig = generatedConfig
+            configWriter.active = generatedConfig
 
             finishSuccessfulConnection(setup, pid, connectStartedAt)
         } catch (error: CancellationException) {
@@ -537,28 +532,6 @@ class ConnectionManager(
     }
 
     /** Points provider rules at the provider's geodata, leaving out what no available file defines. */
-    private suspend fun resolveProviderRoutingRules(rules: List<RoutingRule>): List<RoutingRule> {
-        val resolution = routingData.resolveProviderRules(rules)
-        if (resolution.usedUrls.isNotEmpty()) {
-            log.append(LogSource.APP, "Using provider routing data: ${resolution.usedUrls.joinToString()}")
-        }
-        if (resolution.unavailableUrls.isNotEmpty()) {
-            log.append(
-                LogSource.APP,
-                "Provider routing data not downloaded yet, using compatibility mode: " +
-                    resolution.unavailableUrls.joinToString(),
-            )
-        }
-        if (resolution.droppedEntries.isNotEmpty()) {
-            log.append(
-                LogSource.APP,
-                "Left out provider routing entries missing from routing data: " +
-                    resolution.droppedEntries.joinToString(),
-            )
-        }
-        return resolution.rules
-    }
-
     private suspend fun detectPhysicalRoute(managesSystemRouting: Boolean, tunName: String): PhysicalRouteResult {
         if (!managesSystemRouting) return PhysicalRouteResult(success = true, route = null)
 
@@ -633,178 +606,11 @@ class ConnectionManager(
         return resolvedServer.server
     }
 
-    private suspend fun writeXrayConfig(
-        xrayServer: ServerConfig,
-        runtimeSettings: XrayRuntimeSettings,
-        managesSystemRouting: Boolean,
-        rootBackend: RootConnectionBackend,
-        appRoutingPlan: AppRoutingPlan,
-        physicalRoute: TunManager.PhysicalRoute?,
-        xrayApiEndpoint: XrayApiEndpoint,
-        tproxyPlan: TproxyTrafficPlan?,
-        syntheticDnsAddress: String?,
-    ): GeneratedXrayConfig? {
-        val tproxyInbounds = tproxyPlan?.runtimeState?.groups?.map { group ->
-            XrayInbound.Tproxy(
-                port = group.port,
-                tag = group.inboundTag,
-                allowIpv6 = runtimeSettings.allowIpv6,
-                acceptNonLoopback = tproxyPlan.runtimeState.tetherUpstreamInterface != null,
-            )
-        }
-        val effectiveInbounds = if (runtimeSettings.routeMxrayTrafficThroughXray) {
-            val trafficInbounds: List<XrayInbound> = tproxyInbounds
-                ?: listOf(XrayInbound.Tun(runtimeSettings.tunName, TUN_INBOUND_TAG, runtimeSettings.tunMtu))
-            trafficInbounds + XrayInbound.PrivateHttp(
-                path = "${environment.binDir}/mxray-http-${java.util.UUID.randomUUID().toString().take(12)}.sock",
-            )
-        } else {
-            tproxyInbounds
-        }
-        // Xray's GID-exempt sockets follow Android's current default route in both local and
-        // tethered TPROXY. The tether firewall still tracks the upstream separately.
-        val unboundTproxy = tproxyPlan != null
-        // Root sits inside other VPNs' uid ranges, so without protection a full-tunnel VPN would
-        // capture the core's own connections and loop them back into it.
-        val outboundMark = when {
-            tproxyPlan != null -> PROTECTED_FROM_VPN_MARK
-            managesSystemRouting -> runtimeSettings.fwmark
-            else -> 0
-        }
-
-        // A hand-edited config replaces generation wholesale, but not the identifiers this connect
-        // just allocated: the API endpoint and the inbounds have to be the current ones or the
-        // stats clients talk to nothing and the firewall rule guards the wrong port.
-        if (
-            writeOverriddenXrayConfig(
-                runtimeSettings,
-                xrayApiEndpoint,
-                effectiveInbounds,
-                outboundMark = PROTECTED_FROM_VPN_MARK.takeIf { tproxyPlan != null },
-                clearOutboundInterfaces = unboundTproxy,
-            )
-        ) {
-            return null
-        }
-
-        val followsOtherVpnDns = tproxyPlan != null &&
-            !configGenerator.usesProfileDns(xrayServer, runtimeSettings.preferProfileDns)
-        val generatedConfig = GeneratedXrayConfig(
-            server = xrayServer,
-            runtimeSettings = runtimeSettings,
-            managesSystemRouting = managesSystemRouting,
-            rootBackend = rootBackend,
-            fwmark = outboundMark,
-            followsOtherVpnDns = followsOtherVpnDns,
-            otherVpnDns = if (followsOtherVpnDns) environment.otherVpnDns()?.forIpv6(runtimeSettings.allowIpv6) else null,
-            appRoutingPlan = appRoutingPlan,
-            physicalRoute = physicalRoute.takeUnless { unboundTproxy },
-            xrayApiEndpoint = xrayApiEndpoint,
-            syntheticDnsAddress = syntheticDnsAddress,
-            inbounds = effectiveInbounds,
-        )
-
-        val configJson = executeStep(
-            ConnectionStep(
-                "Config generation",
-                ConnectionProgress.GeneratingConfiguration,
-                telemetryStep = ConnectionTelemetryStep.GenerateConfig,
-                action = { generateXrayConfig(generatedConfig) },
-            ),
-        )
-        executeStep(
-            ConnectionStep(
-                "Config write",
-                ConnectionProgress.GeneratingConfiguration,
-                telemetryStep = ConnectionTelemetryStep.WriteConfig,
-                action = { xrayBinary.writeConfig(configJson) },
-            ),
-        )
-        log.append(LogSource.APP, "Config written to ${xrayBinary.configPath()} (${configJson.length} chars)")
-        generatedConfig.otherVpnDns?.let { log.append(LogSource.APP, "Other VPN DNS: ${it.describe()}") }
-        return generatedConfig
-    }
-
-    private suspend fun generateXrayConfig(config: GeneratedXrayConfig): String = withContext(defaultDispatcher) {
-        val settings = config.runtimeSettings
-        configGenerator.generate(
-            server = config.server,
-            tunName = settings.tunName,
-            fwmark = config.fwmark,
-            dnsServers = settings.dnsServers,
-            domesticDnsServers = settings.domesticDnsServers,
-            preferProfileDns = settings.preferProfileDns,
-            syntheticDnsAddress = config.syntheticDnsAddress,
-            logLevel = settings.logLevel,
-            defaultOutbound = settings.defaultOutbound,
-            bypassLan = settings.bypassLan,
-            allowIpv6 = settings.allowIpv6,
-            routingRules = settings.routingRules,
-            routingDomainStrategy = settings.routingDomainStrategy,
-            routingDomainMatcher = settings.routingDomainMatcher,
-            routingFallbackOutbound = settings.routingFallbackOutbound,
-            appProxyRoutes = config.appRoutingPlan.proxyRoutes,
-            physicalInterface = config.physicalRoute?.dev,
-            xrayApiEndpoint = config.xrayApiEndpoint,
-            xrayBufferSizeKiB = settings.xrayBufferSizeKiB,
-            tunMtu = settings.tunMtu,
-            inbounds = config.inbounds,
-            otherVpnDns = config.otherVpnDns,
-        )
-    }
-
     /**
      * Whether another app's VPN changed the private DNS zone the running config routes to it. Xray
      * cannot reload DNS settings, so the caller has to reconnect to pick the change up.
      */
-    fun otherVpnDnsChanged(): Boolean {
-        val config = activeGeneratedConfig?.takeIf { it.followsOtherVpnDns } ?: return false
-        val current = environment.otherVpnDns()?.forIpv6(config.runtimeSettings.allowIpv6)
-        if (current == config.otherVpnDns) return false
-        log.append(LogSource.APP, "Other VPN DNS changed: ${config.otherVpnDns.describe()} -> ${current.describe()}")
-        return true
-    }
-
-    /**
-     * Writes the hand-edited config, with this connect's runtime identity patched back into it.
-     * Returns false when there is no override, or when it is too broken to patch, so the caller
-     * generates a config as usual rather than starting the core against something unusable.
-     */
-    private suspend fun writeOverriddenXrayConfig(
-        runtimeSettings: XrayRuntimeSettings,
-        xrayApiEndpoint: XrayApiEndpoint,
-        inbounds: List<XrayInbound>?,
-        outboundMark: Int?,
-        clearOutboundInterfaces: Boolean,
-    ): Boolean {
-        val override = xrayBinary.readOverrideConfig() ?: return false
-        val patched = withContext(defaultDispatcher) {
-            configGenerator.applyRuntimeIdentity(
-                configJson = override,
-                tunName = runtimeSettings.tunName,
-                xrayApiEndpoint = xrayApiEndpoint,
-                tunMtu = runtimeSettings.tunMtu,
-                inbounds = inbounds,
-                outboundMark = outboundMark,
-                clearOutboundInterfaces = clearOutboundInterfaces,
-            )
-        }
-        if (patched == null) {
-            log.append(LogSource.APP, "Edited active config is not a JSON object; generating a config instead")
-            return false
-        }
-
-        executeStep(
-            ConnectionStep(
-                "Config write",
-                ConnectionProgress.GeneratingConfiguration,
-                telemetryStep = ConnectionTelemetryStep.WriteConfig,
-                action = { xrayBinary.writeConfig(patched) },
-            ),
-        )
-        log.append(LogSource.APP, "Using edited active config (${patched.length} chars)")
-        return true
-    }
+    fun otherVpnDnsChanged(): Boolean = configWriter.otherVpnDnsChanged()
 
     private fun logAppRoutingPlan(appRoutingPlan: AppRoutingPlan) {
         log.append(
@@ -940,9 +746,9 @@ class ConnectionManager(
                     fail(environment.describe(ConnectionError.TproxyHealthCheck))
                     return@coroutineScope false
                 }
-                lastTproxyAuditAt = environment.elapsedRealtime()
+                tproxyRouting.markAudited()
                 if (tproxyPlan.runtimeState.otherVpnMode == OtherVpnMode.TunnelInTunnel) {
-                    syncOtherVpnRules(tproxyPlan.runtimeState)
+                    tproxyRouting.syncOtherVpnRules(tproxyPlan.runtimeState)
                 }
                 if (!ensureProcessAliveAfterSetup(pid)) return@coroutineScope false
                 tproxyPlan.runtimeState.otherVpnRoutes.takeIf { it.isNotEmpty() }?.let { routes ->
@@ -1179,17 +985,9 @@ class ConnectionManager(
 
     suspend fun localAddressesChanged(backend: RootConnectionBackend): Boolean = if (backend == RootConnectionBackend.Tproxy) tproxyGateway.localAddressesChanged() else tunGateway.localAddressesChanged()
 
-    suspend fun refreshTetherAddresses(): Boolean {
-        val state = stateStore.read() ?: return false
-        val current = state.tproxy?.takeIf { it.tetherIngress is TetherIngressState.Active } ?: return false
-        if (!isProcessAlive(state.xrayPid)) return false
-        val updated = tetherIngress.refreshAddresses(current) ?: return false
-        stateStore.write(state.copy(tproxy = updated))
-        log.append(LogSource.APP, "Tether addresses updated without restarting Xray")
-        return true
-    }
+    suspend fun refreshTetherAddresses(): Boolean = tproxyRouting.refreshTetherAddresses()
 
-    suspend fun isTetherIngressActive(): Boolean = stateStore.read()?.tproxy?.tetherIngress is TetherIngressState.Active
+    suspend fun isTetherIngressActive(): Boolean = tproxyRouting.isTetherIngressActive()
 
     suspend fun applyAppRoutingChanges(
         connectedState: ConnectionState.Connected,
@@ -1221,61 +1019,7 @@ class ConnectionManager(
     ): Boolean {
         val activeRuntime = runtimeState as? XrayRuntimeState.Active ?: return false
         if (activeRuntime.pid != connectedState.corePid || !isProcessAlive(connectedState.corePid)) return false
-        val currentInputs = activeGeneratedConfig ?: return false
-        val currentConfig = xrayBinary.readConfig()?.toJsonObjectOrNull() ?: return false
-        if (currentInputs.runtimeSettings.routingDomainStrategy != runtimeSettings.routingDomainStrategy) {
-            log.append(LogSource.APP, "Live routing update requires a restart to change domain strategy")
-            return false
-        }
-        val nextRuntimeSettings = currentInputs.runtimeSettings.copy(
-            routingRules = resolveProviderRoutingRules(runtimeSettings.routingRules),
-            routingDomainMatcher = runtimeSettings.routingDomainMatcher,
-            routingFallbackOutbound = runtimeSettings.routingFallbackOutbound,
-        )
-        if (
-            currentInputs.rootBackend == RootConnectionBackend.Tproxy &&
-            currentInputs.runtimeSettings.usesProxyAsRoutingDefault() != nextRuntimeSettings.usesProxyAsRoutingDefault()
-        ) {
-            log.append(LogSource.APP, "Live routing update requires a restart to change the TPROXY default route")
-            return false
-        }
-        val nextInputs = currentInputs.copy(runtimeSettings = nextRuntimeSettings)
-        val nextConfigJson = try {
-            generateXrayConfig(nextInputs)
-        } catch (error: IllegalArgumentException) {
-            log.append(LogSource.APP, "Live routing update skipped: ${error.message}")
-            return false
-        } catch (error: IllegalStateException) {
-            log.append(LogSource.APP, "Live routing update skipped: ${error.message}")
-            return false
-        }
-        val nextConfig = nextConfigJson.toJsonObjectOrNull() ?: return false
-        if (currentConfig.withoutRouting() != nextConfig.withoutRouting()) {
-            log.append(LogSource.APP, "Live routing update requires changes outside Xray routing")
-            return false
-        }
-        val nextRouting = nextConfig["routing"] as? JsonObject ?: return false
-
-        return when (val result = xrayRoutingUpdater.replace(activeRuntime.apiEndpoint, nextRouting)) {
-            XrayRoutingUpdateResult.Applied -> {
-                try {
-                    xrayBinary.writeConfig(nextConfigJson)
-                } catch (error: IOException) {
-                    log.append(LogSource.APP, "Could not persist live routing update: ${error.message}")
-                    return false
-                } catch (error: SecurityException) {
-                    log.append(LogSource.APP, "Could not persist live routing update: ${error.message}")
-                    return false
-                }
-                activeGeneratedConfig = nextInputs
-                log.append(LogSource.APP, "Xray routing updated without restarting the core")
-                true
-            }
-            is XrayRoutingUpdateResult.Failed -> {
-                log.append(LogSource.APP, "Live Xray routing update failed: ${result.reason}")
-                false
-            }
-        }
+        return configWriter.applyRoutingChanges(activeRuntime.apiEndpoint, runtimeSettings)
     }
 
     private suspend fun applyAppRoutingChangesOnce(
@@ -1293,91 +1037,10 @@ class ConnectionManager(
                 bypassLan = runtimeSettings.bypassLan,
             )
         }
-
-        val persistedState = stateStore.read() ?: return false
-        val tproxyState = persistedState.tproxy ?: return false
-        return updateTproxyOutput(connectedState, runtimeSettings, persistedState, tproxyState)
+        return tproxyRouting.applyAppRoutingChanges(connectedState, runtimeSettings)
     }
 
-    /**
-     * Keeps the running TPROXY firewall in step with another app's VPN as it comes, goes or
-     * changes its routes. No mode needs the core restarted for that. The mode is the one the
-     * firewall was built with; a changed setting arrives with the reconnect it triggers.
-     */
-    suspend fun followOtherVpnRouting(connectedState: ConnectionState.Connected, runtimeSettings: XrayRuntimeSettings) {
-        val persistedState = stateStore.read() ?: return
-        if (persistedState.rootConnectionBackend != RootConnectionBackend.Tproxy) return
-        val tproxyState = persistedState.tproxy ?: return
-        if (tproxyState.otherVpnMode == OtherVpnMode.TunnelInTunnel) {
-            syncOtherVpnRules(tproxyState)
-            return
-        }
-        val next = tproxyState.followingOtherVpn(environment.otherVpnRoutes())
-        if (next == tproxyState) return
-        if (!updateTproxyOutput(connectedState, runtimeSettings, persistedState, next)) {
-            log.append(LogSource.APP, "Could not follow the other VPN's routes")
-            return
-        }
-        if (next.otherVpnRoutes != tproxyState.otherVpnRoutes) {
-            log.append(LogSource.APP, "Other VPN routes changed: ${next.otherVpnRoutes.joinToString().ifEmpty { "none" }}")
-        }
-        if (next.standDownRoutes != tproxyState.standDownRoutes) {
-            val routes = next.standDownRoutes.joinToString()
-            log.append(LogSource.APP, if (routes.isEmpty()) "No longer standing down for the other VPN" else "Standing down for the other VPN: $routes")
-        }
-    }
-
-    private suspend fun syncOtherVpnRules(state: TproxyRuntimeState) {
-        val result = tproxyGateway.syncOtherVpnRules(state)
-        if (!result.success) log.append(LogSource.APP, "Could not mirror other VPN rules: ${result.error ?: "unknown error"}")
-    }
-
-    /** Rebuilds the inactive output chain from [tproxyState] and swaps it in. */
-    private suspend fun updateTproxyOutput(
-        connectedState: ConnectionState.Connected,
-        runtimeSettings: XrayRuntimeSettings,
-        persistedState: XrayState,
-        tproxyState: TproxyRuntimeState,
-    ): Boolean {
-        if (persistedState.appProxyServerIds.isEmpty() && tproxyState.groups.size > 1) return false
-        if (!isProcessAlive(connectedState.corePid)) return false
-        val appRoutingPlan = appRoutingPlanner.build(
-            baseRouteTable = runtimeSettings.routeTable,
-            includeProxyRoutes = false,
-            includeTunRoutes = true,
-            includeDefaultSelectedRoute = !runtimeSettings.usesProxyAsRoutingDefault(),
-            allowIpv6 = runtimeSettings.allowIpv6,
-        )
-        if (appRoutingPlan.proxyServerIds != persistedState.appProxyServerIds) return false
-        val plan = tproxyGateway.createPlan(
-            appRoutingPlan = appRoutingPlan,
-            routeTable = runtimeSettings.routeTable,
-            allowIpv6 = runtimeSettings.allowIpv6,
-            existingState = tproxyState,
-            tetherUpstreamInterface = tproxyState.tetherUpstreamInterface,
-            bypassLan = tproxyState.bypassLan,
-        )
-        val result = executeStep(
-            ConnectionStep(
-                "TPROXY app routing update",
-                ConnectionProgress.UpdatingAppRouting,
-                isSuccessful = { it.success },
-                action = { tproxyGateway.update(plan, tproxyState.outputChainSlot) },
-            ),
-        )
-        if (!result.success) {
-            log.append(LogSource.APP, "Fast TPROXY app routing update skipped: ${result.error ?: "unknown error"}")
-            return false
-        }
-        val nextSlot = if (tproxyState.outputChainSlot == "a") "b" else "a"
-        stateStore.write(
-            persistedState.copy(
-                tproxy = tproxyState.copy(outputChainSlot = nextSlot),
-                ipRulesApplied = true,
-            ),
-        )
-        return true
-    }
+    suspend fun followOtherVpnRouting(connectedState: ConnectionState.Connected, runtimeSettings: XrayRuntimeSettings) = tproxyRouting.followOtherVpnRouting(connectedState, runtimeSettings)
 
     suspend fun updatePhysicalBypassRoute(
         connectedState: ConnectionState.Connected,
@@ -1399,52 +1062,7 @@ class ConnectionManager(
     ): PhysicalRouteUpdateResult {
         val persistedState = stateStore.read()
         if (persistedState?.rootConnectionBackend == RootConnectionBackend.Tproxy) {
-            val tproxyState = persistedState.tproxy ?: return PhysicalRouteUpdateResult.RequiresReconnect
-            if (!processSupervisor.isAlive(connectedState.corePid)) return PhysicalRouteUpdateResult.RequiresReconnect
-            val previousUpstream = tproxyState.tetherUpstreamInterface
-            val updatedTproxy = if (previousUpstream != null && previousUpstream != physicalRoute.dev) {
-                val addresses = if (tproxyState.dynamicLocalAddresses) {
-                    emptyList()
-                } else {
-                    tproxyGateway.readLocalAddresses(tproxyState.ipv6Enabled)
-                }
-                val updated = tproxyState.copy(
-                    tetherUpstreamInterface = physicalRoute.dev,
-                    localAddresses = addresses,
-                    tetherChainSlot = tproxyState.nextTetherChainSlot(),
-                )
-                val appPlan = appRoutingPlanner.build(
-                    baseRouteTable = runtimeSettings.routeTable,
-                    includeProxyRoutes = false,
-                    includeTunRoutes = true,
-                    includeDefaultSelectedRoute = !runtimeSettings.usesProxyAsRoutingDefault(),
-                    allowIpv6 = runtimeSettings.allowIpv6,
-                )
-                val plan = tproxyGateway.createPlan(
-                    appRoutingPlan = appPlan,
-                    routeTable = runtimeSettings.routeTable,
-                    allowIpv6 = runtimeSettings.allowIpv6,
-                    existingState = updated,
-                    tetherUpstreamInterface = physicalRoute.dev,
-                    bypassLan = runtimeSettings.bypassLan,
-                )
-                if (!tetherIngress.retargetUpstream(plan, previousUpstream)) {
-                    return PhysicalRouteUpdateResult.RequiresReconnect
-                }
-                log.append(LogSource.APP, "Tether upstream changed to ${physicalRoute.dev} without restarting Xray")
-                updated
-            } else {
-                tproxyState
-            }
-            stateStore.write(
-                persistedState.copy(
-                    physicalInterface = physicalRoute.dev,
-                    physicalGateway = physicalRoute.gateway,
-                    physicalTable = physicalRoute.table,
-                    tproxy = updatedTproxy,
-                ),
-            )
-            return PhysicalRouteUpdateResult.Applied(physicalRoute)
+            return tproxyRouting.updatePhysicalRoute(connectedState, physicalRoute, runtimeSettings, persistedState)
         }
         return activeRouting.updatePhysicalBypassRoute(
             connectedState = connectedState,
@@ -1459,15 +1077,7 @@ class ConnectionManager(
         val state = stateStore.read() ?: return false
         val tproxyState = state.tproxy
         return if (state.rootConnectionBackend == RootConnectionBackend.Tproxy && tproxyState != null) {
-            val now = environment.elapsedRealtime()
-            val auditDue = now - lastTproxyAuditAt >= TPROXY_FULL_AUDIT_INTERVAL_MS
-            if (!auditDue && tproxyGateway.checkHealth(tproxyState)) {
-                true
-            } else {
-                tproxyGateway.verify(tproxyState).success.also { healthy ->
-                    if (healthy) lastTproxyAuditAt = now
-                }
-            }
+            tproxyRouting.isHealthy(tproxyState)
         } else {
             tunAvailable
         }
@@ -1522,8 +1132,8 @@ class ConnectionManager(
             apiEndpoint = endpoint,
             physicalRoute = selectPersistedPhysicalRoute(state),
         )
-        activeGeneratedConfig = null
-        replaceXrayApiClients(endpoint)
+        configWriter.active = null
+        apiClients.replace(endpoint)
         return true
     }
 
@@ -1556,10 +1166,10 @@ class ConnectionManager(
         rootRuntimeKnownClean = cleaned && strategy?.managesSystemRouting == true && !preserveTproxyGuard
         if (rootRuntimeKnownClean) cleanup.recordKnownCleanState()
         runtimeState = XrayRuntimeState.Inactive
-        activeGeneratedConfig = null
+        configWriter.active = null
         executeStep(
             ConnectionStep("Close Xray control API", ConnectionProgress.CleaningRuntime) {
-                closeXrayApiClients()
+                apiClients.close()
             },
         )
         if (!cleaned) {
@@ -1619,7 +1229,7 @@ class ConnectionManager(
 
     fun prepareForServiceDestruction() {
         runtimeState.strategy?.requestStop()
-        requestXrayApiClientClose()
+        apiClients.requestClose()
     }
 
     suspend fun ensureCleanRootRuntime(preserveTproxyGuard: Boolean = false): Boolean {
@@ -1634,7 +1244,7 @@ class ConnectionManager(
         rootRuntimeKnownClean = cleaned && !preserveTproxyGuard
         if (rootRuntimeKnownClean) cleanup.recordKnownCleanState()
         runtimeState = XrayRuntimeState.Inactive
-        activeGeneratedConfig = null
+        configWriter.active = null
         if (!cleaned) stateCoordinator.markError(environment.describe(ConnectionError.CleanupFailed))
         return cleaned
     }
@@ -1667,9 +1277,9 @@ class ConnectionManager(
                 }
             }
             runtimeState = XrayRuntimeState.Inactive
-            activeGeneratedConfig = null
+            configWriter.active = null
         }
-        closeXrayApiClients()
+        apiClients.close()
         stateCoordinator.markError(finalMessage, retryable)
     }
 
@@ -1683,7 +1293,7 @@ class ConnectionManager(
             cleanupErrors += error
         } finally {
             runtimeState = XrayRuntimeState.Inactive
-            activeGeneratedConfig = null
+            configWriter.active = null
             if (transitionGuardInstalled && !preserveGuardOnFailure) {
                 try {
                     if (tproxyGateway.removeGuard()) transitionGuardInstalled = false
@@ -1692,7 +1302,7 @@ class ConnectionManager(
                 }
             }
             try {
-                closeXrayApiClients()
+                apiClients.close()
             } catch (error: Exception) {
                 cleanupErrors += error
             }
@@ -1722,9 +1332,7 @@ class ConnectionManager(
             action = {
                 val tproxyState = state.tproxy
                 if (state.rootConnectionBackend == RootConnectionBackend.Tproxy && tproxyState != null) {
-                    tproxyGateway.verify(tproxyState).success.also { healthy ->
-                        if (healthy) lastTproxyAuditAt = environment.elapsedRealtime()
-                    }
+                    tproxyRouting.verify(tproxyState)
                 } else {
                     tunAvailable
                 }
@@ -1740,71 +1348,15 @@ class ConnectionManager(
 
     suspend fun readProcessMetrics(pid: Int): ProcessMetrics? = processFor(pid)?.readProcessMetrics(pid)
 
-    suspend fun readOutboundTrafficStatsBytes(): Map<String, Long> = withXrayApiClients {
-        xrayStatsClient?.queryOutboundTrafficStatsBytes().orEmpty()
-    }
+    suspend fun readOutboundTrafficStatsBytes(): Map<String, Long> = apiClients.readOutboundTrafficStatsBytes()
 
-    override suspend fun readXraySysStats(): XraySysStats? = withXrayApiClients { xrayStatsClient?.getSysStats() }
+    override suspend fun readXraySysStats(): XraySysStats? = apiClients.readSysStats()
 
     override suspend fun readCrashReason(): String = runCatching {
         runtimeState.strategy?.readCrashReason()
     }.getOrNull() ?: "xray process exited"
 
-    suspend fun readBalancerSelection(balancerTag: String) = withXrayApiClients {
-        xrayRoutingClient?.queryBalancerSelection(balancerTag)
-    }
-
-    private suspend fun replaceXrayApiClients(endpoint: XrayApiEndpoint) = withXrayApiClients {
-        replaceXrayApiClientsLocked(endpoint)
-    }
-
-    private fun replaceXrayApiClientsLocked(endpoint: XrayApiEndpoint) {
-        closeXrayApiClientsLocked()
-        apiClientFactory.create(endpoint).also { clients ->
-            xrayStatsClient = clients.stats
-            xrayRoutingClient = clients.routing
-        }
-    }
-
-    private suspend fun closeXrayApiClients() = withXrayApiClients {
-        closeXrayApiClientsLocked()
-    }
-
-    private fun closeXrayApiClientsLocked() {
-        xrayStatsClient?.close()
-        xrayStatsClient = null
-        xrayRoutingClient?.close()
-        xrayRoutingClient = null
-    }
-
-    private suspend fun <T> withXrayApiClients(block: suspend () -> T): T {
-        xrayApiMutex.lock()
-        try {
-            return block()
-        } finally {
-            synchronized(xrayApiCloseGate) {
-                try {
-                    if (xrayApiShutdownRequested) {
-                        closeXrayApiClientsLocked()
-                    }
-                } finally {
-                    xrayApiMutex.unlock()
-                }
-            }
-        }
-    }
-
-    private fun requestXrayApiClientClose() {
-        synchronized(xrayApiCloseGate) {
-            xrayApiShutdownRequested = true
-            if (!xrayApiMutex.tryLock()) return
-            try {
-                closeXrayApiClientsLocked()
-            } finally {
-                xrayApiMutex.unlock()
-            }
-        }
-    }
+    suspend fun readBalancerSelection(balancerTag: String) = apiClients.readBalancerSelection(balancerTag)
 
     private fun runtimeBypassUids(directUids: Set<Int>): Set<Int> {
         val appUid = environment.appUid
@@ -1854,29 +1406,6 @@ class ConnectionManager(
     private suspend fun <T> executeStep(step: ConnectionStep<T>): T = stepExecutor.execute(step)
 }
 
-private data class GeneratedXrayConfig(
-    val server: ServerConfig,
-    val runtimeSettings: XrayRuntimeSettings,
-    val managesSystemRouting: Boolean,
-    val rootBackend: RootConnectionBackend,
-    val fwmark: Int,
-    val followsOtherVpnDns: Boolean,
-    val otherVpnDns: OtherVpnDns?,
-    val appRoutingPlan: AppRoutingPlan,
-    val physicalRoute: TunManager.PhysicalRoute?,
-    val xrayApiEndpoint: XrayApiEndpoint,
-    val syntheticDnsAddress: String?,
-    val inbounds: List<XrayInbound>?,
-)
-
-private fun OtherVpnDns?.describe(): String = this?.let { "${it.domains.joinToString()} via ${it.servers.joinToString()} (net ${it.netId})" } ?: "none"
-
-private fun String.toJsonObjectOrNull(): JsonObject? = runCatching {
-    Json.parseToJsonElement(this) as? JsonObject
-}.getOrNull()
-
-private fun JsonObject.withoutRouting() = filterKeys { it != "routing" }
-
 private sealed interface XrayRuntimeState {
     val strategy: XrayRuntimeStrategy?
 
@@ -1904,10 +1433,7 @@ private fun effectiveRootBackend(
     configuredBackend: RootConnectionBackend,
 ): RootConnectionBackend = if (managesSystemRouting) configuredBackend else RootConnectionBackend.Tun
 
-private fun XrayRuntimeSettings.usesProxyAsRoutingDefault(): Boolean = (routingFallbackOutbound ?: defaultOutbound) == XrayOutbound.Proxy
-
 private const val LEGACY_DEFAULT_TUN_NAME = "xray0"
-private const val TPROXY_FULL_AUDIT_INTERVAL_MS = 10 * 60_000L
 const val TPROXY_INTERFACE_LABEL = "TPROXY"
 private const val CONNECTION_STEP_MAX_RETRIES = 2
 private const val CONNECTION_STEP_RETRY_DELAY_MS = 1_500L
