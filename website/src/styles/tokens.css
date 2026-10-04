@@ -1,0 +1,95 @@
+/*
+ * Material 3 color roles, shape and type scale shared by the landing page and the docs.
+ * Seeded from the launcher icon's blue (#1E78E8) and mapped onto the GM3 baseline tones.
+ * Light is the default; dark follows the data-theme attribute that Starlight's theme script
+ * resolves (including "auto"), and the landing page reuses the same script and storage key.
+ */
+
+:root {
+	--md-primary: #0b57d0;
+	--md-on-primary: #ffffff;
+	--md-primary-container: #d3e3fd;
+	--md-on-primary-container: #041e49;
+	--md-secondary: #535f70;
+	--md-on-secondary: #ffffff;
+	--md-secondary-container: #d7e3f8;
+	--md-on-secondary-container: #101c2b;
+	--md-tertiary: #6b5778;
+	--md-on-tertiary: #ffffff;
+	--md-tertiary-container: #f3daff;
+	--md-on-tertiary-container: #251431;
+	--md-error: #ba1a1a;
+	--md-error-container: #ffdad6;
+	--md-on-error-container: #410002;
+	--md-success: #146c2e;
+	--md-success-container: #c4eed0;
+	--md-on-success-container: #072711;
+	--md-inverse-primary: #a8c7fa;
+	--md-inverse-success: #a8d5b4;
+
+	--md-surface: #f9f9ff;
+	--md-on-surface: #191c20;
+	--md-on-surface-variant: #44474e;
+	--md-surface-container-lowest: #ffffff;
+	--md-surface-container-low: #f2f3fa;
+	--md-surface-container: #ecedf4;
+	--md-surface-container-high: #e6e8ee;
+	--md-surface-container-highest: #e1e2e9;
+	--md-inverse-surface: #2e3036;
+	--md-inverse-on-surface: #eff0f7;
+	--md-outline: #74777f;
+	--md-outline-variant: #c4c6d0;
+	--md-scrim: rgb(0 0 0 / 0.4);
+
+	--md-shape-xs: 4px;
+	--md-shape-sm: 8px;
+	--md-shape-md: 12px;
+	--md-shape-lg: 16px;
+	--md-shape-xl: 28px;
+	--md-shape-xxl: 48px;
+	--md-shape-full: 999px;
+
+	--md-font: 'Google Sans Flex', 'Google Sans', 'Roboto Flex', Roboto, system-ui, sans-serif;
+	--md-font-code: 'Google Sans Code', 'JetBrains Mono', ui-monospace, monospace;
+
+	--md-motion-emphasized: cubic-bezier(0.2, 0, 0, 1);
+	--md-motion-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
+
+	color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+	--md-primary: #a8c7fa;
+	--md-on-primary: #062e6f;
+	--md-primary-container: #0842a0;
+	--md-on-primary-container: #d3e3fd;
+	--md-secondary: #bbc7db;
+	--md-on-secondary: #253140;
+	--md-secondary-container: #3c4858;
+	--md-on-secondary-container: #d7e3f8;
+	--md-tertiary: #d7bee4;
+	--md-on-tertiary: #3b2948;
+	--md-tertiary-container: #533f5f;
+	--md-on-tertiary-container: #f3daff;
+	--md-error: #ffb4ab;
+	--md-error-container: #93000a;
+	--md-on-error-container: #ffdad6;
+	--md-success: #a8d5b4;
+	--md-success-container: #0f5223;
+	--md-on-success-container: #c4eed0;
+	--md-inverse-primary: #0b57d0;
+	--md-inverse-success: #146c2e;
+	--md-surface: #111318;
+	--md-on-surface: #e2e2e9;
+	--md-on-surface-variant: #c4c6d0;
+	--md-surface-container-lowest: #0c0e13;
+	--md-surface-container-low: #191c20;
+	--md-surface-container: #1d2024;
+	--md-surface-container-high: #282a2f;
+	--md-surface-container-highest: #33353a;
+	--md-inverse-surface: #e2e2e9;
+	--md-inverse-on-surface: #2e3036;
+	--md-outline: #8e9099;
+	--md-outline-variant: #44474e;
+	color-scheme: dark;
+}

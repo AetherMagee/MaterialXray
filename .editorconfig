@@ -26,3 +26,11 @@ indent_size = 2
 
 [*.md]
 trim_trailing_whitespace = false
+
+# The website keeps Astro's formatting: tabs, with npm's two-space JSON.
+[website/**]
+indent_style = tab
+
+[website/**.json]
+indent_size = 2
+indent_style = space

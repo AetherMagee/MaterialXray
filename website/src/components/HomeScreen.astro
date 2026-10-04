@@ -1,0 +1,238 @@
+---
+/*
+ * The app's Home screen, redrawn as vector from a real capture (1080x2424 px, Pixel-class emulator)
+ * so it stays sharp at any size and follows the site's light/dark theme.
+ */
+const rows = [
+	{ name: 'Frankfurt', proto: 'vless • raw', ping: '113 ms', chip: 155, flag: 'de', selected: true },
+	{ name: 'Amsterdam', proto: 'trojan • raw', ping: '97 ms', chip: 136, flag: 'nl' },
+	{ name: 'Stockholm', proto: 'vless • raw', ping: '141 ms', chip: 155, flag: 'se' },
+];
+const icon = {
+	bolt: 'M11 21h-1l1-7H7.5c-.58 0-.57-.32-.38-.66.19-.34.05-.08.07-.12C8.48 10.94 10.42 7.54 13 3h1l-1 7h3.5c.49 0 .56.33.47.51l-.07.15C12.96 17.55 11 21 11 21z',
+	down: 'M6 7h12l-6 10z',
+	up: 'M12 7l6 10H6z',
+	refresh: 'M17.65 6.35A7.96 7.96 0 0 0 12 4a8 8 0 1 0 7.73 10h-2.08A6 6 0 1 1 12 6c1.66 0 3.14.69 4.22 1.78L13 11h7V4z',
+	speed: 'M20.38 8.57l-1.23 1.85a8 8 0 0 1-.22 7.58H5.07A8 8 0 0 1 15.58 6.85l1.85-1.23A10 10 0 0 0 3.35 19a2 2 0 0 0 1.72 1h13.85a2 2 0 0 0 1.74-1 10 10 0 0 0-.27-10.44zm-9.79 6.84a2 2 0 0 0 2.83 0l5.66-8.49-8.49 5.66a2 2 0 0 0 0 2.83z',
+	more: 'M12 8a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm0 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm0 6a2 2 0 1 0 0 4 2 2 0 0 0 0-4z',
+	chevron: 'M8.59 16.59 13.17 12 8.59 7.41 10 6l6 6-6 6z',
+	home: 'M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z',
+	settings:
+		'M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.48.48 0 0 0-.48-.41h-3.84a.47.47 0 0 0-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.48.48 0 0 0-.59.22L2.74 8.87a.47.47 0 0 0 .12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32a.47.47 0 0 0-.12-.61zM12 15.6A3.6 3.6 0 1 1 12 8.4a3.6 3.6 0 0 1 0 7.2z',
+	wifi: 'M12.01 21.49 23.64 7c-.45-.34-4.93-4-11.64-4C5.28 3 .81 6.66.36 7l11.63 14.49z',
+	// Material Symbols "arrow_split", 960-unit viewBox.
+	routing: 'M160 520v-80h304l200-200H560v-80h240v240h-80V296L496 520Zm400 280v-80h104L536 594l58-58 126 128V560h80v240Z',
+};
+// A 24-unit Material icon drawn into a box of `size` px centred on (cx, cy).
+const at = (cx: number, cy: number, size = 63, unit = 24) =>
+	`translate(${cx - size / 2} ${cy - size / 2}) scale(${size / unit})`;
+---
+
+<!--
+	The phone's shadow is a box-shadow behind the SVG rather than an SVG or CSS filter. The blobs behind the
+	phone repaint while they spin, and a filter would recompute its blur on every one of those frames.
+-->
+<div class="hs-frame">
+	<div class="hs-shadow"></div>
+	<svg class="home-screen" viewBox="-107 -107 1294 2606" role="img" aria-label="Material Xray home screen, connected to Frankfurt">
+		<defs>
+			<clipPath id="hs-screen"><rect width="1080" height="2424" rx="146"></rect></clipPath>
+			<clipPath id="hs-flag"><rect width="50" height="36" rx="5"></rect></clipPath>
+			<g id="hs-flag-de" clip-path="url(#hs-flag)">
+				<rect width="50" height="12" fill="#000"></rect><rect y="12" width="50" height="12" fill="#dd0000"></rect><rect y="24" width="50" height="12" fill="#ffce00"></rect>
+			</g>
+			<g id="hs-flag-nl" clip-path="url(#hs-flag)">
+				<rect width="50" height="12" fill="#ae1c28"></rect><rect y="12" width="50" height="12" fill="#fff"></rect><rect y="24" width="50" height="12" fill="#21468b"></rect>
+			</g>
+			<g id="hs-flag-se" clip-path="url(#hs-flag)">
+				<rect width="50" height="36" fill="#006aa7"></rect><rect x="14" width="7" height="36" fill="#fecc02"></rect><rect y="14.5" width="50" height="7" fill="#fecc02"></rect>
+			</g>
+		</defs>
+
+		<g class="hs-device">
+			<rect x="-34.2" y="-34.2" width="1148.4" height="2492.4" rx="178.7" fill="#1b1b1f" stroke="#3a3a40" stroke-width="7.6"></rect>
+			<g clip-path="url(#hs-screen)">
+				<rect class="hs-bg" width="1080" height="2424"></rect>
+
+				<!-- Status bar -->
+				<text class="hs-on-surface hs-w500" x="46" y="83" font-size="39">12:00</text>
+				<path class="hs-on-surface" d={icon.wifi} transform={at(896, 69, 40)}></path>
+				<rect class="hs-on-surface" x="935" y="56" width="62" height="30" rx="10"></rect>
+				<rect class="hs-on-surface" x="999" y="64" width="5" height="14" rx="2"></rect>
+
+				<!-- Top app bar -->
+				<g class="hs-on-surface" transform="translate(59 178.5) scale(0.1458)">
+					<path transform="translate(0 432) scale(0.1 -0.1)" d="M1913 3442 c-117 -257 -215 -474 -218 -484 -5 -12 7 -25 42 -49 108 -74 208 -189 267 -306 l26 -53 55 0 55 0 0 674 c0 371 -4 677 -8 680 -4 2 -103 -206 -219 -462z M2316 3695 c-3 -9 -6 -271 -6 -581 l0 -564 543 1 c298 0 535 3 527 6 -154 55 -529 211 -545 227 -11 12 -52 80 -90 151 -130 247 -396 739 -409 757 -12 17 -14 17 -20 3z M1147 2914 c-148 -33 -257 -93 -362 -199 -383 -387 -231 -1036 285 -1222 106 -38 318 -40 425 -5 188 63 339 192 426 364 l29 58 485 0 485 0 0 -170 c0 -157 1 -170 19 -180 26 -14 466 -14 492 0 18 10 19 23 19 180 l0 170 129 0 c186 0 172 -22 169 275 l-3 239 -25 13 c-20 10 -213 13 -891 13 l-867 0 -34 73 c-142 296 -471 461 -781 391z m285 -406 c71 -33 133 -94 167 -167 39 -83 38 -221 -2 -302 -127 -259 -494 -257 -618 4 -137 290 162 598 453 465z M1993 1764 c-71 -120 -151 -203 -294 -304 -21 -15 -20 -17 108 -250 71 -129 172 -313 224 -408 l94 -173 5 53 c3 29 5 294 5 588 l0 535 -57 3 -58 3 -27 -47z M2310 1113 c0 -383 4 -693 8 -688 5 6 120 270 255 588 l247 578 0 109 0 110 -255 0 -255 0 0 -697z"></path>
+				</g>
+				<text class="hs-on-surface" x="152" y="230" font-size="62">Material Xray</text>
+
+				<!-- Connection status -->
+				<text class="hs-primary" x="540" y="373" font-size="62" text-anchor="middle">Connected</text>
+				<use href="#hs-flag-de" x="421" y="424"></use>
+				<text class="hs-on-surface hs-w600" x="484" y="460" font-size="48">Frankfurt</text>
+				<text class="hs-variant" x="540" y="505" font-size="34" text-anchor="middle">01:35</text>
+
+				<circle class="hs-stop" cx="540" cy="741" r="163"></circle>
+				<text class="hs-error" x="540" y="761" font-size="58" text-anchor="middle">Stop</text>
+
+				<!-- Live stats -->
+				<rect class="hs-container" x="42" y="947" width="996" height="242" rx="42"></rect>
+				<path class="hs-variant" d={icon.bolt} transform={at(194, 999, 42)}></path>
+				<text class="hs-variant hs-w500" x="221" y="1010" font-size="31.5">Ping</text>
+				<path class="hs-variant" d={icon.down} transform={at(469, 999, 42)}></path>
+				<text class="hs-variant hs-w500" x="497" y="1010" font-size="31.5">Download</text>
+				<path class="hs-variant" d={icon.up} transform={at(799, 999, 42)}></path>
+				<text class="hs-variant hs-w500" x="827" y="1010" font-size="31.5">Upload</text>
+				<text class="hs-on-surface hs-w500" x="230" y="1066" font-size="42" text-anchor="middle">132 ms</text>
+				<text class="hs-on-surface hs-w500" x="541" y="1066" font-size="42" text-anchor="middle">14.3 KiB/s</text>
+				<text class="hs-on-surface hs-w500" x="851" y="1066" font-size="42" text-anchor="middle">2.1 KiB/s</text>
+				<text class="hs-variant hs-w500" x="84" y="1142" font-size="31.5">Total this session</text>
+				<text class="hs-on-surface hs-w500" x="992" y="1144" font-size="37" text-anchor="end">↓ 1.0 MiB  ↑ 184.6 KiB</text>
+
+				<!-- Subscription card -->
+				<rect x="42" y="1245" width="996" height="1300" rx="42" fill="#000" opacity="0.06"></rect>
+				<rect class="hs-container" x="42" y="1242" width="996" height="1300" rx="42"></rect>
+				<text class="hs-on-surface hs-w600" x="84" y="1336" font-size="43">Aurora VPN</text>
+				<path class="hs-on-surface" d={icon.refresh} transform={at(702, 1321)}></path>
+				<path class="hs-on-surface" d={icon.speed} transform={at(828, 1321)}></path>
+				<path class="hs-on-surface" d={icon.more} transform={at(954, 1321)}></path>
+				<text class="hs-variant" x="86" y="1449" font-size="36.75">Maintenance window on Sunday, 03:00 UTC</text>
+				<text class="hs-on-surface hs-w500" x="540" y="1515" font-size="36.75" text-anchor="middle">68.4 GB of 200 GB</text>
+				<rect class="hs-primary" x="84" y="1539" width="317" height="11" rx="5.5"></rect>
+				<rect class="hs-track" x="412" y="1539" width="572" height="11" rx="5.5"></rect>
+				<circle class="hs-primary" cx="990" cy="1544.5" r="5.5"></circle>
+				<text class="hs-variant" x="994" y="1596" font-size="31.5" text-anchor="end">23 days left</text>
+
+				{
+					rows.map((row, i) => {
+						const y = 1630 + i * 160;
+						const chipX = 948 - row.chip;
+						return (
+							<g>
+								{row.selected && <rect class="hs-selected" x="42" y={y} width="996" height="158" />}
+								<rect class="hs-divider" x="42" y={y + 158} width="996" height="2.5" />
+								<circle class={row.selected ? 'hs-ring-on' : 'hs-ring-off'} cx="97" cy={y + 79} r="20.9" fill="none" stroke-width="5.25" />
+								{row.selected && <circle class="hs-primary" cx="97" cy={y + 79} r="12" />}
+								<use href={`#hs-flag-${row.flag}`} x="143" y={y + 40} />
+								<text class="hs-on-surface hs-w500" x="208" y={y + 73} font-size="44">{row.name}</text>
+								<text class="hs-variant" x="142" y={y + 121} font-size="34">{row.proto}</text>
+								<rect class="hs-chip" x={chipX + 1.5} y={y + 49.5} width={row.chip - 3} height="61" rx="18" stroke-width="3" />
+								<text class="hs-variant hs-w500" x={chipX + row.chip / 2} y={y + 93} font-size="36.75" text-anchor="middle">{row.ping}</text>
+								<path class="hs-variant" d={icon.chevron} transform={at(993, y + 79, 52.5)} />
+							</g>
+						);
+					})
+				}
+
+				<!-- Navigation bar -->
+				<rect class="hs-container" y="2118" width="1080" height="306"></rect>
+				<rect class="hs-track" x="99" y="2135" width="147" height="84" rx="42"></rect>
+				<path class="hs-nav-active" d={icon.home} transform={at(172, 2177.5)}></path>
+				<path class="hs-variant" d={icon.routing} transform={at(539, 2177, 63, 960)}></path>
+				<path class="hs-variant" d={icon.settings} transform={at(906, 2177)}></path>
+				<text class="hs-nav-active hs-w600" x="172" y="2261" font-size="34" text-anchor="middle">Home</text>
+				<text class="hs-variant hs-w500" x="538.5" y="2261" font-size="34" text-anchor="middle">Routing</text>
+				<text class="hs-variant hs-w500" x="905.5" y="2261" font-size="34" text-anchor="middle">Settings</text>
+				<rect class="hs-handle" x="398" y="2388" width="284" height="10" rx="5"></rect>
+			</g>
+		</g>
+	</svg>
+</div>
+
+<style>
+	/* Colors sampled from the app's own light and dark captures. */
+	/* Sizes inside the frame use cqw, where 100cqw spans the 1294-unit viewBox. */
+	.hs-frame {
+		position: relative;
+		container-type: inline-size;
+	}
+
+	/* Traces the bezel's outer edge: x and y -38, 1156 by 2500 units, corner radius 182.5. */
+	.hs-shadow {
+		position: absolute;
+		top: 5.332cqw;
+		left: 5.332cqw;
+		width: 89.335cqw;
+		height: 193.199cqw;
+		border-radius: 14.104cqw;
+		box-shadow:
+			0 5.3cqw 7cqw rgb(0 0 0 / 0.3),
+			0 1.75cqw 2.35cqw rgb(0 0 0 / 0.2);
+		transform: rotate(-3deg);
+		transition: transform 600ms var(--md-motion-spring);
+	}
+
+	:global(.hero-art:hover) .hs-shadow {
+		transform: translateY(-1.777cqw);
+	}
+
+	.home-screen {
+		--hs-bg: #faf8fe;
+		--hs-container: #ededf6;
+		--hs-on-surface: #30323a;
+		--hs-variant: #5d5f68;
+		--hs-primary: #4c5e8b;
+		--hs-track: #dce2f9;
+		--hs-selected: #d1dafb;
+		--hs-divider: #c3c3cd;
+		--hs-chip-stroke: #b0b1bc;
+		--hs-outline: #787a84;
+		--hs-stop: #f0d9dc;
+		--hs-error: #b3261e;
+		--hs-nav-active: #4b5164;
+		--hs-handle: #5f5f62;
+
+		position: relative;
+		display: block;
+		width: 100%;
+		height: auto;
+		overflow: visible;
+		font-family: var(--md-font);
+	}
+
+	.hs-device {
+		transform-box: view-box;
+		transform-origin: 540px 1212px;
+		transform: rotate(-3deg);
+		transition: transform 600ms var(--md-motion-spring);
+	}
+
+	:global(.hero-art:hover) .hs-device {
+		transform: translateY(-23px);
+	}
+
+	:global(:root[data-theme='dark']) .home-screen {
+		--hs-bg: #0d0e12;
+		--hs-container: #17191f;
+		--hs-on-surface: #e4e5f0;
+		--hs-variant: #a9aab5;
+		--hs-primary: #b8c6ee;
+		--hs-track: #353b4d;
+		--hs-selected: #2f384e;
+		--hs-divider: #373a41;
+		--hs-chip-stroke: #454850;
+		--hs-outline: #73757f;
+		--hs-stop: #2f272a;
+		--hs-error: #f2b8b5;
+		--hs-nav-active: #b8bfd5;
+		--hs-handle: #ededed;
+	}
+
+	.hs-bg { fill: var(--hs-bg); }
+	.hs-container { fill: var(--hs-container); }
+	.hs-on-surface { fill: var(--hs-on-surface); }
+	.hs-variant { fill: var(--hs-variant); }
+	.hs-primary { fill: var(--hs-primary); }
+	.hs-track { fill: var(--hs-track); }
+	.hs-selected { fill: var(--hs-selected); }
+	.hs-divider { fill: var(--hs-divider); }
+	.hs-stop { fill: var(--hs-stop); }
+	.hs-error { fill: var(--hs-error); }
+	.hs-nav-active { fill: var(--hs-nav-active); }
+	.hs-handle { fill: var(--hs-handle); }
+	.hs-ring-on { stroke: var(--hs-primary); }
+	.hs-ring-off { stroke: var(--hs-outline); }
+	.hs-chip { fill: var(--hs-bg); stroke: var(--hs-chip-stroke); }
+	.hs-w500 { font-weight: 500; }
+	.hs-w600 { font-weight: 600; }
+</style>

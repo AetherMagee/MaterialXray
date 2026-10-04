@@ -1,0 +1,35 @@
+---
+title: Introduction
+description: What Material Xray is, what it can do, and where to go next.
+---
+
+import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Material Xray is an Android proxy client built on [Xray-core](https://github.com/XTLS/Xray-core), with a Material Design 3 interface. It manages your subscriptions, servers, routing and per-app rules, and runs the tunnel in one of two modes: as a standard Android VPN, or through root-managed routing that keeps the tunnel out of other apps' sight.
+
+:::note
+Material Xray is a client, not a service. You need a proxy server or a subscription of your own.
+:::
+
+## What it does
+
+<CardGrid>
+	<Card title="Subscriptions" icon="list-format">
+		Servers grouped by subscription, with traffic quota, expiry, announcements and latency tests.
+	</Card>
+	<Card title="Protocols" icon="puzzle">
+		VLESS, VMess, Trojan, Shadowsocks, Hysteria2, WireGuard, HTTP, SOCKS and raw Xray JSON.
+	</Card>
+	<Card title="Per-app proxy" icon="setting">
+		Choose which apps use the proxy. In root mode, assign apps to specific servers.
+	</Card>
+	<Card title="Routing" icon="random">
+		Custom rules on domains, IPs, ports and protocols, or rules supplied by your provider.
+	</Card>
+</CardGrid>
+
+## Where to go next
+
+<LinkCard title="Install the app" href="/docs/guide/installation/" description="Requirements, download and verifying a release." />
+<LinkCard title="Root or rootless?" href="/docs/guide/root-vs-rootless/" description="Pick the service mode that fits you." />
+<LinkCard title="For subscription providers" href="/docs/providers/" description="Headers, body formats, routing and deeplinks your panel can use." />

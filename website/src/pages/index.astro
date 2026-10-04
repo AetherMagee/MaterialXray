@@ -1,0 +1,349 @@
+---
+import '../styles/tokens.css';
+import '../styles/landing.css';
+import HomeScreen from '../components/HomeScreen.astro';
+import Icon from '../components/Icon.astro';
+
+const repo = 'https://github.com/AetherMagee/MaterialXray';
+const latest = `${repo}/releases/latest`;
+const title = 'Material Xray: an Android proxy client powered by Xray-core';
+const description = 'An Android proxy client powered by Xray-core, with a Material Design 3 interface.';
+const site = Astro.site!;
+const ogImage = new URL('/og.jpg', site).href;
+
+// Lets search engines describe the page as an app rather than an article.
+const structuredData = {
+	'@context': 'https://schema.org',
+	'@type': 'SoftwareApplication',
+	name: 'Material Xray',
+	description,
+	url: site.href,
+	image: new URL('/icon.png', site).href,
+	screenshot: ogImage,
+	downloadUrl: latest,
+	operatingSystem: 'Android 7.0+',
+	applicationCategory: 'UtilitiesApplication',
+	license: 'https://www.gnu.org/licenses/gpl-3.0.html',
+	offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+};
+
+// MD3 Expressive "cookie" shape: a circle with a gentle 12-lobe ripple, rendered as an SVG path.
+function blob(lobes: number, depth: number, size = 200, steps = 360) {
+	const c = size / 2;
+	const r = c * (1 - depth);
+	const points = Array.from({ length: steps }, (_, i) => {
+		const t = (i / steps) * Math.PI * 2;
+		const rr = r * (1 + depth * Math.cos(lobes * t));
+		return `${(c + rr * Math.cos(t)).toFixed(2)},${(c + rr * Math.sin(t)).toFixed(2)}`;
+	});
+	return `M${points.join('L')}Z`;
+}
+const cookie = blob(12, 0.045);
+const flower = blob(8, 0.12);
+const clover = blob(4, 0.16);
+
+const steps = [
+	{
+		title: 'Install the APK',
+		body: 'Universal APK from GitHub Releases, for Android 7.0+ on arm64, armv7 and x86_64.',
+	},
+	{
+		title: 'Add a subscription',
+		body: 'Paste a link, scan a QR code, or open your provider’s mxray:// link.',
+	},
+	{
+		title: 'Tap Start',
+		body: 'Pick a server, check its ping, connect.',
+	},
+];
+
+const modes = {
+	rootless: [
+		['check', 'Uses Android’s standard VPN permission'],
+		['check', 'Works with always-on VPN'],
+		['check', 'Routing handled by Android itself'],
+		['warning', 'Takes the VPN slot, which other apps can see'],
+		['warning', 'Doesn’t tunnel tethered devices'],
+	],
+	rootful: [
+		['check', 'Invisible to apps that bypass the tunnel'],
+		['check', 'Runs alongside other VPNs, like Tailscale'],
+		['check', 'A different server for each app'],
+		['check', 'Tunnels hotspot and tethered devices'],
+		['warning', 'Requires root access. KernelSU is preferred'],
+	],
+};
+---
+
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<!-- The site has its own dark theme; Dark Reader would recolour the phone mockup beyond recognition. -->
+		<meta name="darkreader-lock" />
+		<title>{title}</title>
+		<meta name="description" content={description} />
+		<link rel="canonical" href={site.href} />
+		<link rel="sitemap" href="/sitemap-index.xml" />
+		<meta property="og:type" content="website" />
+		<meta property="og:url" content={site.href} />
+		<meta property="og:site_name" content="Material Xray" />
+		<meta property="og:title" content={title} />
+		<meta property="og:description" content={description} />
+		<meta property="og:image" content={ogImage} />
+		<meta property="og:image:width" content="1200" />
+		<meta property="og:image:height" content="630" />
+		<meta property="og:image:alt" content="Material Xray's home screen, connected to a server" />
+		<meta name="twitter:card" content="summary_large_image" />
+		<script type="application/ld+json" set:html={JSON.stringify(structuredData)} />
+		<link rel="icon" href="/favicon.png" type="image/png" />
+		<link rel="preconnect" href="https://fonts.googleapis.com" />
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+		<link
+			rel="stylesheet"
+			href="https://fonts.googleapis.com/css2?family=Google+Sans+Code:wght@400;500&family=Google+Sans+Flex:opsz,wght@6..144,400..800&display=swap"
+		/>
+		<script is:inline>
+			// Shares Starlight's storage key so the theme follows you between the landing page and docs.
+			(() => {
+				const stored = localStorage.getItem('starlight-theme');
+				const theme = stored || (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+				document.documentElement.dataset.theme = theme === 'light' ? 'light' : 'dark';
+			})();
+		</script>
+	</head>
+	<body>
+		<header class="top-bar" data-top-bar>
+			<a class="brand" href="/">
+				<span class="brand-icon"><img src="/icon.png" alt="" width="40" height="40" /></span>
+				<span>Material Xray</span>
+			</a>
+			<nav class="top-nav">
+				<a href="/docs/">Docs</a>
+				<a href="/docs/providers/">For providers</a>
+				<a href={repo}>GitHub</a>
+			</nav>
+			<div class="top-actions">
+				<button class="icon-button" type="button" data-theme-toggle aria-label="Toggle dark theme">
+					<Icon name="dark_mode" class="theme-dark" />
+					<Icon name="light_mode" class="theme-light" />
+				</button>
+				<a class="btn btn-tonal btn-small" href={latest}>
+					<Icon name="download" />Download
+				</a>
+			</div>
+		</header>
+
+		<main>
+			<section class="hero">
+				<div class="hero-copy">
+					<h1>
+						A proxy client that feels <em>right at home</em> on Android.
+					</h1>
+					<p class="lead">
+						Material Xray combines Xray-core with a Material&nbsp;3 interface and rootful capabilities that let it
+						run alongside your other VPNs, invisible to the apps you leave out.
+					</p>
+					<div class="hero-actions">
+						<a class="btn btn-filled btn-large" href={latest}>
+							<Icon name="android" />Download APK
+						</a>
+						<a class="btn btn-outlined btn-large" href="/docs/">
+							<Icon name="menu_book" />Read the docs
+						</a>
+					</div>
+				</div>
+
+				<div class="hero-art" aria-hidden="true">
+					<svg class="shape shape-cookie" viewBox="0 0 200 200"><path d={cookie}></path></svg>
+					<svg class="shape shape-flower" viewBox="0 0 200 200"><path d={flower}></path></svg>
+					<svg class="shape shape-clover" viewBox="0 0 200 200"><path d={clover}></path></svg>
+
+					<div class="phone">
+						<HomeScreen />
+					</div>
+				</div>
+			</section>
+
+			<section class="section" id="features">
+				<header class="section-head">
+					<span class="eyebrow">Features</span>
+					<h2>Simple by default.<br />Powerful when you need it.</h2>
+				</header>
+
+				<div class="bento">
+					<article class="tile tile-wide tile-primary">
+						<span class="tile-icon"><Icon name="rocket_launch" /></span>
+						<h3>Always on the latest Xray-core</h3>
+						<p>
+							New Xray-core releases land soon after upstream ships them. VLESS with REALITY and XHTTP, post-quantum
+							REALITY, Hysteria2, WireGuard: your provider’s links just work.
+						</p>
+					</article>
+
+					<article class="tile">
+						<span class="tile-icon"><Icon name="apps" /></span>
+						<h3>Per-app proxy</h3>
+						<p>Choose which apps use the proxy. In root mode, give each app its own server.</p>
+					</article>
+
+					<article class="tile tile-tertiary">
+						<span class="tile-icon"><Icon name="alt_route" /></span>
+						<h3>Simple routing rules</h3>
+						<p>
+							Proxy, bypass or block by domain, IP, port or protocol. Or let your provider manage it all.
+						</p>
+					</article>
+
+					<article class="tile">
+						<span class="tile-icon"><Icon name="monitoring" /></span>
+						<h3>Live stats</h3>
+						<p>Speed, session traffic and ping, on the home screen and in the notification.</p>
+					</article>
+
+					<article class="tile">
+						<span class="tile-icon"><Icon name="palette" /></span>
+						<h3>Native to Android</h3>
+						<p>
+							Jetpack Compose and Material&nbsp;3, not a web view, with wallpaper colors and layouts for phones,
+							tablets and TV.
+						</p>
+					</article>
+
+					<article class="tile tile-wide tile-dark">
+						<span class="tile-icon"><Icon name="terminal" /></span>
+						<h3>Power tools, one tap away</h3>
+						<p>
+							Live logs, a config viewer and editor, raw Xray JSON profiles, backups and a Quick Settings tile.
+						</p>
+						<pre><code><span class="c">// generated by Material Xray</span>
+{"{"} <span class="k">"inbounds"</span>: [{"{"} <span class="k">"protocol"</span>: <span class="s">"tun"</span>, … {"}"}],
+  <span class="k">"routing"</span>: {"{"} <span class="k">"domainStrategy"</span>: <span class="s">"IPIfNonMatch"</span> {"}"} {"}"}</code></pre>
+					</article>
+				</div>
+			</section>
+
+			<section class="section modes" id="modes">
+				<header class="section-head">
+					<span class="eyebrow">Two ways to run</span>
+					<h2>Rootless when you want it simple. Rootful when you want it hidden.</h2>
+				</header>
+
+				<div class="segmented" role="tablist" aria-label="Service mode">
+					<button role="tab" aria-selected="true" data-mode="rootless">
+						<Icon name="check" class="check" />Rootless
+					</button>
+					<button role="tab" aria-selected="false" data-mode="rootful">
+						<Icon name="check" class="check" />Rootful
+					</button>
+				</div>
+
+				<div class="mode-card">
+					{
+						Object.entries(modes).map(([mode, items], i) => (
+							<ul class="mode-list" data-panel={mode} hidden={i !== 0}>
+								{items.map(([icon, text]) => (
+									<li class={icon}>
+										<Icon name={icon === 'check' ? 'check_circle' : 'error'} />
+										{text}
+									</li>
+								))}
+							</ul>
+						))
+					}
+					<a class="btn btn-text" href="/docs/guide/root-vs-rootless/">
+						Compare in detail<Icon name="arrow_forward" />
+					</a>
+				</div>
+			</section>
+
+			<section class="section providers" id="providers">
+				<div class="providers-card">
+					<div class="providers-copy">
+						<span class="eyebrow">For subscription providers</span>
+						<h2>Speaks the language your servers already know.</h2>
+						<p>
+							Material Xray reads the common subscription headers, Happ’s included: titles, quotas, announcements,
+							routing and per-app rules. Can’t set headers? Use the body.
+						</p>
+						<div class="hero-actions">
+							<a class="btn btn-filled" href="/docs/providers/response-headers/">Header reference</a>
+							<a class="btn btn-outlined" href="/docs/providers/deeplinks/">Deeplinks</a>
+						</div>
+					</div>
+					<pre class="http"><code><span class="m">HTTP/1.1 200 OK</span>
+<span class="k">profile-title</span>: base64:TXkgUHJvdmlkZXI=
+<span class="k">subscription-userinfo</span>: upload=0; download=73443041280; total=214748364800; expire=1798761600
+<span class="k">profile-update-interval</span>: 12
+<span class="k">support-url</span>: https://t.me/myprovider
+<span class="k">announce</span>: Maintenance on Sunday, 03:00 UTC
+<span class="k">routing</span>: happ://routing/onadd/eyJOYW1lIjoi…
+
+<span class="c">vless://…#Frankfurt</span>
+<span class="c">hysteria2://…#Amsterdam</span></code></pre>
+				</div>
+			</section>
+
+			<section class="section" id="start">
+				<header class="section-head">
+					<span class="eyebrow">Get started</span>
+					<h2>Up and running in a minute.</h2>
+				</header>
+				<ol class="steps">
+					{
+						steps.map((step, i) => (
+							<li>
+								<span class="step-num">{i + 1}</span>
+								<h3>{step.title}</h3>
+								<p>{step.body}</p>
+							</li>
+						))
+					}
+				</ol>
+				<p class="disclaimer">
+					<Icon name="info" />
+					Material Xray is a client, not a VPN service: bring your own server.
+				</p>
+			</section>
+		</main>
+
+		<footer class="footer">
+			<div class="footer-brand">
+				<span class="brand-icon"><img src="/icon.png" alt="" width="32" height="32" /></span>
+				<span>Material Xray</span>
+			</div>
+			<nav>
+				<a href="/docs/">Documentation</a>
+				<a href={`${repo}/releases`}>Releases</a>
+				<a href={`${repo}/issues`}>Report an issue</a>
+				<a href={repo}>Source code</a>
+			</nav>
+			<p>Powered by <a href="https://github.com/XTLS/Xray-core">Xray-core</a>. © 2026 Material Xray contributors.</p>
+		</footer>
+
+		<script>
+			const root = document.documentElement;
+			document.querySelector('[data-theme-toggle]')?.addEventListener('click', () => {
+				const next = root.dataset.theme === 'dark' ? 'light' : 'dark';
+				root.dataset.theme = next;
+				localStorage.setItem('starlight-theme', next);
+			});
+
+			const bar = document.querySelector('[data-top-bar]');
+			const onScroll = () => bar?.classList.toggle('scrolled', window.scrollY > 8);
+			addEventListener('scroll', onScroll, { passive: true });
+			onScroll();
+
+			const tabs = document.querySelectorAll<HTMLButtonElement>('.segmented [data-mode]');
+			tabs.forEach((tab) =>
+				tab.addEventListener('click', () => {
+					tabs.forEach((t) => t.setAttribute('aria-selected', String(t === tab)));
+					document.querySelectorAll<HTMLElement>('[data-panel]').forEach((panel) => {
+						panel.hidden = panel.dataset.panel !== tab.dataset.mode;
+					});
+				}),
+			);
+		</script>
+	</body>
+</html>

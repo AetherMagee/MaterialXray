@@ -1,0 +1,807 @@
+*,
+*::before,
+*::after {
+	box-sizing: border-box;
+}
+
+html {
+	scroll-behavior: smooth;
+}
+
+body {
+	margin: 0;
+	font-family: var(--md-font);
+	font-optical-sizing: auto;
+	background: var(--md-surface);
+	color: var(--md-on-surface);
+	line-height: 1.5;
+	-webkit-font-smoothing: antialiased;
+	transition: background-color 300ms var(--md-motion-emphasized), color 300ms var(--md-motion-emphasized);
+}
+
+a {
+	color: var(--md-primary);
+}
+
+h1,
+h2,
+h3 {
+	margin: 0;
+	font-weight: 500;
+}
+
+p {
+	margin: 0;
+}
+
+/* Inline SVG icons from Icon.astro, sized like the icon font they replaced. */
+.ms {
+	flex: none;
+	width: 1em;
+	height: 1em;
+	font-size: 1.25em;
+	fill: currentColor;
+}
+
+/* ---------- Buttons ---------- */
+
+.btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.5rem;
+	height: 2.5rem;
+	padding: 0 1.5rem;
+	border-radius: var(--md-shape-full);
+	border: none;
+	font: 500 0.875rem/1 var(--md-font);
+	letter-spacing: 0.01em;
+	text-decoration: none;
+	cursor: pointer;
+	position: relative;
+	overflow: hidden;
+	transition: border-radius 250ms var(--md-motion-spring), box-shadow 200ms ease, background-color 200ms ease;
+}
+
+.btn::after {
+	content: '';
+	position: absolute;
+	inset: 0;
+	background: currentColor;
+	opacity: 0;
+	transition: opacity 150ms ease;
+}
+
+.btn:hover::after {
+	opacity: 0.08;
+}
+
+.btn:active::after {
+	opacity: 0.12;
+}
+
+/* MD3 Expressive shape morph: round buttons square up slightly when pressed. */
+.btn:active {
+	border-radius: var(--md-shape-md);
+}
+
+.btn .ms {
+	font-size: 1.25rem;
+}
+
+.btn-large {
+	height: 3.5rem;
+	padding: 0 1.75rem;
+	font-size: 1rem;
+}
+
+.btn-large .ms {
+	font-size: 1.5rem;
+}
+
+.btn-small {
+	height: 2.5rem;
+	padding: 0 1rem;
+}
+
+.btn-filled {
+	background: var(--md-primary);
+	color: var(--md-on-primary);
+}
+
+.btn-filled:hover {
+	box-shadow: 0 1px 3px rgb(0 0 0 / 0.2), 0 2px 6px rgb(0 0 0 / 0.1);
+}
+
+.btn-tonal {
+	background: var(--md-secondary-container);
+	color: var(--md-on-secondary-container);
+}
+
+.btn-outlined {
+	background: transparent;
+	color: var(--md-on-surface-variant);
+	box-shadow: inset 0 0 0 1px var(--md-outline);
+}
+
+.btn-text {
+	background: transparent;
+	color: var(--md-primary);
+	padding: 0 0.75rem;
+}
+
+.icon-button {
+	display: grid;
+	place-items: center;
+	width: 2.5rem;
+	height: 2.5rem;
+	border: none;
+	border-radius: var(--md-shape-full);
+	background: transparent;
+	color: var(--md-on-surface-variant);
+	cursor: pointer;
+	transition: background-color 150ms ease;
+}
+
+.icon-button:hover {
+	background: color-mix(in srgb, var(--md-on-surface) 8%, transparent);
+}
+
+.icon-button .ms {
+	font-size: 1.5rem;
+}
+
+:root[data-theme='dark'] .theme-dark,
+:root:not([data-theme='dark']) .theme-light {
+	display: none;
+}
+
+/* ---------- Top app bar ---------- */
+
+.top-bar {
+	position: sticky;
+	top: 0;
+	z-index: 10;
+	display: flex;
+	align-items: center;
+	gap: 1.5rem;
+	height: 4rem;
+	padding: 0 clamp(1rem, 4vw, 2.5rem);
+	background: var(--md-surface);
+	transition: background-color 250ms var(--md-motion-emphasized);
+}
+
+.top-bar.scrolled {
+	background: var(--md-surface-container);
+}
+
+.brand {
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+	color: var(--md-on-surface);
+	text-decoration: none;
+	font-size: 1.25rem;
+	font-weight: 600;
+	letter-spacing: -0.01em;
+	white-space: nowrap;
+}
+
+.brand-icon {
+	display: grid;
+	place-items: center;
+	background: #fff;
+	border-radius: var(--md-shape-md);
+	padding: 0.2rem;
+}
+
+.brand-icon img {
+	display: block;
+}
+
+.top-nav {
+	display: flex;
+	gap: 0.25rem;
+	margin-inline-start: auto;
+}
+
+.top-nav a {
+	padding: 0.5rem 1rem;
+	border-radius: var(--md-shape-full);
+	color: var(--md-on-surface-variant);
+	text-decoration: none;
+	font-weight: 500;
+	font-size: 0.9375rem;
+	transition: background-color 150ms ease;
+}
+
+.top-nav a:hover {
+	background: color-mix(in srgb, var(--md-on-surface) 8%, transparent);
+	color: var(--md-on-surface);
+}
+
+.top-actions {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+}
+
+@media (max-width: 720px) {
+	.top-nav {
+		display: none;
+	}
+
+	.top-actions {
+		margin-inline-start: auto;
+	}
+}
+
+@media (max-width: 480px) {
+	/* The hero's Download APK button is right below, so the bar keeps only the theme toggle. */
+	.top-actions .btn {
+		display: none;
+	}
+}
+
+/* ---------- Hero ---------- */
+
+main {
+	overflow-x: clip;
+}
+
+.hero {
+	display: grid;
+	grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+	gap: clamp(2rem, 5vw, 4rem);
+	align-items: center;
+	max-width: 80rem;
+	margin: 0 auto;
+	padding: clamp(2rem, 6vw, 5rem) clamp(1rem, 4vw, 2.5rem) clamp(3rem, 6vw, 5rem);
+}
+
+.hero-copy {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 1.5rem;
+}
+
+.hero h1 {
+	font-size: clamp(2.75rem, 6.5vw, 5rem);
+	line-height: 1.02;
+	letter-spacing: -0.035em;
+	font-weight: 500;
+	font-variation-settings: 'opsz' 144;
+}
+
+.hero h1 em {
+	font-style: normal;
+	color: var(--md-primary);
+	font-weight: 700;
+}
+
+.lead {
+	font-size: clamp(1.0625rem, 1.5vw, 1.25rem);
+	color: var(--md-on-surface-variant);
+	max-width: 36rem;
+}
+
+.hero-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.75rem;
+}
+
+.hero-art {
+	position: relative;
+	display: grid;
+	place-items: center;
+	min-height: 40rem;
+}
+
+.shape {
+	position: absolute;
+	pointer-events: none;
+	transform: rotate(var(--spin));
+}
+
+.shape-cookie {
+	width: min(36rem, 100%);
+	fill: var(--md-primary-container);
+	animation: spin 60s steps(1200) infinite;
+}
+
+.shape-flower {
+	width: 8rem;
+	top: 4%;
+	right: 2%;
+	fill: var(--md-tertiary-container);
+	animation: spin 40s steps(800) infinite reverse;
+}
+
+.shape-clover {
+	width: 6rem;
+	bottom: 8%;
+	left: 4%;
+	fill: var(--md-secondary-container);
+	animation: spin 30s steps(600) infinite;
+}
+
+/*
+ * Spinning a custom property instead of transform keeps the animation on the main thread.
+ * A compositor animation would promote the blobs to layers, and the phone drawn over them
+ * would then be rasterised upright and rotated as a bitmap, blurring its text.
+ * Main-thread frames repaint the phone too, so steps() caps them at 20 a second: each blob's step
+ * count is its duration times 20, which keeps all three updating on the same 50 ms beat.
+ */
+@property --spin {
+	syntax: '<angle>';
+	inherits: false;
+	initial-value: 0deg;
+}
+
+@keyframes spin {
+	to {
+		--spin: 360deg;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.shape {
+		animation: none !important;
+	}
+}
+
+@media (max-width: 960px) {
+	.hero {
+		grid-template-columns: 1fr;
+	}
+
+	.hero-art {
+		min-height: 36rem;
+	}
+}
+
+/* ---------- Phone mockup ---------- */
+
+/* The bezel, tilt and hover motion are drawn inside HomeScreen.astro. */
+.phone {
+	position: relative;
+	width: 21.25rem;
+}
+
+/* ---------- Sections ---------- */
+
+.section {
+	max-width: 80rem;
+	margin: 0 auto;
+	padding: clamp(4rem, 8vw, 7rem) clamp(1rem, 4vw, 2.5rem) 0;
+}
+
+.section-head {
+	max-width: 48rem;
+	margin-bottom: 2.5rem;
+}
+
+.eyebrow {
+	display: inline-block;
+	margin-bottom: 0.75rem;
+	color: var(--md-primary);
+	font-weight: 600;
+	font-size: 0.875rem;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+}
+
+.section h2 {
+	font-size: clamp(2rem, 4vw, 3rem);
+	line-height: 1.1;
+	letter-spacing: -0.025em;
+	font-variation-settings: 'opsz' 96;
+}
+
+/* ---------- Bento ---------- */
+
+.bento {
+	display: grid;
+	grid-template-columns: repeat(4, minmax(0, 1fr));
+	gap: 0.75rem;
+}
+
+.tile {
+	display: flex;
+	flex-direction: column;
+	gap: 0.75rem;
+	padding: 1.75rem;
+	border-radius: var(--md-shape-xl);
+	background: var(--md-surface-container);
+	transition: border-radius 400ms var(--md-motion-spring), transform 400ms var(--md-motion-spring);
+}
+
+.tile:hover {
+	border-radius: var(--md-shape-xxl);
+	transform: translateY(-2px);
+}
+
+.tile h3 {
+	font-size: 1.375rem;
+	line-height: 1.2;
+	letter-spacing: -0.01em;
+}
+
+.tile p {
+	color: var(--md-on-surface-variant);
+}
+
+.tile-icon .ms {
+	font-size: inherit;
+}
+
+.tile-icon {
+	display: grid;
+	place-items: center;
+	width: 3.5rem;
+	height: 3.5rem;
+	margin-bottom: 0.5rem;
+	border-radius: var(--md-shape-lg);
+	background: var(--md-primary-container);
+	color: var(--md-on-primary-container);
+	font-size: 1.75rem;
+}
+
+.tile-wide {
+	grid-column: span 2;
+}
+
+.tile-primary {
+	background: var(--md-primary-container);
+	color: var(--md-on-primary-container);
+}
+
+.tile-primary p {
+	color: inherit;
+	opacity: 0.85;
+}
+
+.tile-primary .tile-icon {
+	background: var(--md-primary);
+	color: var(--md-on-primary);
+	border-radius: var(--md-shape-full);
+}
+
+.tile-tertiary {
+	background: var(--md-tertiary-container);
+	color: var(--md-on-tertiary-container);
+}
+
+.tile-tertiary p {
+	color: inherit;
+	opacity: 0.85;
+}
+
+.tile-tertiary .tile-icon {
+	background: var(--md-tertiary);
+	color: var(--md-on-tertiary);
+}
+
+.tile-dark {
+	background: var(--md-inverse-surface);
+	color: var(--md-inverse-on-surface);
+}
+
+.tile-dark p {
+	color: inherit;
+	opacity: 0.8;
+}
+
+.tile-dark .tile-icon {
+	background: color-mix(in srgb, var(--md-inverse-on-surface) 12%, transparent);
+	color: inherit;
+}
+
+.tile pre {
+	margin: auto 0 0;
+	padding: 1rem 1.25rem;
+	border-radius: var(--md-shape-lg);
+	background: color-mix(in srgb, var(--md-inverse-on-surface) 8%, transparent);
+	font: 0.8125rem/1.6 var(--md-font-code);
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+}
+
+.tile pre .k {
+	color: var(--md-inverse-primary);
+}
+
+.tile pre .s {
+	color: var(--md-inverse-success);
+}
+
+.tile pre .c {
+	opacity: 0.6;
+}
+
+@media (max-width: 960px) {
+	.bento {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+}
+
+@media (max-width: 600px) {
+	.bento {
+		grid-template-columns: 1fr;
+	}
+
+	.tile-wide {
+		grid-column: auto;
+	}
+}
+
+/* ---------- Modes ---------- */
+
+.segmented {
+	display: inline-flex;
+	margin-bottom: 1rem;
+	border: 1px solid var(--md-outline);
+	border-radius: var(--md-shape-full);
+	overflow: hidden;
+}
+
+.segmented button {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.5rem;
+	height: 2.75rem;
+	padding: 0 1.5rem;
+	border: none;
+	background: transparent;
+	color: var(--md-on-surface);
+	font: 500 0.9375rem var(--md-font);
+	cursor: pointer;
+	transition: background-color 200ms var(--md-motion-emphasized);
+}
+
+.segmented button + button {
+	border-inline-start: 1px solid var(--md-outline);
+}
+
+.segmented button .check {
+	width: 0;
+	overflow: hidden;
+	transition: width 250ms var(--md-motion-spring);
+}
+
+.segmented button[aria-selected='true'] {
+	background: var(--md-secondary-container);
+	color: var(--md-on-secondary-container);
+}
+
+.segmented button[aria-selected='true'] .check {
+	width: 1.25rem;
+}
+
+.mode-card {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 1rem;
+	padding: 1.75rem;
+	border-radius: var(--md-shape-xl);
+	background: var(--md-surface-container-low);
+	box-shadow: inset 0 0 0 1px var(--md-outline-variant);
+}
+
+.mode-list {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+	gap: 0.75rem 2rem;
+	width: 100%;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+	animation: fade-up 350ms var(--md-motion-emphasized);
+}
+
+.mode-list[hidden] {
+	display: none;
+}
+
+.mode-list li {
+	display: flex;
+	gap: 0.75rem;
+	align-items: flex-start;
+	font-size: 1.0625rem;
+}
+
+.mode-list .check .ms {
+	color: var(--md-success);
+}
+
+.mode-list .warning .ms {
+	color: var(--sl-color-orange, #b06000);
+}
+
+:root[data-theme='dark'] .mode-list .warning .ms {
+	color: #fdd663;
+}
+
+@keyframes fade-up {
+	from {
+		opacity: 0;
+		transform: translateY(6px);
+	}
+}
+
+/* ---------- Providers ---------- */
+
+.providers-card {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+	gap: 2.5rem;
+	align-items: center;
+	padding: clamp(1.75rem, 4vw, 3.5rem);
+	border-radius: var(--md-shape-xxl);
+	background: var(--md-secondary-container);
+	color: var(--md-on-secondary-container);
+}
+
+.providers-copy {
+	display: flex;
+	flex-direction: column;
+	gap: 1.25rem;
+	align-items: flex-start;
+}
+
+.providers-copy p {
+	opacity: 0.85;
+	font-size: 1.0625rem;
+}
+
+.providers-copy .eyebrow {
+	margin: 0;
+	color: inherit;
+	opacity: 0.8;
+}
+
+.providers .btn-outlined {
+	color: inherit;
+	box-shadow: inset 0 0 0 1px currentColor;
+}
+
+pre.http {
+	margin: 0;
+	padding: 1.5rem;
+	border-radius: var(--md-shape-xl);
+	background: var(--md-surface-container-lowest);
+	color: var(--md-on-surface);
+	font: 0.8125rem/1.75 var(--md-font-code);
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+}
+
+pre.http .m {
+	color: var(--md-success);
+	font-weight: 500;
+}
+
+pre.http .k {
+	color: var(--md-primary);
+}
+
+pre.http .c {
+	color: var(--md-on-surface-variant);
+	opacity: 0.75;
+}
+
+@media (max-width: 960px) {
+	.providers-card {
+		grid-template-columns: 1fr;
+	}
+}
+
+/* ---------- Steps ---------- */
+
+.steps {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+	gap: 0.75rem;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.steps li {
+	display: flex;
+	flex-direction: column;
+	gap: 0.625rem;
+	padding: 1.75rem;
+	border-radius: var(--md-shape-xl);
+	background: var(--md-surface-container-low);
+}
+
+.steps h3 {
+	font-size: 1.25rem;
+}
+
+.steps p {
+	color: var(--md-on-surface-variant);
+}
+
+.step-num {
+	display: grid;
+	place-items: center;
+	width: 3rem;
+	height: 3rem;
+	margin-bottom: 0.5rem;
+	background: var(--md-tertiary-container);
+	color: var(--md-on-tertiary-container);
+	font-size: 1.375rem;
+	font-weight: 700;
+	/* Expressive "soft burst" via clip-path keeps the number on an MD3 shape. */
+	clip-path: polygon(50% 0%, 61% 11%, 75% 7%, 79% 21%, 93% 25%, 89% 39%, 100% 50%, 89% 61%, 93% 75%, 79% 79%, 75% 93%, 61% 89%, 50% 100%, 39% 89%, 25% 93%, 21% 79%, 7% 75%, 11% 61%, 0% 50%, 11% 39%, 7% 25%, 21% 21%, 25% 7%, 39% 11%);
+}
+
+.steps li:nth-child(2) .step-num {
+	width: 4rem;
+	background: var(--md-primary-container);
+	color: var(--md-on-primary-container);
+	clip-path: none;
+	border-radius: var(--md-shape-full);
+}
+
+.steps li:nth-child(3) .step-num {
+	background: var(--md-secondary-container);
+	color: var(--md-on-secondary-container);
+	clip-path: none;
+	border-radius: 50%;
+}
+
+.disclaimer {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	margin-top: 1.5rem;
+	color: var(--md-on-surface-variant);
+	font-size: 0.9375rem;
+}
+
+/* ---------- Footer ---------- */
+
+.footer {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 1rem 2rem;
+	max-width: 80rem;
+	margin: clamp(4rem, 8vw, 7rem) auto 0;
+	padding: 2rem clamp(1rem, 4vw, 2.5rem) 3rem;
+	border-top: 1px solid var(--md-outline-variant);
+	color: var(--md-on-surface-variant);
+	font-size: 0.9375rem;
+}
+
+.footer-brand {
+	display: flex;
+	align-items: center;
+	gap: 0.625rem;
+	color: var(--md-on-surface);
+	font-weight: 600;
+}
+
+.footer nav {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.25rem 1.25rem;
+}
+
+.footer nav a {
+	color: inherit;
+	text-decoration: none;
+}
+
+.footer nav a:hover {
+	color: var(--md-primary);
+}
+
+.footer p {
+	margin-inline-start: auto;
+}

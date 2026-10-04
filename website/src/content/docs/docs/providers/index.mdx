@@ -1,0 +1,28 @@
+---
+title: For subscription providers
+description: How Material Xray fetches, parses and applies your subscription.
+---
+
+import { CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Material Xray works with the subscription formats and headers that common panels already produce, including the Happ-compatible extensions. This section covers what the client sends, what it understands, and how to hand a subscription to a user in one tap.
+
+## How a refresh works
+
+1. The client requests your URL with its [request headers](/docs/providers/request-headers/). With **JSON first** on (the default), it tries `<url>/json` first and falls back to the URL itself.
+2. It reads [response headers](/docs/providers/response-headers/), along with any `#key: value` [body comments](/docs/providers/response-headers/#body-comments).
+3. It parses the body as Xray JSON, a plain share-link list, or base64. See [subscription format](/docs/providers/subscription-format/).
+4. It applies metadata, then [routing](/docs/providers/routing-header/) and [per-app rules](/docs/providers/per-app-routing/) if the user's routing policy allows it.
+
+:::note
+Refreshes require HTTPS unless the user turns on **Allow insecure updates** for the subscription. Redirects from HTTPS to plain HTTP are refused.
+:::
+
+<CardGrid>
+	<LinkCard title="Subscription format" href="/docs/providers/subscription-format/" description="Body formats, the /json endpoint, redirects and URL migration." />
+	<LinkCard title="Request headers" href="/docs/providers/request-headers/" description="User-Agent, HWID and device headers the client sends." />
+	<LinkCard title="Response headers" href="/docs/providers/response-headers/" description="Every header the client reads, with formats and examples." />
+	<LinkCard title="Routing header" href="/docs/providers/routing-header/" description="Push routing rules as Xray JSON or Happ routing links." />
+	<LinkCard title="Per-app routing" href="/docs/providers/per-app-routing/" description="Tell the client which apps to proxy or bypass." />
+	<LinkCard title="Deeplinks" href="/docs/providers/deeplinks/" description="Add a subscription with one tap from your site or bot." />
+</CardGrid>

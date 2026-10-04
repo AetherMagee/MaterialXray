@@ -1,0 +1,325 @@
+/*
+ * Maps Starlight's palette onto the Material 3 roles from tokens.css and restyles the chrome to
+ * read like an MD3 app: a navigation drawer with pill indicators, a pill search bar, rounded
+ * cards for asides and tables. Unlayered, so it wins over Starlight's cascade layers without
+ * needing !important.
+ */
+
+:root,
+:root[data-theme='light'],
+::backdrop {
+	--sl-font: var(--md-font);
+	--sl-font-mono: var(--md-font-code);
+
+	--sl-color-white: var(--md-on-surface);
+	--sl-color-gray-1: var(--md-on-surface);
+	--sl-color-gray-2: var(--md-on-surface);
+	--sl-color-gray-3: var(--md-on-surface-variant);
+	--sl-color-gray-4: var(--md-outline);
+	--sl-color-gray-5: var(--md-outline-variant);
+	--sl-color-gray-6: var(--md-surface-container-high);
+	--sl-color-gray-7: var(--md-surface-container);
+	--sl-color-black: var(--md-surface);
+
+	--sl-color-accent-low: var(--md-primary-container);
+	--sl-color-accent: var(--md-primary);
+	--sl-color-accent-high: var(--md-on-primary-container);
+
+	--sl-color-text: var(--md-on-surface);
+	--sl-color-text-accent: var(--md-primary);
+	--sl-color-text-invert: var(--md-on-primary);
+	--sl-color-bg: var(--md-surface);
+	--sl-color-bg-nav: var(--md-surface-container-low);
+	--sl-color-bg-sidebar: var(--md-surface-container-low);
+	--sl-color-bg-inline-code: var(--md-surface-container-high);
+	--sl-color-bg-accent: var(--md-primary);
+	--sl-color-hairline-light: var(--md-outline-variant);
+	--sl-color-hairline: var(--md-outline-variant);
+	--sl-color-hairline-shade: var(--md-outline-variant);
+	--sl-color-backdrop-overlay: var(--md-scrim);
+
+	/* Aside colors follow MD3 container roles instead of Starlight's hue ramps. */
+	--sl-color-blue-low: var(--md-primary-container);
+	--sl-color-blue: var(--md-primary);
+	--sl-color-blue-high: var(--md-on-primary-container);
+	--sl-color-purple-low: var(--md-tertiary-container);
+	--sl-color-purple: var(--md-tertiary);
+	--sl-color-purple-high: var(--md-on-tertiary-container);
+	--sl-color-orange-low: #ffdcbe;
+	--sl-color-orange: #8b5000;
+	--sl-color-orange-high: #2c1600;
+	--sl-color-red-low: var(--md-error-container);
+	--sl-color-red: var(--md-error);
+	--sl-color-red-high: var(--md-on-error-container);
+	--sl-color-green-low: var(--md-success-container);
+	--sl-color-green: var(--md-success);
+	--sl-color-green-high: var(--md-on-success-container);
+
+	--sl-nav-height: 4rem;
+	--sl-text-h1: 2.75rem;
+	--sl-text-h2: 1.75rem;
+	--sl-text-h3: 1.375rem;
+	--sl-line-height-headings: 1.15;
+}
+
+:root[data-theme='dark'] {
+	--sl-color-orange-low: #6a3c00;
+	--sl-color-orange: #ffb871;
+	--sl-color-orange-high: #ffdcbe;
+}
+
+body {
+	background: var(--md-surface);
+}
+
+/* Header: flat surface, pill search bar. */
+.header {
+	border-bottom: none;
+	background: var(--md-surface-container-low);
+}
+
+.site-title {
+	gap: 0.75rem;
+	font-weight: 600;
+	font-size: 1.25rem;
+	letter-spacing: -0.01em;
+	color: var(--md-on-surface);
+}
+
+.site-title img {
+	height: 2.5rem;
+	width: 2.5rem;
+	padding: 0.25rem;
+	border-radius: var(--md-shape-md);
+	background: #fff;
+}
+
+site-search button[data-open-modal] {
+	border: none;
+	border-radius: var(--md-shape-full);
+	background: var(--md-surface-container-high);
+	color: var(--md-on-surface-variant);
+	height: 3rem;
+	padding-inline: 1rem;
+	transition: background-color 200ms var(--md-motion-emphasized);
+}
+
+site-search button[data-open-modal]:hover {
+	background: var(--md-surface-container-highest);
+}
+
+site-search dialog {
+	border-radius: var(--md-shape-xl);
+	border: none;
+	background: var(--md-surface-container-high);
+}
+
+/* Navigation drawer. */
+.sidebar-pane {
+	border-inline-end: none;
+}
+
+.sidebar-content {
+	--sl-sidebar-item-padding-inline: 1rem;
+}
+
+.sidebar-content .large {
+	font-size: 0.875rem;
+	font-weight: 600;
+	color: var(--md-on-surface-variant);
+	letter-spacing: 0.01em;
+}
+
+.sidebar-content a {
+	border-radius: var(--md-shape-full);
+	padding: 0.5rem 1rem;
+	font-size: 0.9375rem;
+	color: var(--md-on-surface-variant);
+	transition: background-color 200ms var(--md-motion-emphasized);
+}
+
+.sidebar-content a:hover {
+	background: color-mix(in srgb, var(--md-on-surface) 8%, transparent);
+}
+
+.sidebar-content a[aria-current='page'],
+.sidebar-content a[aria-current='page']:hover,
+.sidebar-content a[aria-current='page']:focus {
+	background: var(--md-secondary-container);
+	color: var(--md-on-secondary-container);
+	font-weight: 600;
+}
+
+.sidebar-content ul ul li {
+	border-inline-start: none;
+	margin-inline-start: 0;
+	padding-inline-start: 0;
+}
+
+/* Content pane sits on a rounded surface, like an MD3 list-detail layout. */
+@media (min-width: 50rem) {
+	.main-frame {
+		background: var(--md-surface-container-low);
+	}
+
+	.main-pane {
+		background: var(--md-surface);
+		border-start-start-radius: var(--md-shape-xl);
+		min-height: calc(100vh - var(--sl-nav-height));
+	}
+
+	.right-sidebar {
+		border-inline-start: none;
+	}
+}
+
+/* Typography. */
+.sl-markdown-content h1,
+h1#_top {
+	font-weight: 500;
+	letter-spacing: -0.02em;
+}
+
+.sl-markdown-content :is(h2, h3, h4) {
+	font-weight: 500;
+	letter-spacing: -0.01em;
+}
+
+.sl-markdown-content a {
+	text-underline-offset: 0.2em;
+	text-decoration-thickness: 1px;
+}
+
+.sl-markdown-content :not(pre) > code {
+	border-radius: var(--md-shape-xs);
+	padding: 0.1em 0.35em;
+	font-size: 0.875em;
+}
+
+/* Asides become MD3 cards with a container color and no rule. */
+.starlight-aside {
+	border: none;
+	border-radius: var(--md-shape-lg);
+	padding: 1rem 1.25rem;
+	background: var(--sl-color-asides-bg-accent, var(--sl-color-blue-low));
+	color: var(--sl-color-asides-text-accent, var(--sl-color-blue-high));
+}
+
+.starlight-aside--note {
+	background: var(--md-primary-container);
+	color: var(--md-on-primary-container);
+}
+
+.starlight-aside--tip {
+	background: var(--md-tertiary-container);
+	color: var(--md-on-tertiary-container);
+}
+
+.starlight-aside--caution {
+	background: var(--sl-color-orange-low);
+	color: var(--sl-color-orange-high);
+}
+
+.starlight-aside--danger {
+	background: var(--md-error-container);
+	color: var(--md-on-error-container);
+}
+
+.starlight-aside :is(.starlight-aside__title, .starlight-aside__content, a, code) {
+	color: inherit;
+}
+
+.starlight-aside :not(pre) > code {
+	background: color-mix(in srgb, currentColor 10%, transparent);
+}
+
+/* Tables: outlined card with tonal header row. */
+.sl-markdown-content table {
+	display: table;
+	width: 100%;
+	border-collapse: separate;
+	border-spacing: 0;
+	border: 1px solid var(--md-outline-variant);
+	border-radius: var(--md-shape-lg);
+	overflow: hidden;
+	font-size: 0.9375rem;
+}
+
+.sl-markdown-content :is(th, td) {
+	border: none;
+	border-bottom: 1px solid var(--md-outline-variant);
+	padding: 0.625rem 0.875rem;
+	vertical-align: top;
+}
+
+.sl-markdown-content tr:last-child td {
+	border-bottom: none;
+}
+
+.sl-markdown-content th {
+	background: var(--md-surface-container);
+	color: var(--md-on-surface-variant);
+	font-weight: 600;
+	text-align: start;
+}
+
+.sl-markdown-content td code {
+	white-space: nowrap;
+}
+
+/* Cards and link cards from @astrojs/starlight/components. */
+.card,
+.sl-link-card {
+	border: none;
+	border-radius: var(--md-shape-xl);
+	background: var(--md-surface-container);
+	box-shadow: none;
+	transition: background-color 200ms var(--md-motion-emphasized);
+}
+
+.sl-link-card:hover {
+	background: var(--md-surface-container-high);
+}
+
+.card .icon {
+	border-radius: var(--md-shape-md);
+	background: var(--md-primary-container);
+	color: var(--md-on-primary-container);
+	border: none;
+	padding: 0.375rem;
+}
+
+/* Pagination buttons. */
+.pagination-links a {
+	border: none;
+	border-radius: var(--md-shape-xl);
+	background: var(--md-surface-container);
+	box-shadow: none;
+}
+
+.pagination-links a:hover {
+	background: var(--md-surface-container-high);
+}
+
+/* Table of contents active indicator. */
+starlight-toc a[aria-current='true'] {
+	color: var(--md-primary);
+	font-weight: 600;
+}
+
+/* Tabs component. */
+starlight-tabs [role='tablist'] {
+	border-bottom: 1px solid var(--md-outline-variant);
+}
+
+starlight-tabs [role='tab'][aria-selected='true'] {
+	color: var(--md-primary);
+	border-color: var(--md-primary);
+	border-bottom-width: 3px;
+}
+
+/* Badges render as MD3 assist chips. */
+.sl-badge {
+	border-radius: var(--md-shape-sm);
+	font-family: var(--md-font);
+}
