@@ -548,18 +548,18 @@ private fun AutomaticRoutingDialog(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Button(
-                    onClick = onSwitchToManual,
-                    shape = CircleShape,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(stringResource(R.string.apps_switch_to_manual_mode))
-                }
-                OutlinedButton(
                     onClick = onDismiss,
                     shape = CircleShape,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Text(stringResource(R.string.apps_leave_as_is))
+                }
+                OutlinedButton(
+                    onClick = onSwitchToManual,
+                    shape = CircleShape,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(stringResource(R.string.apps_switch_to_manual_mode))
                 }
             }
         },
