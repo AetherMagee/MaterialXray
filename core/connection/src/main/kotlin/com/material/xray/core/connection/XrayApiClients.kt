@@ -24,10 +24,9 @@ internal class XrayApiClients(private val factory: ConnectionApiClientFactory) {
 
     suspend fun replace(endpoint: XrayApiEndpoint) = withClients {
         closeLocked()
-        factory.create(endpoint).also { clients ->
-            statsClient = clients.stats
-            routingClient = clients.routing
-        }
+        val clients = factory.create(endpoint)
+        statsClient = clients.stats
+        routingClient = clients.routing
     }
 
     suspend fun close() = withClients { closeLocked() }

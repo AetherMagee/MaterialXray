@@ -531,7 +531,6 @@ class ConnectionManager(
         }
     }
 
-    /** Points provider rules at the provider's geodata, leaving out what no available file defines. */
     private suspend fun detectPhysicalRoute(managesSystemRouting: Boolean, tunName: String): PhysicalRouteResult {
         if (!managesSystemRouting) return PhysicalRouteResult(success = true, route = null)
 

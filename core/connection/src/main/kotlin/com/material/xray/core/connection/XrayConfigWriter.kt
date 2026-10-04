@@ -40,6 +40,7 @@ internal class XrayConfigWriter(
     /** Inputs of the config the running core was started with; null with no core or a hand-edited config. */
     var active: GeneratedXrayConfig? = null
 
+    /** Points provider rules at the provider's geodata, leaving out what no available file defines. */
     suspend fun resolveProviderRoutingRules(rules: List<RoutingRule>): List<RoutingRule> {
         val resolution = routingData.resolveProviderRules(rules)
         if (resolution.usedUrls.isNotEmpty()) {
