@@ -26,7 +26,7 @@ fun interface ConnectionXrayRoutingUpdater {
 }
 
 class XrayCliRoutingUpdater(
-    private val binaryPath: () -> String?,
+    private val userCommand: () -> List<String>?,
     private val binDir: String,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : ConnectionXrayRoutingUpdater {
@@ -37,7 +37,7 @@ class XrayCliRoutingUpdater(
     private fun replaceOnIoThread(endpoint: XrayApiEndpoint, routing: JsonObject): XrayRoutingUpdateResult {
         val server = endpoint.cliServerAddress()
             ?: return XrayRoutingUpdateResult.Failed("the active API endpoint is not CLI-compatible")
-        val executable = binaryPath()
+        val command = userCommand()
             ?: return XrayRoutingUpdateResult.Failed("the bundled Android Xray executable is unavailable")
         val workingDirectory = File(binDir)
         if (!workingDirectory.isDirectory) {
@@ -56,7 +56,7 @@ class XrayCliRoutingUpdater(
                 )
             }
             outputFile = File.createTempFile("routing-update-", ".log", workingDirectory)
-            val processBuilder = ProcessBuilder(buildXrayRoutingCommand(executable, server, inputFile.absolutePath))
+            val processBuilder = ProcessBuilder(buildXrayRoutingCommand(command, server, inputFile.absolutePath))
                 .directory(workingDirectory)
                 .redirectErrorStream(true)
                 .apply {
@@ -91,11 +91,10 @@ class XrayCliRoutingUpdater(
 }
 
 internal fun buildXrayRoutingCommand(
-    executable: String,
+    command: List<String>,
     server: String,
     inputPath: String,
-): List<String> = listOf(
-    executable,
+): List<String> = command + listOf(
     "api",
     "adrules",
     "--server=$server",

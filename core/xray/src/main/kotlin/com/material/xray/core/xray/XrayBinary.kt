@@ -13,7 +13,12 @@ class XrayBinary(
     private val paths: XrayPaths,
 ) {
     private val binaryDir = File(paths.filesDir, "bin")
+
+    /** The core's own file, which a root shell executes directly. */
     val binaryPath: String? get() = nativeExecutablePath(XRAY_EXECUTABLE_NAME)
+
+    /** The command that starts the core as this app's own uid, to be followed by Xray's arguments. */
+    val userCommand: List<String>? get() = binaryPath?.let(::listOf)
     val tunLauncherPath: String? get() = nativeExecutablePath(TUN_LAUNCHER_LIBRARY_NAME)
 
     fun ensureAvailable(): Boolean {
@@ -24,10 +29,10 @@ class XrayBinary(
 
     fun readVersion(): String? {
         binaryDir.mkdirs()
-        val binaryPath = binaryPath ?: return null
+        val command = userCommand ?: return null
 
         return runCatching {
-            val process = ProcessBuilder(binaryPath, "version")
+            val process = ProcessBuilder(command + "version")
                 .directory(binaryDir)
                 .redirectErrorStream(true)
                 .apply {

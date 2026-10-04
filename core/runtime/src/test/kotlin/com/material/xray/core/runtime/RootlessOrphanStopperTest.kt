@@ -17,6 +17,22 @@ class RootlessOrphanStopperTest {
     }
 
     @Test
+    fun `matches a core started through the system linker`() {
+        assertTrue(
+            isOwnedXrayCommand(
+                listOf("/system/bin/linker64", "/data/user/0/pkg/files/cores/v26.9.9/libxray.so", "run", "-c", "/data/user/0/pkg/files/config.json"),
+                "/data/user/0/pkg/files/config.json",
+            ),
+        )
+        assertFalse(
+            isOwnedXrayCommand(
+                listOf("/system/bin/linker64", "/data/user/0/pkg/files/other", "run", "-c", "/data/user/0/pkg/files/config.json"),
+                "/data/user/0/pkg/files/config.json",
+            ),
+        )
+    }
+
+    @Test
     fun `rejects other commands and configs`() {
         assertFalse(isOwnedXrayCommand(listOf("/system/bin/sh", "-c", "/data/user/0/pkg/files/config.json"), "/data/user/0/pkg/files/config.json"))
         assertFalse(isOwnedXrayCommand(listOf("/data/app/pkg/lib/arm64/libxray.so", "run", "-c", "/other/config.json"), "/data/user/0/pkg/files/config.json"))

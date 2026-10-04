@@ -312,6 +312,7 @@ class XrayProcessSupervisorTest {
     private class FakeXrayProcessBinary : XrayProcessBinary {
         // Installer paths contain '=', which the launch command must not mistake for assignments.
         override val binaryPath: String = "/tmp/native lib==/libxray.so"
+        override val userCommand: List<String> = listOf(binaryPath)
         override val tunLauncherPath: String = "/tmp/native lib==/libxraytun.so"
 
         override fun configPath(): String = "/tmp/config dir/config.json"
@@ -337,7 +338,7 @@ class XrayProcessSupervisorTest {
         var startedEnvironment: Map<String, String>? = null
 
         override fun start(
-            binaryPath: String,
+            command: List<String>,
             configPath: String,
             workingDir: String,
             logPath: String,

@@ -16,7 +16,7 @@ class XrayRoutingUpdaterTest {
                 "/data/user/0/com.material.xray/files/routing.json",
             ),
             buildXrayRoutingCommand(
-                executable = "/data/app/libxray.so",
+                command = listOf("/data/app/libxray.so"),
                 server = "127.0.0.1:48123",
                 inputPath = "/data/user/0/com.material.xray/files/routing.json",
             ),

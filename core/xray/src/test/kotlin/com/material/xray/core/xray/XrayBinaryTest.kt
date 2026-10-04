@@ -20,6 +20,7 @@ class XrayBinaryTest {
         assertTrue(xrayBinary.ensureAvailable())
 
         assertEquals(core.absolutePath, xrayBinary.binaryPath)
+        assertEquals(listOf(core.absolutePath), xrayBinary.userCommand)
         assertEquals(launcher.absolutePath, xrayBinary.tunLauncherPath)
         assertTrue(File(dir, "bin").isDirectory)
     }

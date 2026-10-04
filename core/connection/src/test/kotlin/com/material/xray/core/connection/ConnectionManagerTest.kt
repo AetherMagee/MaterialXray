@@ -1267,6 +1267,7 @@ class ConnectionManagerTest {
 
     private class FakeXrayBinary : ConnectionXrayBinary {
         override val binaryPath = "/tmp/xray/libxray.so"
+        override val userCommand = listOf(binaryPath)
         override val tunLauncherPath = "/tmp/xray/libxraytun.so"
         var ready = true
         var configJson: String? = null

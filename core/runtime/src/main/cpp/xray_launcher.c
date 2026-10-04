@@ -57,8 +57,9 @@ static void free_string_array(char **items, int count) {
     free(items);
 }
 
-// Returns NULL on failure without raising a Java exception, matching copy_string.
-static char **copy_env(JNIEnv *env, jobjectArray values, jsize count, const char **failure, int *failure_errno) {
+// Copies a Java String[] into a NULL-terminated array. Returns NULL on failure without raising a
+// Java exception, matching copy_string.
+static char **copy_string_array(JNIEnv *env, jobjectArray values, jsize count, const char **failure, int *failure_errno) {
     char **envp = calloc((size_t) count + 1, sizeof(char *));
     if (envp == NULL) {
         *failure = "calloc failed";
@@ -70,7 +71,7 @@ static char **copy_env(JNIEnv *env, jobjectArray values, jsize count, const char
         jstring value = (jstring) (*env)->GetObjectArrayElement(env, values, i);
         if (value == NULL) {
             free_string_array(envp, i);
-            *failure = "environment entry is null";
+            *failure = "launch string is null";
             *failure_errno = EINVAL;
             return NULL;
         }
@@ -89,7 +90,7 @@ JNIEXPORT jint JNICALL
 Java_com_material_xray_core_runtime_AndroidUserXrayProcessLauncher_nativeStart(
         JNIEnv *env,
         jclass clazz,
-        jstring binary_path,
+        jobjectArray command_values,
         jstring config_path,
         jstring working_dir,
         jstring log_path,
@@ -97,7 +98,8 @@ Java_com_material_xray_core_runtime_AndroidUserXrayProcessLauncher_nativeStart(
         jobjectArray env_values) {
     (void) clazz;
 
-    char *binary = NULL;
+    char **command = NULL;
+    char **argv = NULL;
     char *config = NULL;
     char *working = NULL;
     char *log = NULL;
@@ -116,16 +118,21 @@ Java_com_material_xray_core_runtime_AndroidUserXrayProcessLauncher_nativeStart(
         throw_state(env, "environment array is null", EINVAL);
         return -1;
     }
+    if (command_values == NULL || (*env)->GetArrayLength(env, command_values) == 0) {
+        throw_state(env, "launch command is empty", EINVAL);
+        return -1;
+    }
 
     jsize env_count = (*env)->GetArrayLength(env, env_values);
+    jsize command_count = (*env)->GetArrayLength(env, command_values);
 
     // Short-circuit evaluation guarantees that no further JNI call is made once one of these fails,
     // which is what keeps the sequence legal if the VM raised an OutOfMemoryError partway through.
-    if ((binary = copy_string(env, binary_path, &failure, &failure_errno)) == NULL ||
+    if ((command = copy_string_array(env, command_values, command_count, &failure, &failure_errno)) == NULL ||
         (config = copy_string(env, config_path, &failure, &failure_errno)) == NULL ||
         (working = copy_string(env, working_dir, &failure, &failure_errno)) == NULL ||
         (log = copy_string(env, log_path, &failure, &failure_errno)) == NULL ||
-        (child_env = copy_env(env, env_values, env_count, &failure, &failure_errno)) == NULL) {
+        (child_env = copy_string_array(env, env_values, env_count, &failure, &failure_errno)) == NULL) {
         goto cleanup;
     }
 
@@ -156,7 +163,21 @@ Java_com_material_xray_core_runtime_AndroidUserXrayProcessLauncher_nativeStart(
     spawn_env[env_count + 1] = fd_env_compat;
     spawn_env[env_count + 2] = NULL;
 
-    char *argv[] = {binary, "run", "-c", config, NULL};
+    // The command is either the core itself or the system linker followed by the core.
+    argv = calloc((size_t) command_count + 4, sizeof(char *));
+    if (argv == NULL) {
+        failure = "calloc failed";
+        failure_errno = errno;
+        goto cleanup;
+    }
+    for (jsize i = 0; i < command_count; i++) {
+        argv[i] = command[i];
+    }
+    argv[command_count] = "run";
+    argv[command_count + 1] = "-c";
+    argv[command_count + 2] = config;
+    argv[command_count + 3] = NULL;
+
     pid_t pid = fork();
     if (pid < 0) {
         failure = "failed to fork xray";
@@ -180,7 +201,7 @@ Java_com_material_xray_core_runtime_AndroidUserXrayProcessLauncher_nativeStart(
         // Without this the core inherits a closed descriptor and fails in a way that only shows up
         // as an opaque crash, so a failure here has to stop the child instead.
         if (fcntl(child_tun_fd, F_SETFD, 0) < 0) _exit(127);
-        execve(binary, argv, spawn_env);
+        execve(argv[0], argv, spawn_env);
         _exit(127);
     }
 
@@ -190,7 +211,8 @@ cleanup:
     if (child_tun_fd >= 0) close(child_tun_fd);
     free(spawn_env);
     free_string_array(child_env, env_count);
-    free(binary);
+    free(argv);
+    free_string_array(command, command_count);
     free(config);
     free(working);
     free(log);

@@ -242,7 +242,7 @@ class ConnectionManagerFactory(
             ),
             apiClientFactory = XrayConnectionApiClientFactory(AndroidLocalSockets(), LogcatAppLogger()),
             xrayRoutingUpdater = XrayCliRoutingUpdater(
-                binaryPath = { xrayBinary.binaryPath },
+                userCommand = { xrayBinary.userCommand },
                 binDir = environment.binDir,
             ),
             prepareCertificateBundle = {

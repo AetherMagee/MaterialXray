@@ -116,6 +116,8 @@ class XrayBinaryConnectionAdapter(
 ) : ConnectionXrayBinary {
     override val binaryPath: String?
         get() = binary.binaryPath
+    override val userCommand: List<String>?
+        get() = binary.userCommand
     override val tunLauncherPath: String?
         get() = binary.tunLauncherPath
 

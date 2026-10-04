@@ -40,6 +40,7 @@ interface UserXrayProcessController : XrayProcessProbe {
 
 interface XrayProcessBinary {
     val binaryPath: String?
+    val userCommand: List<String>?
     val tunLauncherPath: String?
     fun configPath(): String
 }

@@ -89,7 +89,7 @@ class EphemeralXrayCore(
         buildConfig: (XrayInbound.PrivateHttp) -> String,
     ): RunningCore {
         currentCoroutineContext().ensureActive()
-        val binaryPath = resolveBinaryPath()
+        val command = resolveCommand()
         val binDir = xrayPaths.filesDir.resolve("bin").also { it.mkdirs() }
         val workDir = xrayPaths.cacheDir.resolve("helper-cores").also { it.mkdirs() }
         val runId = UUID.randomUUID().toString()
@@ -101,7 +101,7 @@ class EphemeralXrayCore(
         try {
             val inbound = XrayInbound.PrivateHttp(workDir.resolve("xray-$runId.sock").absolutePath, inboundTag)
             configFile.writeText(buildConfigOrThrow(buildConfig, inbound))
-            val spawned = startProcess(binaryPath, binDir, configFile, logFile)
+            val spawned = startProcess(command, binDir, configFile, logFile)
             process = spawned
             awaitSocketOrThrow(inbound, spawned, logFile, startTimeoutMs)
             started = true
@@ -136,7 +136,7 @@ class EphemeralXrayCore(
         )
     }
 
-    private fun resolveBinaryPath(): String = xrayBinary.binaryPath
+    private fun resolveCommand(): List<String> = xrayBinary.userCommand
         ?: throw EphemeralXrayCoreException("Xray binary is not available")
 
     private fun buildConfigOrThrow(
@@ -149,12 +149,12 @@ class EphemeralXrayCore(
     }
 
     private fun startProcess(
-        binaryPath: String,
+        command: List<String>,
         binDir: File,
         configFile: File,
         logFile: File,
     ): RedirectedProcess {
-        val builder = ProcessBuilder(binaryPath, "run", "-c", configFile.absolutePath)
+        val builder = ProcessBuilder(command + listOf("run", "-c", configFile.absolutePath))
             .directory(binDir)
             .redirectErrorStream(true)
             .apply {

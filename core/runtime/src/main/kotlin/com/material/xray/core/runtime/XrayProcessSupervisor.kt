@@ -263,9 +263,9 @@ internal class UserXrayProcessSupervisor(
     // the caller can reach a suspension point and let a teardown close it underneath us. fork and
     // execve do not wait on IO, so there is nothing to move off the caller's thread anyway.
     override fun start(binDir: String, tunFd: Int): Int {
-        val binaryPath = requireNotNull(xrayBinary.binaryPath) { "xray binary is unavailable" }
+        val command = requireNotNull(xrayBinary.userCommand) { "xray binary is unavailable" }
         pid = processLauncher.start(
-            binaryPath = binaryPath,
+            command = command,
             configPath = xrayBinary.configPath(),
             workingDir = binDir,
             logPath = logFile.absolutePath,
@@ -386,8 +386,9 @@ internal fun parseStatmResidentPages(buffer: ByteArray, length: Int): Long? {
 private fun Byte.isAsciiWhitespace(): Boolean = this == ASCII_SPACE || this == ASCII_TAB || this == ASCII_NEWLINE
 
 internal interface UserXrayProcessLauncher {
+    /** Starts [command] followed by `run -c` [configPath], handing it [tunFd]. */
     fun start(
-        binaryPath: String,
+        command: List<String>,
         configPath: String,
         workingDir: String,
         logPath: String,
@@ -402,7 +403,7 @@ internal interface UserXrayProcessLauncher {
 
 class AndroidUserXrayProcessLauncher : UserXrayProcessLauncher {
     override fun start(
-        binaryPath: String,
+        command: List<String>,
         configPath: String,
         workingDir: String,
         logPath: String,
@@ -412,7 +413,7 @@ class AndroidUserXrayProcessLauncher : UserXrayProcessLauncher {
         val env = (System.getenv() + environment)
             .map { (key, value) -> "$key=$value" }
             .toTypedArray()
-        return nativeStart(binaryPath, configPath, workingDir, logPath, tunFd, env)
+        return nativeStart(command.toTypedArray(), configPath, workingDir, logPath, tunFd, env)
     }
 
     override fun isAlive(pid: Int): Boolean = nativeIsAlive(pid)
@@ -426,7 +427,7 @@ class AndroidUserXrayProcessLauncher : UserXrayProcessLauncher {
 
         @JvmStatic
         external fun nativeStart(
-            binaryPath: String,
+            command: Array<String>,
             configPath: String,
             workingDir: String,
             logPath: String,

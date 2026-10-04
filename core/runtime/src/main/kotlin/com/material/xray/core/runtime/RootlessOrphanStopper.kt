@@ -4,6 +4,7 @@ import android.content.Context
 import android.system.Os
 import android.system.OsConstants
 import com.material.xray.core.xray.ACTIVE_CONFIG_FILE
+import com.material.xray.core.xray.XRAY_EXECUTABLE_NAME
 import java.io.File
 import kotlinx.coroutines.delay
 import org.koin.core.annotation.Factory
@@ -68,8 +69,14 @@ class RootlessOrphanStopper(private val context: Context) {
     }
 }
 
-internal fun isOwnedXrayCommand(args: List<String>, configPath: String): Boolean = args.firstOrNull()?.endsWith("/libxray.so") == true &&
-    args.windowed(2).any { (flag, value) -> flag == "-c" && value == configPath }
+// A core the app cannot exec directly runs as an argument of the system linker.
+internal fun isOwnedXrayCommand(args: List<String>, configPath: String): Boolean {
+    val core = if (args.firstOrNull()?.let(SYSTEM_LINKERS::contains) == true) args.getOrNull(1) else args.firstOrNull()
+    return core?.endsWith("/$XRAY_EXECUTABLE_NAME") == true &&
+        args.windowed(2).any { (flag, value) -> flag == "-c" && value == configPath }
+}
+
+private val SYSTEM_LINKERS = setOf("/system/bin/linker64", "/system/bin/linker")
 
 internal fun effectiveUidFromStatus(lines: List<String>): Int? = lines.firstOrNull { it.startsWith("Uid:") }
     ?.substringAfter(':')
