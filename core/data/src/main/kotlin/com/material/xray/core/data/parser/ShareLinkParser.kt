@@ -4,27 +4,38 @@ import com.material.xray.core.model.ServerConfig
 
 class ShareLinkParser {
 
-    fun parse(uri: String): ServerConfig? {
-        val trimmed = uri.trim()
-        return when {
-            trimmed.startsWith("vless://") -> VlessParser.parse(trimmed)
-            trimmed.startsWith("vmess://") -> VmessParser.parse(trimmed)
-            trimmed.startsWith("trojan://") -> TrojanParser.parse(trimmed)
-            trimmed.startsWith("ss://") -> ShadowsocksParser.parse(trimmed)
-            trimmed.startsWith("hysteria2://") || trimmed.startsWith("hy2://") -> Hysteria2Parser.parse(trimmed)
-            else -> null
-        }
-    }
+    fun parse(uri: String): ServerConfig? = parseWith(directParsers, uri.trim())
 
     fun parseMultiple(text: String): List<ServerConfig> = text.lines()
         .map { it.trim() }
         .filter { it.isNotEmpty() }
-        .mapNotNull { parseSubscriptionLine(it) }
+        .mapNotNull { parseWith(subscriptionParsers, it) }
 
-    private fun parseSubscriptionLine(uri: String): ServerConfig? = when {
-        uri.startsWith("http://") || uri.startsWith("https://") -> HttpProxyParser.parse(uri)
-        uri.startsWith("socks://") || uri.startsWith("socks5://") || uri.startsWith("socks5h://") -> SocksParser.parse(uri)
-        uri.startsWith("wireguard://") || uri.startsWith("wg://") -> WireGuardParser.parse(uri)
-        else -> parse(uri)
+    private fun parseWith(parsers: Map<String, (String) -> ServerConfig?>, uri: String): ServerConfig? = parsers.entries.firstOrNull { (scheme, _) -> uri.startsWith(scheme) }?.value?.invoke(uri)
+
+    internal companion object {
+        /** Links a user can add on their own. */
+        private val directParsers: Map<String, (String) -> ServerConfig?> = mapOf(
+            "vless://" to VlessParser::parse,
+            "vmess://" to VmessParser::parse,
+            "trojan://" to TrojanParser::parse,
+            "ss://" to ShadowsocksParser::parse,
+            "hysteria2://" to Hysteria2Parser::parse,
+            "hy2://" to Hysteria2Parser::parse,
+        )
+
+        /** Subscriptions also carry proxies that only make sense as part of a provider's list. */
+        private val subscriptionParsers: Map<String, (String) -> ServerConfig?> = directParsers + mapOf(
+            "http://" to HttpProxyParser::parse,
+            "https://" to HttpProxyParser::parse,
+            "socks://" to SocksParser::parse,
+            "socks5://" to SocksParser::parse,
+            "socks5h://" to SocksParser::parse,
+            "wireguard://" to WireGuardParser::parse,
+            "wg://" to WireGuardParser::parse,
+        )
+
+        val directSchemes: Set<String> = directParsers.keys
+        val subscriptionSchemes: Set<String> = subscriptionParsers.keys
     }
 }

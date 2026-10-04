@@ -19,3 +19,10 @@ dependencies {
     testImplementation(libs.okhttp.mockwebserver)
     testImplementation(libs.okhttp.tls)
 }
+
+// WebsiteDocsTest compares the website's provider docs against the parsers.
+tasks.test {
+    inputs.dir("../../website/src/content/docs")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+        .withPropertyName("websiteDocs")
+}

@@ -495,6 +495,13 @@ tasks.matching { task ->
     dependsOn(validateReleaseTelemetry)
 }
 
+// SubscriptionDeepLinkTest runs the website's deeplink examples through the app's parser.
+tasks.withType<Test>().configureEach {
+    inputs.file("../website/src/content/docs/docs/providers/deeplinks.md")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+        .withPropertyName("websiteDeeplinksDoc")
+}
+
 dependencies {
     implementation(project(":core:model"))
     implementation(project(":core:common"))
