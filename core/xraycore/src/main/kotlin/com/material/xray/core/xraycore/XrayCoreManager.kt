@@ -1,4 +1,4 @@
-package com.material.xray.core.data.xraycore
+package com.material.xray.core.xraycore
 
 import com.material.xray.core.common.di.ApplicationScope
 import com.material.xray.core.common.log.LogBuffer
@@ -35,7 +35,8 @@ import org.koin.core.annotation.Singleton
 sealed interface XrayCoreOperation {
     data class Downloading(val tag: String, val downloaded: Long, val total: Long?) : XrayCoreOperation
 
-    data object Verifying : XrayCoreOperation
+    /** Checking a download of release [tag], or a file when null. */
+    data class Verifying(val tag: String?) : XrayCoreOperation
 
     data class Installed(val core: InstalledXrayCore) : XrayCoreOperation
 
@@ -52,10 +53,14 @@ data class XrayCoreState(
     val selectedId: String? = null,
     val operation: XrayCoreOperation? = null,
 ) {
-    val isBusy: Boolean get() = operation is XrayCoreOperation.Downloading || operation == XrayCoreOperation.Verifying
+    val isBusy: Boolean get() = operation is XrayCoreOperation.Downloading || operation is XrayCoreOperation.Verifying
 
     /** The version of the core that runs on the next start. */
     val activeVersion: String? get() = installed.firstOrNull { it.id == selectedId }?.version ?: bundledVersion
+
+    /** Whether release [tag] is newer than the bundled core and every installed one; false while the bundled version is unknown. */
+    fun isNewerThanEveryCore(tag: String): Boolean = bundledVersion != null &&
+        (installed.map { it.version } + bundledVersion).all { (compareXrayVersions(tag, it) ?: 0) > 0 }
 }
 
 /**
@@ -92,17 +97,32 @@ class XrayCoreManager(
         }
     }
 
-    /** Upstream releases this device can run, newest first. */
-    suspend fun releases(): List<XrayCoreRelease> = withContext(ioDispatcher) {
+    /** Page [page], counted from 1, of the upstream releases this device can run, newest first. */
+    suspend fun releases(page: Int): XrayCoreReleasePage = withContext(ioDispatcher) {
         try {
-            httpClient.use { client -> fetchXrayCoreReleases(client, platformInfo.primaryAbi) }
+            httpClient.use { client -> fetchXrayCoreReleases(client, platformInfo.primaryAbi, page) }
         } catch (error: IOException) {
             log.append(LogSource.APP, "Listing Xray releases failed: ${error.describe()}")
             throw error as? XrayCoreException ?: XrayCoreException(XrayCoreFailure.Network, error)
         }
     }
 
-    fun install(release: XrayCoreRelease) = launchOperation(XrayCoreOperation.Downloading(release.tag, 0, null)) {
+    /** The newest release if it is newer than every core on the device, for periodic update checks. */
+    suspend fun findUpdate(): XrayCoreRelease? {
+        initialization.join()
+        return releases(page = 1).releases.firstOrNull()?.takeIf { _state.value.isNewerThanEveryCore(it.tag) }
+    }
+
+    /** Installs [release] and waits for it, or returns null when it failed or another install was running. */
+    suspend fun installAndWait(release: XrayCoreRelease): InstalledXrayCore? {
+        install(release)?.join() ?: return null
+        val core = (_state.value.operation as? XrayCoreOperation.Installed)?.core ?: return null
+        clearResult()
+        return core
+    }
+
+    /** Starts installing [release]; returns the install, or null when another one is running. */
+    fun install(release: XrayCoreRelease): Job? = launchOperation(XrayCoreOperation.Downloading(release.tag, 0, null)) {
         val stagingDir = store.createStagingDir()
         stage(stagingDir) {
             val archive = File(stagingDir, "release.zip")
@@ -111,7 +131,7 @@ class XrayCoreManager(
                     _state.update { it.copy(operation = XrayCoreOperation.Downloading(release.tag, downloaded, total)) }
                 }
             }
-            _state.update { it.copy(operation = XrayCoreOperation.Verifying) }
+            _state.update { it.copy(operation = XrayCoreOperation.Verifying(release.tag)) }
             val executable = store.stagedExecutable(stagingDir)
             extractXrayExecutable(archive, executable)
             archive.delete()
@@ -122,7 +142,7 @@ class XrayCoreManager(
     }
 
     /** Installs the executable, or release zip, that [open] reads. */
-    fun installFromFile(open: () -> InputStream) = launchOperation(XrayCoreOperation.Verifying) {
+    fun installFromFile(open: () -> InputStream): Job? = launchOperation(XrayCoreOperation.Verifying(null)) {
         val stagingDir = store.createStagingDir()
         stage(stagingDir) {
             val upload = File(stagingDir, "upload")
@@ -159,11 +179,15 @@ class XrayCoreManager(
         publishInstalled()
     }
 
-    /** Starts [block] unless an install is running. Callers are on the main thread, so the check and the busy state cannot interleave. */
-    private fun launchOperation(initial: XrayCoreOperation, block: suspend () -> InstalledXrayCore) {
-        if (_state.value.isBusy) return
-        _state.update { it.copy(operation = initial) }
-        job = scope.launch(ioDispatcher) {
+    /** Starts [block] unless an install is running; the screen and the update worker may both try. */
+    private fun launchOperation(initial: XrayCoreOperation, block: suspend () -> InstalledXrayCore): Job? {
+        var started = false
+        _state.update { state ->
+            started = !state.isBusy
+            if (started) state.copy(operation = initial) else state
+        }
+        if (!started) return null
+        return scope.launch(ioDispatcher) {
             // Staging cleanup from a previous run must not delete this install's directory.
             initialization.join()
             val result = try {
@@ -178,7 +202,7 @@ class XrayCoreManager(
             (result as? XrayCoreOperation.Installed)?.let { log.append(LogSource.APP, "Installed Xray core ${it.core.id} (${it.core.version})") }
             publishInstalled()
             _state.update { it.copy(operation = result) }
-        }
+        }.also { job = it }
     }
 
     private suspend fun <T> stage(stagingDir: File, block: suspend () -> T): T = try {

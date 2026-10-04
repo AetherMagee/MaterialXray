@@ -3,6 +3,7 @@ package com.material.xray.core.ui.components
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -35,6 +36,28 @@ fun SelectableOptionRow(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
 ) {
+    SelectableOptionRow(selected = selected, onSelected = onSelected, modifier = modifier, enabled = enabled) {
+        Text(
+            text = title,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+        )
+        Text(
+            text = description,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+/** A [SelectableOptionRow] whose text column is drawn by the caller. */
+@Composable
+fun SelectableOptionRow(
+    selected: Boolean,
+    onSelected: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    content: @Composable ColumnScope.() -> Unit,
+) {
     Row(
         modifier = modifier
             .alpha(if (enabled) 1f else 0.38f)
@@ -56,17 +79,8 @@ fun SelectableOptionRow(
         Column(
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.spacedBy(2.dp),
-        ) {
-            Text(
-                text = title,
-                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-            )
-            Text(
-                text = description,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+            content = content,
+        )
     }
 }
 

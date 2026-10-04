@@ -1,7 +1,8 @@
-package com.material.xray.core.data.xraycore
+package com.material.xray.core.xraycore
 
 import java.io.IOException
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
@@ -24,7 +25,7 @@ class XrayCoreReleasesTest {
             ]
             """,
             assetName = ASSET,
-        )
+        ).releases
 
         assertEquals(listOf("v26.9.30", "v26.7.11"), releases.map { it.tag })
         assertTrue(releases.first().prerelease)
@@ -33,7 +34,24 @@ class XrayCoreReleasesTest {
 
     @Test
     fun `releases without this device's asset are skipped`() {
-        assertTrue(parseXrayCoreReleases("[${release("v26.9.30", "2026-09-30")}]", "Xray-android-amd64.zip").isEmpty())
+        assertTrue(parseXrayCoreReleases("[${release("v26.9.30", "2026-09-30")}]", "Xray-android-amd64.zip").releases.isEmpty())
+    }
+
+    @Test
+    fun `a full page has more unless it reached unsupported versions`() {
+        val supported = "[${release("v26.9.30", "2026-09-30")}, ${release("v26.9.9", "2026-09-09")}]"
+        val reachingOld = "[${release("v26.9.30", "2026-09-30")}, ${release("v25.12.8", "2025-12-08")}]"
+
+        assertTrue(parseXrayCoreReleases(supported, ASSET, pageSize = 2).hasMore)
+        assertFalse(parseXrayCoreReleases(supported, ASSET, pageSize = 3).hasMore)
+        assertFalse(parseXrayCoreReleases(reachingOld, ASSET, pageSize = 2).hasMore)
+    }
+
+    @Test
+    fun `cores older than the latest tested version are not recommended`() {
+        assertTrue(isRecommendedXrayVersion(LATEST_TESTED_XRAY_VERSION))
+        assertTrue(isRecommendedXrayVersion("26.9.30"))
+        assertFalse(isRecommendedXrayVersion(MINIMUM_XRAY_VERSION))
     }
 
     @Test

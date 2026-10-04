@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The Xray core page (:feature:xraycore), kept apart so a build without it can drop the file. -->
+<resources>
+    <string name="settings_xray_core_source_bundled">Built-in</string>
+    <string name="settings_xray_core_source_release">GitHub</string>
+    <string name="settings_xray_core_source_file">File</string>
+    <string name="settings_xray_core_delete">Delete %1$s</string>
+    <string name="settings_xray_core_install_file">Install from file</string>
+    <string name="settings_xray_core_file_warning_title">Install a core from a file?</string>
+    <string name="settings_xray_core_file_warning">Pick an Xray executable or a release zip. Only use builds you trust: the core sees all of your traffic.</string>
+    <string name="settings_xray_core_file_warning_root">Pick an Xray executable or a release zip. Only use builds you trust: the core sees all of your traffic and runs as root.</string>
+    <string name="settings_xray_core_choose_file">Choose file</string>
+    <string name="settings_xray_core_releases_unavailable">No upstream build for this device. Install one from a file.</string>
+    <string name="settings_xray_core_releases_retry">Refresh</string>
+    <string name="settings_xray_core_releases_empty">No releases found.</string>
+    <string name="settings_xray_core_releases_more">Show more</string>
+    <string name="settings_xray_core_old">Old</string>
+    <string name="settings_xray_core_old_separator">Old versions below · things may break</string>
+    <string name="settings_xray_core_release_new">New</string>
+    <string name="settings_xray_core_release_install">Download %1$s</string>
+    <string name="settings_xray_core_cancel">Cancel</string>
+    <string name="settings_xray_core_use">Use</string>
+    <string name="settings_xray_core_installed_result">Installed %1$s</string>
+    <string name="settings_xray_core_failed_network">Could not reach GitHub.</string>
+    <string name="settings_xray_core_failed_rate_limited">GitHub rate limit hit. Try again later.</string>
+    <string name="settings_xray_core_failed_integrity">Checksum mismatch, download discarded.</string>
+    <string name="settings_xray_core_failed_unsupported">Not an Xray core for this device.</string>
+    <string name="settings_xray_core_failed_broken">The core did not start.</string>
+    <string name="settings_xray_core_failed_too_old">Older than %1$s, not supported.</string>
+    <string name="settings_xray_core_updates">Updates</string>
+    <string name="settings_xray_core_periodic_checks">Check for new Xray-core versions periodically</string>
+    <string name="settings_xray_core_update_action">When a new version releases</string>
+    <string name="settings_xray_core_update_action_notify">Notify me</string>
+    <string name="settings_xray_core_update_action_install">Update automatically</string>
+    <string name="settings_xray_core_summary_built_in">v%1$s · Built-in</string>
+    <string name="settings_xray_core_summary_custom">v%1$s · Custom</string>
+    <string name="notification_channel_xray_core_updates">Xray core updates</string>
+    <string name="notification_xray_core_update_title">New Xray core available</string>
+    <string name="notification_xray_core_update_text">Xray %1$s is out. Tap to open Material Xray.</string>
+    <string name="notification_xray_core_updated_title">Xray core updated</string>
+    <string name="notification_xray_core_updated_text">Now using Xray %1$s.</string>
+</resources>

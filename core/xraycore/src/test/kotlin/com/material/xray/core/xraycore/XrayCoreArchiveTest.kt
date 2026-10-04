@@ -1,4 +1,4 @@
-package com.material.xray.core.data.xraycore
+package com.material.xray.core.xraycore
 
 import java.io.File
 import java.nio.file.Files

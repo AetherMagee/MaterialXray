@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The Xray core page (:feature:xraycore), kept apart so a build without it can drop the file. -->
+<resources>
+    <string name="settings_xray_core_source_bundled">Встроенное</string>
+    <string name="settings_xray_core_source_release">GitHub</string>
+    <string name="settings_xray_core_source_file">Файл</string>
+    <string name="settings_xray_core_delete">Удалить %1$s</string>
+    <string name="settings_xray_core_install_file">Установить из файла</string>
+    <string name="settings_xray_core_file_warning_title">Установить ядро из файла?</string>
+    <string name="settings_xray_core_file_warning">Выберите исполняемый файл Xray или zip-архив релиза. Используйте только сборки, которым доверяете: ядро видит весь ваш трафик.</string>
+    <string name="settings_xray_core_file_warning_root">Выберите исполняемый файл Xray или zip-архив релиза. Используйте только сборки, которым доверяете: ядро видит весь ваш трафик и работает от root.</string>
+    <string name="settings_xray_core_choose_file">Выбрать файл</string>
+    <string name="settings_xray_core_releases_unavailable">Для этого устройства нет официальной сборки. Установите ядро из файла.</string>
+    <string name="settings_xray_core_releases_retry">Обновить</string>
+    <string name="settings_xray_core_releases_empty">Релизы не найдены.</string>
+    <string name="settings_xray_core_releases_more">Показать ещё</string>
+    <string name="settings_xray_core_old">Старая</string>
+    <string name="settings_xray_core_old_separator">Ниже старые версии · что-то может сломаться</string>
+    <string name="settings_xray_core_release_new">Новое</string>
+    <string name="settings_xray_core_release_install">Загрузить %1$s</string>
+    <string name="settings_xray_core_cancel">Отмена</string>
+    <string name="settings_xray_core_use">Выбрать</string>
+    <string name="settings_xray_core_installed_result">Установлена %1$s</string>
+    <string name="settings_xray_core_failed_network">Не удалось связаться с GitHub.</string>
+    <string name="settings_xray_core_failed_rate_limited">Превышен лимит запросов GitHub. Повторите позже.</string>
+    <string name="settings_xray_core_failed_integrity">Контрольная сумма не совпала, загрузка удалена.</string>
+    <string name="settings_xray_core_failed_unsupported">Это не ядро Xray для этого устройства.</string>
+    <string name="settings_xray_core_failed_broken">Ядро не запустилось.</string>
+    <string name="settings_xray_core_failed_too_old">Старше %1$s, не поддерживается.</string>
+    <string name="settings_xray_core_updates">Обновления</string>
+    <string name="settings_xray_core_periodic_checks">Периодически проверять новые версии Xray-core</string>
+    <string name="settings_xray_core_update_action">Когда выходит новая версия</string>
+    <string name="settings_xray_core_update_action_notify">Уведомить меня</string>
+    <string name="settings_xray_core_update_action_install">Обновить автоматически</string>
+    <string name="settings_xray_core_summary_built_in">v%1$s · Встроенное</string>
+    <string name="settings_xray_core_summary_custom">v%1$s · Своё</string>
+    <string name="notification_channel_xray_core_updates">Обновления ядра Xray</string>
+    <string name="notification_xray_core_update_title">Доступно новое ядро Xray</string>
+    <string name="notification_xray_core_update_text">Вышел Xray %1$s. Нажмите, чтобы открыть Material Xray.</string>
+    <string name="notification_xray_core_updated_title">Ядро Xray обновлено</string>
+    <string name="notification_xray_core_updated_text">Теперь используется Xray %1$s.</string>
+</resources>

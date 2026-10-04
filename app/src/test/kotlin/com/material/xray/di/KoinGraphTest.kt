@@ -49,6 +49,7 @@ import com.material.xray.core.xray.PlatformDns
 import com.material.xray.core.xray.TproxyCompatibilityCache
 import com.material.xray.core.xray.VpnTransportProbe
 import com.material.xray.core.xray.XrayPaths
+import com.material.xray.feature.xraycore.XrayCoreUpdateWorker
 import com.material.xray.service.AppUpdateWorker
 import com.material.xray.service.GeoDataUpdateWorker
 import com.material.xray.service.SubscriptionUpdateWorker
@@ -95,7 +96,7 @@ class KoinGraphTest {
             .map { it.qualifier }
             .toSet()
 
-        listOf(AppUpdateWorker::class, GeoDataUpdateWorker::class, SubscriptionUpdateWorker::class).forEach { worker ->
+        listOf(AppUpdateWorker::class, GeoDataUpdateWorker::class, SubscriptionUpdateWorker::class, XrayCoreUpdateWorker::class).forEach { worker ->
             assertTrue(
                 "${worker.simpleName} is not registered for KoinWorkerFactory",
                 named(worker.java.name) in workerQualifiers,

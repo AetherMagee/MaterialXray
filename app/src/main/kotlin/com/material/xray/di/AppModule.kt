@@ -18,11 +18,13 @@ import com.material.xray.core.telemetry.di.CoreTelemetryModule
 import com.material.xray.core.ui.R
 import com.material.xray.core.ui.di.CoreUiModule
 import com.material.xray.core.xray.di.CoreXrayModule
+import com.material.xray.core.xraycore.di.CoreXrayCoreModule
 import com.material.xray.feature.configviewer.di.FeatureConfigViewerModule
 import com.material.xray.feature.home.di.FeatureHomeModule
 import com.material.xray.feature.logs.di.FeatureLogsModule
 import com.material.xray.feature.routing.di.FeatureRoutingModule
 import com.material.xray.feature.settings.di.FeatureSettingsModule
+import com.material.xray.feature.xraycore.di.FeatureXrayCoreModule
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -56,6 +58,8 @@ import org.koin.core.annotation.Singleton
         FeatureLogsModule::class,
         FeatureSettingsModule::class,
         FeatureConfigViewerModule::class,
+        CoreXrayCoreModule::class,
+        FeatureXrayCoreModule::class,
     ],
 )
 @Configuration

@@ -1,4 +1,4 @@
-package com.material.xray.core.data.xraycore
+package com.material.xray.core.xraycore
 
 import java.io.IOException
 import kotlinx.serialization.json.Json
@@ -21,15 +21,19 @@ data class XrayCoreRelease(
     val assetSha256: String,
 )
 
+/** One page of [fetchXrayCoreReleases]; [hasMore] says whether a later page can hold supported releases. */
+data class XrayCoreReleasePage(val releases: List<XrayCoreRelease>, val hasMore: Boolean)
+
 /**
- * Lists upstream releases straight from GitHub's API. Mirrors are deliberately not used here: the
+ * Lists one page of upstream releases straight from GitHub's API. Pages are small because every
+ * release carries its full changelog: a hundred of them are about 10 MB. Mirrors are deliberately not used here: the
  * checksum this returns is what every later download is verified against, and an Xray executable
  * carries no signature of its own that could catch a mirror serving something else.
  */
-internal fun fetchXrayCoreReleases(client: OkHttpClient, abi: String): List<XrayCoreRelease> {
-    val assetName = xrayReleaseAssetName(abi) ?: return emptyList()
+internal fun fetchXrayCoreReleases(client: OkHttpClient, abi: String, page: Int): XrayCoreReleasePage {
+    val assetName = xrayReleaseAssetName(abi) ?: return XrayCoreReleasePage(emptyList(), hasMore = false)
     val request = Request.Builder()
-        .url("$XRAY_RELEASES_API_URL?per_page=$RELEASES_PER_PAGE")
+        .url("$XRAY_RELEASES_API_URL?per_page=$RELEASES_PER_PAGE&page=$page")
         .header("Accept", "application/vnd.github+json")
         .header("X-GitHub-Api-Version", "2022-11-28")
         .header("User-Agent", XRAY_CORE_USER_AGENT)
@@ -44,19 +48,29 @@ internal fun fetchXrayCoreReleases(client: OkHttpClient, abi: String): List<Xray
     return parseXrayCoreReleases(body, assetName)
 }
 
-internal fun parseXrayCoreReleases(body: String, assetName: String): List<XrayCoreRelease> {
+internal fun parseXrayCoreReleases(body: String, assetName: String, pageSize: Int = RELEASES_PER_PAGE): XrayCoreReleasePage {
     // Any JSON of an unexpected shape, not only malformed JSON, surfaces as IllegalArgumentException.
-    val releases = try {
-        Json.parseToJsonElement(body).jsonArray
-            .map { it.jsonObject }
-            .filterNot { it.boolean("draft") }
-            .mapNotNull { release -> parseRelease(release, assetName) }
+    val (listed, releases) = try {
+        val objects = Json.parseToJsonElement(body).jsonArray.map { it.jsonObject }
+        objects to objects.filterNot { it.boolean("draft") }.mapNotNull { release -> parseRelease(release, assetName) }
     } catch (error: IllegalArgumentException) {
         throw IOException("GitHub releases response was not valid", error)
     }
-    return releases
-        .filter { isSupportedXrayVersion(it.tag) }
-        .sortedWith { left, right -> compareXrayVersions(right.tag, left.tag) ?: right.publishedAt.compareTo(left.publishedAt) }
+    // GitHub lists newest first, so once a page reaches unsupported versions the later ones are too.
+    val reachedUnsupported = listed.any { release ->
+        release.string("tag_name")?.let { compareXrayVersions(it, MINIMUM_XRAY_VERSION) }?.let { it < 0 } == true
+    }
+    return XrayCoreReleasePage(
+        releases = releases
+            .filter { isSupportedXrayVersion(it.tag) }
+            .sortedWith(newestReleaseFirst),
+        hasMore = listed.size >= pageSize && !reachedUnsupported,
+    )
+}
+
+/** Orders releases newest first. */
+val newestReleaseFirst = Comparator<XrayCoreRelease> { left, right ->
+    compareXrayVersions(right.tag, left.tag) ?: right.publishedAt.compareTo(left.publishedAt)
 }
 
 private fun parseRelease(release: JsonObject, assetName: String): XrayCoreRelease? {
@@ -89,6 +103,9 @@ fun xrayReleaseAssetName(abi: String): String? = when (abi) {
     "x86_64" -> "Xray-android-amd64.zip"
     else -> null
 }
+
+/** Whether [version] is at least [LATEST_TESTED_XRAY_VERSION]; the app warns against older cores. */
+fun isRecommendedXrayVersion(version: String): Boolean = (compareXrayVersions(version, LATEST_TESTED_XRAY_VERSION) ?: 0) >= 0
 
 /** Whether [version] is at least [MINIMUM_XRAY_VERSION]. Unparseable versions are not. */
 fun isSupportedXrayVersion(version: String): Boolean = (compareXrayVersions(version, MINIMUM_XRAY_VERSION) ?: -1) >= 0
@@ -129,10 +146,13 @@ private fun JsonObject.boolean(key: String): Boolean = this[key]?.jsonPrimitive?
 /** The oldest release whose Android build adopts a TUN fd and understands every config the app generates. */
 const val MINIMUM_XRAY_VERSION = "v26.1.23"
 
+/** The version the app was last tested with. Older cores still run but are marked as not recommended. */
+const val LATEST_TESTED_XRAY_VERSION = "v26.7.28"
+
 internal const val XRAY_CORE_USER_AGENT = "MaterialXray"
 private const val XRAY_REPOSITORY = "XTLS/Xray-core"
 private const val XRAY_RELEASES_API_URL = "https://api.github.com/repos/$XRAY_REPOSITORY/releases"
-private const val RELEASES_PER_PAGE = 100
+private const val RELEASES_PER_PAGE = 10
 private const val HTTP_FORBIDDEN = 403
 private const val HTTP_TOO_MANY_REQUESTS = 429
 private val SHA256_PATTERN = Regex("[0-9a-f]{64}")

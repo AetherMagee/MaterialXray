@@ -23,6 +23,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -85,15 +86,22 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.runtime.toMutableStateList
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.InputMode
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -122,7 +130,6 @@ import androidx.lifecycle.repeatOnLifecycle
 import com.material.xray.core.android.locale.setAppLocales
 import com.material.xray.core.data.repository.BackupSummary
 import com.material.xray.core.data.repository.SettingsSnapshot
-import com.material.xray.core.data.xraycore.XrayCoreState
 import com.material.xray.core.model.AppUpdateCheckStatus
 import com.material.xray.core.model.AppUpdateInterval
 import com.material.xray.core.model.ConnectionState
@@ -143,6 +150,7 @@ import com.material.xray.core.model.isInProgress
 import com.material.xray.core.runtime.GeoDataAsset
 import com.material.xray.core.runtime.GeoDataDownloadProgress
 import com.material.xray.core.runtime.OemAutostartGuidance
+import com.material.xray.core.runtime.XrayCoreVersion
 import com.material.xray.core.ui.R
 import com.material.xray.core.ui.components.DropdownOption
 import com.material.xray.core.ui.components.FadingOutlinedTextField as OutlinedTextField
@@ -162,27 +170,64 @@ import org.xmlpull.v1.XmlPullParser
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(showTitleBarLogo: Boolean, viewModel: SettingsViewModel = koinViewModel()) {
+fun SettingsScreen(
+    showTitleBarLogo: Boolean,
+    xrayCorePage: OptionalSettingsPage? = null,
+    viewModel: SettingsViewModel = koinViewModel(),
+) {
     val persistedSettings by viewModel.settings.collectAsStateWithLifecycle()
     val settings = persistedSettings
     // Subpages are local state rather than navigation destinations, because the app keeps a single
     // flat graph of tabs. They are drawn over the settings list rather than swapped with it, so the
     // list keeps its scroll position and its event collectors while a subpage is open.
     var subpage by rememberSaveable { mutableStateOf<SettingsSubpage?>(null) }
-    BackHandler(enabled = subpage != null) { subpage = null }
+    val closeSubpage = {
+        if (subpage == SettingsSubpage.XrayCore) viewModel.refreshXrayCoreVersion()
+        subpage = null
+    }
+    BackHandler(enabled = subpage != null, onBack = closeSubpage)
 
     if (settings == null) {
         SettingsLoadingScreen(showTitleBarLogo)
         return
     }
 
+    // With a remote or keyboard, focus follows the page on top: into a subpage when it opens, and
+    // back to the row that opened it when it closes. The list underneath cannot take focus meanwhile.
+    val listFocus = remember { FocusRequester() }
+    val subpageFocus = remember { FocusRequester() }
+    val inputModeManager = LocalInputModeManager.current
+    var subpageWasOpen by remember { mutableStateOf(false) }
+    LaunchedEffect(subpage) {
+        if (inputModeManager.inputMode == InputMode.Keyboard) {
+            when {
+                subpage != null -> {
+                    // Let AnimatedContent compose the page first.
+                    withFrameNanos {}
+                    subpageFocus.requestFocus()
+                }
+                subpageWasOpen -> listFocus.requestFocus()
+            }
+        }
+        subpageWasOpen = subpage != null
+    }
+
     Box {
-        SettingsScreenContent(
-            viewModel = viewModel,
-            settings = settings,
-            onOpenDnsSettings = { subpage = SettingsSubpage.Dns },
-            onOpenXrayCore = { subpage = SettingsSubpage.XrayCore },
-        )
+        Box(
+            modifier = Modifier
+                .focusRequester(listFocus)
+                .focusProperties { onEnter = { if (subpage != null) cancelFocusChange() } }
+                .focusRestorer()
+                .focusGroup(),
+        ) {
+            SettingsScreenContent(
+                viewModel = viewModel,
+                settings = settings,
+                onOpenDnsSettings = { subpage = SettingsSubpage.Dns },
+                xrayCorePage = xrayCorePage,
+                onOpenXrayCore = { subpage = SettingsSubpage.XrayCore },
+            )
+        }
 
         AnimatedContent(
             targetState = subpage,
@@ -191,19 +236,29 @@ fun SettingsScreen(showTitleBarLogo: Boolean, viewModel: SettingsViewModel = koi
             },
             label = "settingsSubpage",
         ) { openSubpage ->
-            when (openSubpage) {
-                SettingsSubpage.Dns -> DnsSettingsScreen(
-                    settings = settings,
-                    viewModel = viewModel,
-                    onBack = { subpage = null },
-                )
-                SettingsSubpage.XrayCore -> XrayCoreScreen(
-                    useRootService = settings.useRootService,
-                    onBack = { subpage = null },
-                )
-                null -> Unit
+            Box(modifier = if (openSubpage == subpage) Modifier.focusRequester(subpageFocus).focusGroup() else Modifier) {
+                SubpageContent(openSubpage, settings, viewModel, xrayCorePage, closeSubpage)
             }
         }
+    }
+}
+
+@Composable
+private fun SubpageContent(
+    openSubpage: SettingsSubpage?,
+    settings: SettingsSnapshot,
+    viewModel: SettingsViewModel,
+    xrayCorePage: OptionalSettingsPage?,
+    closeSubpage: () -> Unit,
+) {
+    when (openSubpage) {
+        SettingsSubpage.Dns -> DnsSettingsScreen(
+            settings = settings,
+            viewModel = viewModel,
+            onBack = closeSubpage,
+        )
+        SettingsSubpage.XrayCore -> xrayCorePage?.content(settings.useRootService, closeSubpage)
+        null -> Unit
     }
 }
 
@@ -218,6 +273,7 @@ private fun SettingsScreenContent(
     viewModel: SettingsViewModel,
     settings: SettingsSnapshot,
     onOpenDnsSettings: () -> Unit,
+    xrayCorePage: OptionalSettingsPage?,
     onOpenXrayCore: () -> Unit,
 ) {
     val rootAvailable by viewModel.rootAvailable.collectAsStateWithLifecycle()
@@ -230,7 +286,7 @@ private fun SettingsScreenContent(
     val geoDataDownloadProgress by viewModel.geoDataDownloadProgress.collectAsStateWithLifecycle()
     val geoDataLastUpdated by viewModel.geoDataLastUpdated.collectAsStateWithLifecycle()
     val geoDataCachedSizes by viewModel.geoDataCachedSizes.collectAsStateWithLifecycle()
-    val xrayCoreState by koinViewModel<XrayCoreViewModel>().state.collectAsStateWithLifecycle()
+    val xrayCoreVersion by viewModel.xrayCoreVersion.collectAsStateWithLifecycle()
     val databaseResetting by viewModel.databaseResetting.collectAsStateWithLifecycle()
     val backupBusy by viewModel.backupBusy.collectAsStateWithLifecycle()
     val backupImportSummary by viewModel.backupImportSummary.collectAsStateWithLifecycle()
@@ -353,7 +409,7 @@ private fun SettingsScreenContent(
     val hasLatencyCheckUrlChanges by remember(editingLatencyCheckUrl, latencyCheckUrl) {
         derivedStateOf { editingLatencyCheckUrl.text.toString().trim() != latencyCheckUrl }
     }
-    val xrayCoreVersionText = xrayCoreVersionText(xrayCoreState)
+    val xrayCoreVersionText = xrayCoreVersionText(xrayCoreVersion)
     val appUpdateCheckInProgress = appUpdateCheckStatus?.isInProgress == true
     val appUpdateCheckDescription = appUpdateCheckStatus?.let { appUpdateCheckDescription(it) }
 
@@ -613,6 +669,17 @@ private fun SettingsScreenContent(
                 }
             }
 
+            if (xrayCorePage != null) {
+                item(key = "xray_core") {
+                    SettingsActionRow(
+                        title = stringResource(R.string.settings_xray_core_title),
+                        subtitle = xrayCorePage.summary(),
+                        navigates = true,
+                        onClick = onOpenXrayCore,
+                    )
+                }
+            }
+
             if (rootServiceActive && rootConnectionBackend == RootConnectionBackend.Tun) {
                 item(key = "tun_name") {
                     Column(
@@ -731,23 +798,6 @@ private fun SettingsScreenContent(
                     subtitle = stringResource(R.string.settings_dns_row_subtitle),
                     navigates = true,
                     onClick = onOpenDnsSettings,
-                )
-            }
-
-            item(key = "xray_core") {
-                val selectedCore = xrayCoreState.installed.firstOrNull { it.id == xrayCoreState.selectedId }
-                SettingsActionRow(
-                    title = stringResource(R.string.settings_xray_core_title),
-                    subtitle = when {
-                        selectedCore != null -> stringResource(R.string.settings_xray_core_row_selected, selectedCore.version)
-                        xrayCoreState.bundledVersion != null -> stringResource(
-                            R.string.settings_xray_core_row_bundled,
-                            xrayCoreState.bundledVersion.orEmpty(),
-                        )
-                        else -> xrayCoreVersionText
-                    },
-                    navigates = true,
-                    onClick = onOpenXrayCore,
                 )
             }
 
@@ -1748,8 +1798,8 @@ private fun SettingsDialogs(
 }
 
 @Composable
-private fun xrayCoreVersionText(state: XrayCoreState): String {
-    val version = state.activeVersion
+private fun xrayCoreVersionText(state: XrayCoreVersion): String {
+    val version = state.version
     return when {
         !state.loaded -> stringResource(R.string.settings_xray_core_version_detecting)
         version == null -> stringResource(R.string.settings_xray_core_version_unknown)

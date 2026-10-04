@@ -514,6 +514,8 @@ dependencies {
     implementation(project(":feature:logs"))
     implementation(project(":feature:settings"))
     implementation(project(":feature:configviewer"))
+    implementation(project(":core:xraycore"))
+    implementation(project(":feature:xraycore"))
 
     implementation(libs.activity.compose)
     implementation(libs.appcompat)

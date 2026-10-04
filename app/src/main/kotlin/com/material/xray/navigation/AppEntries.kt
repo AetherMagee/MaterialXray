@@ -29,7 +29,10 @@ import com.material.xray.feature.routing.RoutingRuleViewerRequest
 import com.material.xray.feature.routing.RoutingRuleViewerScreen
 import com.material.xray.feature.routing.RoutingScreen
 import com.material.xray.feature.routing.RoutingViewModel
+import com.material.xray.feature.settings.OptionalSettingsPage
 import com.material.xray.feature.settings.SettingsScreen
+import com.material.xray.feature.xraycore.XrayCoreScreen
+import com.material.xray.feature.xraycore.xrayCoreSummary
 import kotlinx.serialization.json.Json
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -74,7 +77,7 @@ internal fun appEntryProvider(
         TabChrome(chrome.value) { LogsScreen(settings.value.showTitleBarLogo) }
     }
     entry<SettingsKey> {
-        TabChrome(chrome.value) { SettingsScreen(settings.value.showTitleBarLogo) }
+        TabChrome(chrome.value) { SettingsScreen(settings.value.showTitleBarLogo, xrayCorePage = xrayCoreSettingsPage) }
     }
     entry<ConfigViewerKey> { key ->
         val request = remember(key) { key.request.toConfigViewerRequest() }
@@ -101,3 +104,10 @@ private fun ConfigViewerTarget.toConfigViewerRequest(): ConfigViewerRequest = wh
     ConfigViewerTarget.Running -> ConfigViewerRequest.Running
     is ConfigViewerTarget.Server -> ConfigViewerRequest.Server(serverId, name)
 }
+
+// The Xray core page lives in its own feature so a store build can leave it out: drop this and
+// :feature:xraycore, and Settings shows no row for it.
+private val xrayCoreSettingsPage = OptionalSettingsPage(
+    summary = { xrayCoreSummary() },
+    content = { useRootService, onBack -> XrayCoreScreen(useRootService = useRootService, onBack = onBack) },
+)

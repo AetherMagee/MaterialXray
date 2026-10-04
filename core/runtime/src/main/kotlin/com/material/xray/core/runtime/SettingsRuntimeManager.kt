@@ -27,6 +27,9 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.koin.core.annotation.Singleton
 
+/** The core's version, null once [loaded] when it could not be read. */
+data class XrayCoreVersion(val loaded: Boolean = false, val version: String? = null)
+
 @Singleton
 class SettingsRuntimeManager(
     private val context: Context,
@@ -41,11 +44,15 @@ class SettingsRuntimeManager(
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     private val _rootAvailable = MutableStateFlow<Boolean?>(null)
+    private val _xrayCoreVersion = MutableStateFlow(XrayCoreVersion())
     private val diagnosticsMutex = Mutex()
     private var diagnosticsLoaded = false
     private val geoDataUpdateBatch = GeoDataUpdateBatch(::reloadActiveConnectionIfConnected)
 
     val rootAvailable: StateFlow<Boolean?> = _rootAvailable.asStateFlow()
+
+    /** The version of the core the next connection starts, the bundled one or one the user installed. */
+    val xrayCoreVersion: StateFlow<XrayCoreVersion> = _xrayCoreVersion.asStateFlow()
 
     suspend fun setLauncherIcon(icon: LauncherIcon) {
         settingsRepository.setLauncherIcon(icon)
@@ -94,6 +101,7 @@ class SettingsRuntimeManager(
         if (settingsRepository.useRootService.first() && checkRootAvailability()) {
             detectTproxyCompatibility()
         }
+        refreshXrayCoreVersion()
         diagnosticsLoaded = true
     }
 
@@ -159,6 +167,11 @@ class SettingsRuntimeManager(
             reloadActiveConnectionIfConnected()
         }
         return available
+    }
+
+    /** Rereads [xrayCoreVersion], which changes when the user switches cores. */
+    suspend fun refreshXrayCoreVersion() {
+        _xrayCoreVersion.value = XrayCoreVersion(loaded = true, version = withContext(ioDispatcher) { appXrayBinary(context).readVersion() })
     }
 
     private fun reloadActiveConnectionIfConnected() {
