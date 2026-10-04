@@ -16,7 +16,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
-internal data class XrayHealthWatchdogConfig(
+data class XrayHealthWatchdogConfig(
     val processIntervalMs: Long,
     val tproxyCheckIntervalMs: Long,
     val memoryCheckIntervalMs: Long,
@@ -27,14 +27,14 @@ internal data class XrayHealthWatchdogConfig(
     val checkFailureLogThreshold: Int,
 )
 
-internal interface XrayHealthProbe {
+interface XrayHealthProbe {
     suspend fun isProcessAlive(pid: Int): Boolean
     suspend fun readCrashReason(): String
     suspend fun readProcessResidentMemoryMb(pid: Int): Long?
     suspend fun readXraySysStats(): XraySysStats?
 }
 
-internal class XrayHealthWatchdog(
+class XrayHealthWatchdog(
     private val scope: CoroutineScope,
     private val stateCoordinator: ConnectionStateCoordinator,
     private val healthProbe: XrayHealthProbe,

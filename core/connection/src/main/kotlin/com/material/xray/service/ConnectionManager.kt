@@ -40,7 +40,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 
 @Suppress("LargeClass")
-internal class ConnectionManager(
+class ConnectionManager(
     private val configGenerator: ConfigGenerator,
     private val stateCoordinator: ConnectionStateCoordinator,
     private val log: LogBuffer,
@@ -1750,7 +1750,7 @@ internal class ConnectionManager(
         runtimeState.strategy?.readCrashReason()
     }.getOrNull() ?: "xray process exited"
 
-    internal suspend fun readBalancerSelection(balancerTag: String) = withXrayApiClients {
+    suspend fun readBalancerSelection(balancerTag: String) = withXrayApiClients {
         xrayRoutingClient?.queryBalancerSelection(balancerTag)
     }
 
@@ -1908,7 +1908,7 @@ private fun XrayRuntimeSettings.usesProxyAsRoutingDefault(): Boolean = (routingF
 
 private const val LEGACY_DEFAULT_TUN_NAME = "xray0"
 private const val TPROXY_FULL_AUDIT_INTERVAL_MS = 10 * 60_000L
-internal const val TPROXY_INTERFACE_LABEL = "TPROXY"
+const val TPROXY_INTERFACE_LABEL = "TPROXY"
 private const val CONNECTION_STEP_MAX_RETRIES = 2
 private const val CONNECTION_STEP_RETRY_DELAY_MS = 1_500L
 private const val XRAY_API_READY_TIMEOUT_MS = 10_000L

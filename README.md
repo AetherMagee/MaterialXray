@@ -143,12 +143,12 @@ core/common         Logging, formatting, log buffer, connection state coordinato
 core/root           Root shell and process execution (JVM)
 core/xray           Xray configuration, TUN and routing plans, gRPC stubs (JVM)
 core/network        Link probing, DNS and bundled CA handling (JVM)
-core/connection     Connection lifecycle, health watchdog, routing updaters (JVM)
+core/connection     Connection manager, TUN and TPROXY routing, health watchdog (JVM)
 core/database       Room database, entities, DAOs, migrations and schemas (JVM)
 core/data           Repositories and subscription parsing (JVM)
 core/telemetry      Telemetry events and the client interface (JVM)
 core/android        Android implementations of the JVM modules' platform interfaces, Sentry client
-core/runtime        VpnService, connection manager, workers, tile, native launcher
+core/runtime        VpnService, process supervisors, workers, tile, native launcher
 core/ui             Theme, components, adaptive layout and all resources
 core/navigation     Navigation 3 keys, navigator and scene strategies
 feature/*           One Compose screen tree per tab or destination

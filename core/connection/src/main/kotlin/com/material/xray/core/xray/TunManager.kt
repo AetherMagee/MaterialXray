@@ -304,7 +304,7 @@ class TunManager internal constructor(
         return if (result.isSuccess) RoutingResult(success = true) else result.toRoutingError(command)
     }
 
-    internal fun routingRemovalCommand(
+    fun routingRemovalCommand(
         fwmark: Int,
         routeMark: Int,
         routeTable: Int,

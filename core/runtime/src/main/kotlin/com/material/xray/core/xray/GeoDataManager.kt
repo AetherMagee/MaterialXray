@@ -77,12 +77,6 @@ fun combinedGeoDataDownloadProgress(
     )
 }
 
-data class GeoDataStatus(
-    val geoipUrl: String,
-    val geositeUrl: String,
-    val downloaded: Boolean,
-)
-
 enum class GeoDataAsset(val fileName: String, val displayName: String) {
     GEOIP(GEOIP_FILE_NAME, "GeoIP"),
     GEOSITE(GEOSITE_FILE_NAME, "GeoSite"),

@@ -201,4 +201,4 @@ internal class VpnServiceXrayRuntimeStrategy(
  * Recorded in place of a physical interface by a runtime that has none, so a state file written by
  * an earlier process still identifies which runtime created it.
  */
-internal const val VPN_SERVICE_INTERFACE_LABEL = "VpnService"
+const val VPN_SERVICE_INTERFACE_LABEL = "VpnService"

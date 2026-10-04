@@ -8,7 +8,7 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 
-internal data class ConnectionStep<T>(
+data class ConnectionStep<T>(
     val label: String,
     val progress: ConnectionProgress? = null,
     val telemetryStep: ConnectionTelemetryStep? = null,
@@ -29,7 +29,7 @@ internal data class ConnectionStep<T>(
     }
 }
 
-internal class ConnectionStepExecutor(
+class ConnectionStepExecutor(
     private val elapsedRealtime: () -> Long,
     private val log: (String) -> Unit,
     private val onProgressStarted: (ConnectionProgress) -> Long,

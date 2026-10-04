@@ -16,16 +16,16 @@ sealed interface PhysicalRouteUpdateResult {
     data object RequiresReconnect : PhysicalRouteUpdateResult
 }
 
-internal interface ActiveRoutingStateStore {
+interface ActiveRoutingStateStore {
     suspend fun read(): XrayState?
     suspend fun write(state: XrayState)
 }
 
-internal interface ConnectionStateStore : ActiveRoutingStateStore {
+interface ConnectionStateStore : ActiveRoutingStateStore {
     suspend fun delete()
 }
 
-internal interface ActiveRoutingController {
+interface ActiveRoutingController {
     suspend fun applyAppRoutingChanges(
         connectedState: ConnectionState.Connected,
         tunName: String,
@@ -45,7 +45,7 @@ internal interface ActiveRoutingController {
     ): PhysicalRouteUpdateResult
 }
 
-internal interface TunRoutingGateway {
+interface TunRoutingGateway {
     suspend fun localAddressesChanged(): Boolean = false
 
     suspend fun findAvailableWlanName(): String?
@@ -82,7 +82,7 @@ internal interface TunRoutingGateway {
     ): TunManager.RoutingResult
 }
 
-internal class StateFileRoutingStateStore(
+class StateFileRoutingStateStore(
     private val stateFile: StateFile,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : ConnectionStateStore {
@@ -97,7 +97,7 @@ internal class StateFileRoutingStateStore(
     }
 }
 
-internal class TunManagerRoutingGateway(
+class TunManagerRoutingGateway(
     private val tunManager: TunManager,
 ) : TunRoutingGateway {
     override suspend fun localAddressesChanged(): Boolean = tunManager.localAddressesChanged()
@@ -156,7 +156,7 @@ internal class TunManagerRoutingGateway(
     ): TunManager.RoutingResult = tunManager.replacePhysicalBypassRoute(bypassTable, physicalRoute)
 }
 
-internal class ActiveRoutingUpdater(
+class ActiveRoutingUpdater(
     private val appUidProvider: () -> Int,
     private val tunGateway: TunRoutingGateway,
     private val stateStore: ActiveRoutingStateStore,

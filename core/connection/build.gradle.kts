@@ -8,6 +8,9 @@ dependencies {
     implementation(project(":core:xray"))
     implementation(project(":core:network"))
     implementation(project(":core:root"))
+    implementation(project(":core:database"))
+    implementation(project(":core:data"))
+    implementation(project(":core:telemetry"))
 
     implementation(libs.coroutines.core)
     implementation(libs.serialization.json)

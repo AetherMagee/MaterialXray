@@ -17,7 +17,7 @@ import org.koin.core.annotation.Singleton
  * Whether a verdict is a real statement about the kernel. A denied root shell, a timeout or a foreign
  * rule conflict says nothing about TPROXY support, so it must not be used to demote the user's backend.
  */
-internal fun TproxyCompatibility.isConclusive(): Boolean = when (this) {
+fun TproxyCompatibility.isConclusive(): Boolean = when (this) {
     is TproxyCompatibility.Supported -> true
     is TproxyCompatibility.Unsupported -> when (reason) {
         TproxyCompatibility.Reason.IptablesMangleUnavailable,

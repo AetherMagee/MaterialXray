@@ -15,7 +15,7 @@ import com.material.xray.data.db.entity.routeAssignment
 import com.material.xray.data.repository.ServerRepository
 import com.material.xray.model.ServerConfig
 
-internal data class AppRoutingPlan(
+data class AppRoutingPlan(
     val directUids: Set<Int>,
     val proxyRoutes: List<AppProxyRoute>,
     val tunRoutes: List<TunManager.AppTunRoute>,
@@ -23,7 +23,7 @@ internal data class AppRoutingPlan(
     val routeProfileIds: Set<Int>,
 )
 
-internal interface RoutingPlanBuilder {
+interface RoutingPlanBuilder {
     suspend fun build(
         baseRouteTable: Int,
         includeProxyRoutes: Boolean,
@@ -34,7 +34,7 @@ internal interface RoutingPlanBuilder {
     ): AppRoutingPlan
 }
 
-internal class AppRoutingPlanner(
+class AppRoutingPlanner(
     private val appBypassDao: AppBypassDao,
     private val serverRepository: ServerRepository,
     private val appInventory: AppInventorySource,

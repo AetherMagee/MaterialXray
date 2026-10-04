@@ -1,7 +1,7 @@
 package com.material.xray.service
 
 /** A user-facing reason a connection failed; the platform turns it into localized text. */
-internal sealed interface ConnectionError {
+sealed interface ConnectionError {
     data object Unknown : ConnectionError
 
     data object VpnPermissionRequired : ConnectionError

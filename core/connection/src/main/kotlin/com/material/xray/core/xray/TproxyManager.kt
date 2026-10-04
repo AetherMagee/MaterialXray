@@ -395,7 +395,7 @@ class TproxyManager internal constructor(
         }.shellAnd()
     }
 
-    internal companion object {
+    companion object {
         const val SLOT_A = "a"
         const val SLOT_B = "b"
 
