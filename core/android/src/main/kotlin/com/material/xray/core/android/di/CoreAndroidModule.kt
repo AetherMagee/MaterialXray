@@ -13,5 +13,5 @@ import org.koin.core.annotation.Singleton
 class CoreAndroidModule {
     // The mirror is a plain file in the JVM module; only the platform knows the no-backup directory.
     @Singleton(binds = [DiagnosticsConsentMirroring::class])
-    fun diagnosticsConsentMirror(context: Context): DiagnosticsConsentMirror = diagnosticsConsentMirror(context)
+    fun provideDiagnosticsConsentMirror(context: Context): DiagnosticsConsentMirror = diagnosticsConsentMirror(context)
 }
