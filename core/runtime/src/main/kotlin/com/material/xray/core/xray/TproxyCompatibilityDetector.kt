@@ -1,7 +1,6 @@
 package com.material.xray.core.xray
 
-import android.content.Context
-import android.os.Build
+import com.material.xray.core.common.platform.PlatformInfo
 import com.material.xray.core.root.RootShell
 import com.material.xray.core.root.shellQuote
 import com.material.xray.core.xray.FirewallCommands.IPV4 as IPTABLES
@@ -47,11 +46,11 @@ internal fun TproxyCompatibility.isConclusive(): Boolean = when (this) {
 @Singleton
 class TproxyCompatibilityDetector(
     private val shell: RootShell,
-    context: Context,
+    private val platformInfo: PlatformInfo,
+    private val cache: TproxyCompatibilityCache,
     private val telemetryReporter: TelemetryReporter,
 ) {
-    private val appUid = context.applicationInfo.uid
-    private val preferences = context.getSharedPreferences(CACHE_PREFERENCES_NAME, Context.MODE_PRIVATE)
+    private val appUid = platformInfo.uid
     private val mutex = Mutex()
     private var probed = false
     private val _state = MutableStateFlow<TproxyCompatibility>(TproxyCompatibility.Unknown)
@@ -91,17 +90,11 @@ class TproxyCompatibilityDetector(
         }
     }
 
-    private fun readCachedCompatibility(): TproxyCompatibility? {
-        if (preferences.getString(CACHE_FINGERPRINT_KEY, null) != Build.FINGERPRINT) return null
-        return decodeCachedTproxyCompatibility(preferences.getString(CACHE_RESULT_KEY, null))
-    }
+    private fun readCachedCompatibility(): TproxyCompatibility? = decodeCachedTproxyCompatibility(cache.read(platformInfo.buildFingerprint))
 
     private fun cacheCompatibility(result: TproxyCompatibility) {
         val encoded = encodeCachedTproxyCompatibility(result) ?: return
-        preferences.edit()
-            .putString(CACHE_FINGERPRINT_KEY, Build.FINGERPRINT)
-            .putString(CACHE_RESULT_KEY, encoded)
-            .apply()
+        cache.write(platformInfo.buildFingerprint, encoded)
     }
 
     private suspend fun runDetection(): TproxyCompatibility {
@@ -201,9 +194,6 @@ class TproxyCompatibilityDetector(
         private const val PROBE_PRIORITY_SLOTS = 8
         private const val PROBE_TIMEOUT_MS = 15_000L
         private const val MARK_CONFLICT_EXIT_CODE = 42
-        private const val CACHE_PREFERENCES_NAME = "tproxy-compatibility"
-        private const val CACHE_FINGERPRINT_KEY = "build-fingerprint"
-        private const val CACHE_RESULT_KEY = "result"
 
         fun markCollisionCommand(appUid: Int): String {
             require(appUid > 0)

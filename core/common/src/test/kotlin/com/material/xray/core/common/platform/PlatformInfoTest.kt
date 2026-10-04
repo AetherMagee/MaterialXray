@@ -14,6 +14,8 @@ class PlatformInfoTest {
         override val model: String = "Pixel 8",
         override val device: String = "shiba",
         override val processId: Int = 1234,
+        override val uid: Int = 10123,
+        override val buildFingerprint: String = "google/shiba/shiba:14",
     ) : PlatformInfo
 
     @Test

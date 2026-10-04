@@ -15,6 +15,7 @@ import com.material.xray.core.android.xray.AndroidLocalSockets
 import com.material.xray.core.android.xray.AndroidPlatformDns
 import com.material.xray.core.android.xray.AndroidVpnTransportProbe
 import com.material.xray.core.android.xray.AndroidXrayPaths
+import com.material.xray.core.android.xray.SharedPreferencesTproxyCompatibilityCache
 import com.material.xray.core.app.AppInventory
 import com.material.xray.core.app.AppInventorySource
 import com.material.xray.core.common.connection.AppUpdateScheduling
@@ -33,6 +34,7 @@ import com.material.xray.core.network.NetworkLinkProbe
 import com.material.xray.core.xray.GeoDataUrlSettings
 import com.material.xray.core.xray.LocalSockets
 import com.material.xray.core.xray.PlatformDns
+import com.material.xray.core.xray.TproxyCompatibilityCache
 import com.material.xray.core.xray.VpnTransportProbe
 import com.material.xray.core.xray.XrayPaths
 import com.material.xray.data.parser.SubscriptionDeviceIdentity
@@ -117,6 +119,7 @@ class KoinGraphTest {
             PlatformInfo::class to AndroidPlatformInfo::class,
             MonotonicClock::class to ElapsedRealtimeClock::class,
             XrayPaths::class to AndroidXrayPaths::class,
+            TproxyCompatibilityCache::class to SharedPreferencesTproxyCompatibilityCache::class,
             LocalSockets::class to AndroidLocalSockets::class,
             PlatformDns::class to AndroidPlatformDns::class,
             VpnTransportProbe::class to AndroidVpnTransportProbe::class,

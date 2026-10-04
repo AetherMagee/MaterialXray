@@ -15,4 +15,6 @@ class AndroidPlatformInfo : PlatformInfo {
     override val model: String get() = Build.MODEL.orEmpty()
     override val device: String get() = Build.DEVICE.orEmpty()
     override val processId: Int get() = Process.myPid()
+    override val uid: Int get() = Process.myUid()
+    override val buildFingerprint: String get() = Build.FINGERPRINT.orEmpty()
 }

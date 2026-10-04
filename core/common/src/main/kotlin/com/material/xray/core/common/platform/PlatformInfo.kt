@@ -29,6 +29,12 @@ interface PlatformInfo {
     /** Id of the current process (`Process.myPid()`). */
     val processId: Int
 
+    /** The app's Linux uid (`Process.myUid()`), which root firewall rules match; -1 off Android. */
+    val uid: Int
+
+    /** Identifies the installed OS build (`Build.FINGERPRINT`), for caches of kernel or ROM facts. */
+    val buildFingerprint: String
+
     companion object {
         /**
          * [sdkInt] on a host that is not Android. Above every API level, so [atLeast] holds: the
@@ -59,4 +65,6 @@ object JvmPlatformInfo : PlatformInfo {
 
     // ProcessHandle does not exist on Android; the getter defers it until asked.
     override val processId: Int get() = ProcessHandle.current().pid().toInt()
+    override val uid: Int get() = -1
+    override val buildFingerprint: String get() = "$osName/$osVersion"
 }
