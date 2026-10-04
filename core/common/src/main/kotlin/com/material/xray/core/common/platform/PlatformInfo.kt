@@ -35,6 +35,9 @@ interface PlatformInfo {
     /** Identifies the installed OS build (`Build.FINGERPRINT`), for caches of kernel or ROM facts. */
     val buildFingerprint: String
 
+    /** The device's preferred ABI (`Build.SUPPORTED_ABIS[0]`), such as `arm64-v8a`; blank off Android. */
+    val primaryAbi: String
+
     companion object {
         /**
          * [sdkInt] on a host that is not Android. Above every API level, so [atLeast] holds: the
@@ -67,4 +70,5 @@ object JvmPlatformInfo : PlatformInfo {
     override val processId: Int get() = ProcessHandle.current().pid().toInt()
     override val uid: Int get() = -1
     override val buildFingerprint: String get() = "$osName/$osVersion"
+    override val primaryAbi: String get() = ""
 }

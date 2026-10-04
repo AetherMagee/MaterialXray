@@ -68,7 +68,7 @@ jobs:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
         run: ./gradlew --stacktrace app:assembleRelease
 
-      - name: Prepare release APK artifact
+      - name: Prepare release APK artifacts
         id: artifact
         shell: bash
         run: |
@@ -80,12 +80,18 @@ jobs:
           fi
 
           short_sha="${GITHUB_SHA::7}"
-          apk_name="MaterialXray-v${version_name}-${short_sha}.apk"
-          apk_path="app/build/outputs/apk/release/${apk_name}"
-          cp app/build/outputs/apk/release/app-release.apk "$apk_path"
+          apk_base="MaterialXray-v${version_name}-${short_sha}"
+          apk_dir="app/build/outputs/apk/release/dist"
+          mkdir -p "$apk_dir"
+          # GitHub lists release assets by name and older updaters take the first APK, so the
+          # universal one keeps the plain name and per-ABI ones add ".<abi>" before ".apk".
+          cp app/build/outputs/apk/release/app-universal-release.apk "$apk_dir/${apk_base}.apk"
+          for abi in arm64-v8a x86_64 armeabi-v7a; do
+            cp "app/build/outputs/apk/release/app-${abi}-release.apk" "$apk_dir/${apk_base}.${abi}.apk"
+          done
 
-          echo "apk_name=$apk_name" >> "$GITHUB_OUTPUT"
-          echo "apk_path=$apk_path" >> "$GITHUB_OUTPUT"
+          echo "apk_base=$apk_base" >> "$GITHUB_OUTPUT"
+          echo "apk_dir=$apk_dir" >> "$GITHUB_OUTPUT"
           echo "version_tag=v$version_name" >> "$GITHUB_OUTPUT"
 
       - name: Prepare Xray corresponding source
@@ -104,14 +110,14 @@ jobs:
         uses: actions/attest@v4
         with:
           subject-path: |
-            ${{ steps.artifact.outputs.apk_path }}
+            ${{ steps.artifact.outputs.apk_dir }}/*.apk
             ${{ steps.xray-source.outputs.source_path }}
 
-      - name: Upload release APK
+      - name: Upload release APKs
         uses: actions/upload-artifact@v7
         with:
-          name: ${{ steps.artifact.outputs.apk_name }}
-          path: ${{ steps.artifact.outputs.apk_path }}
+          name: ${{ steps.artifact.outputs.apk_base }}
+          path: ${{ steps.artifact.outputs.apk_dir }}/*.apk
           if-no-files-found: error
 
       - name: Upload Xray corresponding source
@@ -125,12 +131,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION_TAG: ${{ steps.artifact.outputs.version_tag }}
-          APK_PATH: ${{ steps.artifact.outputs.apk_path }}
-          APK_NAME: ${{ steps.artifact.outputs.apk_name }}
+          APK_DIR: ${{ steps.artifact.outputs.apk_dir }}
           XRAY_SOURCE_PATH: ${{ steps.xray-source.outputs.source_path }}
           XRAY_SOURCE_NAME: ${{ steps.xray-source.outputs.source_name }}
         run: |
           set -euo pipefail
+          assets=("$APK_DIR"/*.apk "$XRAY_SOURCE_PATH#${XRAY_SOURCE_NAME}")
           if gh release view "$VERSION_TAG" >/dev/null 2>&1; then
             git fetch --no-tags origin "refs/tags/${VERSION_TAG}:refs/tags/${VERSION_TAG}"
             tag_commit="$(git rev-list -n 1 "$VERSION_TAG")"
@@ -138,14 +144,9 @@ jobs:
               echo "$VERSION_TAG already points to $tag_commit, not $GITHUB_SHA" >&2
               exit 1
             fi
-            gh release upload "$VERSION_TAG" \
-              "$APK_PATH#${APK_NAME}" \
-              "$XRAY_SOURCE_PATH#${XRAY_SOURCE_NAME}" \
-              --clobber
+            gh release upload "$VERSION_TAG" "${assets[@]}" --clobber
           else
-            gh release create "$VERSION_TAG" \
-              "$APK_PATH#${APK_NAME}" \
-              "$XRAY_SOURCE_PATH#${XRAY_SOURCE_NAME}" \
+            gh release create "$VERSION_TAG" "${assets[@]}" \
               --target "$GITHUB_SHA" \
               --title "$VERSION_TAG" \
               --generate-notes

@@ -16,6 +16,7 @@ class PlatformInfoTest {
         override val processId: Int = 1234,
         override val uid: Int = 10123,
         override val buildFingerprint: String = "google/shiba/shiba:14",
+        override val primaryAbi: String = "arm64-v8a",
     ) : PlatformInfo
 
     @Test

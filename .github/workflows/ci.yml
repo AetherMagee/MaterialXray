@@ -49,5 +49,5 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: MaterialXray-debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+          path: app/build/outputs/apk/debug/app-universal-debug.apk
           if-no-files-found: error

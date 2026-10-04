@@ -1,5 +1,7 @@
 package com.material.xray.core.data.repository
 
+import com.material.xray.core.common.platform.JvmPlatformInfo
+import com.material.xray.core.common.platform.PlatformInfo
 import com.material.xray.core.model.AppUpdateCheckStatus
 import com.material.xray.core.network.DirectHttpClient
 import java.io.IOException
@@ -31,7 +33,7 @@ class GitHubReleaseFetcherTest {
             )
             .build()
 
-        val release = GitHubReleaseFetcher(DirectHttpClient(client)).fetchLatestRelease("0.5.0")
+        val release = fetcher(client).fetchLatestRelease("0.5.0")
 
         assertEquals("v0.6.0", release.tagName)
         assertEquals(APK_URL, release.apkDownloadUrl)
@@ -58,7 +60,7 @@ class GitHubReleaseFetcherTest {
         var failure: IOException? = null
 
         try {
-            GitHubReleaseFetcher(DirectHttpClient(client)).fetchLatestRelease("0.5.0")
+            fetcher(client).fetchLatestRelease("0.5.0")
         } catch (error: IOException) {
             failure = error
         }
@@ -82,7 +84,7 @@ class GitHubReleaseFetcherTest {
         var failure: IOException? = null
 
         try {
-            GitHubReleaseFetcher(DirectHttpClient(client)).fetchLatestRelease("0.5.0")
+            fetcher(client).fetchLatestRelease("0.5.0")
         } catch (error: IOException) {
             failure = error
         }
@@ -113,7 +115,7 @@ class GitHubReleaseFetcherTest {
             .build()
         val statuses = mutableListOf<AppUpdateCheckStatus>()
 
-        val release = GitHubReleaseFetcher(DirectHttpClient(client)).fetchLatestRelease("0.5.0") { statuses += it }
+        val release = fetcher(client).fetchLatestRelease("0.5.0") { statuses += it }
 
         assertEquals("v0.6.0", release.tagName)
         assertEquals(APK_URL, release.apkDownloadUrl)
@@ -153,7 +155,7 @@ class GitHubReleaseFetcherTest {
             .build()
         val statuses = mutableListOf<AppUpdateCheckStatus>()
 
-        GitHubReleaseFetcher(DirectHttpClient(client)).fetchLatestRelease("0.5.0") { statuses += it }
+        fetcher(client).fetchLatestRelease("0.5.0") { statuses += it }
 
         assertEquals(
             listOf(
@@ -190,7 +192,7 @@ class GitHubReleaseFetcherTest {
             .build()
         val statuses = mutableListOf<AppUpdateCheckStatus>()
 
-        GitHubReleaseFetcher(DirectHttpClient(client)).fetchLatestRelease("0.5.0") { statuses += it }
+        fetcher(client).fetchLatestRelease("0.5.0") { statuses += it }
 
         assertEquals(
             listOf(
@@ -205,6 +207,36 @@ class GitHubReleaseFetcherTest {
             statuses,
         )
     }
+
+    @Test
+    fun picksApkForPrimaryAbi() = runTest {
+        assertEquals(ARM64_APK_URL, fetchSplitRelease(abiPlatform("arm64-v8a")).apkDownloadUrl)
+        assertEquals(X86_64_APK_URL, fetchSplitRelease(abiPlatform("x86_64")).apkDownloadUrl)
+    }
+
+    @Test
+    fun fallsBackToUniversalApkWithoutMatchingAbi() = runTest {
+        assertEquals(APK_URL, fetchSplitRelease(abiPlatform("x86")).apkDownloadUrl)
+        assertEquals(APK_URL, fetchSplitRelease(JvmPlatformInfo).apkDownloadUrl)
+    }
+
+    private suspend fun fetchSplitRelease(platformInfo: PlatformInfo): GitHubRelease {
+        val client = OkHttpClient.Builder()
+            .addInterceptor(
+                Interceptor { chain ->
+                    val isRepository = chain.request().url.encodedPath == "/repositories/1208039570"
+                    response(chain, 200, if (isRepository) REPOSITORY_JSON else SPLIT_RELEASE_JSON)
+                },
+            )
+            .build()
+        return fetcher(client, platformInfo).fetchLatestRelease("0.5.0")
+    }
+
+    private fun abiPlatform(abi: String): PlatformInfo = object : PlatformInfo by JvmPlatformInfo {
+        override val primaryAbi: String = abi
+    }
+
+    private fun fetcher(client: OkHttpClient, platformInfo: PlatformInfo = JvmPlatformInfo) = GitHubReleaseFetcher(DirectHttpClient(client), platformInfo)
 
     private fun response(
         chain: Interceptor.Chain,
@@ -221,8 +253,17 @@ class GitHubReleaseFetcherTest {
     private companion object {
         const val APK_URL =
             "https://github.com/AetherMagee/MaterialXray/releases/download/v0.6.0/MaterialXray-v0.6.0.apk"
+        const val ARM64_APK_URL =
+            "https://github.com/AetherMagee/MaterialXray/releases/download/v0.6.0/MaterialXray-v0.6.0.arm64-v8a.apk"
+        const val X86_64_APK_URL =
+            "https://github.com/AetherMagee/MaterialXray/releases/download/v0.6.0/MaterialXray-v0.6.0.x86_64.apk"
         const val REPOSITORY_JSON = "{\"id\":1208039570,\"full_name\":\"AetherMagee/MaterialXray\"}"
         const val RELEASE_JSON = "{\"tag_name\":\"v0.6.0\",\"assets\":[{\"browser_download_url\":\"$APK_URL\"}]}"
+        const val SPLIT_RELEASE_JSON =
+            "{\"tag_name\":\"v0.6.0\",\"assets\":[" +
+                "{\"browser_download_url\":\"$APK_URL\"}," +
+                "{\"browser_download_url\":\"$ARM64_APK_URL\"}," +
+                "{\"browser_download_url\":\"$X86_64_APK_URL\"}]}"
         const val FOREIGN_RELEASE_JSON =
             "{\"tag_name\":\"v0.6.0\",\"assets\":[{\"browser_download_url\":" +
                 "\"https://github.com/attacker/MaterialXray/releases/download/v0.6.0/update.apk\"}]}"

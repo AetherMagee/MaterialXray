@@ -396,9 +396,16 @@ android {
         targetSdk = 36
         versionCode = 940
         versionName = "0.9.4"
+    }
 
-        ndk {
-            abiFilters += listOf("arm64-v8a", "x86_64", "armeabi-v7a")
+    // A universal APK plus one per ABI, all with the same versionCode so an install can move
+    // between them. The release workflow names them so GitHub lists the universal one first.
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("arm64-v8a", "x86_64", "armeabi-v7a")
+            isUniversalApk = true
         }
     }
 
@@ -428,6 +435,9 @@ android {
             // Xray ships stripped; packaging it untouched keeps the APK's copy byte-identical to
             // the official executable CHECKSUMS.sha256 lists.
             keepDebugSymbols += "**/libxray.so"
+            // Splits do not filter the universal APK. Libraries that bring an x86 build would add a
+            // lib/x86 without Xray, which an x86 device would pick over the ARM translation layer.
+            excludes += "lib/x86/**"
         }
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"

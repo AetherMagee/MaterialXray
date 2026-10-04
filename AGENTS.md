@@ -25,7 +25,7 @@
 - App startup is `MaterialXrayApp` for Koin and scheduled subscription refresh, then `MainActivity` -> `MaterialXrayTheme` -> `MainNavigation`.
 
 ## Native Assets
-- The APK is universal: arm64-v8a, x86_64 and armeabi-v7a. Both modes run an Android Xray build as `libxray.so` from `nativeLibraryDir`.
+- Builds produce a universal APK plus one per ABI: arm64-v8a, x86_64 and armeabi-v7a. Releases publish all four; the updater picks the one for the device's primary ABI. Both modes run an Android Xray build as `libxray.so` from `nativeLibraryDir`.
 - No Xray binary is committed, so building an APK needs network access once per Xray version:
   - `downloadXray` fetches upstream's arm64-v8a and x86_64 Android builds for `third_party/xray/VERSION` and fails unless the archive and executable match `third_party/xray/CHECKSUMS.sha256`.
   - `buildXray` compiles armeabi-v7a, which upstream does not publish for Android, from `third_party/xray/COMMIT` with upstream's Android flags and the Go toolchain in `third_party/xray/GO_TOOLCHAIN`. It needs Go 1.21+ on `PATH` (Go fetches the pinned toolchain) and takes about a minute on a cold cache.

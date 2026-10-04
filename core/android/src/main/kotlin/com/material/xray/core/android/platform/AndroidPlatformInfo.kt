@@ -17,4 +17,5 @@ class AndroidPlatformInfo : PlatformInfo {
     override val processId: Int get() = Process.myPid()
     override val uid: Int get() = Process.myUid()
     override val buildFingerprint: String get() = Build.FINGERPRINT.orEmpty()
+    override val primaryAbi: String get() = Build.SUPPORTED_ABIS.firstOrNull().orEmpty()
 }

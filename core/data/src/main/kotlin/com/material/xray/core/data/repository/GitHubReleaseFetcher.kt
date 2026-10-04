@@ -1,5 +1,6 @@
 package com.material.xray.core.data.repository
 
+import com.material.xray.core.common.platform.PlatformInfo
 import com.material.xray.core.model.AppUpdateCheckStatus
 import com.material.xray.core.network.AppHttpClient
 import java.io.IOException
@@ -26,6 +27,7 @@ data class GitHubRelease(
 @Singleton
 class GitHubReleaseFetcher(
     private val httpClient: AppHttpClient,
+    private val platformInfo: PlatformInfo,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     private val json = Json { ignoreUnknownKeys = true }
@@ -155,16 +157,20 @@ class GitHubReleaseFetcher(
                 message = "GitHub release response did not include a tag",
                 statusCode = statusCode,
             )
-        val apkDownloadUrl = release["assets"]
+        val apkUrls = release["assets"]
             ?.jsonArray
-            ?.asSequence()
             ?.mapNotNull { asset ->
                 asset.jsonObject["browser_download_url"]
                     ?.jsonPrimitive
                     ?.contentOrNull
                     ?.takeIf { isOfficialApkUrl(it, repositoryFullName) }
             }
-            ?.firstOrNull()
+            .orEmpty()
+        // Releases ship `<name>.apk` for every ABI and `<name>.<abi>.apk` per ABI. GitHub lists
+        // assets by name, so the universal APK comes first, which is also what older clients take.
+        val abiApkSuffix = platformInfo.primaryAbi.takeIf(String::isNotEmpty)?.let { ".$it.apk" }
+        val apkDownloadUrl = apkUrls.firstOrNull { abiApkSuffix != null && it.endsWith(abiApkSuffix) }
+            ?: apkUrls.firstOrNull()
             ?: throw InvalidReleaseResponseException(
                 message = "GitHub release response did not include an APK",
                 statusCode = statusCode,
