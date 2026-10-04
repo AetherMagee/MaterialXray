@@ -122,6 +122,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import com.material.xray.core.android.locale.setAppLocales
 import com.material.xray.core.data.repository.BackupSummary
 import com.material.xray.core.data.repository.SettingsSnapshot
+import com.material.xray.core.data.xraycore.XrayCoreState
 import com.material.xray.core.model.AppUpdateCheckStatus
 import com.material.xray.core.model.AppUpdateInterval
 import com.material.xray.core.model.ConnectionState
@@ -164,11 +165,11 @@ import org.xmlpull.v1.XmlPullParser
 fun SettingsScreen(showTitleBarLogo: Boolean, viewModel: SettingsViewModel = koinViewModel()) {
     val persistedSettings by viewModel.settings.collectAsStateWithLifecycle()
     val settings = persistedSettings
-    // The DNS subpage is local state rather than a navigation destination, because the app keeps a
-    // single flat graph of tabs. It is drawn over the settings list rather than swapped with it, so
-    // the list keeps its scroll position and its event collectors while the subpage is open.
-    var showDnsSettings by rememberSaveable { mutableStateOf(false) }
-    BackHandler(enabled = showDnsSettings) { showDnsSettings = false }
+    // Subpages are local state rather than navigation destinations, because the app keeps a single
+    // flat graph of tabs. They are drawn over the settings list rather than swapped with it, so the
+    // list keeps its scroll position and its event collectors while a subpage is open.
+    var subpage by rememberSaveable { mutableStateOf<SettingsSubpage?>(null) }
+    BackHandler(enabled = subpage != null) { subpage = null }
 
     if (settings == null) {
         SettingsLoadingScreen(showTitleBarLogo)
@@ -179,26 +180,34 @@ fun SettingsScreen(showTitleBarLogo: Boolean, viewModel: SettingsViewModel = koi
         SettingsScreenContent(
             viewModel = viewModel,
             settings = settings,
-            onOpenDnsSettings = { showDnsSettings = true },
+            onOpenDnsSettings = { subpage = SettingsSubpage.Dns },
+            onOpenXrayCore = { subpage = SettingsSubpage.XrayCore },
         )
 
         AnimatedContent(
-            targetState = showDnsSettings,
+            targetState = subpage,
             transitionSpec = {
                 fadeIn(tween(SUBPAGE_FADE_MS)) togetherWith fadeOut(tween(SUBPAGE_FADE_MS)) using null
             },
-            label = "dnsSettings",
-        ) { dnsSettingsOpen ->
-            if (dnsSettingsOpen) {
-                DnsSettingsScreen(
+            label = "settingsSubpage",
+        ) { openSubpage ->
+            when (openSubpage) {
+                SettingsSubpage.Dns -> DnsSettingsScreen(
                     settings = settings,
                     viewModel = viewModel,
-                    onBack = { showDnsSettings = false },
+                    onBack = { subpage = null },
                 )
+                SettingsSubpage.XrayCore -> XrayCoreScreen(
+                    useRootService = settings.useRootService,
+                    onBack = { subpage = null },
+                )
+                null -> Unit
             }
         }
     }
 }
+
+private enum class SettingsSubpage { Dns, XrayCore }
 
 private const val SUBPAGE_FADE_MS = 180
 
@@ -209,6 +218,7 @@ private fun SettingsScreenContent(
     viewModel: SettingsViewModel,
     settings: SettingsSnapshot,
     onOpenDnsSettings: () -> Unit,
+    onOpenXrayCore: () -> Unit,
 ) {
     val rootAvailable by viewModel.rootAvailable.collectAsStateWithLifecycle()
     val tproxyCompatibility by viewModel.tproxyCompatibility.collectAsStateWithLifecycle()
@@ -220,7 +230,7 @@ private fun SettingsScreenContent(
     val geoDataDownloadProgress by viewModel.geoDataDownloadProgress.collectAsStateWithLifecycle()
     val geoDataLastUpdated by viewModel.geoDataLastUpdated.collectAsStateWithLifecycle()
     val geoDataCachedSizes by viewModel.geoDataCachedSizes.collectAsStateWithLifecycle()
-    val xrayCoreVersion by viewModel.xrayCoreVersion.collectAsStateWithLifecycle()
+    val xrayCoreState by koinViewModel<XrayCoreViewModel>().state.collectAsStateWithLifecycle()
     val databaseResetting by viewModel.databaseResetting.collectAsStateWithLifecycle()
     val backupBusy by viewModel.backupBusy.collectAsStateWithLifecycle()
     val backupImportSummary by viewModel.backupImportSummary.collectAsStateWithLifecycle()
@@ -343,7 +353,7 @@ private fun SettingsScreenContent(
     val hasLatencyCheckUrlChanges by remember(editingLatencyCheckUrl, latencyCheckUrl) {
         derivedStateOf { editingLatencyCheckUrl.text.toString().trim() != latencyCheckUrl }
     }
-    val xrayCoreVersionText = xrayCoreVersionText(xrayCoreVersion)
+    val xrayCoreVersionText = xrayCoreVersionText(xrayCoreState)
     val appUpdateCheckInProgress = appUpdateCheckStatus?.isInProgress == true
     val appUpdateCheckDescription = appUpdateCheckStatus?.let { appUpdateCheckDescription(it) }
 
@@ -721,6 +731,23 @@ private fun SettingsScreenContent(
                     subtitle = stringResource(R.string.settings_dns_row_subtitle),
                     navigates = true,
                     onClick = onOpenDnsSettings,
+                )
+            }
+
+            item(key = "xray_core") {
+                val selectedCore = xrayCoreState.installed.firstOrNull { it.id == xrayCoreState.selectedId }
+                SettingsActionRow(
+                    title = stringResource(R.string.settings_xray_core_title),
+                    subtitle = when {
+                        selectedCore != null -> stringResource(R.string.settings_xray_core_row_selected, selectedCore.version)
+                        xrayCoreState.bundledVersion != null -> stringResource(
+                            R.string.settings_xray_core_row_bundled,
+                            xrayCoreState.bundledVersion.orEmpty(),
+                        )
+                        else -> xrayCoreVersionText
+                    },
+                    navigates = true,
+                    onClick = onOpenXrayCore,
                 )
             }
 
@@ -1721,10 +1748,13 @@ private fun SettingsDialogs(
 }
 
 @Composable
-private fun xrayCoreVersionText(xrayCoreVersion: String?): String = when (xrayCoreVersion) {
-    null -> stringResource(R.string.settings_xray_core_version_detecting)
-    "unknown" -> stringResource(R.string.settings_xray_core_version_unknown)
-    else -> stringResource(R.string.settings_xray_core_version, xrayCoreVersion)
+private fun xrayCoreVersionText(state: XrayCoreState): String {
+    val version = state.activeVersion
+    return when {
+        !state.loaded -> stringResource(R.string.settings_xray_core_version_detecting)
+        version == null -> stringResource(R.string.settings_xray_core_version_unknown)
+        else -> stringResource(R.string.settings_xray_core_version, version)
+    }
 }
 
 @Composable

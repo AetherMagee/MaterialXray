@@ -125,7 +125,6 @@ class SettingsViewModel(
     val backupEvents: Flow<BackupOperationMessage> = _backupEvents.receiveAsFlow()
     val rootAvailable: StateFlow<Boolean?> = settingsRuntimeManager.rootAvailable
     val tproxyCompatibility: StateFlow<TproxyCompatibility> = settingsRuntimeManager.tproxyCompatibility
-    val xrayCoreVersion: StateFlow<String?> = settingsRuntimeManager.xrayCoreVersion
     val appUpdateCheckStatus: StateFlow<AppUpdateCheckStatus?> = _appUpdateCheckStatus.asStateFlow()
     val oemAutostartGuidance = oemAutostartManager.guidance
 

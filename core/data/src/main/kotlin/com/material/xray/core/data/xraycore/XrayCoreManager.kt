@@ -1,6 +1,8 @@
 package com.material.xray.core.data.xraycore
 
 import com.material.xray.core.common.di.ApplicationScope
+import com.material.xray.core.common.log.LogBuffer
+import com.material.xray.core.common.log.LogSource
 import com.material.xray.core.common.platform.PlatformInfo
 import com.material.xray.core.data.repository.githubMirrorUrls
 import com.material.xray.core.network.AppHttpClient
@@ -41,6 +43,8 @@ sealed interface XrayCoreOperation {
 }
 
 data class XrayCoreState(
+    /** Whether the bundled core's version and the installed cores have been read. */
+    val loaded: Boolean = false,
     /** The version of the core inside the APK; null until read or when it cannot run. */
     val bundledVersion: String? = null,
     val installed: List<InstalledXrayCore> = emptyList(),
@@ -49,6 +53,9 @@ data class XrayCoreState(
     val operation: XrayCoreOperation? = null,
 ) {
     val isBusy: Boolean get() = operation is XrayCoreOperation.Downloading || operation == XrayCoreOperation.Verifying
+
+    /** The version of the core that runs on the next start. */
+    val activeVersion: String? get() = installed.firstOrNull { it.id == selectedId }?.version ?: bundledVersion
 }
 
 /**
@@ -61,6 +68,7 @@ class XrayCoreManager(
     private val paths: XrayPaths,
     private val httpClient: AppHttpClient,
     private val platformInfo: PlatformInfo,
+    private val log: LogBuffer,
     @ApplicationScope private val scope: CoroutineScope,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
@@ -77,8 +85,9 @@ class XrayCoreManager(
     init {
         scope.launch(ioDispatcher) {
             store.removeAbandonedStaging()
-            _state.update { it.copy(bundledVersion = XrayBinary(paths).readBundledVersion()) }
+            val bundledVersion = XrayBinary(paths).readBundledVersion()
             publishInstalled()
+            _state.update { it.copy(loaded = true, bundledVersion = bundledVersion) }
         }
     }
 
@@ -86,10 +95,9 @@ class XrayCoreManager(
     suspend fun releases(): List<XrayCoreRelease> = withContext(ioDispatcher) {
         try {
             httpClient.use { client -> fetchXrayCoreReleases(client, platformInfo.primaryAbi) }
-        } catch (error: XrayCoreException) {
-            throw error
         } catch (error: IOException) {
-            throw XrayCoreException(XrayCoreFailure.Network, error)
+            log.append(LogSource.APP, "Listing Xray releases failed: ${error.describe()}")
+            throw error as? XrayCoreException ?: XrayCoreException(XrayCoreFailure.Network, error)
         }
     }
 
@@ -159,11 +167,11 @@ class XrayCoreManager(
             } catch (error: CancellationException) {
                 _state.update { it.copy(operation = null) }
                 throw error
-            } catch (error: XrayCoreException) {
-                XrayCoreOperation.Failed(error.failure)
-            } catch (_: IOException) {
-                XrayCoreOperation.Failed(XrayCoreFailure.Network)
+            } catch (error: IOException) {
+                log.append(LogSource.APP, "Installing an Xray core failed: ${error.describe()}")
+                XrayCoreOperation.Failed((error as? XrayCoreException)?.failure ?: XrayCoreFailure.Network)
             }
+            (result as? XrayCoreOperation.Installed)?.let { log.append(LogSource.APP, "Installed Xray core ${it.core.id} (${it.core.version})") }
             publishInstalled()
             _state.update { it.copy(operation = result) }
         }
@@ -196,6 +204,9 @@ class XrayCoreManager(
         val selectedId = store.selectedId()?.takeIf { id -> installed.any { it.id == id } }
         _state.update { it.copy(installed = installed, selectedId = selectedId) }
     }
+
+    private fun Throwable.describe(): String = generateSequence(this) { it.cause }
+        .joinToString(": ") { it.message ?: it.javaClass.simpleName }
 
     private companion object {
         // The first start of a freshly written 40 MB executable can be slow on older phones.

@@ -41,13 +41,11 @@ class SettingsRuntimeManager(
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     private val _rootAvailable = MutableStateFlow<Boolean?>(null)
-    private val _xrayCoreVersion = MutableStateFlow<String?>(null)
     private val diagnosticsMutex = Mutex()
     private var diagnosticsLoaded = false
     private val geoDataUpdateBatch = GeoDataUpdateBatch(::reloadActiveConnectionIfConnected)
 
     val rootAvailable: StateFlow<Boolean?> = _rootAvailable.asStateFlow()
-    val xrayCoreVersion: StateFlow<String?> = _xrayCoreVersion.asStateFlow()
 
     suspend fun setLauncherIcon(icon: LauncherIcon) {
         settingsRepository.setLauncherIcon(icon)
@@ -96,7 +94,6 @@ class SettingsRuntimeManager(
         if (settingsRepository.useRootService.first() && checkRootAvailability()) {
             detectTproxyCompatibility()
         }
-        _xrayCoreVersion.value = readXrayCoreVersion()
         diagnosticsLoaded = true
     }
 
@@ -162,10 +159,6 @@ class SettingsRuntimeManager(
             reloadActiveConnectionIfConnected()
         }
         return available
-    }
-
-    suspend fun readXrayCoreVersion(): String = withContext(ioDispatcher) {
-        appXrayBinary(context).readVersion() ?: "unknown"
     }
 
     private fun reloadActiveConnectionIfConnected() {
