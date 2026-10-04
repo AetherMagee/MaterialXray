@@ -2,4 +2,11 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- AndroidPlatformDns, AndroidVpnTransportProbe and AndroidNetworkLinkProbe query ConnectivityManager. -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <application>
+        <!-- initializeSentryTelemetry starts Sentry itself; auto-init would run without a DSN. -->
+        <meta-data
+            android:name="io.sentry.auto-init"
+            android:value="false" />
+    </application>
 </manifest>
