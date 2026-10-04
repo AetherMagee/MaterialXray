@@ -1,0 +1,58 @@
+name: Website
+
+on:
+  push:
+    branches: [master]
+    paths: [website/**, .github/workflows/website.yml]
+  pull_request:
+    paths: [website/**, .github/workflows/website.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Deploys queue rather than cancel, so an rsync is never cut off halfway.
+concurrency:
+  group: website-${{ github.ref }}
+
+jobs:
+  build:
+    name: "Website: Build and deploy"
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: website
+
+    steps:
+      - name: Check out sources
+        uses: actions/checkout@v7
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: website/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build site
+        run: npm run build
+
+      # The key only runs rrsync confined to the site's directory on the server,
+      # so "/" below is that directory, not the server's root.
+      - name: Deploy
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
+        env:
+          DEPLOY_HOST: ${{ secrets.WEBSITE_DEPLOY_HOST }}
+          DEPLOY_KEY: ${{ secrets.WEBSITE_DEPLOY_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.WEBSITE_DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/deploy_key
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/deploy_key
+          rsync -rlz --delete-after --delay-updates --chmod=D755,F644 \
+            -e "ssh -i $HOME/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes" \
+            dist/ "mxray-deploy@$DEPLOY_HOST:/"

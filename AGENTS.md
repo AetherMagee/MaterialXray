@@ -44,8 +44,13 @@
 - The compiler plugin fails the build on a missing binding, but only in a compilation that includes `MaterialXrayApp`; an incremental compile that skips it prints `compile-safety validation skipped`. `KoinGraphTest` in `:app` checks the parts that only resolve at runtime, including every interface-to-Android-implementation binding; add a pair there when you add a seam.
 - `local.properties`, Gradle outputs, `.cxx`, and most local IDE state are gitignored; do not depend on local-only values except SDK path or local signing credentials.
 
+## Website
+- `website/` is the materialxray.app landing page and documentation: Astro + Starlight, built with `npm ci && npm run build` inside `website/`. It is not part of the Gradle build.
+- The docs describe app behaviour, notably the subscription headers, deeplinks, share links and settings. A change to user-facing behaviour should update `website/src/content/docs` in the same commit.
+
 ## CI
-- `.github/workflows/ci.yml` only builds and uploads the debug APK, on pull requests and on pushes to master.
+- `.github/workflows/ci.yml` only builds and uploads the debug APK, on pull requests and on pushes to master. It ignores changes under `website/`.
+- `.github/workflows/website.yml` builds the site for changes under `website/` and, on master, deploys it to the VPS with rsync.
 - `.github/workflows/release.yml` manually builds, signs, uploads, and publishes a release APK.
 
 ## QA

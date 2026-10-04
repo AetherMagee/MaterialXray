@@ -4,7 +4,9 @@ on:
   # A pull request already builds its branch, so pushes only build master.
   push:
     branches: [master]
+    paths-ignore: [website/**, .github/workflows/website.yml]
   pull_request:
+    paths-ignore: [website/**, .github/workflows/website.yml]
 
 permissions:
   contents: read
