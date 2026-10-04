@@ -3,13 +3,7 @@ package com.material.xray.telemetry
 import com.material.xray.core.xray.TproxyCompatibility
 import com.material.xray.model.ConnectionProgress
 import com.material.xray.model.RootConnectionBackend
-import io.sentry.SentryEvent
-import io.sentry.protocol.Message
-import io.sentry.protocol.Request
-import io.sentry.protocol.SentryException
-import io.sentry.protocol.User
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -17,7 +11,7 @@ class TelemetryReporterTest {
     @Test
     fun `disabled reporter emits nothing`() {
         val client = FakeTelemetryClient()
-        val reporter = TelemetryReporter(client)
+        val reporter = TelemetryReporter(client) { 0 }
 
         reporter.recordConnectionAttempt(connection())
         reporter.recordConnectionCompletion(
@@ -33,7 +27,7 @@ class TelemetryReporterTest {
     @Test
     fun `opt out closes client and stops telemetry`() {
         val client = FakeTelemetryClient()
-        val reporter = TelemetryReporter(client)
+        val reporter = TelemetryReporter(client) { 0 }
         reporter.setEnabled(true)
         reporter.recordConnectionAttempt(connection())
 
@@ -50,7 +44,7 @@ class TelemetryReporterTest {
     @Test
     fun `reporter adopts an early initialized client`() {
         val client = FakeTelemetryClient(initiallyEnabled = true)
-        val reporter = TelemetryReporter(client)
+        val reporter = TelemetryReporter(client) { 0 }
 
         reporter.recordConnectionAttempt(connection())
         reporter.setEnabled(false)
@@ -64,7 +58,7 @@ class TelemetryReporterTest {
     @Test
     fun `connection completion records one exhaustive outcome`() {
         val client = FakeTelemetryClient()
-        val reporter = TelemetryReporter(client).apply { setEnabled(true) }
+        val reporter = TelemetryReporter(client) { 0 }.apply { setEnabled(true) }
 
         reporter.recordConnectionAttempt(connection())
         reporter.recordConnectionCompletion(
@@ -111,7 +105,7 @@ class TelemetryReporterTest {
     @Test
     fun `interrupted connection is counted and timed`() {
         val client = FakeTelemetryClient()
-        val reporter = TelemetryReporter(client).apply { setEnabled(true) }
+        val reporter = TelemetryReporter(client) { 0 }.apply { setEnabled(true) }
 
         reporter.recordConnectionAttempt(connection())
         reporter.recordConnectionCompletion(
@@ -127,7 +121,7 @@ class TelemetryReporterTest {
     @Test
     fun `specific connection step uses stable trace id`() {
         val client = FakeTelemetryClient()
-        val reporter = TelemetryReporter(client).apply { setEnabled(true) }
+        val reporter = TelemetryReporter(client) { 0 }.apply { setEnabled(true) }
         reporter.recordConnectionAttempt(connection())
 
         reporter.startConnectionStep(
@@ -144,7 +138,7 @@ class TelemetryReporterTest {
     @Test
     fun `connection failure uses first specific step classification`() {
         val client = FakeTelemetryClient()
-        val reporter = TelemetryReporter(client).apply { setEnabled(true) }
+        val reporter = TelemetryReporter(client) { 0 }.apply { setEnabled(true) }
         reporter.recordConnectionAttempt(connection())
 
         reporter.recordConnectionStepFailure(ConnectionTelemetryStep.ActivateTproxy)
@@ -166,7 +160,7 @@ class TelemetryReporterTest {
     @Test
     fun `root fallback records effective VPN context and clears handled failure`() {
         val client = FakeTelemetryClient()
-        val reporter = TelemetryReporter(client).apply { setEnabled(true) }
+        val reporter = TelemetryReporter(client) { 0 }.apply { setEnabled(true) }
         reporter.recordConnectionAttempt(connection())
         reporter.recordConnectionStepFailure(ConnectionTelemetryStep.RootAccess)
 
@@ -188,40 +182,9 @@ class TelemetryReporterTest {
     }
 
     @Test
-    fun `sanitizer removes unsafe event context`() {
-        val event = SentryEvent().apply {
-            request = Request()
-            serverName = "device-name"
-            logger = "unsafe.logger"
-            message = Message().apply { formatted = "user-provided message" }
-            exceptions = listOf(
-                SentryException().apply {
-                    type = "IllegalStateException"
-                    value = "secret exception text"
-                },
-            )
-            user = User().apply {
-                id = "installation-id"
-                email = "person@example.com"
-                ipAddress = "192.0.2.1"
-            }
-        }
-
-        sanitizeTelemetryEvent(event)
-
-        assertNull(event.request)
-        assertNull(event.serverName)
-        assertNull(event.message)
-        assertEquals("IllegalStateException", event.exceptions?.single()?.value)
-        assertEquals("installation-id", event.user?.id)
-        assertNull(event.user?.email)
-        assertNull(event.user?.ipAddress)
-    }
-
-    @Test
     fun `TPROXY compatibility uses fixed low cardinality attributes`() {
         val client = FakeTelemetryClient()
-        val reporter = TelemetryReporter(client, elapsedRealtime = { 0 }).apply { setEnabled(true) }
+        val reporter = TelemetryReporter(client) { 0 }.apply { setEnabled(true) }
 
         reporter.recordTproxyCompatibility(
             TproxyCompatibility.Unsupported(
@@ -250,7 +213,7 @@ class TelemetryReporterTest {
     @Test
     fun `fresh probe malfunctions create a fixed issue without raw output`() {
         val client = FakeTelemetryClient()
-        val reporter = TelemetryReporter(client, elapsedRealtime = { 0 }).apply { setEnabled(true) }
+        val reporter = TelemetryReporter(client) { 0 }.apply { setEnabled(true) }
 
         reporter.recordTproxyCompatibility(
             TproxyCompatibility.Unsupported(

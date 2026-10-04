@@ -10,6 +10,7 @@ import com.material.xray.core.android.platform.AndroidAppBuildInfo
 import com.material.xray.core.android.platform.AndroidPlatformInfo
 import com.material.xray.core.android.platform.ElapsedRealtimeClock
 import com.material.xray.core.android.platform.LogcatAppLogger
+import com.material.xray.core.android.telemetry.SentryTelemetryClient
 import com.material.xray.core.android.xray.AndroidLocalSockets
 import com.material.xray.core.android.xray.AndroidPlatformDns
 import com.material.xray.core.android.xray.AndroidVpnTransportProbe
@@ -48,6 +49,7 @@ import com.material.xray.service.LogcatEcho
 import com.material.xray.service.RoutingChangeManager
 import com.material.xray.service.SubscriptionUpdateWorker
 import com.material.xray.telemetry.DiagnosticsConsentMirror
+import com.material.xray.telemetry.TelemetryClient
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.cancel
 import org.junit.After
@@ -110,6 +112,7 @@ class KoinGraphTest {
             CoreTrafficRoutingSetting::class to SettingsRepository::class,
             GeoDataUrlSettings::class to SettingsRepository::class,
             DiagnosticsConsentMirroring::class to DiagnosticsConsentMirror::class,
+            TelemetryClient::class to SentryTelemetryClient::class,
             AppLogger::class to LogcatAppLogger::class,
             PlatformInfo::class to AndroidPlatformInfo::class,
             MonotonicClock::class to ElapsedRealtimeClock::class,

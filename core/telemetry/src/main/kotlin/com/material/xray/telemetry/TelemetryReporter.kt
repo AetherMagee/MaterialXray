@@ -1,10 +1,12 @@
 package com.material.xray.telemetry
 
-import android.os.SystemClock
+import com.material.xray.core.common.platform.MonotonicClock
+import com.material.xray.core.common.platform.elapsedMillis
 import com.material.xray.core.xray.TproxyCompatibility
 import com.material.xray.model.ConnectionProgress
 import com.material.xray.model.ConnectionState
 import com.material.xray.model.RootConnectionBackend
+import org.koin.core.annotation.Singleton
 
 enum class TelemetryServiceMode(val value: String) {
     Root("root"),
@@ -173,12 +175,11 @@ data class TelemetryConnectionContext(
         )
 }
 
-class TelemetryReporter internal constructor(
+@Singleton
+class TelemetryReporter(
     private val client: TelemetryClient,
-    private val elapsedRealtime: () -> Long,
+    private val clock: MonotonicClock,
 ) {
-    constructor(client: TelemetryClient) : this(client, SystemClock::elapsedRealtime)
-
     @Volatile private var enabled = client.isEnabled
     private val lastIssueAt = mutableMapOf<String, Long>()
     private var activeConnectionTrace: TelemetryTransaction? = null
@@ -372,7 +373,7 @@ class TelemetryReporter internal constructor(
     @Synchronized
     private fun shouldReportIssue(key: String): Boolean {
         if (!enabled) return false
-        val now = elapsedRealtime()
+        val now = clock.elapsedMillis()
         val previous = lastIssueAt[key]
         if (previous != null && now - previous < ISSUE_REPORT_INTERVAL_MS) return false
         lastIssueAt[key] = now

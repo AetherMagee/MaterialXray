@@ -146,8 +146,8 @@ core/network        Link probing, DNS and bundled CA handling (JVM)
 core/connection     Connection lifecycle, health watchdog, routing updaters (JVM)
 core/database       Room database, entities, DAOs, migrations and schemas (JVM)
 core/data           Repositories and subscription parsing (JVM)
-core/android        Android implementations of the JVM modules' platform interfaces
-core/telemetry      Sentry integration
+core/telemetry      Telemetry events and the client interface (JVM)
+core/android        Android implementations of the JVM modules' platform interfaces, Sentry client
 core/runtime        VpnService, connection manager, workers, tile, native launcher
 core/ui             Theme, components, adaptive layout and all resources
 core/navigation     Navigation 3 keys, navigator and scene strategies

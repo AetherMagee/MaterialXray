@@ -16,11 +16,13 @@ dependencies {
     implementation(project(":core:xray"))
     implementation(project(":core:network"))
     implementation(project(":core:data"))
+    implementation(project(":core:telemetry"))
 
     implementation(libs.androidx.annotation)
     implementation(libs.appcompat)
     implementation(libs.core.ktx)
     implementation(libs.coroutines.core)
+    implementation(libs.sentry.android)
 
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.junit)

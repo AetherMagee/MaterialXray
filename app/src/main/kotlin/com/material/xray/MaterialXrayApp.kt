@@ -2,6 +2,8 @@ package com.material.xray
 
 import android.app.Application
 import android.util.Log
+import com.material.xray.core.android.telemetry.diagnosticsConsentMirror
+import com.material.xray.core.android.telemetry.initializeSentryTelemetry
 import com.material.xray.core.common.di.ApplicationScope
 import com.material.xray.core.launcher.LauncherIconManager
 import com.material.xray.core.locale.initializeAppLocales
@@ -17,9 +19,7 @@ import com.material.xray.service.GeoDataUpdateScheduler
 import com.material.xray.service.OemAutostartManager
 import com.material.xray.service.StartupDiagnosticsLogger
 import com.material.xray.service.SubscriptionUpdateScheduler
-import com.material.xray.telemetry.DiagnosticsConsentMirror
 import com.material.xray.telemetry.TelemetryReporter
-import com.material.xray.telemetry.initializeSentryTelemetry
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.delay
@@ -66,7 +66,7 @@ class MaterialXrayApp : Application() {
     private val appScope: CoroutineScope by inject(named<ApplicationScope>())
 
     override fun onCreate() {
-        val diagnosticsConsentMirror = DiagnosticsConsentMirror(this)
+        val diagnosticsConsentMirror = diagnosticsConsentMirror(this)
         // This must precede starting Koin so opted-in users can report failures while the
         // application graph and eager startup state are being constructed.
         if (diagnosticsConsentMirror.isEnabled()) initializeSentryTelemetry(this)
