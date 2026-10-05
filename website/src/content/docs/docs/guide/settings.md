@@ -40,7 +40,7 @@ Advanced options cover the Xray log level, buffer size, TUN MTU, a RAM threshold
 
 ## Appearance and notifications
 
-The navigation bar and rail stay in place while tab content moves within its viewport, so the selected highlight animates continuously. Detail screens open over the navigation controls; on wide windows, their sheet dims the controls beneath it.
+The navigation bar and rail stay in place while tab content moves within its viewport, so the selected highlight animates continuously. The active tab label smoothly changes to medium weight. Detail screens open over the navigation controls; on wide windows, their sheet dims the controls beneath it.
 
 - **App language**: English or Russian, or follow the system.
 - **App icon**: the default icon or a Material-style alternative.

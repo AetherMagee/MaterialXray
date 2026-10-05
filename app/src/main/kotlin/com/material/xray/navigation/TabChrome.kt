@@ -1,6 +1,7 @@
 package com.material.xray.navigation
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -37,15 +38,22 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.text
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.material.xray.core.navigation.HomeKey
@@ -111,7 +119,7 @@ private fun AppNavigationBar(state: TabChromeState, height: Dp, modifier: Modifi
                 key(tab) {
                     NavigationBarItem(
                         icon = { TabIcon(tab) },
-                        label = { Text(stringResource(tab.labelRes)) },
+                        label = { AnimatedTabLabel(tab, selected = state.selectedTab() == tab) },
                         selected = state.selectedTab() == tab,
                         onClick = { state.onSelectTab(tab) },
                     )
@@ -154,7 +162,7 @@ private fun AppNavigationRail(state: TabChromeState, modifier: Modifier) {
                         key(tab) {
                             NavigationRailItem(
                                 icon = { TabIcon(tab) },
-                                label = { Text(stringResource(tab.labelRes)) },
+                                label = { AnimatedTabLabel(tab, selected = state.selectedTab() == tab) },
                                 selected = state.selectedTab() == tab,
                                 onClick = { state.onSelectTab(tab) },
                             )
@@ -164,6 +172,24 @@ private fun AppNavigationRail(state: TabChromeState, modifier: Modifier) {
             }
             Spacer(Modifier.weight(1f))
         }
+    }
+}
+
+/** Blend glyphs rather than jump between the system font's discrete available weights. */
+@Composable
+private fun AnimatedTabLabel(tab: TopLevelKey, selected: Boolean) {
+    val label = stringResource(tab.labelRes)
+    val emphasis by animateFloatAsState(
+        targetValue = if (selected) 1f else 0f,
+        animationSpec = tween(200),
+        label = "tabLabelEmphasis",
+    )
+    Box(
+        modifier = Modifier.clearAndSetSemantics { text = AnnotatedString(label) },
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(label, fontWeight = FontWeight.Normal, modifier = Modifier.graphicsLayer { alpha = 1f - emphasis })
+        Text(label, fontWeight = FontWeight.Medium, modifier = Modifier.graphicsLayer { alpha = emphasis })
     }
 }
 
