@@ -2294,8 +2294,8 @@ class XrayService(
         } else {
             localizedString(R.string.notification_separator_expanded)
         }
-        return settings.normalizedFieldOrder()
-            .mapNotNull { field -> notificationFieldText(field, settings, metrics) }
+        return settings.normalizedFieldOrder(rootMode = state.physicalInterface != VPN_SERVICE_INTERFACE_LABEL)
+            .mapNotNull { field -> notificationFieldText(field, settings, metrics, state) }
             .joinToString(separator)
             .ifBlank { baseText }
     }
@@ -2304,6 +2304,7 @@ class XrayService(
         field: NotificationField,
         settings: NotificationSettings,
         metrics: NotificationMetrics,
+        state: ConnectionState.Connected,
     ): String? {
         if (!settings.isFieldEnabled(field)) return null
         val compact = settings.style == NotificationStyle.Compact
@@ -2361,6 +2362,10 @@ class XrayService(
                     localizedString(R.string.notification_session_expanded, downloaded, uploaded)
                 }
             }
+            NotificationField.PinnedInterface -> localizedString(
+                if (compact) R.string.notification_pinned_interface_compact else R.string.notification_pinned_interface_expanded,
+                state.physicalInterface,
+            )
         }
     }
 

@@ -57,6 +57,8 @@
     <string name="notification_field_ping_description">Время отклика используемого сервера</string>
     <string name="notification_field_session_traffic_label">Трафик за сеанс</string>
     <string name="notification_field_session_traffic_description">Данные, переданные с запуска ядра</string>
+    <string name="notification_field_pinned_interface_label">Закреплённый интерфейс</string>
+    <string name="notification_field_pinned_interface_description">Сетевой интерфейс, используемый root-подключением</string>
 
     <string name="notification_style_normal_label">Обычный</string>
     <string name="notification_style_normal_description">Каждое поле на отдельной строке</string>

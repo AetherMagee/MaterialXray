@@ -39,6 +39,7 @@ Advanced options cover the Xray log level, buffer size, TUN MTU, a RAM threshold
 - **App icon**: the default icon or a Material-style alternative.
 - **Floating connect button**: a small corner button instead of the large power button.
 - **Notification fields**: pick what the connection notification shows and how often it updates.
+  In rootful mode, **Pinned interface** can be selected alongside metrics such as ping and traffic speed, and reordered with them. It is hidden in rootless mode. With no fields selected, the notification still shows the connection status and interface as before.
 
 ## Quick Settings tile
 

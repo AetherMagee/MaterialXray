@@ -4,6 +4,7 @@ import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import com.material.xray.core.model.BackupData
+import com.material.xray.core.model.NotificationField
 import java.io.File
 import java.lang.reflect.Modifier
 import kotlinx.coroutines.flow.first
@@ -47,6 +48,37 @@ class SettingsBackupRoundTripTest {
         repository.restoreFromMap(mapOf("tun_name" to "tun9"), sourceBackupVersion = BackupData.SPARSE_SETTINGS_VERSION)
 
         assertEquals(false, store.data.first()[SettingsRepository.DIAGNOSTICS_ENABLED])
+    }
+
+    @Test
+    fun `pinned interface selection and order survive backup restore in both settings flows`() = runBlocking {
+        val order = listOf(NotificationField.PinnedInterface, NotificationField.Ping)
+        repository.setNotificationShowPinnedInterface(true)
+        repository.setNotificationFieldOrder(order)
+        val backup = repository.getAllAsMap()
+        repository.setNotificationShowPinnedInterface(false)
+
+        repository.restoreFromMap(backup, sourceBackupVersion = BackupData.CURRENT_VERSION)
+
+        val notification = repository.notificationSettings.first()
+        val snapshot = repository.settingsSnapshot.first().notificationSettings
+        assertTrue(notification.showPinnedInterface)
+        assertEquals(order, notification.normalizedFieldOrder().take(2))
+        assertEquals(notification, snapshot)
+    }
+
+    @Test
+    fun `reordering rootless fields keeps the hidden pinned interface in its saved position`() = runBlocking {
+        repository.setNotificationFieldOrder(listOf(NotificationField.Ping, NotificationField.PinnedInterface, NotificationField.TrafficSpeed))
+
+        repository.setNotificationFieldOrder(listOf(NotificationField.TrafficSpeed, NotificationField.SessionTraffic, NotificationField.Ping))
+
+        val order = repository.notificationSettings.first().normalizedFieldOrder()
+        assertEquals(NotificationField.PinnedInterface, order[1])
+        assertEquals(
+            listOf(NotificationField.TrafficSpeed, NotificationField.SessionTraffic, NotificationField.Ping),
+            order.filter { it != NotificationField.PinnedInterface }.take(3),
+        )
     }
 
     @Suppress("UNCHECKED_CAST")
@@ -115,6 +147,7 @@ class SettingsBackupRoundTripTest {
             "notification_show_connection_count" to true,
             "notification_show_ping" to true,
             "notification_show_session_traffic" to true,
+            "notification_show_pinned_interface" to true,
             "notification_field_order" to "PING",
             "subscription_send_hwid" to false,
             "subscription_prefer_json" to true,

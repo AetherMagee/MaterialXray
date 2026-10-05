@@ -324,12 +324,16 @@ class SettingsViewModel(
     fun setNotificationShowSessionTraffic(enabled: Boolean) = viewModelScope.launch {
         settingsRepo.setNotificationShowSessionTraffic(enabled)
     }
+    fun setNotificationShowPinnedInterface(enabled: Boolean) = viewModelScope.launch {
+        settingsRepo.setNotificationShowPinnedInterface(enabled)
+    }
     fun setNotificationFieldEnabled(field: NotificationField, enabled: Boolean) = when (field) {
         NotificationField.TrafficSpeed -> setNotificationShowTrafficSpeed(enabled)
         NotificationField.RamUsage -> setNotificationShowRamUsage(enabled)
         NotificationField.ConnectionCount -> setNotificationShowConnectionCount(enabled)
         NotificationField.Ping -> setNotificationShowPing(enabled)
         NotificationField.SessionTraffic -> setNotificationShowSessionTraffic(enabled)
+        NotificationField.PinnedInterface -> setNotificationShowPinnedInterface(enabled)
     }
     fun setNotificationFieldOrder(order: List<NotificationField>) = viewModelScope.launch {
         settingsRepo.setNotificationFieldOrder(order)

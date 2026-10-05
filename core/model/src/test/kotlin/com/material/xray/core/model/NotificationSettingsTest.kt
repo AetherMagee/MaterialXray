@@ -48,6 +48,25 @@ class NotificationSettingsTest {
     }
 
     @Test
+    fun `a pinned-interface-only notification needs no polling`() {
+        val settings = NotificationSettings(showTrafficSpeed = false, showPing = false, showPinnedInterface = true)
+
+        assertEquals(listOf(NotificationField.PinnedInterface), settings.normalizedFieldOrder().filter(settings::isFieldEnabled))
+        assertFalse(settings.needsMetricsPoll)
+        assertFalse(settings.needsPingProbe)
+    }
+
+    @Test
+    fun `rootless mode hides the pinned interface without losing its saved position`() {
+        val savedOrder = listOf(NotificationField.PinnedInterface, NotificationField.SessionTraffic, NotificationField.Ping)
+        val settings = NotificationSettings(fieldOrder = savedOrder, showPinnedInterface = true)
+
+        assertEquals(savedOrder.drop(1), settings.normalizedFieldOrder(rootMode = false).take(2))
+        assertFalse(settings.normalizedFieldOrder(rootMode = false).contains(NotificationField.PinnedInterface))
+        assertEquals(savedOrder, settings.normalizedFieldOrder(rootMode = true).take(3))
+    }
+
+    @Test
     fun `every field reports its own toggle`() {
         val settings = NotificationSettings(
             showTrafficSpeed = true,

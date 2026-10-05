@@ -8,10 +8,11 @@ data class NotificationSettings(
     val showConnectionCount: Boolean = false,
     val showPing: Boolean = true,
     val showSessionTraffic: Boolean = false,
+    val showPinnedInterface: Boolean = false,
     val fieldOrder: List<NotificationField> = DEFAULT_FIELD_ORDER,
 ) {
     val anyFieldEnabled: Boolean
-        get() = showTrafficSpeed || showRamUsage || showConnectionCount || showPing || showSessionTraffic
+        get() = showTrafficSpeed || showRamUsage || showConnectionCount || showPing || showSessionTraffic || showPinnedInterface
 
     /**
      * Whether the shared metrics poll has to run. Ping is left out: it is measured on its own far
@@ -29,9 +30,12 @@ data class NotificationSettings(
         NotificationField.ConnectionCount -> showConnectionCount
         NotificationField.Ping -> showPing
         NotificationField.SessionTraffic -> showSessionTraffic
+        NotificationField.PinnedInterface -> showPinnedInterface
     }
 
-    fun normalizedFieldOrder(): List<NotificationField> = (fieldOrder + DEFAULT_FIELD_ORDER).distinct()
+    fun normalizedFieldOrder(rootMode: Boolean = true): List<NotificationField> = (fieldOrder + DEFAULT_FIELD_ORDER)
+        .distinct()
+        .filter { rootMode || it != NotificationField.PinnedInterface }
 
     companion object {
         const val MIN_UPDATE_INTERVAL_MS = 100
@@ -43,6 +47,7 @@ data class NotificationSettings(
             NotificationField.RamUsage,
             NotificationField.ConnectionCount,
             NotificationField.SessionTraffic,
+            NotificationField.PinnedInterface,
         )
     }
 }
@@ -53,6 +58,7 @@ enum class NotificationField {
     ConnectionCount,
     Ping,
     SessionTraffic,
+    PinnedInterface,
 }
 
 enum class NotificationStyle {

@@ -144,6 +144,7 @@ class SettingsRepository(
         val NOTIFICATION_SHOW_CONNECTION_COUNT = booleanPreferencesKey("notification_show_connection_count")
         val NOTIFICATION_SHOW_PING = booleanPreferencesKey("notification_show_ping")
         val NOTIFICATION_SHOW_SESSION_TRAFFIC = booleanPreferencesKey("notification_show_session_traffic")
+        val NOTIFICATION_SHOW_PINNED_INTERFACE = booleanPreferencesKey("notification_show_pinned_interface")
         val NOTIFICATION_FIELD_ORDER = stringPreferencesKey("notification_field_order")
         val SUBSCRIPTION_SEND_HWID = booleanPreferencesKey("subscription_send_hwid")
         val SUBSCRIPTION_PREFER_JSON = booleanPreferencesKey("subscription_prefer_json")
@@ -312,6 +313,7 @@ class SettingsRepository(
             showConnectionCount = prefs[NOTIFICATION_SHOW_CONNECTION_COUNT] ?: false,
             showPing = prefs[NOTIFICATION_SHOW_PING] ?: true,
             showSessionTraffic = prefs[NOTIFICATION_SHOW_SESSION_TRAFFIC] ?: false,
+            showPinnedInterface = prefs[NOTIFICATION_SHOW_PINNED_INTERFACE] ?: false,
             fieldOrder = decodeNotificationFieldOrder(prefs[NOTIFICATION_FIELD_ORDER]),
         )
     }
@@ -370,6 +372,7 @@ class SettingsRepository(
                 showConnectionCount = prefs[NOTIFICATION_SHOW_CONNECTION_COUNT] ?: false,
                 showPing = prefs[NOTIFICATION_SHOW_PING] ?: true,
                 showSessionTraffic = prefs[NOTIFICATION_SHOW_SESSION_TRAFFIC] ?: false,
+                showPinnedInterface = prefs[NOTIFICATION_SHOW_PINNED_INTERFACE] ?: false,
                 fieldOrder = decodeNotificationFieldOrder(prefs[NOTIFICATION_FIELD_ORDER]),
             ),
             subscriptionSendHardwareId = prefs[SUBSCRIPTION_SEND_HWID] ?: true,
@@ -512,8 +515,18 @@ class SettingsRepository(
     suspend fun setNotificationShowSessionTraffic(enabled: Boolean) = store.edit { prefs ->
         prefs[NOTIFICATION_SHOW_SESSION_TRAFFIC] = enabled
     }
+    suspend fun setNotificationShowPinnedInterface(enabled: Boolean) = store.edit { prefs ->
+        prefs[NOTIFICATION_SHOW_PINNED_INTERFACE] = enabled
+    }
     suspend fun setNotificationFieldOrder(fields: List<NotificationField>) = store.edit { prefs ->
-        prefs[NOTIFICATION_FIELD_ORDER] = encodeNotificationFieldOrder(fields)
+        val order = (fields + NotificationSettings.DEFAULT_FIELD_ORDER).distinct().toMutableList()
+        if (NotificationField.PinnedInterface !in fields) {
+            val previousIndex = decodeNotificationFieldOrder(prefs[NOTIFICATION_FIELD_ORDER])
+                .indexOf(NotificationField.PinnedInterface)
+            order.remove(NotificationField.PinnedInterface)
+            order.add(previousIndex, NotificationField.PinnedInterface)
+        }
+        prefs[NOTIFICATION_FIELD_ORDER] = encodeNotificationFieldOrder(order)
     }
     suspend fun setSubscriptionSendHardwareId(enabled: Boolean) = store.edit { prefs ->
         prefs[SUBSCRIPTION_SEND_HWID] = enabled
@@ -706,6 +719,9 @@ class SettingsRepository(
             map["notification_show_session_traffic"]
                 ?.toBooleanStrictOrNull()
                 ?.let { prefs[NOTIFICATION_SHOW_SESSION_TRAFFIC] = it }
+            map["notification_show_pinned_interface"]
+                ?.toBooleanStrictOrNull()
+                ?.let { prefs[NOTIFICATION_SHOW_PINNED_INTERFACE] = it }
             map["notification_field_order"]?.let { encoded ->
                 prefs[NOTIFICATION_FIELD_ORDER] = encodeNotificationFieldOrder(decodeNotificationFieldOrder(encoded))
             }

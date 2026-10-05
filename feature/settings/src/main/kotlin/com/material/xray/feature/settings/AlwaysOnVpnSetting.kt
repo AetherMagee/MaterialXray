@@ -56,7 +56,7 @@ internal fun AlwaysOnVpnSetting() {
     }
 }
 
-private fun isAlwaysOnVpnEnabled(context: Context): Boolean = runCatching {
+internal fun isAlwaysOnVpnEnabled(context: Context): Boolean = runCatching {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
         // This getter queries the calling app's UID, without needing a running service or context.
         VpnService().isAlwaysOn

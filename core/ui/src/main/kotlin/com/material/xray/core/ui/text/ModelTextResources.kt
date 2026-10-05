@@ -192,6 +192,7 @@ val NotificationField.labelResource: Int
         NotificationField.ConnectionCount -> R.string.notification_field_connection_count_label
         NotificationField.Ping -> R.string.notification_field_ping_label
         NotificationField.SessionTraffic -> R.string.notification_field_session_traffic_label
+        NotificationField.PinnedInterface -> R.string.notification_field_pinned_interface_label
     }
 
 @get:StringRes
@@ -202,6 +203,7 @@ val NotificationField.descriptionResource: Int
         NotificationField.ConnectionCount -> R.string.notification_field_connection_count_description
         NotificationField.Ping -> R.string.notification_field_ping_description
         NotificationField.SessionTraffic -> R.string.notification_field_session_traffic_description
+        NotificationField.PinnedInterface -> R.string.notification_field_pinned_interface_description
     }
 
 @get:StringRes

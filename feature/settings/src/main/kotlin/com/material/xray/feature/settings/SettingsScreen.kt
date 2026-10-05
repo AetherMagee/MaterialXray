@@ -341,6 +341,7 @@ private fun SettingsScreenContent(
     var showClearGeoDataDialog by rememberSaveable { mutableStateOf(false) }
     val rootServiceAvailable = rootAvailable != false
     val rootServiceActive = useRootService && rootAvailable == true
+    val rootNotificationFields = rootServiceActive && !rememberSystemState(::isAlwaysOnVpnEnabled).value
 
     val editingTunName = rememberSaveable(tunName, saver = TextFieldState.Saver) { TextFieldState(tunName) }
     val editingXrayBufferSizeKiB = rememberSaveable(xrayBufferSizeKiB, saver = TextFieldState.Saver) { TextFieldState(xrayBufferSizeKiB.toString()) }
@@ -535,6 +536,7 @@ private fun SettingsScreenContent(
                     if (!isTelevision) {
                         NotificationSettingsSection(
                             settings = notificationSettings,
+                            rootMode = rootNotificationFields,
                             onConfigureFields = { showNotificationFieldsDialog = true },
                             onConfigureStyle = { showFieldStyleDialog = true },
                             onConfigureFrequency = { showUpdateFrequencyDialog = true },
@@ -1139,6 +1141,7 @@ private fun SettingsScreenContent(
         backupImportSummary = backupImportSummary,
         backupBusy = backupBusy,
         notificationSettings = notificationSettings,
+        rootMode = rootNotificationFields,
         actions = SettingsDialogActions(
             onDismissRootAccessDenied = { showRootAccessDeniedDialog = false },
             onDismissNotificationFields = { showNotificationFieldsDialog = false },
@@ -1501,6 +1504,7 @@ private fun SettingsNestedSection(
 @Composable
 private fun NotificationSettingsSection(
     settings: NotificationSettings,
+    rootMode: Boolean,
     onConfigureFields: () -> Unit,
     onConfigureStyle: () -> Unit,
     onConfigureFrequency: () -> Unit,
@@ -1527,7 +1531,7 @@ private fun NotificationSettingsSection(
 
         SettingsActionRow(
             title = stringResource(R.string.settings_configure_notification_fields),
-            subtitle = notificationFieldSummary(settings),
+            subtitle = notificationFieldSummary(settings, rootMode),
             onClick = onConfigureFields,
         )
         SettingsActionRow(
@@ -1675,6 +1679,7 @@ private fun SettingsDialogs(
     backupImportSummary: BackupSummary?,
     backupBusy: Boolean,
     notificationSettings: NotificationSettings,
+    rootMode: Boolean,
     actions: SettingsDialogActions,
 ) {
     if (backupImportSummary != null) {
@@ -1743,6 +1748,7 @@ private fun SettingsDialogs(
     if (showNotificationFieldsDialog) {
         NotificationFieldsDialog(
             settings = notificationSettings,
+            rootMode = rootMode,
             onDismiss = actions.onDismissNotificationFields,
             onFieldEnabledChange = actions.onFieldEnabledChange,
             onReorder = actions.onReorderFields,
@@ -2428,11 +2434,12 @@ private fun UpdateFrequencyDialog(
 @Composable
 private fun NotificationFieldsDialog(
     settings: NotificationSettings,
+    rootMode: Boolean,
     onDismiss: () -> Unit,
     onFieldEnabledChange: (NotificationField, Boolean) -> Unit,
     onReorder: (List<NotificationField>) -> Unit,
 ) {
-    val order = remember { settings.normalizedFieldOrder().toMutableStateList() }
+    val order = remember(rootMode) { settings.normalizedFieldOrder(rootMode).toMutableStateList() }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -2562,8 +2569,8 @@ private fun ReorderableFieldList(
 }
 
 @Composable
-private fun notificationFieldSummary(settings: NotificationSettings): String {
-    val enabledFields = settings.normalizedFieldOrder()
+private fun notificationFieldSummary(settings: NotificationSettings, rootMode: Boolean): String {
+    val enabledFields = settings.normalizedFieldOrder(rootMode)
         .filter(settings::isFieldEnabled)
         .map { stringResource(it.labelResource) }
     return if (enabledFields.isEmpty()) {
