@@ -146,7 +146,7 @@ class XrayTileService(
             label = snapshot.label()
             icon = Icon.createWithResource(
                 applicationContext,
-                R.drawable.ic_qs_material_xray,
+                R.drawable.ic_launcher_material_monochrome,
             )
             state = snapshot.tileState()
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
