@@ -500,6 +500,19 @@ private fun SettingsScreenContent(
                         tproxyCompatibility = tproxyCompatibility,
                         autoConnect = autoConnect,
                         oemAutostartGuidance = oemAutostartGuidance,
+                        rootTunNameSetting = {
+                            Column(
+                                modifier = Modifier.padding(horizontal = 16.dp),
+                                verticalArrangement = Arrangement.spacedBy(16.dp),
+                            ) {
+                                RootTunNameSetting(
+                                    visible = true,
+                                    editingTunName = editingTunName,
+                                    hasTunNameChanges = hasTunNameChanges,
+                                    onSave = { viewModel.setTunName(editingTunName.text.toString()) },
+                                )
+                            }
+                        },
                         actions = SettingsServiceActions(
                             onUseRootServiceChange = viewModel::setUseRootService,
                             onRetryRootAccess = viewModel::retryRootAccess,
@@ -688,22 +701,6 @@ private fun SettingsScreenContent(
                         navigates = true,
                         onClick = onOpenXrayCore,
                     )
-                }
-            }
-
-            if (rootServiceActive && rootConnectionBackend == RootConnectionBackend.Tun) {
-                item(key = "tun_name") {
-                    Column(
-                        modifier = Modifier.padding(horizontal = 16.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp),
-                    ) {
-                        RootTunNameSetting(
-                            visible = true,
-                            editingTunName = editingTunName,
-                            hasTunNameChanges = hasTunNameChanges,
-                            onSave = { viewModel.setTunName(editingTunName.text.toString()) },
-                        )
-                    }
                 }
             }
 
@@ -1279,6 +1276,7 @@ private fun SettingsServiceSection(
     tproxyCompatibility: TproxyCompatibility,
     autoConnect: Boolean,
     oemAutostartGuidance: OemAutostartGuidance,
+    rootTunNameSetting: @Composable () -> Unit,
     actions: SettingsServiceActions,
 ) {
     Text(
@@ -1375,6 +1373,8 @@ private fun SettingsServiceSection(
                     onSelected = actions.onOtherVpnModeChange,
                     modifier = Modifier.padding(horizontal = 16.dp),
                 )
+            } else {
+                rootTunNameSetting()
             }
         }
 
