@@ -97,8 +97,11 @@ class SettingsRuntimeManager(
      */
     suspend fun loadRuntimeDiagnostics() = diagnosticsMutex.withLock {
         if (diagnosticsLoaded) return@withLock
-        if (settingsRepository.useRootService.first() && checkRootAvailability()) {
-            detectTproxyCompatibility()
+        if (settingsRepository.useRootService.first()) {
+            val available = rootAccessMutex.withLock {
+                _rootAvailable.value ?: checkRootAvailabilityLocked(reloadConnection = true)
+            }
+            if (available) detectTproxyCompatibility()
         }
         refreshXrayCoreVersion()
         diagnosticsLoaded = true

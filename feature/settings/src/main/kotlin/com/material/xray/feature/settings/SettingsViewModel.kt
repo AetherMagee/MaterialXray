@@ -188,10 +188,6 @@ class SettingsViewModel(
         }
     }
 
-    fun refreshRootAccess() {
-        if (rootAvailable.value == true || currentSettings().useRootService) retryRootAccess()
-    }
-
     fun setUseRootService(enabled: Boolean) {
         rootModeJob?.cancel()
         rootModeJob = viewModelScope.launch {

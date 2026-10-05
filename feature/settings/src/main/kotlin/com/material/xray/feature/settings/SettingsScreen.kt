@@ -163,9 +163,7 @@ import com.material.xray.core.ui.text.labelResource
 import com.material.xray.core.xray.TproxyCompatibility
 import java.util.Date
 import java.util.Locale
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collect
-import kotlinx.coroutines.isActive
 import org.koin.compose.viewmodel.koinViewModel
 import org.xmlpull.v1.XmlPullParser
 
@@ -329,14 +327,6 @@ private fun SettingsScreenContent(
     val resources = LocalResources.current
     val lifecycleOwner = LocalLifecycleOwner.current
     rememberSystemState { viewModel.refreshOemAutostartGuidance() }
-    LaunchedEffect(viewModel, lifecycleOwner) {
-        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
-            while (isActive) {
-                viewModel.refreshRootAccess()
-                delay(ROOT_ACCESS_REFRESH_INTERVAL_MS)
-            }
-        }
-    }
     val scrollState = rememberLazyListState()
     var showRootAccessDeniedDialog by rememberSaveable { mutableStateOf(false) }
     var showNotificationFieldsDialog by rememberSaveable { mutableStateOf(false) }
@@ -2538,5 +2528,3 @@ private fun notificationFieldSummary(settings: NotificationSettings, rootMode: B
 private fun digitsOnly(maxLength: Int) = InputTransformation.byValue { _, proposed ->
     proposed.filter(Char::isDigit).take(maxLength)
 }
-
-private const val ROOT_ACCESS_REFRESH_INTERVAL_MS = 30_000L
