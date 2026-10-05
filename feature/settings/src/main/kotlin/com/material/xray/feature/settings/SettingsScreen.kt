@@ -14,6 +14,7 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatDelegate
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusGroup
@@ -50,6 +51,7 @@ import androidx.compose.material.icons.filled.DragIndicator
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -890,9 +892,16 @@ private fun SettingsScreenContent(
                         Text(stringResource(R.string.settings_import))
                     }
                     if (showAdvancedOptions) {
+                        val clearGeoDataEnabled = canClearGeoData(connectionState) && !geoDataOperationInProgress
                         OutlinedButton(
-                            enabled = canClearGeoData(connectionState) && !geoDataOperationInProgress,
+                            enabled = clearGeoDataEnabled,
                             onClick = { showClearGeoDataDialog = true },
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                            border = if (clearGeoDataEnabled) {
+                                BorderStroke(1.dp, MaterialTheme.colorScheme.error)
+                            } else {
+                                ButtonDefaults.outlinedButtonBorder(enabled = false)
+                            },
                         ) {
                             Text(
                                 stringResource(
