@@ -83,7 +83,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.colorspace.ColorSpaces
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -898,7 +900,10 @@ private fun SettingsScreenContent(
                             onClick = { showClearGeoDataDialog = true },
                             colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
                             border = if (clearGeoDataEnabled) {
-                                BorderStroke(1.dp, MaterialTheme.colorScheme.error)
+                                BorderStroke(
+                                    1.dp,
+                                    MaterialTheme.colorScheme.error.withLuminance(MaterialTheme.colorScheme.outlineVariant.luminance()),
+                                )
                             } else {
                                 ButtonDefaults.outlinedButtonBorder(enabled = false)
                             },
@@ -2389,4 +2394,18 @@ private fun notificationFieldSummary(settings: NotificationSettings, rootMode: B
 
 private fun digitsOnly(maxLength: Int) = InputTransformation.byValue { _, proposed ->
     proposed.filter(Char::isDigit).take(maxLength)
+}
+
+/** Keeps the error tint while matching the lightness of the adjacent outlined buttons. */
+private fun Color.withLuminance(target: Float): Color {
+    val linear = convert(ColorSpaces.LinearSrgb)
+    val current = linear.luminance()
+    if (current == target) return this
+    val scale = if (current > target) target / current else (1f - target) / (1f - current)
+    val offset = if (current > target) 0f else 1f - scale
+    return linear.copy(
+        red = linear.red * scale + offset,
+        green = linear.green * scale + offset,
+        blue = linear.blue * scale + offset,
+    ).convert(ColorSpaces.Srgb)
 }
