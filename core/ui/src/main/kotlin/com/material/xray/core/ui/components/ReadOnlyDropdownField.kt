@@ -2,6 +2,7 @@ package com.material.xray.core.ui.components
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -19,6 +20,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.unit.dp
 
 /**
  * A text field that opens a menu instead of a keyboard, for picking one of a fixed set of values.
@@ -66,7 +68,7 @@ fun <T> ReadOnlyDropdownField(
                         if (option.description == null) {
                             Text(option.label)
                         } else {
-                            Column {
+                            Column(modifier = Modifier.padding(vertical = 8.dp)) {
                                 Text(option.label)
                                 Text(
                                     option.description,
