@@ -28,7 +28,7 @@
     <string name="settings_xray_core_failed_broken">Ядро не запустилось.</string>
     <string name="settings_xray_core_failed_too_old">Старше %1$s, не поддерживается.</string>
     <string name="settings_xray_core_updates">Обновления</string>
-    <string name="settings_xray_core_periodic_checks">Периодически проверять новые версии Xray-core</string>
+    <string name="settings_xray_core_periodic_checks">Автоматически проверять новые версии Xray-core</string>
     <string name="settings_xray_core_update_action">Когда выходит новая версия</string>
     <string name="settings_xray_core_update_action_notify">Уведомить меня</string>
     <string name="settings_xray_core_update_action_install">Обновить автоматически</string>

@@ -21,6 +21,7 @@ import androidx.work.WorkerParameters
 import com.material.xray.core.android.locale.localizedString
 import com.material.xray.core.common.log.LogBuffer
 import com.material.xray.core.common.log.LogSource
+import com.material.xray.core.model.AppUpdateInterval
 import com.material.xray.core.ui.R
 import com.material.xray.core.xraycore.XrayCoreManager
 import com.material.xray.core.xraycore.XrayCoreUpdateAction
@@ -72,24 +73,23 @@ class XrayCoreUpdater(
     }
 }
 
-/** Runs [XrayCoreUpdater] once a day while periodic checks are on. */
+/** Runs [XrayCoreUpdater] at the chosen interval while automatic checks are on. */
 @Singleton
 class XrayCoreUpdateScheduler(private val context: Context) {
-    fun setEnabled(enabled: Boolean) {
+    fun setEnabled(enabled: Boolean, interval: AppUpdateInterval) {
         val workManager = WorkManager.getInstance(context)
         if (!enabled) {
             workManager.cancelUniqueWork(WORK_NAME)
             return
         }
-        val request = PeriodicWorkRequestBuilder<XrayCoreUpdateWorker>(CHECK_INTERVAL_HOURS, TimeUnit.HOURS)
+        val request = PeriodicWorkRequestBuilder<XrayCoreUpdateWorker>(interval.hours.toLong(), TimeUnit.HOURS)
             .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
             .build()
-        workManager.enqueueUniquePeriodicWork(WORK_NAME, ExistingPeriodicWorkPolicy.KEEP, request)
+        workManager.enqueueUniquePeriodicWork(WORK_NAME, ExistingPeriodicWorkPolicy.UPDATE, request)
     }
 
     private companion object {
         const val WORK_NAME = "xray_core_update_check"
-        const val CHECK_INTERVAL_HOURS = 24L
     }
 }
 

@@ -72,13 +72,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.material.xray.core.model.AppUpdateInterval
 import com.material.xray.core.ui.R
 import com.material.xray.core.ui.components.DropdownOption
 import com.material.xray.core.ui.components.ReadOnlyDropdownField
 import com.material.xray.core.ui.components.ScrolledTopAppBar
 import com.material.xray.core.ui.components.SelectableOptionRow
-import com.material.xray.core.ui.components.SettingsSwitchRow
 import com.material.xray.core.ui.components.TooltipIconButton
+import com.material.xray.core.ui.components.UpdateChecksSetting
+import com.material.xray.core.ui.components.UpdateIntervalDialog
 import com.material.xray.core.xray.InstalledXrayCore
 import com.material.xray.core.xray.XrayCoreSource
 import com.material.xray.core.xraycore.MINIMUM_XRAY_VERSION
@@ -115,6 +117,7 @@ fun XrayCoreScreen(
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
     val snackbarHostState = remember { SnackbarHostState() }
     var showFileWarning by rememberSaveable { mutableStateOf(false) }
+    var showUpdateIntervalDialog by rememberSaveable { mutableStateOf(false) }
     val fileLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri?.let(viewModel::installFromFile)
     }
@@ -238,6 +241,7 @@ fun XrayCoreScreen(
                             }
                             viewModel.setPeriodicChecks(enabled)
                         },
+                        onIntervalClick = { showUpdateIntervalDialog = true },
                         onActionSelected = viewModel::setUpdateAction,
                     )
                 }
@@ -245,6 +249,17 @@ fun XrayCoreScreen(
         }
     }
 
+    if (showUpdateIntervalDialog) {
+        UpdateIntervalDialog(
+            current = updateSettings.interval,
+            default = AppUpdateInterval.OneWeek,
+            onDismiss = { showUpdateIntervalDialog = false },
+            onConfirm = {
+                viewModel.setUpdateInterval(it)
+                showUpdateIntervalDialog = false
+            },
+        )
+    }
     if (showFileWarning) {
         AlertDialog(
             onDismissRequest = { showFileWarning = false },
@@ -290,6 +305,7 @@ private fun UpdateSettings(
     settings: XrayCoreUpdateSettings,
     onPeriodicChecksChange: (Boolean) -> Unit,
     onActionSelected: (XrayCoreUpdateAction) -> Unit,
+    onIntervalClick: () -> Unit,
 ) {
     Column(
         modifier = Modifier.padding(top = 16.dp),
@@ -301,9 +317,11 @@ private fun UpdateSettings(
             style = MaterialTheme.typography.titleSmall,
             color = MaterialTheme.colorScheme.primary,
         )
-        SettingsSwitchRow(
+        UpdateChecksSetting(
             title = stringResource(R.string.settings_xray_core_periodic_checks),
             checked = settings.periodicChecks,
+            interval = settings.interval,
+            onClick = onIntervalClick,
             onCheckedChange = onPeriodicChecksChange,
         )
         AnimatedVisibility(visible = settings.periodicChecks) {

@@ -4,6 +4,7 @@ import android.app.Application
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.material.xray.core.model.AppUpdateInterval
 import com.material.xray.core.xraycore.XrayCoreException
 import com.material.xray.core.xraycore.XrayCoreFailure
 import com.material.xray.core.xraycore.XrayCoreManager
@@ -152,8 +153,13 @@ class XrayCoreViewModel(
     fun select(id: String?) = viewModelScope.launch { switcher.switchTo(id) }
 
     fun setPeriodicChecks(enabled: Boolean) {
-        updateSettingsStore.update { it.copy(periodicChecks = enabled) }
-        updateScheduler.setEnabled(enabled)
+        val updated = updateSettingsStore.update { it.copy(periodicChecks = enabled) }
+        updateScheduler.setEnabled(updated.periodicChecks, updated.interval)
+    }
+
+    fun setUpdateInterval(interval: AppUpdateInterval) {
+        val updated = updateSettingsStore.update { it.copy(intervalHours = interval.hours) }
+        updateScheduler.setEnabled(updated.periodicChecks, updated.interval)
     }
 
     fun setUpdateAction(action: XrayCoreUpdateAction) {

@@ -133,7 +133,8 @@
     <string name="settings_section_about">О приложении</string>
     <string name="settings_app_update_checks_title">Автоматически проверять обновления</string>
     <string name="settings_app_update_interval_title">Проверять обновления каждые...</string>
-    <string name="settings_update_interval_twelve_hours">12 часов (по умолчанию)</string>
+    <string name="settings_update_interval_default">%1$s (по умолчанию)</string>
+    <string name="settings_update_interval_twelve_hours">12 часов</string>
     <string name="settings_update_interval_one_day">1 день</string>
     <string name="settings_update_interval_three_days">3 дня</string>
     <string name="settings_update_interval_one_week">1 неделю</string>
@@ -207,6 +208,6 @@
     <string name="settings_geodata_download_progress_with_total">Загружено %1$s из %2$s</string>
     <string name="settings_asset_update_failed">Не удалось обновить</string>
     <string name="settings_asset_update_failed_with_detail">Не удалось обновить: %1$s</string>
-    <string name="settings_xray_core_title">Ядро Xray</string>
+    <string name="settings_xray_core_title">Выбрать версию Xray-core</string>
     <string name="settings_xray_core_versions">Версии</string>
 </resources>

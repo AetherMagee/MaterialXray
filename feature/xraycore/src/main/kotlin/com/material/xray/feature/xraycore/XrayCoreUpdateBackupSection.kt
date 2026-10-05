@@ -1,6 +1,7 @@
 package com.material.xray.feature.xraycore
 
 import com.material.xray.core.data.repository.BackupSection
+import com.material.xray.core.model.AppUpdateInterval
 import com.material.xray.core.xraycore.XrayCoreUpdateAction
 import com.material.xray.core.xraycore.XrayCoreUpdateSettingsStore
 import kotlinx.serialization.Serializable
@@ -18,19 +19,22 @@ class XrayCoreUpdateBackupSection(
 
     override fun export(): JsonElement {
         val settings = settingsStore.settings.value
-        return json.encodeToJsonElement(Backup.serializer(), Backup(settings.periodicChecks, settings.action))
+        return json.encodeToJsonElement(Backup.serializer(), Backup(settings.periodicChecks, settings.action, settings.interval.hours))
     }
 
     override suspend fun restore(value: JsonElement?) {
         val backup = value?.let { json.decodeFromJsonElement(Backup.serializer(), it) } ?: Backup()
-        val updated = settingsStore.update { it.copy(periodicChecks = backup.periodicChecks, action = backup.action) }
-        scheduler.setEnabled(updated.periodicChecks)
+        val updated = settingsStore.update {
+            it.copy(periodicChecks = backup.periodicChecks, action = backup.action, intervalHours = backup.intervalHours)
+        }
+        scheduler.setEnabled(updated.periodicChecks, updated.interval)
     }
 
     @Serializable
     private data class Backup(
         val periodicChecks: Boolean = false,
         val action: XrayCoreUpdateAction = XrayCoreUpdateAction.Notify,
+        val intervalHours: Int = AppUpdateInterval.OneWeek.hours,
     )
 
     private companion object {

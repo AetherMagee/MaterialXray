@@ -20,6 +20,8 @@ import com.material.xray.core.runtime.OemAutostartManager
 import com.material.xray.core.runtime.StartupDiagnosticsLogger
 import com.material.xray.core.runtime.SubscriptionUpdateScheduler
 import com.material.xray.core.telemetry.TelemetryReporter
+import com.material.xray.core.xraycore.XrayCoreUpdateSettingsStore
+import com.material.xray.feature.xraycore.XrayCoreUpdateScheduler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.delay
@@ -40,6 +42,10 @@ class MaterialXrayApp : Application() {
     private val subscriptionUpdateScheduler: SubscriptionUpdateScheduler by inject()
 
     private val appUpdateScheduler: AppUpdateScheduler by inject()
+
+    private val xrayCoreUpdateScheduler: XrayCoreUpdateScheduler by inject()
+
+    private val xrayCoreUpdateSettingsStore: XrayCoreUpdateSettingsStore by inject()
 
     private val geoDataUpdateScheduler: GeoDataUpdateScheduler by inject()
 
@@ -122,6 +128,8 @@ class MaterialXrayApp : Application() {
                 settingsRepository.appUpdateChecksEnabled.first(),
                 settingsRepository.appUpdateInterval.first(),
             )
+            val coreUpdates = xrayCoreUpdateSettingsStore.settings.value
+            xrayCoreUpdateScheduler.setEnabled(coreUpdates.periodicChecks, coreUpdates.interval)
             subscriptionUpdateScheduler.schedulePeriodicUpdates()
             subscriptionUpdateScheduler.enqueueDueCheckNow(STARTUP_BACKGROUND_WORK_DELAY_SECONDS)
         }

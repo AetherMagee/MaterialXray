@@ -1,5 +1,6 @@
 package com.material.xray.core.xraycore
 
+import com.material.xray.core.model.AppUpdateInterval
 import com.material.xray.core.xray.XrayPaths
 import java.io.File
 import java.io.IOException
@@ -19,11 +20,15 @@ enum class XrayCoreUpdateAction { Notify, Install }
 data class XrayCoreUpdateSettings(
     val periodicChecks: Boolean = false,
     val action: XrayCoreUpdateAction = XrayCoreUpdateAction.Notify,
+    val intervalHours: Int = AppUpdateInterval.OneWeek.hours,
     /** The last release a notification was shown for, so each one is announced once. */
     val notifiedTag: String? = null,
     /** The core the last automatic update installed, removed once a newer one replaces it. */
     val autoInstalledId: String? = null,
-)
+) {
+    val interval: AppUpdateInterval
+        get() = AppUpdateInterval.entries.find { it.hours == intervalHours } ?: AppUpdateInterval.OneWeek
+}
 
 /**
  * Keeps [XrayCoreUpdateSettings] in a file of their own rather than in the app's settings, so the

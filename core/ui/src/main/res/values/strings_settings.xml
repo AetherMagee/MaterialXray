@@ -125,7 +125,8 @@
     <string name="settings_section_about">About</string>
     <string name="settings_app_update_checks_title">Automatically check for updates</string>
     <string name="settings_app_update_interval_title">Check for updates every...</string>
-    <string name="settings_update_interval_twelve_hours">12 hours (default)</string>
+    <string name="settings_update_interval_default">%1$s (default)</string>
+    <string name="settings_update_interval_twelve_hours">12 hours</string>
     <string name="settings_update_interval_one_day">1 day</string>
     <string name="settings_update_interval_three_days">3 days</string>
     <string name="settings_update_interval_one_week">1 week</string>
@@ -204,6 +205,6 @@
     <string name="settings_geodata_download_progress_with_total">Downloaded %1$s of %2$s</string>
     <string name="settings_asset_update_failed">Update failed</string>
     <string name="settings_asset_update_failed_with_detail">Update failed: %1$s</string>
-    <string name="settings_xray_core_title">Xray core</string>
+    <string name="settings_xray_core_title">Choose Xray-core version</string>
     <string name="settings_xray_core_versions">Versions</string>
 </resources>
