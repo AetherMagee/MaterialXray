@@ -44,6 +44,7 @@ import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -67,7 +68,11 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.dropShadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.shadow.Shadow
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.changedToUp
 import androidx.compose.ui.input.pointer.pointerInput
@@ -80,6 +85,7 @@ import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -443,8 +449,7 @@ private fun LogEntriesList(
                 }
             },
             modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(16.dp),
+                .align(Alignment.BottomEnd),
         )
     }
 }
@@ -457,8 +462,27 @@ private fun ScrollToBottomButton(visible: Boolean, onClick: () -> Unit, modifier
         exit = fadeOut() + scaleOut(),
         modifier = modifier,
     ) {
-        SmallFloatingActionButton(onClick = onClick) {
-            Icon(Icons.Default.KeyboardArrowDown, contentDescription = stringResource(R.string.logs_scroll_to_bottom))
+        // Keep the drawn shadow inside the fading layer, just like AnimatedDropdownMenu.
+        Box(
+            modifier = Modifier
+                .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                .padding(16.dp),
+        ) {
+            SmallFloatingActionButton(
+                onClick = onClick,
+                modifier = Modifier.dropShadow(
+                    FloatingActionButtonDefaults.smallShape,
+                    Shadow(radius = 8.dp, color = Color.Black.copy(alpha = 0.22f), offset = DpOffset(0.dp, 2.dp)),
+                ),
+                elevation = FloatingActionButtonDefaults.elevation(
+                    defaultElevation = 0.dp,
+                    pressedElevation = 0.dp,
+                    focusedElevation = 0.dp,
+                    hoveredElevation = 0.dp,
+                ),
+            ) {
+                Icon(Icons.Default.KeyboardArrowDown, contentDescription = stringResource(R.string.logs_scroll_to_bottom))
+            }
         }
     }
 }
