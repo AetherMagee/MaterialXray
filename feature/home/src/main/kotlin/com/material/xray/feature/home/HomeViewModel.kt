@@ -11,7 +11,6 @@ import com.material.xray.core.data.parser.SubscriptionFetchException
 import com.material.xray.core.data.repository.ProviderRoutingAvailability
 import com.material.xray.core.data.repository.ServerRepository
 import com.material.xray.core.data.repository.SettingsRepository
-import com.material.xray.core.data.repository.selectedProviderRoutingAvailability
 import com.material.xray.core.data.repository.toSubscriptionAppRouting
 import com.material.xray.core.data.repository.toSubscriptionRouting
 import com.material.xray.core.database.entity.ServerEntity
@@ -101,13 +100,20 @@ internal fun SubscriptionEntity.manualRoutingData(
     policy: RoutingPolicyControl,
     selectedProvider: ProviderRoutingAvailability?,
 ) = SubscriptionRoutingData(
-    appRouting = toSubscriptionAppRouting().takeUnless {
-        policy == RoutingPolicyControl.SubscriptionProvider && selectedProvider?.appRoutingProvided == true
-    },
-    routing = toSubscriptionRouting().takeUnless {
-        policy == RoutingPolicyControl.SubscriptionProvider && selectedProvider?.xrayRoutingProvided == true
-    },
+    appRouting = if (policy == RoutingPolicyControl.SubscriptionProvider && selectedProvider?.appRoutingProvided == true) null else toSubscriptionAppRouting(),
+    routing = if (policy == RoutingPolicyControl.SubscriptionProvider && selectedProvider?.xrayRoutingProvided == true) null else toSubscriptionRouting(),
 )
+
+internal fun ProviderRoutingAvailability?.canApplyManually(
+    policy: RoutingPolicyControl,
+    selectedProvider: ProviderRoutingAvailability?,
+): Boolean = this != null &&
+    (
+        appRoutingProvided &&
+            (policy == RoutingPolicyControl.User || selectedProvider?.appRoutingProvided != true) ||
+            xrayRoutingProvided &&
+            (policy == RoutingPolicyControl.User || selectedProvider?.xrayRoutingProvided != true)
+        )
 
 sealed interface HomeUiEvent {
     data class Toast(val message: String) : HomeUiEvent
@@ -178,14 +184,15 @@ class HomeViewModel(
         // Overlaying the latency states copies every list item and reruns on each probe result;
         // keep that churn off the main dispatcher.
         .flowOn(defaultDispatcher)
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), homeData.value?.serverItems.orEmpty())
+        // Retain the prepared list while another tab is visible; returning must not replay it.
+        .stateIn(viewModelScope, SharingStarted.Eagerly, homeData.value?.serverItems.orEmpty())
 
     val serversBySubscription: StateFlow<Map<Long, List<ServerListItem>>> = serverItems
         .map { items -> items.groupBy { it.entity.subscriptionId } }
         .flowOn(defaultDispatcher)
         .stateIn(
             viewModelScope,
-            SharingStarted.WhileSubscribed(5000),
+            SharingStarted.Eagerly,
             serverItems.value.groupBy { it.entity.subscriptionId },
         )
 
@@ -206,19 +213,12 @@ class HomeViewModel(
 
     val routingPolicyControl: StateFlow<RoutingPolicyControl> = settingsRepo.routingPolicyControl
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), RoutingPolicyControl.default)
+    internal val providerRoutingBySubscription: StateFlow<Map<Long, ProviderRoutingAvailability>> = homeData
+        .map { it?.providerRoutingBySubscription.orEmpty() }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, homeData.value?.providerRoutingBySubscription.orEmpty())
     internal val providerRoutingAvailability: StateFlow<ProviderRoutingAvailability?> = homeData
-        .map { data ->
-            data?.let {
-                selectedProviderRoutingAvailability(it.selectedServerId, it.servers, it.subscriptions)
-            }
-        }
-        .stateIn(
-            viewModelScope,
-            SharingStarted.WhileSubscribed(5000),
-            homeData.value?.let {
-                selectedProviderRoutingAvailability(it.selectedServerId, it.servers, it.subscriptions)
-            },
-        )
+        .map { it?.selectedProviderRouting }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, homeData.value?.selectedProviderRouting)
 
     val selectedServer: StateFlow<ServerConfig?> = homeData
         .map { it?.selectedServer }

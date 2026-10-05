@@ -6,9 +6,11 @@ import com.material.xray.core.android.locale.appLocaleChanges
 import com.material.xray.core.android.locale.forAppLanguage
 import com.material.xray.core.android.locale.localizedString
 import com.material.xray.core.common.di.ApplicationScope
+import com.material.xray.core.data.repository.ProviderRoutingAvailability
 import com.material.xray.core.data.repository.ServerRepository
 import com.material.xray.core.data.repository.SettingsRepository
 import com.material.xray.core.data.repository.SubscriptionRepository
+import com.material.xray.core.data.repository.providerRoutingAvailability
 import com.material.xray.core.database.entity.ServerEntity
 import com.material.xray.core.database.entity.SubscriptionEntity
 import com.material.xray.core.model.ServerConfig
@@ -23,6 +25,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.serialization.json.Json
@@ -38,6 +41,8 @@ data class HomeData(
     val serverItems: List<ServerListItem>,
     val selectedServerId: Long,
     val selectedServer: ServerConfig?,
+    val providerRoutingBySubscription: Map<Long, ProviderRoutingAvailability>,
+    val selectedProviderRouting: ProviderRoutingAvailability?,
 )
 
 /**
@@ -67,20 +72,29 @@ class HomeDataState(
     // for servers that no longer exist do not accumulate for the lifetime of the process.
     private var endpointSummaryCache = mapOf<String, String>()
 
+    // Routing JSON belongs in the background snapshot, including for collapsed cards. Rebuild
+    // it only when subscriptions change, rather than on every server latency update or tab entry.
+    private val subscriptionsWithRouting = subscriptionRepository.observeAll().map { subscriptions ->
+        subscriptions to subscriptions.associate { it.id to it.providerRoutingAvailability() }
+    }
+
     val data: StateFlow<HomeData?> = combine(
-        subscriptionRepository.observeAll(),
+        subscriptionsWithRouting,
         serverRepository.observeAll(),
         settingsRepository.lastServerId,
         appLocaleChanges.onStart { emit(Unit) },
-    ) { subscriptions, servers, selectedServerId, _ ->
+    ) { (subscriptions, providerRouting), servers, selectedServerId, _ ->
+        val selectedEntity = servers.find { it.id == selectedServerId }
         HomeData(
             subscriptions = subscriptions,
             servers = servers,
             serverItems = buildServerItems(servers),
             selectedServerId = selectedServerId,
-            selectedServer = servers.find { it.id == selectedServerId }?.let { entity ->
+            selectedServer = selectedEntity?.let { entity ->
                 runCatching { serverRepository.parseConfig(entity) }.getOrNull()
             },
+            providerRoutingBySubscription = providerRouting,
+            selectedProviderRouting = selectedEntity?.subscriptionId?.let(providerRouting::get),
         )
     }
         // Building the list items decodes every server config JSON, which grows with the number

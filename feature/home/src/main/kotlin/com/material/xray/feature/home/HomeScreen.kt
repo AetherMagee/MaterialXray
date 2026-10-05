@@ -413,7 +413,7 @@ fun HomeScreen(
                     contentType = { "subscription" },
                 ) { subscription ->
                     val servers = uiState.serversBySubscription[subscription.id].orEmpty()
-                    val manualRouting = subscription.manualRoutingData(
+                    val canApplyRouting = uiState.providerRoutingBySubscription[subscription.id].canApplyManually(
                         policy = uiState.routingPolicyControl,
                         selectedProvider = uiState.providerRoutingAvailability,
                     )
@@ -429,7 +429,7 @@ fun HomeScreen(
                         selectedServerId = uiState.selectedServerId,
                         defaultPingMethod = uiState.defaultPingMethod,
                         showBothLatencyResults = uiState.showBothLatencyResults,
-                        canApplyRouting = manualRouting.appRouting != null || manualRouting.routing != null,
+                        canApplyRouting = canApplyRouting,
                         canCollapse = subscriptions.size > 1,
                         expanded = subscription.id !in collapsedSubscriptionIds,
                         canReorder = subscriptions.size > 1,
@@ -1025,6 +1025,7 @@ private fun collectHomeUiState(viewModel: HomeViewModel): HomeUiState {
     val showBothLatencyResults by viewModel.showBothLatencyResults.collectAsStateWithLifecycle()
     val routingPolicyControl by viewModel.routingPolicyControl.collectAsStateWithLifecycle()
     val providerRoutingAvailability by viewModel.providerRoutingAvailability.collectAsStateWithLifecycle()
+    val providerRoutingBySubscription by viewModel.providerRoutingBySubscription.collectAsStateWithLifecycle()
     val pendingSubscriptionRouting by viewModel.pendingSubscriptionRouting.collectAsStateWithLifecycle()
     val availableUpdate by viewModel.availableUpdate.collectAsStateWithLifecycle()
     val appUpdateInstallProgress by viewModel.appUpdateInstallProgress.collectAsStateWithLifecycle()
@@ -1049,6 +1050,7 @@ private fun collectHomeUiState(viewModel: HomeViewModel): HomeUiState {
         showBothLatencyResults = showBothLatencyResults,
         routingPolicyControl = routingPolicyControl,
         providerRoutingAvailability = providerRoutingAvailability,
+        providerRoutingBySubscription = providerRoutingBySubscription,
         pendingSubscriptionRouting = pendingSubscriptionRouting,
         availableUpdate = availableUpdate,
         appUpdateInstallProgress = appUpdateInstallProgress,
@@ -1114,6 +1116,7 @@ private data class HomeUiState(
     val showBothLatencyResults: Boolean,
     val routingPolicyControl: RoutingPolicyControl,
     val providerRoutingAvailability: ProviderRoutingAvailability?,
+    val providerRoutingBySubscription: Map<Long, ProviderRoutingAvailability>,
     val pendingSubscriptionRouting: SubscriptionRoutingData?,
     val availableUpdate: AppUpdate?,
     val appUpdateInstallProgress: AppUpdateInstallProgress?,
