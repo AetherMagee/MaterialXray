@@ -36,7 +36,7 @@
     <string name="settings_xray_core_update_action">When a new version releases</string>
     <string name="settings_xray_core_update_action_notify">Notify me</string>
     <string name="settings_xray_core_update_action_install">Update automatically</string>
-    <string name="settings_xray_core_summary_built_in">v%1$s · Built-in</string>
+    <string name="settings_xray_core_summary_built_in">v%1$s (built-in)</string>
     <string name="settings_xray_core_summary_custom">v%1$s · Custom</string>
     <string name="notification_channel_xray_core_updates">Xray core updates</string>
     <string name="notification_xray_core_update_title">New Xray core available</string>

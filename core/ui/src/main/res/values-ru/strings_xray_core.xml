@@ -36,7 +36,7 @@
     <string name="settings_xray_core_update_action">Когда выходит новая версия</string>
     <string name="settings_xray_core_update_action_notify">Уведомить меня</string>
     <string name="settings_xray_core_update_action_install">Обновить автоматически</string>
-    <string name="settings_xray_core_summary_built_in">v%1$s · Встроенное</string>
+    <string name="settings_xray_core_summary_built_in">v%1$s (встроенное)</string>
     <string name="settings_xray_core_summary_custom">v%1$s · Своё</string>
     <string name="notification_channel_xray_core_updates">Обновления ядра Xray</string>
     <string name="notification_xray_core_update_title">Доступно новое ядро Xray</string>
