@@ -42,43 +42,34 @@ import org.koin.compose.viewmodel.koinViewModel
  */
 internal fun appEntryProvider(
     navigator: Navigator,
-    chrome: State<TabChromeState>,
     settings: State<SettingsSnapshot>,
     pendingSubscriptionLink: State<String?>,
     onSubscriptionLinkHandled: State<() -> Unit>,
     addSubscriptionFocusRequester: FocusRequester,
 ): (NavKey) -> NavEntry<NavKey> = entryProvider {
     entry<HomeKey> {
-        TabChrome(chrome.value) {
-            HomeScreen(
-                showTitleBarLogo = settings.value.showTitleBarLogo,
-                floatingConnectButton = settings.value.floatingConnectButton,
-                pendingSubscriptionLink = pendingSubscriptionLink.value,
-                onSubscriptionLinkHandled = { onSubscriptionLinkHandled.value() },
-                onOpenServerConfig = { serverId, name ->
-                    navigator.openDetail(ConfigViewerKey(ConfigViewerTarget.Server(serverId, name)))
-                },
-                onViewRunningConfig = { navigator.openDetail(ConfigViewerKey(ConfigViewerTarget.Running)) },
-                addSubscriptionFocusRequester = addSubscriptionFocusRequester,
-            )
-        }
+        HomeScreen(
+            showTitleBarLogo = settings.value.showTitleBarLogo,
+            floatingConnectButton = settings.value.floatingConnectButton,
+            pendingSubscriptionLink = pendingSubscriptionLink.value,
+            onSubscriptionLinkHandled = { onSubscriptionLinkHandled.value() },
+            onOpenServerConfig = { serverId, name ->
+                navigator.openDetail(ConfigViewerKey(ConfigViewerTarget.Server(serverId, name)))
+            },
+            onViewRunningConfig = { navigator.openDetail(ConfigViewerKey(ConfigViewerTarget.Running)) },
+            addSubscriptionFocusRequester = addSubscriptionFocusRequester,
+        )
     }
     entry<RoutingKey> {
-        TabChrome(chrome.value) {
-            RoutingScreen(
-                showTitleBarLogo = settings.value.showTitleBarLogo,
-                onViewRule = { request -> navigator.openDetail(RoutingRuleViewerKey(Json.encodeToString(request))) },
-                onEditRule = { rule -> navigator.openDetail(RoutingRuleEditorKey(Json.encodeToString(rule))) },
-                viewModel = activityRoutingViewModel(),
-            )
-        }
+        RoutingScreen(
+            showTitleBarLogo = settings.value.showTitleBarLogo,
+            onViewRule = { request -> navigator.openDetail(RoutingRuleViewerKey(Json.encodeToString(request))) },
+            onEditRule = { rule -> navigator.openDetail(RoutingRuleEditorKey(Json.encodeToString(rule))) },
+            viewModel = activityRoutingViewModel(),
+        )
     }
-    entry<LogsKey> {
-        TabChrome(chrome.value) { LogsScreen(settings.value.showTitleBarLogo) }
-    }
-    entry<SettingsKey> {
-        TabChrome(chrome.value) { SettingsScreen(settings.value.showTitleBarLogo, xrayCorePage = xrayCoreSettingsPage) }
-    }
+    entry<LogsKey> { LogsScreen(settings.value.showTitleBarLogo) }
+    entry<SettingsKey> { SettingsScreen(settings.value.showTitleBarLogo, xrayCorePage = xrayCoreSettingsPage) }
     entry<ConfigViewerKey> { key ->
         val request = remember(key) { key.request.toConfigViewerRequest() }
         ConfigViewerScreen(request = request, onBack = navigator::closeDetail)

@@ -91,6 +91,30 @@ fun NavigationState.toEntries(entryProvider: (NavKey) -> NavEntry<NavKey>): List
     return stacksInUse.flatMap { decoratedEntries.getValue(it) }
 }
 
+/** Tabs stay in a clipped viewport; only the selected tab's detail goes into the window overlay. */
+data class NavigationEntryLayers(
+    val tabs: List<NavEntry<NavKey>>,
+    val details: List<NavEntry<NavKey>>,
+)
+
+@Composable
+fun NavigationState.toEntryLayers(entryProvider: (NavKey) -> NavEntry<NavKey>): NavigationEntryLayers = splitEntryLayers(toEntries(entryProvider), topLevelKey, currentDetailKey = currentStack.last() as? DetailKey)
+
+internal fun splitEntryLayers(
+    entries: List<NavEntry<NavKey>>,
+    currentTab: TopLevelKey,
+    currentDetailKey: DetailKey?,
+): NavigationEntryLayers {
+    // The empty backdrop lets detail scenes cover or dim the persistent chrome beneath them.
+    val backdrop = NavEntry<NavKey>(currentTab) {}.withNavKey(currentTab)
+    return NavigationEntryLayers(
+        tabs = entries.filter { it.navKey is TopLevelKey },
+        details = listOf(backdrop) + listOfNotNull(
+            entries.lastOrNull()?.takeIf { currentDetailKey != null && it.navKey == currentDetailKey },
+        ),
+    )
+}
+
 /**
  * The key an entry was created for. `NavEntry` keeps its key private, and the scene strategy and the
  * transitions need it, so [toEntries] records it in the entry's metadata.

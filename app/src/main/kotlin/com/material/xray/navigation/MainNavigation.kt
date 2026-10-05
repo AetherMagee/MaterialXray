@@ -1,10 +1,12 @@
 package com.material.xray.navigation
 
-import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.foundation.background
+import androidx.compose.foundation.focusGroup
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -14,13 +16,18 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.compose.rememberLifecycleOwner
 import androidx.navigation3.ui.NavDisplay
 import com.material.xray.core.navigation.HomeKey
 import com.material.xray.core.navigation.LogsKey
@@ -32,17 +39,13 @@ import com.material.xray.core.navigation.TopLevelKeys
 import com.material.xray.core.navigation.appPredictivePopTransitionSpec
 import com.material.xray.core.navigation.appTransitionSpec
 import com.material.xray.core.navigation.rememberDetailSheetSceneStrategy
-import com.material.xray.core.navigation.toEntries
+import com.material.xray.core.navigation.toEntryLayers
 import com.material.xray.core.ui.R
 import com.material.xray.core.ui.adaptive.TwoPaneMinWidth
 import com.material.xray.core.ui.components.TopBarTint
 import org.koin.compose.viewmodel.koinViewModel
 
-/**
- * The app's navigation: one `NavDisplay` filling the window. Tabs carry the bar or rail with them
- * ([TabChrome]); details are pushed on the current tab's stack and either fill the window or, on a
- * wide one, open as an end-edge sheet over the tab.
- */
+/** Persistent tab chrome with one display for tabs and a full-window overlay for details. */
 @Composable
 fun MainNavigation(
     navigationState: NavigationState,
@@ -98,30 +101,54 @@ fun MainNavigation(
         scrimClickLabel = stringResource(R.string.navigation_close_sheet),
     )
 
-    // Painted behind the scenes so that, while two of them cross-fade, the gap shows the same colour
-    // as the tabs' own Scaffolds rather than the window background.
-    SharedTransitionLayout(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        val chrome = TabChromeState(
-            visibleTabs = visibleTabs,
-            selectedTab = { navigator.currentTopLevelKey },
-            onSelectTab = { tab: TopLevelKey -> navigator.selectTab(tab) },
-            sharedTransitionScope = this,
-            topBarTint = topBarTint,
+    val entryProvider = remember(navigator) {
+        appEntryProvider(
+            navigator = navigator,
+            settings = settingsState,
+            pendingSubscriptionLink = subscriptionLinkState,
+            onSubscriptionLinkHandled = onSubscriptionLinkHandledState,
+            addSubscriptionFocusRequester = addSubscriptionFocusRequester,
         )
-        val chromeState = rememberUpdatedState(chrome)
-        val entryProvider = remember(navigator) {
-            appEntryProvider(
-                navigator = navigator,
-                chrome = chromeState,
-                settings = settingsState,
-                pendingSubscriptionLink = subscriptionLinkState,
-                onSubscriptionLinkHandled = onSubscriptionLinkHandledState,
-                addSubscriptionFocusRequester = addSubscriptionFocusRequester,
-            )
+    }
+    val layers = navigationState.toEntryLayers(entryProvider)
+    val hasDetail = layers.details.size > 1
+    val backgroundLifecycle = rememberLifecycleOwner(
+        maxLifecycle = if (hasDetail) Lifecycle.State.STARTED else Lifecycle.State.RESUMED,
+    )
+    val focusManager = LocalFocusManager.current
+    var backgroundHasFocus by remember { mutableStateOf(false) }
+    LaunchedEffect(hasDetail) {
+        if (hasDetail && backgroundHasFocus) focusManager.clearFocus()
+    }
+    val backgroundModifier = Modifier
+        .then(if (hasDetail) Modifier.clearAndSetSemantics {} else Modifier)
+        .onFocusChanged { backgroundHasFocus = it.hasFocus }
+        .focusProperties { onEnter = { if (hasDetail) cancelFocusChange() } }
+        .focusGroup()
+
+    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        CompositionLocalProvider(LocalLifecycleOwner provides backgroundLifecycle) {
+            TabChrome(
+                state = TabChromeState(
+                    visibleTabs = visibleTabs,
+                    selectedTab = { navigator.currentTopLevelKey },
+                    onSelectTab = { tab: TopLevelKey -> navigator.selectTab(tab) },
+                    topBarTint = topBarTint,
+                ),
+                modifier = backgroundModifier,
+            ) {
+                NavDisplay(
+                    entries = layers.tabs,
+                    onBack = navigator::goBack,
+                    transitionSpec = appTransitionSpec(visibleTabs, layoutDirectionSign, interruptedDirection),
+                    popTransitionSpec = appTransitionSpec(visibleTabs, layoutDirectionSign, interruptedDirection),
+                    predictivePopTransitionSpec = appPredictivePopTransitionSpec(visibleTabs, layoutDirectionSign, interruptedDirection),
+                )
+            }
         }
         NavDisplay(
-            entries = navigationState.toEntries(entryProvider),
-            onBack = navigator::goBack,
+            entries = layers.details,
+            onBack = navigator::closeDetail,
             sceneStrategies = listOf(detailSheetStrategy),
             transitionSpec = appTransitionSpec(visibleTabs, layoutDirectionSign, interruptedDirection),
             popTransitionSpec = appTransitionSpec(visibleTabs, layoutDirectionSign, interruptedDirection),
