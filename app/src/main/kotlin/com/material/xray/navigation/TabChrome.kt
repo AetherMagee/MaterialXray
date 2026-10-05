@@ -189,7 +189,7 @@ private fun AnimatedTabLabel(tab: TopLevelKey, selected: Boolean) {
         contentAlignment = Alignment.Center,
     ) {
         Text(label, fontWeight = FontWeight.Normal, modifier = Modifier.graphicsLayer { alpha = 1f - emphasis })
-        Text(label, fontWeight = FontWeight.Medium, modifier = Modifier.graphicsLayer { alpha = emphasis })
+        Text(label, fontWeight = FontWeight.SemiBold, modifier = Modifier.graphicsLayer { alpha = emphasis })
     }
 }
 

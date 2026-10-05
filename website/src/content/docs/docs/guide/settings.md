@@ -40,7 +40,7 @@ Advanced options cover the Xray log level, buffer size, TUN MTU, a RAM threshold
 
 ## Appearance and notifications
 
-The navigation bar and rail stay in place while tab content moves within its viewport, so the selected highlight animates continuously. The active tab label smoothly changes to medium weight. Detail screens, including DNS and Xray-core settings, open over the navigation controls with a platform-style slide. Predictive Back previews the previous screen and can be cancelled; on wide windows, the detail sheet slides in from the edge and dims the controls beneath it.
+The navigation bar and rail stay in place while tab content moves within its viewport, so the selected highlight animates continuously. The active tab label smoothly changes to semibold weight. Detail screens, including DNS and Xray-core settings, open over the navigation controls with a platform-style slide. Predictive Back previews the previous screen and can be cancelled; on wide windows, the detail sheet slides in from the edge and dims the controls beneath it.
 
 - **App language**: English or Russian, or follow the system.
 - **App icon**: the default icon or a Material-style alternative.
