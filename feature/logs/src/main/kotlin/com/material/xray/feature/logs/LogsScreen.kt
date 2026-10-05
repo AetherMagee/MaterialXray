@@ -10,11 +10,14 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -174,117 +177,124 @@ fun LogsScreen(showTitleBarLogo: Boolean, viewModel: LogsViewModel = koinViewMod
     Scaffold(
         contentWindowInsets = WindowInsets(0.dp),
         topBar = {
-            TopAppBar(
-                title = {
-                    AppBarTitle(
-                        if (selectionMode) {
-                            stringResource(R.string.logs_selected_count, selectedEntries.size)
-                        } else {
-                            stringResource(R.string.navigation_logs)
-                        },
-                        showTitleBarLogo && !selectionMode,
-                    )
-                },
-                navigationIcon = {
-                    if (selectionMode) {
-                        TooltipIconButton(
-                            tooltip = stringResource(R.string.logs_cancel_selection),
-                            onClick = { selectedIds = emptySet() },
-                        ) {
-                            Icon(Icons.Default.Close, contentDescription = stringResource(R.string.logs_cancel_selection))
-                        }
-                    }
-                },
-                expandedHeight = AppTopBarHeight,
-                windowInsets = TopAppBarDefaults.windowInsets,
-                actions = {
-                    if (selectionMode) {
-                        TooltipIconButton(
-                            tooltip = stringResource(R.string.logs_copy_selected),
-                            onClick = {
-                                viewModel.copyEntries(selectedEntries)
-                                Toast.makeText(context, R.string.logs_copied, Toast.LENGTH_SHORT).show()
-                                selectedIds = emptySet()
+            AnimatedContent(
+                targetState = selectionMode to selectedEntries,
+                contentKey = { it.first },
+                transitionSpec = { fadeIn(tween(300)) togetherWith fadeOut(tween(300)) using null },
+                label = "logsHeader",
+            ) { (selecting, entries) ->
+                TopAppBar(
+                    title = {
+                        AppBarTitle(
+                            if (selecting) {
+                                stringResource(R.string.logs_selected_count, entries.size)
+                            } else {
+                                stringResource(R.string.navigation_logs)
                             },
-                        ) {
-                            Icon(Icons.Default.ContentCopy, contentDescription = stringResource(R.string.logs_copy_selected))
-                        }
-                    } else {
-                        Box {
+                            showTitleBarLogo && !selecting,
+                        )
+                    },
+                    navigationIcon = {
+                        if (selecting) {
                             TooltipIconButton(
-                                tooltip = stringResource(R.string.logs_export),
-                                enabled = !isExporting,
-                                onClick = { showExportMenu = true },
+                                tooltip = stringResource(R.string.logs_cancel_selection),
+                                onClick = { selectedIds = emptySet() },
                             ) {
-                                Icon(Icons.Default.Save, contentDescription = stringResource(R.string.logs_export))
+                                Icon(Icons.Default.Close, contentDescription = stringResource(R.string.logs_cancel_selection))
                             }
-                            AnimatedDropdownMenu(
-                                expanded = showExportMenu,
-                                onDismissRequest = { showExportMenu = false },
+                        }
+                    },
+                    expandedHeight = AppTopBarHeight,
+                    windowInsets = TopAppBarDefaults.windowInsets,
+                    actions = {
+                        if (selecting) {
+                            TooltipIconButton(
+                                tooltip = stringResource(R.string.logs_copy_selected),
+                                onClick = {
+                                    viewModel.copyEntries(entries)
+                                    Toast.makeText(context, R.string.logs_copied, Toast.LENGTH_SHORT).show()
+                                    selectedIds = emptySet()
+                                },
                             ) {
-                                DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.logs_save_to_file)) },
-                                    leadingIcon = { Icon(Icons.Default.Save, contentDescription = null) },
-                                    onClick = {
-                                        showExportMenu = false
-                                        try {
-                                            saveLogsLauncher.launch(LOG_EXPORT_FILE_NAME)
-                                        } catch (_: ActivityNotFoundException) {
-                                            Toast.makeText(
-                                                context,
-                                                R.string.logs_save_failed,
-                                                Toast.LENGTH_SHORT,
-                                            ).show()
-                                        }
-                                    },
-                                )
-                                DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.logs_share)) },
-                                    leadingIcon = { Icon(Icons.Default.Share, contentDescription = null) },
-                                    onClick = {
-                                        showExportMenu = false
-                                        coroutineScope.launch {
-                                            isExporting = true
+                                Icon(Icons.Default.ContentCopy, contentDescription = stringResource(R.string.logs_copy_selected))
+                            }
+                        } else {
+                            Box {
+                                TooltipIconButton(
+                                    tooltip = stringResource(R.string.logs_export),
+                                    enabled = !isExporting,
+                                    onClick = { showExportMenu = true },
+                                ) {
+                                    Icon(Icons.Default.Save, contentDescription = stringResource(R.string.logs_export))
+                                }
+                                AnimatedDropdownMenu(
+                                    expanded = showExportMenu,
+                                    onDismissRequest = { showExportMenu = false },
+                                ) {
+                                    DropdownMenuItem(
+                                        text = { Text(stringResource(R.string.logs_save_to_file)) },
+                                        leadingIcon = { Icon(Icons.Default.Save, contentDescription = null) },
+                                        onClick = {
+                                            showExportMenu = false
                                             try {
-                                                shareLogFile(context, viewModel.createShareFile())
-                                            } catch (_: IOException) {
-                                                Toast.makeText(
-                                                    context,
-                                                    R.string.logs_share_failed,
-                                                    Toast.LENGTH_SHORT,
-                                                ).show()
-                                            } catch (_: IllegalArgumentException) {
-                                                Toast.makeText(
-                                                    context,
-                                                    R.string.logs_share_failed,
-                                                    Toast.LENGTH_SHORT,
-                                                ).show()
+                                                saveLogsLauncher.launch(LOG_EXPORT_FILE_NAME)
                                             } catch (_: ActivityNotFoundException) {
                                                 Toast.makeText(
                                                     context,
-                                                    R.string.logs_share_failed,
+                                                    R.string.logs_save_failed,
                                                     Toast.LENGTH_SHORT,
                                                 ).show()
-                                            } finally {
-                                                isExporting = false
                                             }
-                                        }
-                                    },
-                                )
+                                        },
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text(stringResource(R.string.logs_share)) },
+                                        leadingIcon = { Icon(Icons.Default.Share, contentDescription = null) },
+                                        onClick = {
+                                            showExportMenu = false
+                                            coroutineScope.launch {
+                                                isExporting = true
+                                                try {
+                                                    shareLogFile(context, viewModel.createShareFile())
+                                                } catch (_: IOException) {
+                                                    Toast.makeText(
+                                                        context,
+                                                        R.string.logs_share_failed,
+                                                        Toast.LENGTH_SHORT,
+                                                    ).show()
+                                                } catch (_: IllegalArgumentException) {
+                                                    Toast.makeText(
+                                                        context,
+                                                        R.string.logs_share_failed,
+                                                        Toast.LENGTH_SHORT,
+                                                    ).show()
+                                                } catch (_: ActivityNotFoundException) {
+                                                    Toast.makeText(
+                                                        context,
+                                                        R.string.logs_share_failed,
+                                                        Toast.LENGTH_SHORT,
+                                                    ).show()
+                                                } finally {
+                                                    isExporting = false
+                                                }
+                                            }
+                                        },
+                                    )
+                                }
+                            }
+                            TooltipIconButton(tooltip = stringResource(R.string.logs_copy_all), onClick = {
+                                viewModel.copyAll()
+                                Toast.makeText(context, R.string.logs_copied, Toast.LENGTH_SHORT).show()
+                            }) {
+                                Icon(Icons.Default.ContentCopy, contentDescription = stringResource(R.string.logs_copy_all))
+                            }
+                            TooltipIconButton(tooltip = stringResource(R.string.logs_clear), onClick = { viewModel.clear() }) {
+                                Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.logs_clear))
                             }
                         }
-                        TooltipIconButton(tooltip = stringResource(R.string.logs_copy_all), onClick = {
-                            viewModel.copyAll()
-                            Toast.makeText(context, R.string.logs_copied, Toast.LENGTH_SHORT).show()
-                        }) {
-                            Icon(Icons.Default.ContentCopy, contentDescription = stringResource(R.string.logs_copy_all))
-                        }
-                        TooltipIconButton(tooltip = stringResource(R.string.logs_clear), onClick = { viewModel.clear() }) {
-                            Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.logs_clear))
-                        }
-                    }
-                },
-            )
+                    },
+                )
+            }
         },
         bottomBar = {
             SegmentedTabRow(
