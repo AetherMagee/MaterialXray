@@ -494,6 +494,7 @@ private fun SettingsScreenContent(
                         rootServiceAvailable = rootServiceAvailable,
                         rootServiceActive = rootServiceActive,
                         useRootService = useRootService,
+                        showAdvancedOptions = showAdvancedOptions,
                         rootConnectionBackend = rootConnectionBackend,
                         tunnelTetheredClients = tunnelTetheredClients,
                         otherVpnMode = otherVpnMode,
@@ -1270,6 +1271,7 @@ private fun SettingsServiceSection(
     rootServiceAvailable: Boolean,
     rootServiceActive: Boolean,
     useRootService: Boolean,
+    showAdvancedOptions: Boolean,
     rootConnectionBackend: RootConnectionBackend,
     tunnelTetheredClients: Boolean,
     otherVpnMode: OtherVpnMode,
@@ -1358,7 +1360,7 @@ private fun SettingsServiceSection(
                 onCheckedChange = actions.onTunnelTetheredClientsChange,
             )
 
-            if (rootConnectionBackend == RootConnectionBackend.Tproxy) {
+            if (showAdvancedOptions && rootConnectionBackend == RootConnectionBackend.Tproxy) {
                 ReadOnlyDropdownField(
                     label = stringResource(R.string.settings_other_vpn_mode),
                     selectedText = stringResource(otherVpnMode.labelResource),
@@ -1373,7 +1375,7 @@ private fun SettingsServiceSection(
                     onSelected = actions.onOtherVpnModeChange,
                     modifier = Modifier.padding(horizontal = 16.dp),
                 )
-            } else {
+            } else if (showAdvancedOptions) {
                 rootTunNameSetting()
             }
         }
