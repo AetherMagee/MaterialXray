@@ -17,6 +17,8 @@ import com.material.xray.core.xraycore.XrayCoreUpdateSettingsStore
 import com.material.xray.core.xraycore.newestReleaseFirst
 import java.io.IOException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -33,7 +35,8 @@ sealed interface XrayCoreReleasesState {
         val releases: List<XrayCoreRelease>,
         val hasMore: Boolean,
         val loadingMore: Boolean = false,
-        val moreFailure: XrayCoreFailure? = null,
+        val failure: XrayCoreFailure? = null,
+        val refreshing: Boolean = false,
     ) : XrayCoreReleasesState
 
     data class Failed(val failure: XrayCoreFailure) : XrayCoreReleasesState
@@ -47,10 +50,20 @@ class XrayCoreViewModel(
     private val updateSettingsStore: XrayCoreUpdateSettingsStore,
     private val updateScheduler: XrayCoreUpdateScheduler,
 ) : ViewModel() {
-    private val _releases = MutableStateFlow<XrayCoreReleasesState>(XrayCoreReleasesState.Loading)
+    private val cachedPages = manager.cachedReleasePages
+    private val _releases = MutableStateFlow<XrayCoreReleasesState>(
+        if (cachedPages.isEmpty()) {
+            XrayCoreReleasesState.Loading
+        } else {
+            XrayCoreReleasesState.Loaded(
+                releases = cachedPages.flatMap { it.releases }.distinctBy { it.tag }.sortedWith(newestReleaseFirst),
+                hasMore = cachedPages.last().hasMore,
+            )
+        },
+    )
     private val autoSelecting = MutableStateFlow(false)
-    private var releasesRequested = false
-    private var loadedPages = 0
+    private var releasesRequested = cachedPages.isNotEmpty()
+    private var loadedPages = cachedPages.size
     private var releasesJob: Job? = null
 
     val state: StateFlow<XrayCoreState> = manager.state
@@ -87,22 +100,27 @@ class XrayCoreViewModel(
         }
     }
 
-    /** Lists releases once per view model, since GitHub allows few anonymous requests an hour. */
+    /** Reuses cached pages until the user refreshes, since GitHub limits anonymous requests. */
     fun loadReleasesIfNeeded() {
         if (canDownload && !releasesRequested) loadReleases()
     }
 
     fun loadReleases() {
         releasesRequested = true
-        releasesJob?.cancel()
-        _releases.value = XrayCoreReleasesState.Loading
+        val previousJob = releasesJob
+        previousJob?.cancel()
+        val previous = (_releases.value as? XrayCoreReleasesState.Loaded)?.copy(loadingMore = false, refreshing = false)
+        _releases.value = previous?.copy(refreshing = true, failure = null) ?: XrayCoreReleasesState.Loading
         releasesJob = viewModelScope.launch {
+            // Let an in-flight page finish cancellation before replacing its cached list.
+            previousJob?.join()
             _releases.value = try {
                 val page = manager.releases(page = 1)
                 loadedPages = 1
                 XrayCoreReleasesState.Loaded(page.releases, page.hasMore)
             } catch (error: XrayCoreException) {
-                XrayCoreReleasesState.Failed(error.failure)
+                currentCoroutineContext().ensureActive()
+                previous?.copy(failure = error.failure) ?: XrayCoreReleasesState.Failed(error.failure)
             }
         }
     }
@@ -110,8 +128,8 @@ class XrayCoreViewModel(
     /** Fetches the next page of releases, only when the user asks for older ones. */
     fun loadMoreReleases() {
         val loaded = _releases.value as? XrayCoreReleasesState.Loaded ?: return
-        if (!loaded.hasMore || loaded.loadingMore) return
-        _releases.value = loaded.copy(loadingMore = true, moreFailure = null)
+        if (!loaded.hasMore || loaded.loadingMore || loaded.refreshing) return
+        _releases.value = loaded.copy(loadingMore = true, failure = null)
         releasesJob = viewModelScope.launch {
             _releases.value = try {
                 val page = manager.releases(page = loadedPages + 1)
@@ -121,7 +139,8 @@ class XrayCoreViewModel(
                     hasMore = page.hasMore,
                 )
             } catch (error: XrayCoreException) {
-                loaded.copy(moreFailure = error.failure)
+                currentCoroutineContext().ensureActive()
+                loaded.copy(failure = error.failure)
             }
         }
     }

@@ -34,7 +34,7 @@ Resolvers are comma-separated and tried in order. Each one is an IP address or a
 
 ## Core
 
-**Choose Xray-core version** opens the core manager. **Check for new Xray-core versions automatically** has a separate switch and interval picker: tap the text to choose **12 hours**, **1 day**, **3 days**, or **1 week** (default). Changing this interval does not affect app update checks. When checks are enabled, choose whether to be notified of a new core or install it automatically. The interval is included in backups.
+**Choose Xray-core version** opens the core manager. **Check for new Xray-core versions automatically** has a separate switch and interval picker: tap the text to choose **12 hours**, **1 day**, **3 days**, or **1 week** (default). Changing this interval does not affect app update checks. When checks are enabled, choose whether to be notified of a new core or install it automatically. The interval is included in backups. Loaded version pages are cached across app restarts; reopening the picker reuses them. Tap Refresh to fetch the latest list. A failed refresh keeps the cached list available, while automatic update checks always request current releases.
 
 Advanced options cover the Xray log level, buffer size, TUN MTU, a RAM threshold that restarts the core, the latency-check URL, and geodata URLs and update interval.
 

@@ -23,6 +23,8 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -78,6 +80,7 @@ class XrayCoreManager(
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     private val store = XrayCoreStore(paths)
+    private val releaseCache = XrayCoreReleaseCache(paths, platformInfo.primaryAbi)
     private val workingDir get() = File(paths.filesDir, "bin").apply { mkdirs() }
     private val _state = MutableStateFlow(XrayCoreState())
     private var job: Job? = null
@@ -97,11 +100,22 @@ class XrayCoreManager(
         }
     }
 
-    /** Page [page], counted from 1, of the upstream releases this device can run, newest first. */
+    /** Already loaded pages, kept across screen and process recreation. */
+    val cachedReleasePages: List<XrayCoreReleasePage> get() = releaseCache.pages
+
+    /** Fetches page [page], counted from 1, and caches it for the version picker. */
     suspend fun releases(page: Int): XrayCoreReleasePage = withContext(ioDispatcher) {
+        val result = fetchReleases(page)
+        currentCoroutineContext().ensureActive()
+        releaseCache.save(page, result)
+        result
+    }
+
+    private suspend fun fetchReleases(page: Int): XrayCoreReleasePage {
         try {
-            httpClient.use { client -> fetchXrayCoreReleases(client, platformInfo.primaryAbi, page) }
+            return httpClient.use { client -> fetchXrayCoreReleases(client, platformInfo.primaryAbi, page) }
         } catch (error: IOException) {
+            currentCoroutineContext().ensureActive()
             log.append(LogSource.APP, "Listing Xray releases failed: ${error.describe()}")
             throw error as? XrayCoreException ?: XrayCoreException(XrayCoreFailure.Network, error)
         }
@@ -110,7 +124,9 @@ class XrayCoreManager(
     /** The newest release if it is newer than every core on the device, for periodic update checks. */
     suspend fun findUpdate(): XrayCoreRelease? {
         initialization.join()
-        return releases(page = 1).releases.firstOrNull()?.takeIf { _state.value.isNewerThanEveryCore(it.tag) }
+        // Scheduled checks always fetch fresh data without replacing the picker's paginated cache.
+        return withContext(ioDispatcher) { fetchReleases(page = 1) }
+            .releases.firstOrNull()?.takeIf { _state.value.isNewerThanEveryCore(it.tag) }
     }
 
     /** Installs [release] and waits for it, or returns null when it failed or another install was running. */

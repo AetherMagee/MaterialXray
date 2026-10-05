@@ -179,7 +179,7 @@ fun XrayCoreScreen(
         ) {
             item(key = "versions_header") {
                 VersionsHeader(
-                    loading = viewModel.canDownload && releases == XrayCoreReleasesState.Loading,
+                    loading = viewModel.canDownload && (releases == XrayCoreReleasesState.Loading || loaded?.refreshing == true),
                     canRefresh = viewModel.canDownload,
                     onRefresh = viewModel::loadReleases,
                 )
@@ -197,7 +197,7 @@ fun XrayCoreScreen(
                     modifier = if (entry.key == firstNewKey) Modifier.focusRequester(firstNewFocus) else Modifier,
                 )
             }
-            if (loaded?.hasMore == true) {
+            if (loaded?.hasMore == true && !loaded.refreshing) {
                 item(key = "show_more") {
                     // Centred under the full-width rows, or a remote's Down skips it: focus search
                     // favours the candidate whose centre lines up. It stays enabled while loading so
@@ -391,7 +391,7 @@ private fun coreEntries(state: XrayCoreState, releases: List<XrayCoreRelease>): 
 private fun releasesNote(canDownload: Boolean, releases: XrayCoreReleasesState): Pair<String, Boolean>? = when {
     !canDownload -> stringResource(R.string.settings_xray_core_releases_unavailable) to false
     releases is XrayCoreReleasesState.Failed -> failureText(releases.failure) to true
-    releases is XrayCoreReleasesState.Loaded && releases.moreFailure != null -> failureText(releases.moreFailure) to true
+    releases is XrayCoreReleasesState.Loaded && releases.failure != null -> failureText(releases.failure) to true
     releases is XrayCoreReleasesState.Loaded && releases.releases.isEmpty() ->
         stringResource(R.string.settings_xray_core_releases_empty) to false
     else -> null

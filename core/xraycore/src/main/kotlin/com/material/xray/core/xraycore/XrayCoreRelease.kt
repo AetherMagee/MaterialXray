@@ -1,6 +1,7 @@
 package com.material.xray.core.xraycore
 
 import java.io.IOException
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.booleanOrNull
@@ -13,6 +14,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 
 /** An upstream Xray release that has a verifiable build for this device. */
+@Serializable
 data class XrayCoreRelease(
     val tag: String,
     val publishedAt: String,
@@ -22,6 +24,7 @@ data class XrayCoreRelease(
 )
 
 /** One page of [fetchXrayCoreReleases]; [hasMore] says whether a later page can hold supported releases. */
+@Serializable
 data class XrayCoreReleasePage(val releases: List<XrayCoreRelease>, val hasMore: Boolean)
 
 /**
