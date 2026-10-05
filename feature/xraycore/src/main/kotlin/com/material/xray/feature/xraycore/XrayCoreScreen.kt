@@ -21,6 +21,8 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -74,6 +76,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -131,6 +134,7 @@ fun XrayCoreScreen(
     // Checks still run without the permission, but neither outcome could be shown.
     val notificationPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
     val context = LocalContext.current
+    val layoutDirection = LocalLayoutDirection.current
 
     val activity = LocalActivity.current
     LaunchedEffect(viewModel) { viewModel.loadReleasesIfNeeded() }
@@ -181,8 +185,14 @@ fun XrayCoreScreen(
             state = listState,
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding),
-            contentPadding = PaddingValues(vertical = 8.dp),
+                .padding(top = padding.calculateTopPadding()),
+            // The inset belongs to the scrolling content so rows can pass behind the gesture bar.
+            contentPadding = PaddingValues(
+                start = padding.calculateStartPadding(layoutDirection),
+                top = 8.dp,
+                end = padding.calculateEndPadding(layoutDirection),
+                bottom = padding.calculateBottomPadding() + 8.dp,
+            ),
         ) {
             item(key = "versions_header") {
                 VersionsHeader(
