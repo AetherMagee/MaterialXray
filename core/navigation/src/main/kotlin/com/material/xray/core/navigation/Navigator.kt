@@ -10,6 +10,13 @@ class Navigator(private val state: NavigationState) {
     /** The tab that was selected before the current one; feeds the interrupted-slide rule. */
     private var previousTopLevelKey by mutableStateOf(state.topLevelKey)
 
+    private var homeTapOrigin by mutableStateOf<TopLevelKey?>(null)
+
+    /** Home taps are forward tab changes; only Back removes the previous tab visually. */
+    val displayStacks: List<TopLevelKey>
+        get() = homeTapOrigin?.takeIf { state.topLevelKey == state.startKey }
+            ?.let { listOf(it, state.startKey) } ?: state.stacksInUse
+
     val currentTopLevelKey: TopLevelKey
         get() = state.topLevelKey
 
@@ -28,7 +35,12 @@ class Navigator(private val state: NavigationState) {
     fun selectTab(key: TopLevelKey) {
         require(key in state.backStacks) { "No back stack for $key" }
         if (key == state.topLevelKey) return
+        switchTab(key, fromTap = true)
+    }
+
+    private fun switchTab(key: TopLevelKey, fromTap: Boolean) {
         previousTopLevelKey = state.topLevelKey
+        homeTapOrigin = previousTopLevelKey.takeIf { fromTap && key == state.startKey }
         state.topLevelKey = key
     }
 
@@ -55,7 +67,7 @@ class Navigator(private val state: NavigationState) {
         val stack = state.currentStack
         when {
             stack.size > 1 -> stack.removeAt(stack.lastIndex)
-            state.topLevelKey != state.startKey -> selectTab(state.startKey)
+            state.topLevelKey != state.startKey -> switchTab(state.startKey, fromTap = false)
         }
     }
 

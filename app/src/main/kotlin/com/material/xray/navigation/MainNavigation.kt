@@ -125,8 +125,8 @@ fun MainNavigation(
         scrimClickLabel = stringResource(R.string.navigation_close_sheet),
     )
 
-    val entryProvider = remember(navigator, homeViewModel) {
-        appEntryProvider(
+    val entryProvider = remember(navigationState, navigator, homeViewModel) {
+        val provider = appEntryProvider(
             navigator = navigator,
             homeViewModel = homeViewModel,
             settings = settingsState,
@@ -134,8 +134,9 @@ fun MainNavigation(
             onSubscriptionLinkHandled = onSubscriptionLinkHandledState,
             addSubscriptionFocusRequester = addSubscriptionFocusRequester,
         )
+        return@remember { key: NavKey -> provider(key).withTabLifecycle(key, navigator, navigationState.startKey) }
     }
-    val layers = navigationState.toEntryLayers(entryProvider)
+    val layers = navigationState.toEntryLayers(entryProvider, navigator.displayStacks)
     val hasDetail = layers.details.size > 1
     val backgroundLifecycle = rememberLifecycleOwner(
         maxLifecycle = if (hasDetail) Lifecycle.State.STARTED else Lifecycle.State.RESUMED,
@@ -187,7 +188,8 @@ fun MainNavigation(
                 val tabBack = rememberNavigationEventState(tabScene)
                 // Only the visible page may handle Back. The outer page owns detail gestures,
                 // while a screen's own editor handler still takes precedence over navigation.
-                if (!hasDetail) NavigationBackHandler(tabScene, tabBack, onBackCompleted = navigator::goBack)
+                // Home exits the app even when another tab is retained under its tap animation.
+                if (!hasDetail && currentTab != navigationState.startKey) NavigationBackHandler(tabScene, tabBack, onBackCompleted = navigator::goBack)
                 NavDisplay(
                     sceneState = tabScene,
                     navigationEventState = tabBack,
@@ -221,5 +223,18 @@ fun MainNavigation(
             popTransitionSpec = appDetailTransitionSpec(layoutDirectionSign, isPop = true),
             predictivePopTransitionSpec = appDetailPredictivePopTransitionSpec(layoutDirectionSign),
         )
+    }
+}
+
+/** Keep a tab retained beneath a Home tap from handling Back or collecting screen data. */
+private fun NavEntry<NavKey>.withTabLifecycle(key: NavKey, navigator: Navigator, startKey: TopLevelKey): NavEntry<NavKey> {
+    if (key !is TopLevelKey) return this
+    val entry = this
+    return NavEntry<NavKey>(key, contentKey = contentKey, metadata = metadata) {
+        val retainedOrigin = navigator.currentTopLevelKey == startKey && key != startKey
+        val tabLifecycle = rememberLifecycleOwner(
+            maxLifecycle = if (retainedOrigin) Lifecycle.State.CREATED else Lifecycle.State.RESUMED,
+        )
+        CompositionLocalProvider(LocalLifecycleOwner provides tabLifecycle) { entry.Content() }
     }
 }

@@ -77,7 +77,10 @@ class NavigationState(
  * ViewModel stores, so a tab that is not on screen keeps both until its entries are popped.
  */
 @Composable
-fun NavigationState.toEntries(entryProvider: (NavKey) -> NavEntry<NavKey>): List<NavEntry<NavKey>> {
+fun NavigationState.toEntries(
+    entryProvider: (NavKey) -> NavEntry<NavKey>,
+    displayStacks: List<TopLevelKey> = stacksInUse,
+): List<NavEntry<NavKey>> {
     val decoratedEntries = backStacks.mapValues { (_, stack) ->
         rememberDecoratedNavEntries(
             backStack = stack,
@@ -88,7 +91,7 @@ fun NavigationState.toEntries(entryProvider: (NavKey) -> NavEntry<NavKey>): List
             entryProvider = { key -> entryProvider(key).withNavKey(key) },
         )
     }
-    return stacksInUse.flatMap { decoratedEntries.getValue(it) }
+    return displayStacks.flatMap { decoratedEntries.getValue(it) }
 }
 
 /** Tabs stay in a clipped viewport; only the selected tab's detail goes into the window overlay. */
@@ -98,7 +101,10 @@ data class NavigationEntryLayers(
 )
 
 @Composable
-fun NavigationState.toEntryLayers(entryProvider: (NavKey) -> NavEntry<NavKey>): NavigationEntryLayers = splitEntryLayers(toEntries(entryProvider), topLevelKey, currentDetailKey = currentStack.last() as? DetailKey)
+fun NavigationState.toEntryLayers(
+    entryProvider: (NavKey) -> NavEntry<NavKey>,
+    displayStacks: List<TopLevelKey> = stacksInUse,
+): NavigationEntryLayers = splitEntryLayers(toEntries(entryProvider, displayStacks), topLevelKey, currentDetailKey = currentStack.last() as? DetailKey)
 
 internal fun splitEntryLayers(
     entries: List<NavEntry<NavKey>>,

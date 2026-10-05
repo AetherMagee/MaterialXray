@@ -52,5 +52,13 @@ class NavigationEntryLayersTest {
         assertEquals(listOf(HomeKey, SettingsKey), layers.tabs.map { it.navKey })
     }
 
+    @Test
+    fun `Home tap display order restores only the Home detail above both tab roots`() {
+        val layers = splitEntryLayers(listOf(settings, settingsDetail, home, homeDetail), HomeKey, homeDetailKey)
+        assertEquals(listOf(SettingsKey, HomeKey), layers.tabs.map { it.navKey })
+        assertEquals(listOf(HomeKey, homeDetailKey), layers.details.map { it.navKey })
+        assertTrue(layers.details.last() === homeDetail)
+    }
+
     private fun entry(key: NavKey): NavEntry<NavKey> = NavEntry<NavKey>(key) {}.withNavKey(key)
 }

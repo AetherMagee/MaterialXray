@@ -45,6 +45,63 @@ class NavigatorTest {
     }
 
     @Test
+    fun `a Home tap puts Home above the previous tab without changing logical stacks`() {
+        navigator.selectTab(SettingsKey)
+        navigator.selectTab(HomeKey)
+        assertEquals(listOf(SettingsKey, HomeKey), navigator.displayStacks)
+        assertEquals(listOf(HomeKey), state.stacksInUse)
+        assertEquals(listOf(HomeKey), state.keysInUse)
+        assertEquals(listOf(SettingsKey), state.backStacks.getValue(SettingsKey).toList())
+
+        navigator.selectTab(HomeKey)
+        navigator.goBack()
+        assertEquals(listOf(SettingsKey, HomeKey), navigator.displayStacks)
+        assertEquals(listOf(HomeKey), state.keysInUse)
+    }
+
+    @Test
+    fun `real Back returns to Home without retaining the outgoing tab`() {
+        navigator.selectTab(LogsKey)
+        navigator.goBack()
+        assertEquals(listOf(HomeKey), navigator.displayStacks)
+        navigator.selectTab(SettingsKey)
+        navigator.selectTab(HomeKey)
+        navigator.selectTab(LogsKey)
+        navigator.goBack()
+        assertEquals(listOf(HomeKey), navigator.displayStacks)
+    }
+
+    @Test
+    fun `rapid tab taps retain only the latest Home origin`() {
+        repeat(3) {
+            navigator.selectTab(RoutingKey)
+            navigator.selectTab(HomeKey)
+            assertEquals(listOf(RoutingKey, HomeKey), navigator.displayStacks)
+            navigator.selectTab(SettingsKey)
+            assertEquals(listOf(HomeKey, SettingsKey), navigator.displayStacks)
+            navigator.selectTab(HomeKey)
+            assertEquals(listOf(SettingsKey, HomeKey), navigator.displayStacks)
+        }
+    }
+
+    @Test
+    fun `Home taps preserve saved details on both tabs`() {
+        navigator.openDetail(runningConfig)
+        navigator.selectTab(SettingsKey)
+        navigator.openDetail(DnsSettingsKey)
+        navigator.selectTab(HomeKey)
+        assertEquals(listOf(SettingsKey, HomeKey), navigator.displayStacks)
+        assertEquals(runningConfig, navigator.currentDetailKey)
+        navigator.closeDetail()
+        assertEquals(listOf(SettingsKey, HomeKey), navigator.displayStacks)
+        navigator.selectTab(SettingsKey)
+        assertEquals(DnsSettingsKey, navigator.currentDetailKey)
+        navigator.goBack()
+        navigator.goBack()
+        assertEquals(listOf(HomeKey), navigator.displayStacks)
+    }
+
+    @Test
     fun `back from a detail returns to the tab it was opened on`() {
         navigator.selectTab(RoutingKey)
         navigator.openDetail(editor)
