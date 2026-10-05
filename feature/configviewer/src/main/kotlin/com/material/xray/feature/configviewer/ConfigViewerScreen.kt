@@ -6,6 +6,11 @@ import android.content.Context
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.annotation.StringRes
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
@@ -122,15 +127,7 @@ fun ConfigViewerScreen(
     val resources = LocalResources.current
     val copiedMessage = stringResource(R.string.config_viewer_copied)
     val clipboardLabel = stringResource(R.string.config_viewer_clipboard_label)
-    val copyable = uiState.copyableText()
     val editing = uiState.isEditing()
-    val fixedEditorTopBar = request == ConfigViewerRequest.Running && editing
-    val editorScrollState = rememberTopAppBarState()
-    val previewScrollState = rememberTopAppBarState()
-    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(
-        state = if (fixedEditorTopBar) editorScrollState else previewScrollState,
-        canScroll = { !fixedEditorTopBar },
-    )
 
     // Typing stays inside the composition. Routing every keystroke through a StateFlow makes the
     // text arrive a frame late, which is what makes the cursor jump under fast or predictive input,
@@ -162,96 +159,113 @@ fun ConfigViewerScreen(
         }
     }
 
-    Scaffold(
-        modifier = if (fixedEditorTopBar) Modifier else Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-        // Keep the bottom inset; previews include it in their scrollable padding so content can
-        // pass behind the transparent system navigation bar without hiding the last line.
-        contentWindowInsets = WindowInsets.navigationBars,
-        topBar = {
-            ScrolledTopAppBar(
-                title = title,
-                scrollBehavior = scrollBehavior,
-                showLogo = false,
-                navigationIcon = {
-                    TooltipIconButton(tooltip = stringResource(if (editing) R.string.config_viewer_cancel_edit else R.string.config_viewer_back), onClick = if (editing) viewModel::cancelEdit else onBack) {
-                        Icon(
-                            imageVector = if (editing) Icons.Default.Close else Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(
-                                if (editing) R.string.config_viewer_cancel_edit else R.string.config_viewer_back,
-                            ),
-                        )
-                    }
-                },
-                actions = {
-                    if (editing) {
-                        TooltipIconButton(tooltip = stringResource(R.string.config_viewer_save), onClick = onSave) {
-                            Icon(Icons.Default.Check, contentDescription = stringResource(R.string.config_viewer_save))
+    val editorScrollState = rememberTopAppBarState()
+    val previewScrollState = rememberTopAppBarState()
+    AnimatedContent(
+        targetState = ConfigViewerContent(uiState, jsonDraft, paramsDraft),
+        contentKey = { it.state.isEditing() },
+        transitionSpec = { fadeIn(tween(300)) togetherWith fadeOut(tween(300)) using null },
+        label = "configEditor",
+    ) { content ->
+        val editing = content.state.isEditing()
+        val copyable = content.state.copyableText()
+        val fixedEditorTopBar = request == ConfigViewerRequest.Running && editing
+        val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(
+            state = if (fixedEditorTopBar) editorScrollState else previewScrollState,
+            canScroll = { !fixedEditorTopBar },
+        )
+
+        Scaffold(
+            modifier = if (fixedEditorTopBar) Modifier else Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+            // Keep the bottom inset; previews include it in their scrollable padding so content can
+            // pass behind the transparent system navigation bar without hiding the last line.
+            contentWindowInsets = WindowInsets.navigationBars,
+            topBar = {
+                ScrolledTopAppBar(
+                    title = title,
+                    scrollBehavior = scrollBehavior,
+                    showLogo = false,
+                    navigationIcon = {
+                        TooltipIconButton(tooltip = stringResource(if (editing) R.string.config_viewer_cancel_edit else R.string.config_viewer_back), onClick = if (editing) viewModel::cancelEdit else onBack) {
+                            Icon(
+                                imageVector = if (editing) Icons.Default.Close else Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = stringResource(
+                                    if (editing) R.string.config_viewer_cancel_edit else R.string.config_viewer_back,
+                                ),
+                            )
                         }
-                    } else {
-                        if (copyable != null) {
-                            TooltipIconButton(
-                                tooltip = stringResource(R.string.config_viewer_copy),
-                                onClick = {
-                                    context.copyToClipboard(clipboardLabel, copyable)
-                                    Toast.makeText(context, copiedMessage, Toast.LENGTH_SHORT).show()
-                                },
-                            ) {
-                                Icon(
-                                    Icons.Default.ContentCopy,
-                                    contentDescription = stringResource(R.string.config_viewer_copy),
-                                )
+                    },
+                    actions = {
+                        if (editing) {
+                            TooltipIconButton(tooltip = stringResource(R.string.config_viewer_save), onClick = onSave) {
+                                Icon(Icons.Default.Check, contentDescription = stringResource(R.string.config_viewer_save))
+                            }
+                        } else {
+                            if (copyable != null) {
+                                TooltipIconButton(
+                                    tooltip = stringResource(R.string.config_viewer_copy),
+                                    onClick = {
+                                        context.copyToClipboard(clipboardLabel, copyable)
+                                        Toast.makeText(context, copiedMessage, Toast.LENGTH_SHORT).show()
+                                    },
+                                ) {
+                                    Icon(
+                                        Icons.Default.ContentCopy,
+                                        contentDescription = stringResource(R.string.config_viewer_copy),
+                                    )
+                                }
+                            }
+                            guarded?.let { isGuarded ->
+                                TooltipIconButton(tooltip = stringResource(if (isGuarded) R.string.config_viewer_unguard else R.string.config_viewer_guard), onClick = viewModel::toggleGuard) {
+                                    Icon(
+                                        imageVector = if (isGuarded) Icons.Filled.Shield else Icons.Outlined.Shield,
+                                        contentDescription = stringResource(
+                                            if (isGuarded) R.string.config_viewer_unguard else R.string.config_viewer_guard,
+                                        ),
+                                    )
+                                }
+                            }
+                            if (content.state.isEditable()) {
+                                TooltipIconButton(tooltip = stringResource(R.string.config_viewer_edit), onClick = viewModel::beginEdit) {
+                                    Icon(Icons.Default.Edit, contentDescription = stringResource(R.string.config_viewer_edit))
+                                }
                             }
                         }
-                        guarded?.let { isGuarded ->
-                            TooltipIconButton(tooltip = stringResource(if (isGuarded) R.string.config_viewer_unguard else R.string.config_viewer_guard), onClick = viewModel::toggleGuard) {
-                                Icon(
-                                    imageVector = if (isGuarded) Icons.Filled.Shield else Icons.Outlined.Shield,
-                                    contentDescription = stringResource(
-                                        if (isGuarded) R.string.config_viewer_unguard else R.string.config_viewer_guard,
-                                    ),
-                                )
-                            }
-                        }
-                        if (uiState.isEditable()) {
-                            TooltipIconButton(tooltip = stringResource(R.string.config_viewer_edit), onClick = viewModel::beginEdit) {
-                                Icon(Icons.Default.Edit, contentDescription = stringResource(R.string.config_viewer_edit))
-                            }
-                        }
-                    }
-                },
-            )
-        },
-    ) { padding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(
-                    PaddingValues(
-                        start = padding.calculateStartPadding(layoutDirection),
-                        top = padding.calculateTopPadding(),
-                        end = padding.calculateEndPadding(layoutDirection),
-                        bottom = if (editing) padding.calculateBottomPadding() else 0.dp,
+                    },
+                )
+            },
+        ) { padding ->
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(
+                        PaddingValues(
+                            start = padding.calculateStartPadding(layoutDirection),
+                            top = padding.calculateTopPadding(),
+                            end = padding.calculateEndPadding(layoutDirection),
+                            bottom = if (editing) padding.calculateBottomPadding() else 0.dp,
+                        ),
                     ),
-                ),
-        ) {
-            when (val state = uiState) {
-                // Reading a local row or file is quick enough that a spinner would only ever be a
-                // flash of noise between the fade-in and the content.
-                ConfigViewerUiState.Loading -> Unit
-                is ConfigViewerUiState.Message -> Text(
-                    text = stringResource(state.textRes),
-                    modifier = Modifier
-                        .align(Alignment.Center)
-                        .padding(32.dp),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                is ConfigViewerUiState.JsonDocument -> JsonDocumentContent(state, padding.calculateBottomPadding())
-                is ConfigViewerUiState.JsonEditor -> JsonEditorContent(state = state, text = jsonDraft)
-                is ConfigViewerUiState.Params -> ParamsList(state, padding.calculateBottomPadding())
-                is ConfigViewerUiState.ParamsEditor -> ParamsEditorList(
-                    state = state,
-                    drafts = paramsDraft,
-                )
+            ) {
+                when (val state = content.state) {
+                    // Reading a local row or file is quick enough that a spinner would only ever be a
+                    // flash of noise between the fade-in and the content.
+                    ConfigViewerUiState.Loading -> Unit
+                    is ConfigViewerUiState.Message -> Text(
+                        text = stringResource(state.textRes),
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .padding(32.dp),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    is ConfigViewerUiState.JsonDocument -> JsonDocumentContent(state, padding.calculateBottomPadding())
+                    is ConfigViewerUiState.JsonEditor -> JsonEditorContent(state = state, text = content.jsonDraft)
+                    is ConfigViewerUiState.Params -> ParamsList(state, padding.calculateBottomPadding())
+                    is ConfigViewerUiState.ParamsEditor -> ParamsEditorList(
+                        state = state,
+                        drafts = content.paramsDraft,
+                    )
+                }
             }
         }
     }
@@ -263,6 +277,13 @@ fun ConfigViewerScreen(
         )
     }
 }
+
+// Keep each outgoing editor's draft alive until its fade completes, even after edit mode ends.
+private data class ConfigViewerContent(
+    val state: ConfigViewerUiState,
+    val jsonDraft: TextFieldState,
+    val paramsDraft: Map<EditKey, TextFieldState>,
+)
 
 @Composable
 private fun ConfigViewerRequest.title(): String = when (this) {
