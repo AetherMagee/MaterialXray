@@ -25,6 +25,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -154,6 +157,15 @@ private fun SessionTotalsRow(traffic: SessionTrafficMetrics?, locale: Locale) {
     val unavailable = stringResource(R.string.home_stats_unavailable)
     val downloaded = traffic?.let { formatSize(it.downlinkBytes, locale) } ?: unavailable
     val uploaded = traffic?.let { formatSize(it.uplinkBytes, locale) } ?: unavailable
+    val totals = stringResource(R.string.home_stats_session_value, downloaded, uploaded)
+    val styledTotals = buildAnnotatedString {
+        append(totals)
+        totals.forEachIndexed { index, character ->
+            if (character == '↓' || character == '↑') {
+                addStyle(SpanStyle(fontWeight = FontWeight.Bold), index, index + 1)
+            }
+        }
+    }
 
     // The arrows carry the only clue to which figure is which, and a screen reader cannot read
     // them, so the whole row is replaced by one spelled-out description.
@@ -172,7 +184,7 @@ private fun SessionTotalsRow(traffic: SessionTrafficMetrics?, locale: Locale) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Text(
-            text = stringResource(R.string.home_stats_session_value, downloaded, uploaded),
+            text = styledTotals,
             style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurface,
             maxLines = 1,
