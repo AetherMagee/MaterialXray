@@ -26,9 +26,10 @@ import com.material.xray.core.ui.components.FocusHighlight
 import com.material.xray.core.ui.components.rememberSystemState
 
 @Composable
-internal fun AlwaysOnVpnSetting() {
+internal fun AlwaysOnVpnSetting(rootServiceActive: Boolean) {
     val context = LocalContext.current
     val alwaysOn = rememberSystemState(::isAlwaysOnVpnEnabled).value
+    val enabled = !rootServiceActive
 
     Row(
         modifier = Modifier
@@ -38,6 +39,7 @@ internal fun AlwaysOnVpnSetting() {
                 interactionSource = null,
                 indication = FocusHighlight,
                 role = Role.Button,
+                enabled = enabled,
                 onClick = { context.openVpnSettings() },
             )
             .padding(horizontal = 16.dp, vertical = 8.dp),
@@ -45,11 +47,17 @@ internal fun AlwaysOnVpnSetting() {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            Text(stringResource(R.string.settings_always_on_vpn), style = MaterialTheme.typography.bodyLarge)
             Text(
-                stringResource(R.string.settings_always_on_vpn_description),
+                stringResource(R.string.settings_always_on_vpn),
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (enabled) 1f else 0.38f),
+            )
+            Text(
+                stringResource(
+                    if (enabled) R.string.settings_always_on_vpn_description else R.string.settings_always_on_vpn_root_unavailable,
+                ),
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (enabled) 1f else 0.38f),
             )
         }
         Switch(checked = alwaysOn, onCheckedChange = null, enabled = false)

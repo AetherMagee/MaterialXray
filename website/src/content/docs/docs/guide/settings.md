@@ -17,7 +17,7 @@ A tour of the Settings tab. Some options only show up after you turn on **Show a
 | **TUN interface name** | Names the rootful TUN interface. Shown below **Tunnel tethered clients** when **TUN interface** is selected; **Transparent proxy** shows **When another VPN is active** in the same place. |
 | **Route app traffic through Xray** | Sends Material Xray's own data updates through the active connection. Latency checks always bypass it. |
 | **Connection health watchdog** | Watches the local Xray API, the tunnel and root routing for failures, without sending external probes. |
-| **Always-on VPN** | Shows whether Android's always-on VPN is enabled for Material Xray. Tap the row below **Auto-connect on boot** to open Android's VPN settings and manage it there. |
+| **Always-on VPN** | Shows whether Android's always-on VPN is enabled for Material Xray. Tap the row below **Auto-connect on boot** to open Android's VPN settings and manage it there. The row is disabled while root service is enabled. |
 
 If root access is unavailable, **Use root service** shows a **Retry** button. Granting access and retrying restores an off switch; enabling root mode remains your choice. Losing access switches the app back to rootless mode. Android's VPN permission is required to connect in rootless mode.
 
