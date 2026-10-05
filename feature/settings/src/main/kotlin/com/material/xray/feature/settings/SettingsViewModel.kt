@@ -28,7 +28,6 @@ import com.material.xray.core.model.XrayOutbound
 import com.material.xray.core.model.XrayRuntimeSettings
 import com.material.xray.core.model.isInProgress
 import com.material.xray.core.network.Ipv6Detector
-import com.material.xray.core.runtime.AppResetManager
 import com.material.xray.core.runtime.AppUpdateChecker
 import com.material.xray.core.runtime.GeoDataAsset
 import com.material.xray.core.runtime.GeoDataManager
@@ -82,7 +81,6 @@ class SettingsViewModel(
     private val settingsRepo: SettingsRepository,
     private val appUpdateChecker: AppUpdateChecker,
     private val backupManager: BackupManager,
-    private val appResetManager: AppResetManager,
     private val connectionStateCoordinator: ConnectionStateCoordinator,
     private val providerRoutingCoordinator: ProviderRoutingCoordinator,
     private val settingsRuntimeManager: SettingsRuntimeManager,
@@ -97,8 +95,6 @@ class SettingsViewModel(
     private val _geoDataClearing = MutableStateFlow(false)
     private val _assetUpdateEvents = Channel<AssetUpdateMessage>(Channel.BUFFERED)
     private val _rootAccessDeniedEvents = Channel<Unit>(Channel.BUFFERED)
-    private val _appResetFailures = Channel<Unit>(Channel.BUFFERED)
-    private val _appResetting = MutableStateFlow(false)
     private val _backupBusy = MutableStateFlow(false)
     private val _backupImportSummary = MutableStateFlow<BackupSummary?>(null)
     private val _backupEvents = Channel<BackupOperationMessage>(Channel.BUFFERED)
@@ -121,8 +117,6 @@ class SettingsViewModel(
     val geoDataCachedSizes = geoDataManager.cachedSizes
     val assetUpdateEvents: Flow<AssetUpdateMessage> = _assetUpdateEvents.receiveAsFlow()
     val rootAccessDeniedEvents: Flow<Unit> = _rootAccessDeniedEvents.receiveAsFlow()
-    val appResetFailures: Flow<Unit> = _appResetFailures.receiveAsFlow()
-    val appResetting: StateFlow<Boolean> = _appResetting.asStateFlow()
     val backupBusy: StateFlow<Boolean> = _backupBusy.asStateFlow()
     val backupImportSummary: StateFlow<BackupSummary?> = _backupImportSummary.asStateFlow()
     val backupEvents: Flow<BackupOperationMessage> = _backupEvents.receiveAsFlow()
@@ -414,22 +408,6 @@ class SettingsViewModel(
     fun setLatencyCheckUrl(url: String) = viewModelScope.launch { settingsRepo.setLatencyCheckUrl(url) }
     fun setSortOutboundsByLatency(enabled: Boolean) = viewModelScope.launch {
         settingsRepo.setSortOutboundsByLatency(enabled)
-    }
-
-    /** On success the system kills the app, so only a failure comes back. */
-    fun resetApp() {
-        if (_appResetting.value) return
-        viewModelScope.launch {
-            _appResetting.value = true
-            try {
-                runCatching { appResetManager.reset() }.exceptionOrNull()?.let { error ->
-                    if (error is CancellationException) throw error
-                    _appResetFailures.send(Unit)
-                }
-            } finally {
-                _appResetting.value = false
-            }
-        }
     }
 
     fun updateGeoipAsset(url: String) {

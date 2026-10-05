@@ -73,3 +73,18 @@ class ConnectionShutdownManager(
         const val DISCONNECT_TIMEOUT_MILLIS = 10_000L
     }
 }
+
+internal fun ConnectionState.requiresRuntimeDisconnect(): Boolean = when (this) {
+    ConnectionState.Connecting,
+    ConnectionState.ApplyingRoutingChanges,
+    ConnectionState.UpdatingRoutingData,
+    is ConnectionState.Connected,
+    ConnectionState.Disconnecting,
+    -> true
+
+    ConnectionState.Disconnected,
+    is ConnectionState.Error,
+    is ConnectionState.InterfaceBusy,
+    is ConnectionState.RestartRequired,
+    -> false
+}

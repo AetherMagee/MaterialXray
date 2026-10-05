@@ -202,7 +202,6 @@ private fun SettingsScreenContent(
     val geoDataLastUpdated by viewModel.geoDataLastUpdated.collectAsStateWithLifecycle()
     val geoDataCachedSizes by viewModel.geoDataCachedSizes.collectAsStateWithLifecycle()
     val xrayCoreVersion by viewModel.xrayCoreVersion.collectAsStateWithLifecycle()
-    val appResetting by viewModel.appResetting.collectAsStateWithLifecycle()
     val backupBusy by viewModel.backupBusy.collectAsStateWithLifecycle()
     val backupImportSummary by viewModel.backupImportSummary.collectAsStateWithLifecycle()
     val appUpdateCheckStatus by viewModel.appUpdateCheckStatus.collectAsStateWithLifecycle()
@@ -247,7 +246,6 @@ private fun SettingsScreenContent(
     var showNotificationFieldsDialog by rememberSaveable { mutableStateOf(false) }
     var showFieldStyleDialog by rememberSaveable { mutableStateOf(false) }
     var showUpdateFrequencyDialog by rememberSaveable { mutableStateOf(false) }
-    var showResetAppDialog by rememberSaveable { mutableStateOf(false) }
     var showOpenSourceLicensesDialog by rememberSaveable { mutableStateOf(false) }
     var showAppUpdateIntervalDialog by rememberSaveable { mutableStateOf(false) }
     var geoDataToDelete by rememberSaveable { mutableStateOf<GeoDataAsset?>(null) }
@@ -351,18 +349,6 @@ private fun SettingsScreenContent(
         lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
             viewModel.rootAccessDeniedEvents.collect {
                 showRootAccessDeniedDialog = true
-            }
-        }
-    }
-
-    LaunchedEffect(viewModel, context, resources) {
-        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
-            viewModel.appResetFailures.collect {
-                Toast.makeText(
-                    context,
-                    resources.getString(R.string.settings_app_reset_failed),
-                    Toast.LENGTH_SHORT,
-                ).show()
             }
         }
     }
@@ -917,24 +903,6 @@ private fun SettingsScreenContent(
                     }
                 }
             }
-            if (showAdvancedOptions) {
-                item(key = "app_reset") {
-                    SettingsActionRow(
-                        title = stringResource(R.string.settings_reset_app),
-                        subtitle = stringResource(
-                            if (appResetting) {
-                                R.string.settings_resetting_app
-                            } else {
-                                R.string.settings_reset_app_description
-                            },
-                        ),
-                        enabled = !appResetting,
-                        onClick = { showResetAppDialog = true },
-                        navigates = true,
-                    )
-                }
-            }
-
             item(key = "settings_header") {
                 Column(
                     modifier = Modifier.padding(horizontal = 16.dp),
@@ -1045,7 +1013,6 @@ private fun SettingsScreenContent(
         showNotificationFieldsDialog = showNotificationFieldsDialog,
         showUpdateFrequencyDialog = showUpdateFrequencyDialog,
         showFieldStyleDialog = showFieldStyleDialog,
-        showResetAppDialog = showResetAppDialog,
         backupImportSummary = backupImportSummary,
         backupBusy = backupBusy,
         notificationSettings = notificationSettings,
@@ -1055,11 +1022,6 @@ private fun SettingsScreenContent(
             onDismissNotificationFields = { showNotificationFieldsDialog = false },
             onDismissUpdateFrequency = { showUpdateFrequencyDialog = false },
             onDismissFieldStyle = { showFieldStyleDialog = false },
-            onDismissResetApp = { showResetAppDialog = false },
-            onResetApp = {
-                showResetAppDialog = false
-                viewModel.resetApp()
-            },
             onDismissBackupImport = viewModel::dismissBackupImport,
             onConfirmBackupImport = viewModel::confirmBackupImport,
             onFieldEnabledChange = viewModel::setNotificationFieldEnabled,
@@ -1591,8 +1553,6 @@ private data class SettingsDialogActions(
     val onDismissNotificationFields: () -> Unit,
     val onDismissUpdateFrequency: () -> Unit,
     val onDismissFieldStyle: () -> Unit,
-    val onDismissResetApp: () -> Unit,
-    val onResetApp: () -> Unit,
     val onDismissBackupImport: () -> Unit,
     val onConfirmBackupImport: () -> Unit,
     val onFieldEnabledChange: (NotificationField, Boolean) -> Unit,
@@ -1607,7 +1567,6 @@ private fun SettingsDialogs(
     showNotificationFieldsDialog: Boolean,
     showUpdateFrequencyDialog: Boolean,
     showFieldStyleDialog: Boolean,
-    showResetAppDialog: Boolean,
     backupImportSummary: BackupSummary?,
     backupBusy: Boolean,
     notificationSettings: NotificationSettings,
@@ -1703,27 +1662,6 @@ private fun SettingsDialogs(
             selected = notificationSettings.style,
             onDismiss = actions.onDismissFieldStyle,
             onSelect = actions.onSelectFieldStyle,
-        )
-    }
-
-    if (showResetAppDialog) {
-        AlertDialog(
-            onDismissRequest = actions.onDismissResetApp,
-            title = { Text(stringResource(R.string.settings_reset_app_title)) },
-            text = { Text(stringResource(R.string.settings_reset_app_confirmation)) },
-            confirmButton = {
-                TextButton(onClick = actions.onResetApp) {
-                    Text(
-                        text = stringResource(R.string.settings_reset),
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = actions.onDismissResetApp) {
-                    Text(stringResource(R.string.settings_cancel))
-                }
-            },
         )
     }
 }

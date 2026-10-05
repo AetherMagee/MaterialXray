@@ -115,13 +115,6 @@
         <item quantity="other">%1$d app routes</item>
     </plurals>
     <string name="settings_backup_importing">Importing&#8230;</string>
-    <string name="settings_reset_app">Reset app</string>
-    <string name="settings_reset_app_description">Delete all app data, as if the app were reinstalled</string>
-    <string name="settings_resetting_app">Resetting app&#8230;</string>
-    <string name="settings_reset_app_title">Reset app?</string>
-    <string name="settings_reset_app_confirmation">This permanently deletes all subscriptions, servers, settings, downloaded geodata and Xray cores, as if the app were reinstalled. Any active connection will be stopped and the app will close.</string>
-    <string name="settings_reset">Reset</string>
-    <string name="settings_app_reset_failed">Unable to reset the app</string>
     <string name="settings_section_about">About</string>
     <string name="settings_app_update_checks_title">Automatically check for updates</string>
     <string name="settings_app_update_interval_title">Check for updates every...</string>
