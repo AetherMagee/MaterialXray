@@ -8,6 +8,11 @@ import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -18,6 +23,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
@@ -311,7 +317,6 @@ private fun UpdateSettings(
 ) {
     Column(
         modifier = Modifier.padding(top = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Text(
             stringResource(R.string.settings_xray_core_updates),
@@ -319,6 +324,7 @@ private fun UpdateSettings(
             style = MaterialTheme.typography.titleSmall,
             color = MaterialTheme.colorScheme.primary,
         )
+        Spacer(Modifier.height(8.dp))
         UpdateChecksSetting(
             title = stringResource(R.string.settings_xray_core_periodic_checks),
             checked = settings.periodicChecks,
@@ -326,13 +332,17 @@ private fun UpdateSettings(
             onClick = onIntervalClick,
             onCheckedChange = onPeriodicChecksChange,
         )
-        AnimatedVisibility(visible = settings.periodicChecks) {
+        AnimatedVisibility(
+            visible = settings.periodicChecks,
+            enter = fadeIn(tween(150)) + expandVertically(tween(250), expandFrom = Alignment.Top),
+            exit = fadeOut(tween(100)) + shrinkVertically(tween(250), shrinkTowards = Alignment.Top),
+        ) {
             ReadOnlyDropdownField(
                 label = stringResource(R.string.settings_xray_core_update_action),
                 selectedText = updateActionLabel(settings.action),
                 options = XrayCoreUpdateAction.entries.map { DropdownOption(it, updateActionLabel(it)) },
                 onSelected = onActionSelected,
-                modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
+                modifier = Modifier.padding(start = 16.dp, top = 8.dp, end = 16.dp, bottom = 8.dp),
             )
         }
     }
