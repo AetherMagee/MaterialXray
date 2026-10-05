@@ -472,7 +472,7 @@ private fun ScrollToBottomButton(visible: Boolean, onClick: () -> Unit, modifier
                 onClick = onClick,
                 modifier = Modifier.dropShadow(
                     FloatingActionButtonDefaults.smallShape,
-                    Shadow(radius = 8.dp, color = Color.Black.copy(alpha = 0.22f), offset = DpOffset(0.dp, 2.dp)),
+                    Shadow(radius = 8.dp, color = Color.Black.copy(alpha = 0.12f), offset = DpOffset(0.dp, 2.dp)),
                 ),
                 elevation = FloatingActionButtonDefaults.elevation(
                     defaultElevation = 0.dp,
