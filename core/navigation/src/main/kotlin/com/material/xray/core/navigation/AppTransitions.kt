@@ -47,7 +47,7 @@ private fun AnimatedContentTransitionScope<Scene<NavKey>>.appContentTransform(
     interruptedDirection: Int,
 ): ContentTransform {
     val direction = tabTransitionDirection(tabOrder, initialState.tab, targetState.tab, interruptedDirection) * layoutDirectionSign
-    return tabEnterTransition(direction) togetherWith tabExitTransition(direction)
+    return tabContentTransform(direction)
 }
 
 /** The tab a scene belongs to: the nearest tab root at or below its top entry. */
@@ -82,14 +82,16 @@ internal val PlatformPageEasing by lazy {
     )
 }
 
-private fun tabEnterTransition(direction: Int): EnterTransition = if (direction == 0) {
+internal fun tabContentTransform(direction: Int): ContentTransform = tabEnterTransition(direction) togetherWith tabExitTransition(direction)
+
+internal fun tabEnterTransition(direction: Int): EnterTransition = if (direction == 0) {
     EnterTransition.None
 } else {
     fadeIn(tween(durationMillis = 338, easing = LinearEasing)) +
         slideInHorizontally(tween(TAB_TRANSITION_MS, easing = PlatformPageEasing)) { direction * it / 4 }
 }
 
-private fun tabExitTransition(direction: Int): ExitTransition = if (direction == 0) {
+internal fun tabExitTransition(direction: Int): ExitTransition = if (direction == 0) {
     ExitTransition.None
 } else {
     fadeOut(tween(durationMillis = 113, easing = LinearEasing)) +

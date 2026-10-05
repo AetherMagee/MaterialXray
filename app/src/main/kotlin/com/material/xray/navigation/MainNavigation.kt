@@ -23,20 +23,24 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.InputMode
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.LayoutDirection
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.ViewModelStoreOwner
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.compose.rememberLifecycleOwner
+import androidx.navigation3.runtime.NavEntry
+import androidx.navigation3.runtime.NavKey
+import androidx.navigation3.scene.NavigationBackHandler
+import androidx.navigation3.scene.SinglePaneSceneStrategy
+import androidx.navigation3.scene.rememberNavigationEventState
+import androidx.navigation3.scene.rememberSceneState
 import androidx.navigation3.ui.NavDisplay
 import com.material.xray.core.navigation.HomeKey
 import com.material.xray.core.navigation.LogsKey
@@ -116,7 +120,6 @@ fun MainNavigation(
     val topBarTint = remember { TopBarTint() }
     val layoutDirectionSign = if (LocalLayoutDirection.current == LayoutDirection.Rtl) -1 else 1
     val interruptedDirection = navigator.latestTabDirection(visibleTabs)
-    val pageShiftPx = with(LocalDensity.current) { 96.dp.roundToPx() }
     val detailSheetStrategy = rememberDetailSheetSceneStrategy(
         minWindowWidth = TwoPaneMinWidth,
         scrimClickLabel = stringResource(R.string.navigation_close_sheet),
@@ -151,7 +154,10 @@ fun MainNavigation(
                     withFrameNanos {}
                     detailFocus.requestFocus()
                 }
-                detailWasOpen -> backgroundFocus.requestFocus()
+                detailWasOpen -> {
+                    withFrameNanos {}
+                    backgroundFocus.requestFocus()
+                }
             }
         }
         detailWasOpen = hasDetail
@@ -164,7 +170,9 @@ fun MainNavigation(
         .focusRestorer()
         .focusGroup()
 
-    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+    // Keep the tab host's identity stable when selecting tabs. Full-screen details animate this
+    // actual page out and back, rather than moving over an unrelated stationary background.
+    val tabContent = rememberUpdatedState<@Composable () -> Unit> {
         CompositionLocalProvider(LocalLifecycleOwner provides backgroundLifecycle) {
             TabChrome(
                 state = TabChromeState(
@@ -175,24 +183,43 @@ fun MainNavigation(
                 ),
                 modifier = backgroundModifier,
             ) {
+                val tabScene = rememberSceneState(entries = layers.tabs, sceneStrategies = listOf(SinglePaneSceneStrategy()), onBack = navigator::goBack)
+                val tabBack = rememberNavigationEventState(tabScene)
+                // Only the visible page may handle Back. The outer page owns detail gestures,
+                // while a screen's own editor handler still takes precedence over navigation.
+                if (!hasDetail) NavigationBackHandler(tabScene, tabBack, onBackCompleted = navigator::goBack)
                 NavDisplay(
-                    entries = layers.tabs,
-                    onBack = navigator::goBack,
+                    sceneState = tabScene,
+                    navigationEventState = tabBack,
                     transitionSpec = appTransitionSpec(visibleTabs, layoutDirectionSign, interruptedDirection),
                     popTransitionSpec = appTransitionSpec(visibleTabs, layoutDirectionSign, interruptedDirection),
                     predictivePopTransitionSpec = appPredictivePopTransitionSpec(visibleTabs, layoutDirectionSign, interruptedDirection),
                 )
             }
         }
-        Box(modifier = Modifier.fillMaxSize().focusRequester(detailFocus).focusGroup()) {
-            NavDisplay(
-                entries = layers.details,
-                onBack = navigator::closeDetail,
-                sceneStrategies = listOf(detailSheetStrategy),
-                transitionSpec = appDetailTransitionSpec(pageShiftPx, layoutDirectionSign),
-                popTransitionSpec = appDetailTransitionSpec(pageShiftPx, layoutDirectionSign, isPop = true),
-                predictivePopTransitionSpec = appDetailPredictivePopTransitionSpec(),
-            )
+    }
+    val tabHost = NavEntry<NavKey>(currentTab, contentKey = "materialxray.tabHost") { tabContent.value() }
+    val detailEntries = layers.details.drop(1).map { entry ->
+        NavEntry<NavKey>(requireNotNull(navigator.currentDetailKey), contentKey = entry.contentKey, metadata = entry.metadata) {
+            Box(modifier = Modifier.fillMaxSize().focusRequester(detailFocus).focusGroup()) { entry.Content() }
         }
+    }
+    val pageEntries = listOf(tabHost) + detailEntries
+    val pageScene = rememberSceneState(
+        entries = pageEntries,
+        sceneStrategies = listOf(detailSheetStrategy),
+        onBack = navigator::closeDetail,
+    )
+    val pageBack = rememberNavigationEventState(pageScene)
+    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        NavigationBackHandler(pageScene, pageBack, onBackCompleted = navigator::closeDetail)
+        NavDisplay(
+            sceneState = pageScene,
+            navigationEventState = pageBack,
+            modifier = Modifier.fillMaxSize(),
+            transitionSpec = appDetailTransitionSpec(layoutDirectionSign),
+            popTransitionSpec = appDetailTransitionSpec(layoutDirectionSign, isPop = true),
+            predictivePopTransitionSpec = appDetailPredictivePopTransitionSpec(layoutDirectionSign),
+        )
     }
 }
