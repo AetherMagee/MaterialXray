@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
@@ -28,7 +29,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -38,6 +39,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -50,6 +52,7 @@ import com.material.xray.core.ui.R
 import com.material.xray.core.ui.components.DropdownOption
 import com.material.xray.core.ui.components.FadingOutlinedTextField as OutlinedTextField
 import com.material.xray.core.ui.components.ReadOnlyDropdownField
+import com.material.xray.core.ui.components.ScrolledTopAppBar
 import com.material.xray.core.ui.components.TooltipIconButton
 import com.material.xray.core.ui.text.catchAllEffectResource
 import com.material.xray.core.ui.text.descriptionResource
@@ -105,6 +108,7 @@ fun RoutingRuleEditorScreen(
         }
     }
     val canSave = editableRule.profileOriginalRuleJson == null || profileRule != null
+    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
 
     fun saveRule(updatedRule: RoutingRule) {
         if (editableRule.subscriptionWide) {
@@ -161,10 +165,12 @@ fun RoutingRuleEditorScreen(
     )
 
     Scaffold(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier.fillMaxSize().nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.routing_edit_rule_title)) },
+            ScrolledTopAppBar(
+                title = stringResource(R.string.routing_edit_rule_title),
+                scrollBehavior = scrollBehavior,
+                showLogo = false,
                 navigationIcon = {
                     TooltipIconButton(tooltip = stringResource(R.string.routing_rule_viewer_back), onClick = onBack) {
                         Icon(
@@ -191,7 +197,7 @@ fun RoutingRuleEditorScreen(
                     }
                 },
                 shape = CircleShape,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 16.dp, vertical = 8.dp),
             ) {
                 Text(stringResource(R.string.routing_save))
             }
