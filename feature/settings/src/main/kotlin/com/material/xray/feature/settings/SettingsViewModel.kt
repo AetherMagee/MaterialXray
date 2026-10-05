@@ -105,6 +105,8 @@ class SettingsViewModel(
     private val _appUpdateCheckStatus = MutableStateFlow<AppUpdateCheckStatus?>(null)
     private var preparedBackupImport: PreparedBackupImport? = null
     private var rootModeJob: Job? = null
+    private var rootAccessJob: Job? = null
+    private val _rootAccessChecking = MutableStateFlow(false)
     private var rootBackendJob: Job? = null
 
     val settings = settingsDataState.data
@@ -125,6 +127,7 @@ class SettingsViewModel(
     val backupImportSummary: StateFlow<BackupSummary?> = _backupImportSummary.asStateFlow()
     val backupEvents: Flow<BackupOperationMessage> = _backupEvents.receiveAsFlow()
     val rootAvailable: StateFlow<Boolean?> = settingsRuntimeManager.rootAvailable
+    val rootAccessChecking: StateFlow<Boolean> = _rootAccessChecking.asStateFlow()
     val tproxyCompatibility: StateFlow<TproxyCompatibility> = settingsRuntimeManager.tproxyCompatibility
     val xrayCoreVersion: StateFlow<XrayCoreVersion> = settingsRuntimeManager.xrayCoreVersion
     val appUpdateCheckStatus: StateFlow<AppUpdateCheckStatus?> = _appUpdateCheckStatus.asStateFlow()
@@ -172,6 +175,23 @@ class SettingsViewModel(
     }
 
     fun openOemAutostartSettings() = oemAutostartManager.openSettings()
+
+    fun retryRootAccess() {
+        if (rootAccessJob?.isActive == true) return
+        rootAccessJob = viewModelScope.launch {
+            _rootAccessChecking.value = true
+            try {
+                settingsRuntimeManager.checkRootAvailability()
+            } finally {
+                _rootAccessChecking.value = false
+            }
+        }
+    }
+
+    fun refreshRootAccess() {
+        if (rootAvailable.value == true || currentSettings().useRootService) retryRootAccess()
+    }
+
     fun setUseRootService(enabled: Boolean) {
         rootModeJob?.cancel()
         rootModeJob = viewModelScope.launch {
@@ -179,11 +199,6 @@ class SettingsViewModel(
             if (enabled == currentSettings().useRootService) return@launch
             if (!enabled) {
                 settingsRuntimeManager.setUseRootService(false)
-                return@launch
-            }
-
-            if (rootAvailable.value == false) {
-                _rootAccessDeniedEvents.send(Unit)
                 return@launch
             }
 

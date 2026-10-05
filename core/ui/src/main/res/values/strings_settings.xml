@@ -170,6 +170,7 @@
     <string name="settings_tproxy_unsupported">TPROXY is unsupported on this device</string>
     <string name="settings_retry_compatibility_check">Retry compatibility check</string>
     <string name="settings_unavailable">Unavailable</string>
+    <string name="settings_retry_root_access">Retry</string>
     <string name="settings_auto_connect_on_boot">Auto-connect on boot</string>
     <string name="settings_always_on_vpn">Always-on VPN</string>
     <string name="settings_always_on_vpn_description">Tap to go into Settings to manage</string>

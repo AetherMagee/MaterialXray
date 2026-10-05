@@ -84,6 +84,7 @@ import com.material.xray.core.network.ServerLatencyTester
 import com.material.xray.core.root.RootShell
 import com.material.xray.core.runtime.AlwaysOnVpnState
 import com.material.xray.core.runtime.ConnectionManagerFactory
+import com.material.xray.core.runtime.SettingsRuntimeManager
 import com.material.xray.core.runtime.StartupDiagnosticsLogger
 import com.material.xray.core.runtime.XRAY_LOG_FILE_NAME
 import com.material.xray.core.runtime.XrayLogStreamer
@@ -140,6 +141,7 @@ class XrayService(
     private val serverRepository: ServerRepository by inject()
 
     private val settingsRepo: SettingsRepository by inject()
+    private val settingsRuntimeManager: SettingsRuntimeManager by inject()
 
     private val connectionStateCoordinator: ConnectionStateCoordinator by inject()
 
@@ -189,6 +191,7 @@ class XrayService(
     // Written by main-thread command paths, read and rewritten by the IO watchdog loop.
     @Volatile
     private var lastNetworkSafetyCheckAtMs = 0L
+    private var lastRootAccessCheckAtMs = 0L
     private var processRecoveryJob: Job? = null
     private var alwaysOnRetryJob: Job? = null
     private var fullReconfigurationPending = false
@@ -756,7 +759,8 @@ class XrayService(
                     telemetryStep = ConnectionTelemetryStep.RootAccess,
                     isSuccessful = { it },
                     action = {
-                        withContext(ioDispatcher) { rootShell.open(RootShell.NetworkNamespace.INIT) }
+                        settingsRuntimeManager.checkRootAvailability(reloadConnection = false) &&
+                            withContext(ioDispatcher) { rootShell.open(RootShell.NetworkNamespace.INIT) }
                     },
                 ),
             )
@@ -764,18 +768,6 @@ class XrayService(
             false
         }
         if (runtimeSettings.useRootService && !forceVpnService && !rootServiceAvailable) {
-            if (runtimeSettings.rootConnectionBackend == RootConnectionBackend.Tproxy) {
-                telemetryReporter.updateConnectionContext(
-                    runtimeSettings.telemetryConnectionContext(alwaysOnVpn = false),
-                )
-                val message = localizedString(
-                    R.string.connection_error_tproxy_unsupported,
-                    "root access or the init network namespace is unavailable",
-                )
-                logBuffer.append(LogSource.APP, message)
-                connectionStateCoordinator.markError(message)
-                return false
-            }
             settingsRepo.setUseRootService(false)
             rootServiceRequested = false
             logBuffer.append(
@@ -1347,6 +1339,14 @@ class XrayService(
     }
 
     private suspend fun runtimeModeRecoveryReason(): String? {
+        val now = SystemClock.elapsedRealtime()
+        if (connectionManager.isUsingRootRuntime && now - lastRootAccessCheckAtMs >= ROOT_ACCESS_CHECK_INTERVAL_MS) {
+            lastRootAccessCheckAtMs = now
+            if (!settingsRuntimeManager.checkRootAvailability(reloadConnection = false)) {
+                rootServiceRequested = false
+                return "Root access lost; switching to Android VpnService..."
+            }
+        }
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return null
         val alwaysOnVpn = isAlwaysOn
         if (alwaysOnVpnState.active.value != alwaysOnVpn) {
@@ -2558,6 +2558,7 @@ class XrayService(
         private const val CONNECTION_COMMAND_WAKE_LOCK_TIMEOUT_MS = 10 * 60_000L
         private const val LOCAL_ADDRESS_CHECK_INTERVAL_MS = 5_000L
         private const val NETWORK_SAFETY_CHECK_INTERVAL_MS = 60_000L
+        private const val ROOT_ACCESS_CHECK_INTERVAL_MS = 30_000L
         private const val PERIODIC_ROOT_ROUTE_VERIFICATION_REASON = "periodic root route verification"
         private val NETWORK_RETARGET_RETRY_DELAYS_MS = listOf(250L, 500L, 1_000L, 2_000L, 4_000L, 8_000L)
         private const val LOCAL_API_HEALTH_PROBE_INTERVAL_MS = 60_000L

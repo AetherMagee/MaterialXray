@@ -23,6 +23,7 @@ class RootShell(
     private val appProcessId: Int,
     private val logger: AppLogger = NoOpAppLogger,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val startProcess: () -> Process = { ProcessBuilder("su").redirectErrorStream(false).start() },
 ) {
     enum class NetworkNamespace {
         CURRENT,
@@ -65,6 +66,16 @@ class RootShell(
                 }
                 opened && (requiredNamespace == null || isNamespaceAvailable(requiredNamespace))
             }
+        }
+    }
+
+    /** Checks a new su session, so an existing shell cannot hide a revoked root grant. */
+    suspend fun checkAccess(requiredNamespace: NetworkNamespace? = null): Boolean {
+        val probe = RootShell(appProcessId, logger, ioDispatcher, startProcess)
+        return try {
+            probe.open(requiredNamespace)
+        } finally {
+            probe.close()
         }
     }
 
@@ -143,7 +154,7 @@ class RootShell(
         if (isShellReady()) return true
         closeInternal()
         return runCatching {
-            val rootProcess = ProcessBuilder("su").redirectErrorStream(false).start()
+            val rootProcess = startProcess()
             process = rootProcess
             if (closeGeneration.get() != expectedGeneration) {
                 rootProcess.destroyForciblyCompat()

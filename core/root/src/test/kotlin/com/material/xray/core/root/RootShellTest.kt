@@ -1,9 +1,61 @@
 package com.material.xray.core.root
 
+import java.io.File
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TemporaryFolder
 
 class RootShellTest {
+    @get:Rule
+    val folder = TemporaryFolder()
+
+    @Test
+    fun `fresh access checks detect revocation and restoration without closing the working shell`() = runBlocking {
+        File(folder.root, "id").apply {
+            writeText("#!/bin/sh\nprintf '0\\n'\n")
+            setExecutable(true)
+        }
+        File(folder.root, "readlink").apply {
+            writeText("#!/bin/sh\nprintf 'net:[41]\\n'\n")
+            setExecutable(true)
+        }
+        val denied = AtomicBoolean(false)
+        val processes = AtomicInteger()
+        val shell = RootShell(
+            appProcessId = 123,
+            startProcess = {
+                processes.incrementAndGet()
+                if (denied.get()) {
+                    ProcessBuilder("sh", "-c", "exit 1").start()
+                } else {
+                    ProcessBuilder("sh").apply {
+                        environment()["PATH"] = "${folder.root}:${System.getenv("PATH")}"
+                    }.start()
+                }
+            },
+        )
+        try {
+            assertTrue(shell.open(RootShell.NetworkNamespace.INIT))
+            denied.set(true)
+
+            assertFalse(shell.checkAccess(RootShell.NetworkNamespace.INIT))
+            assertEquals("still running", shell.execute("printf 'still running'").output)
+            denied.set(false)
+
+            assertTrue(shell.checkAccess(RootShell.NetworkNamespace.INIT))
+            assertEquals(3, processes.get())
+            assertTrue(shell.execute("true").isSuccess)
+        } finally {
+            shell.close()
+        }
+    }
+
     @Test
     fun `unqualified root commands default to the init namespace`() {
         assertEquals(

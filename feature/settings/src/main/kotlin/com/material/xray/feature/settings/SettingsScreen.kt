@@ -163,7 +163,9 @@ import com.material.xray.core.ui.text.labelResource
 import com.material.xray.core.xray.TproxyCompatibility
 import java.util.Date
 import java.util.Locale
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.isActive
 import org.koin.compose.viewmodel.koinViewModel
 import org.xmlpull.v1.XmlPullParser
 
@@ -276,6 +278,7 @@ private fun SettingsScreenContent(
     onOpenXrayCore: () -> Unit,
 ) {
     val rootAvailable by viewModel.rootAvailable.collectAsStateWithLifecycle()
+    val rootAccessChecking by viewModel.rootAccessChecking.collectAsStateWithLifecycle()
     val tproxyCompatibility by viewModel.tproxyCompatibility.collectAsStateWithLifecycle()
     val geoipUpdating by viewModel.geoipUpdating.collectAsStateWithLifecycle()
     val geositeUpdating by viewModel.geositeUpdating.collectAsStateWithLifecycle()
@@ -329,6 +332,14 @@ private fun SettingsScreenContent(
     val resources = LocalResources.current
     val lifecycleOwner = LocalLifecycleOwner.current
     rememberSystemState { viewModel.refreshOemAutostartGuidance() }
+    LaunchedEffect(viewModel, lifecycleOwner) {
+        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            while (isActive) {
+                viewModel.refreshRootAccess()
+                delay(ROOT_ACCESS_REFRESH_INTERVAL_MS)
+            }
+        }
+    }
     val scrollState = rememberLazyListState()
     var showRootAccessDeniedDialog by rememberSaveable { mutableStateOf(false) }
     var showNotificationFieldsDialog by rememberSaveable { mutableStateOf(false) }
@@ -477,6 +488,7 @@ private fun SettingsScreenContent(
                 Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     SettingsServiceSection(
                         rootAvailable = rootAvailable,
+                        rootAccessChecking = rootAccessChecking,
                         rootServiceAvailable = rootServiceAvailable,
                         rootServiceActive = rootServiceActive,
                         useRootService = useRootService,
@@ -488,6 +500,7 @@ private fun SettingsScreenContent(
                         oemAutostartGuidance = oemAutostartGuidance,
                         actions = SettingsServiceActions(
                             onUseRootServiceChange = viewModel::setUseRootService,
+                            onRetryRootAccess = viewModel::retryRootAccess,
                             onRootConnectionBackendChange = viewModel::setRootConnectionBackend,
                             onTunnelTetheredClientsChange = viewModel::setTunnelTetheredClients,
                             onOtherVpnModeChange = viewModel::setOtherVpnMode,
@@ -1243,6 +1256,7 @@ private fun BackupOperationEventEffect(viewModel: SettingsViewModel) {
 /** What the service section's controls change. */
 private data class SettingsServiceActions(
     val onUseRootServiceChange: (Boolean) -> Unit,
+    val onRetryRootAccess: () -> Unit,
     val onRootConnectionBackendChange: (RootConnectionBackend) -> Unit,
     val onTunnelTetheredClientsChange: (Boolean) -> Unit,
     val onOtherVpnModeChange: (OtherVpnMode) -> Unit,
@@ -1254,6 +1268,7 @@ private data class SettingsServiceActions(
 @Composable
 private fun SettingsServiceSection(
     rootAvailable: Boolean?,
+    rootAccessChecking: Boolean,
     rootServiceAvailable: Boolean,
     rootServiceActive: Boolean,
     useRootService: Boolean,
@@ -1272,18 +1287,39 @@ private fun SettingsServiceSection(
     )
 
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        SettingsSwitchRow(
-            title = stringResource(R.string.settings_use_root_service),
-            description = stringResource(R.string.settings_unavailable).takeIf { rootAvailable == false },
-            checked = useRootService && rootAvailable != false,
-            onCheckedChange = actions.onUseRootServiceChange,
-            enabled = rootServiceAvailable,
-            titleColor = if (rootAvailable == false) {
-                MaterialTheme.colorScheme.onSurfaceVariant
-            } else {
-                MaterialTheme.colorScheme.onSurface
-            },
-        )
+        if (rootAvailable == false) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(stringResource(R.string.settings_use_root_service), style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        stringResource(R.string.settings_unavailable),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                TooltipIconButton(
+                    tooltip = stringResource(R.string.settings_retry_root_access),
+                    onClick = actions.onRetryRootAccess,
+                    enabled = !rootAccessChecking,
+                ) {
+                    if (rootAccessChecking) {
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                    } else {
+                        Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.settings_retry_root_access))
+                    }
+                }
+            }
+        } else {
+            SettingsSwitchRow(
+                title = stringResource(R.string.settings_use_root_service),
+                checked = useRootService,
+                onCheckedChange = actions.onUseRootServiceChange,
+                enabled = rootServiceAvailable && !rootAccessChecking,
+            )
+        }
 
         if (rootServiceActive) {
             val tproxySelectable = tproxyCompatibility !is TproxyCompatibility.Unsupported
@@ -2583,3 +2619,5 @@ private fun notificationFieldSummary(settings: NotificationSettings, rootMode: B
 private fun digitsOnly(maxLength: Int) = InputTransformation.byValue { _, proposed ->
     proposed.filter(Char::isDigit).take(maxLength)
 }
+
+private const val ROOT_ACCESS_REFRESH_INTERVAL_MS = 30_000L

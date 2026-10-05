@@ -46,6 +46,7 @@ class SettingsRuntimeManager(
     private val _rootAvailable = MutableStateFlow<Boolean?>(null)
     private val _xrayCoreVersion = MutableStateFlow(XrayCoreVersion())
     private val diagnosticsMutex = Mutex()
+    private val rootAccessMutex = Mutex()
     private var diagnosticsLoaded = false
     private val geoDataUpdateBatch = GeoDataUpdateBatch(::reloadActiveConnectionIfConnected)
 
@@ -69,18 +70,16 @@ class SettingsRuntimeManager(
         appUpdateScheduler.setEnabled(true, interval)
     }
 
-    suspend fun setUseRootService(enabled: Boolean): Boolean {
+    suspend fun setUseRootService(enabled: Boolean): Boolean = rootAccessMutex.withLock {
         if (!enabled) {
             settingsRepository.setUseRootService(false)
             reloadActiveConnectionIfConnected()
-            return true
+            return@withLock true
         }
-        val available = withContext(ioDispatcher) { rootShell.open(RootShell.NetworkNamespace.INIT) }
-        _rootAvailable.value = available
-        if (!available) return false
+        if (!checkRootAvailabilityLocked(reloadConnection = true)) return@withLock false
         settingsRepository.setUseRootService(true)
         reloadActiveConnectionIfConnected()
-        return true
+        true
     }
 
     suspend fun setRootConnectionBackend(backend: RootConnectionBackend) {
@@ -159,12 +158,16 @@ class SettingsRuntimeManager(
         geoDataManager.refresh(asset)
     }
 
-    suspend fun checkRootAvailability(): Boolean {
-        val available = withContext(ioDispatcher) { rootShell.open(RootShell.NetworkNamespace.INIT) }
+    suspend fun checkRootAvailability(reloadConnection: Boolean = true): Boolean = rootAccessMutex.withLock {
+        checkRootAvailabilityLocked(reloadConnection)
+    }
+
+    private suspend fun checkRootAvailabilityLocked(reloadConnection: Boolean): Boolean {
+        val available = withContext(ioDispatcher) { rootShell.checkAccess(RootShell.NetworkNamespace.INIT) }
         _rootAvailable.value = available
         if (!available && settingsRepository.useRootService.first()) {
             settingsRepository.setUseRootService(false)
-            reloadActiveConnectionIfConnected()
+            if (reloadConnection) reloadActiveConnectionIfConnected()
         }
         return available
     }

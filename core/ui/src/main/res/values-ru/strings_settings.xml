@@ -178,6 +178,7 @@
     <string name="settings_tproxy_unsupported">TPROXY не поддерживается на этом устройстве</string>
     <string name="settings_retry_compatibility_check">Повторить проверку совместимости</string>
     <string name="settings_unavailable">Недоступно</string>
+    <string name="settings_retry_root_access">Повторить</string>
     <string name="settings_auto_connect_on_boot">Подключаться при запуске устройства</string>
     <string name="settings_always_on_vpn">Постоянный VPN</string>
     <string name="settings_always_on_vpn_description">Нажмите, чтобы перейти в системные настройки</string>
