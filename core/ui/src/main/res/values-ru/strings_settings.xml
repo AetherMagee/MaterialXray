@@ -127,13 +127,13 @@
         <item quantity="other">%1$d маршрута приложений</item>
     </plurals>
     <string name="settings_backup_importing">Импорт&#8230;</string>
-    <string name="settings_reset_internal_database">Сбросить внутреннюю базу данных</string>
-    <string name="settings_reset_internal_database_description">Удалить подписки, серверы и маршрутизацию приложений, сохранив настройки приложения</string>
-    <string name="settings_resetting_internal_database">Сброс внутренней базы данных&#8230;</string>
-    <string name="settings_reset_internal_database_title">Сбросить внутреннюю базу данных?</string>
-    <string name="settings_reset_internal_database_confirmation">Все подписки, серверы и данные маршрутизации приложений будут удалены без возможности восстановления. Настройки приложения сохранятся, а активное подключение будет остановлено.</string>
+    <string name="settings_reset_app">Сбросить приложение</string>
+    <string name="settings_reset_app_description">Удалить все данные приложения, как при переустановке</string>
+    <string name="settings_resetting_app">Сброс приложения&#8230;</string>
+    <string name="settings_reset_app_title">Сбросить приложение?</string>
+    <string name="settings_reset_app_confirmation">Все подписки, серверы, настройки, загруженные геоданные и ядра Xray будут удалены без возможности восстановления, как при переустановке. Активное подключение будет остановлено, а приложение закроется.</string>
     <string name="settings_reset">Сбросить</string>
-    <string name="settings_internal_database_reset_failed">Не удалось сбросить внутреннюю базу данных</string>
+    <string name="settings_app_reset_failed">Не удалось сбросить приложение</string>
     <string name="settings_section_about">О приложении</string>
     <string name="settings_app_update_checks_title">Автоматически проверять обновления</string>
     <string name="settings_app_update_interval_title">Проверять обновления каждые...</string>

@@ -2,7 +2,6 @@ package com.material.xray.core.database
 
 import androidx.room.Room
 import androidx.sqlite.driver.bundled.BundledSQLiteDriver
-import com.material.xray.core.common.log.NoOpAppLogger
 import com.material.xray.core.database.entity.ServerEntity
 import com.material.xray.core.database.entity.SubscriptionEntity
 import kotlinx.coroutines.test.runTest
@@ -44,19 +43,6 @@ class DatabaseTransactionsTest {
 
         assertEquals("abort", failure?.message)
         assertTrue(database.subscriptionDao().getAll().isEmpty())
-    }
-
-    @Test
-    fun deleteAllRowsEmptiesEveryEntityTable() = runTest {
-        val id = database.subscriptionDao().insert(SubscriptionEntity(name = "First", url = "https://example.com"))
-        database.serverDao().insertAll(listOf(server(id)))
-
-        database.deleteAllRows()
-
-        assertTrue(database.subscriptionDao().getAll().isEmpty())
-        assertTrue(database.serverDao().getAll().isEmpty())
-        // Room's identity table survives, so the next open still recognises the schema.
-        assertTrue(DatabaseOpenChecker(database, NoOpAppLogger).canRead())
     }
 
     private fun server(subscriptionId: Long) = ServerEntity(

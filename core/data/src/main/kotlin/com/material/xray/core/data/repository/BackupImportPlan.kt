@@ -40,6 +40,8 @@ internal data class PlannedBackupServer(
     val subscriptionKey: String,
     val config: ServerConfig,
     val sortOrder: Int,
+    val edited: Boolean,
+    val guarded: Boolean,
 )
 
 internal data class PlannedBackupAppRoute(
@@ -94,7 +96,7 @@ internal object BackupImportPlanner {
             }
             val sortOrder = serversPerSubscription.getOrDefault(subscriptionKey, 0)
             serversPerSubscription[subscriptionKey] = sortOrder + 1
-            PlannedBackupServer(key, subscriptionKey, server.config, sortOrder)
+            PlannedBackupServer(key, subscriptionKey, server.config, sortOrder, server.edited, server.guarded)
         }
         requireUnique(servers.map { it.key }, "server key")
 

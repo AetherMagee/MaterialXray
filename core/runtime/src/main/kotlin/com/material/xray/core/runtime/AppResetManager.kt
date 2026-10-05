@@ -1,31 +1,24 @@
 package com.material.xray.core.runtime
 
+import android.app.ActivityManager
 import android.content.Context
 import com.material.xray.core.common.connection.ConnectionStateCoordinator
-import com.material.xray.core.data.repository.SettingsRepository
-import com.material.xray.core.database.AppDatabase
-import com.material.xray.core.database.deleteAllRows
 import com.material.xray.core.model.ConnectionState
-import com.material.xray.core.xray.ActiveConfigOverrideStore
 import com.material.xray.service.XrayService
-import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import org.koin.core.annotation.Singleton
 
+/** Wipes every piece of app data, leaving the app as a fresh install would. */
 @Singleton
-class DatabaseResetManager(
+class AppResetManager(
     private val context: Context,
-    private val database: AppDatabase,
-    private val settingsRepository: SettingsRepository,
-    private val routingChangeManager: RoutingChangeManager,
     private val stateCoordinator: ConnectionStateCoordinator,
-    private val activeConfigOverrideStore: ActiveConfigOverrideStore,
-    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
+    /**
+     * Never returns on success: the system kills the app once its data is gone. The connection is
+     * stopped first because root mode undoes its routing from files the wipe deletes.
+     */
     suspend fun reset() {
         if (stateCoordinator.state.value.requiresRuntimeDisconnect()) {
             XrayService.disconnect(context, force = true)
@@ -35,12 +28,8 @@ class DatabaseResetManager(
                 },
             ) { "Timed out waiting for the active connection to stop" }
         }
-
-        withContext(NonCancellable) {
-            withContext(ioDispatcher) { database.deleteAllRows() }
-            settingsRepository.setLastServerId(-1)
-            activeConfigOverrideStore.clear()
-            routingChangeManager.clearPendingChanges()
+        check(context.getSystemService(ActivityManager::class.java).clearApplicationUserData()) {
+            "The system refused to clear the app data"
         }
     }
 

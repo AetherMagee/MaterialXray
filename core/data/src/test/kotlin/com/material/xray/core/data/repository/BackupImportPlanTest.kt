@@ -58,6 +58,31 @@ class BackupImportPlanTest {
     }
 
     @Test
+    fun `server edits and protection survive planning`() {
+        val backup = BackupData(
+            version = BackupData.CURRENT_VERSION,
+            subscriptions = listOf(BackupData.BackupSubscription(key = "s", name = "Provider", url = "https://example.com/sub")),
+            servers = listOf(
+                BackupData.BackupServer(
+                    key = "a",
+                    subscriptionKey = "s",
+                    subscriptionUrl = null,
+                    config = ServerConfig(protocol = Protocol.VLESS, name = "A", address = "example.com", port = 443, password = "uuid"),
+                    edited = true,
+                    guarded = true,
+                ),
+            ),
+            bypassedApps = emptyList(),
+            settings = emptyMap(),
+        )
+
+        val server = BackupImportPlanner.create(backup).servers.single()
+
+        assertEquals(true, server.edited)
+        assertEquals(true, server.guarded)
+    }
+
+    @Test
     fun `legacy bypass entries remain importable`() {
         val backup = BackupData(
             subscriptions = emptyList(),

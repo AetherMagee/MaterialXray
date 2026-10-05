@@ -621,13 +621,14 @@ class SettingsRepository(
 
     suspend fun getAllAsMap(): Map<String, String> {
         val prefs = store.data.first()
-        return prefs.asMap().entries
-            .filterNot { (key, _) -> key == DIAGNOSTICS_NOTICE_SHOWN || key == DIAGNOSTICS_ENABLED }
-            .associate { (key, value) -> key.name to value.toString() }
+        return prefs.asMap().entries.associate { (key, value) -> key.name to value.toString() }
     }
 
     suspend fun restoreFromMap(map: Map<String, String>, sourceBackupVersion: Int? = null) {
         store.edit { prefs ->
+            // Backups before version 5 did not carry diagnostics consent, which must never flip on import.
+            val diagnosticsEnabled = prefs[DIAGNOSTICS_ENABLED]
+            val diagnosticsNoticeShown = prefs[DIAGNOSTICS_NOTICE_SHOWN]
             prefs.clear()
             map["tun_name"]?.let { prefs[TUN_NAME] = it }
             map["dns_servers"]?.let { prefs[DNS_SERVERS] = it }
@@ -678,6 +679,13 @@ class SettingsRepository(
             map["root_connection_backend"]?.let { value ->
                 prefs[ROOT_CONNECTION_BACKEND] = RootConnectionBackend.fromValue(value).persistedValue
             }
+            map["route_mxray_traffic_through_xray"]
+                ?.toBooleanStrictOrNull()
+                ?.let { prefs[ROUTE_MXRAY_TRAFFIC_THROUGH_XRAY] = it }
+            (map["diagnostics_enabled"]?.toBooleanStrictOrNull() ?: diagnosticsEnabled)
+                ?.let { prefs[DIAGNOSTICS_ENABLED] = it }
+            (map["diagnostics_notice_shown"]?.toBooleanStrictOrNull() ?: diagnosticsNoticeShown)
+                ?.let { prefs[DIAGNOSTICS_NOTICE_SHOWN] = it }
             map["notification_update_interval_ms"]
                 ?.toIntOrNull()
                 ?.coerceIn(NotificationSettings.MIN_UPDATE_INTERVAL_MS, NotificationSettings.MAX_UPDATE_INTERVAL_MS)

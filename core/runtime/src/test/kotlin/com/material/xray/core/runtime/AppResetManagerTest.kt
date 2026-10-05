@@ -5,7 +5,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-class DatabaseResetManagerTest {
+class AppResetManagerTest {
     @Test
     fun `reset waits for active runtime states`() {
         assertTrue(ConnectionState.Connecting.requiresRuntimeDisconnect())

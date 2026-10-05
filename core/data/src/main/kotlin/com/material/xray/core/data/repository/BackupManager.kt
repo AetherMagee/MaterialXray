@@ -6,9 +6,6 @@ import com.material.xray.core.common.connection.ConnectionStateCoordinator
 import com.material.xray.core.data.platform.BackupStorage
 import com.material.xray.core.data.platform.LauncherIconSwitcher
 import com.material.xray.core.database.AppDatabase
-import com.material.xray.core.database.dao.AppBypassDao
-import com.material.xray.core.database.dao.ServerDao
-import com.material.xray.core.database.dao.SubscriptionDao
 import com.material.xray.core.database.entity.AppRouteAssignment
 import com.material.xray.core.database.entity.ServerEntity
 import com.material.xray.core.database.entity.SubscriptionEntity
@@ -19,6 +16,7 @@ import com.material.xray.core.model.BackupData
 import com.material.xray.core.model.ConnectionState
 import com.material.xray.core.model.ServerConfig
 import com.material.xray.core.model.appKey
+import com.material.xray.core.xray.ActiveConfigOverrideStore
 import com.material.xray.core.xray.XrayPaths
 import java.io.ByteArrayOutputStream
 import java.io.IOException
@@ -39,20 +37,22 @@ class BackupManager(
     private val backupStorage: BackupStorage,
     private val xrayPaths: XrayPaths,
     private val database: AppDatabase,
-    private val subscriptionDao: SubscriptionDao,
-    private val serverDao: ServerDao,
-    private val appBypassDao: AppBypassDao,
     private val settingsRepository: SettingsRepository,
     private val launcherIconSwitcher: LauncherIconSwitcher,
     private val appUpdateScheduler: AppUpdateScheduling,
     private val connectionShutdown: ConnectionShutdown,
     private val connectionStateCoordinator: ConnectionStateCoordinator,
+    private val activeConfigOverrideStore: ActiveConfigOverrideStore,
+    private val sections: List<BackupSection>,
 ) {
     private val json = Json {
         encodeDefaults = true
         ignoreUnknownKeys = true
         prettyPrint = true
     }
+    private val subscriptionDao = database.subscriptionDao()
+    private val serverDao = database.serverDao()
+    private val appBypassDao = database.appBypassDao()
     private val operationMutex = Mutex()
     private val journalStore = BackupRestoreJournalStore(xrayPaths.filesDir, json)
 
@@ -114,7 +114,7 @@ class BackupManager(
         val subscriptionKeyById = subscriptions.associate { subscription ->
             subscription.id to "subscription-${subscription.id}"
         }
-        val serverKeyById = servers.associate { server -> server.id to "server-${server.id}" }
+        val serverKeyById = servers.associate { server -> server.id to "$SERVER_KEY_PREFIX${server.id}" }
         val selectedServerKey = settings[LAST_SERVER_ID_SETTING]
             ?.toLongOrNull()
             ?.let(serverKeyById::get)
@@ -133,6 +133,8 @@ class BackupManager(
                     customUserAgent = subscription.customUserAgent,
                     customHeaders = subscription.customHeaders,
                     allowInsecureUpdates = subscription.allowInsecureUpdates,
+                    lastUpdated = subscription.lastUpdated,
+                    lastAutoRefreshFailureAt = subscription.lastAutoRefreshFailureAt,
                     metadata = subscription.toSubscriptionMetadata(),
                     appRouting = subscription.toSubscriptionAppRouting(),
                     routing = subscription.toSubscriptionRouting(),
@@ -144,6 +146,8 @@ class BackupManager(
                     subscriptionKey = subscriptionKeyById.getValue(server.subscriptionId),
                     subscriptionUrl = subscriptions.first { it.id == server.subscriptionId }.url,
                     config = json.decodeFromString<ServerConfig>(server.configJson),
+                    edited = server.edited,
+                    guarded = server.guarded,
                 )
             },
             bypassedApps = appRoutes
@@ -162,11 +166,14 @@ class BackupManager(
                 )
             },
             selectedServerKey = selectedServerKey,
+            activeConfigOverride = activeConfigOverrideStore.read(),
+            sections = sections.associate { section -> section.key to section.export() },
         )
     }
 
     private suspend fun applyPlan(plan: BackupImportPlan) {
         var selectedServerId = -1L
+        var serverIdByKey = emptyMap<String, Long>()
         database.withWriteTransaction {
             appBypassDao.deleteAll()
             subscriptionDao.deleteAll()
@@ -183,6 +190,8 @@ class BackupManager(
                         customUserAgent = planned.value.customUserAgent,
                         customHeaders = planned.value.customHeaders,
                         allowInsecureUpdates = planned.value.allowInsecureUpdates,
+                        lastUpdated = planned.value.lastUpdated,
+                        lastAutoRefreshFailureAt = planned.value.lastAutoRefreshFailureAt,
                         sortOrder = sortOrder,
                     ).withSubscriptionMetadata(planned.value.metadata)
                         .withSubscriptionAppRouting(planned.value.appRouting)
@@ -198,10 +207,12 @@ class BackupManager(
                     port = planned.config.port,
                     configJson = json.encodeToString(planned.config),
                     sortOrder = planned.sortOrder,
+                    edited = planned.edited,
+                    guarded = planned.guarded,
                 )
             }
             val serverIds = if (serverEntities.isEmpty()) emptyList() else serverDao.insertAll(serverEntities)
-            val serverIdByKey = plan.servers.map { it.key }.zip(serverIds).toMap()
+            serverIdByKey = plan.servers.map { it.key }.zip(serverIds).toMap()
 
             val routes = plan.appRoutes.map { planned ->
                 AppRouteAssignment(
@@ -223,6 +234,18 @@ class BackupManager(
             plan.source.settings + (LAST_SERVER_ID_SETTING to selectedServerId.toString()),
             sourceBackupVersion = plan.source.version,
         )
+        val configOverride = plan.source.activeConfigOverride
+        if (configOverride == null) {
+            activeConfigOverrideStore.clear()
+        } else {
+            val newIdByOldId = serverIdByKey.mapNotNull { (key, newId) ->
+                key.removePrefix(SERVER_KEY_PREFIX).toLongOrNull()?.let { oldId -> oldId to newId }
+            }.toMap()
+            check(activeConfigOverrideStore.save(remapServerTags(configOverride, newIdByOldId))) {
+                "Unable to restore the edited runtime config"
+            }
+        }
+        sections.forEach { section -> section.restore(plan.source.sections[section.key]) }
     }
 
     private suspend fun disconnectActiveConnection() {
@@ -308,7 +331,19 @@ class BackupManager(
 
     private companion object {
         const val LAST_SERVER_ID_SETTING = "last_server_id"
+        const val SERVER_KEY_PREFIX = "server-"
         const val MAX_BACKUP_BYTES = 16 * 1024 * 1024
         const val DISCONNECT_TIMEOUT_MILLIS = 10_000L
     }
+}
+
+private val SERVER_TAG = Regex("\"(app-(?:in|proxy)-(?:forced-)?)(\\d+)\"")
+
+/**
+ * Points the per-app tags `AppRoutingPlanner` derives from server ids at the ids the servers got
+ * on import, since a hand-edited config keeps the ones from when it was saved.
+ */
+internal fun remapServerTags(config: String, newIdByOldId: Map<Long, Long>): String = SERVER_TAG.replace(config) { match ->
+    val newId = match.groupValues[2].toLongOrNull()?.let(newIdByOldId::get)
+    if (newId == null) match.value else "\"${match.groupValues[1]}$newId\""
 }

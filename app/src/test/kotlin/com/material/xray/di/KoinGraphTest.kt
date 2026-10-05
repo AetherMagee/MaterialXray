@@ -33,6 +33,7 @@ import com.material.xray.core.data.parser.SubscriptionDeviceIdentity
 import com.material.xray.core.data.platform.BackupStorage
 import com.material.xray.core.data.platform.LauncherIconSwitcher
 import com.material.xray.core.data.repository.AppUpdateDataStore
+import com.material.xray.core.data.repository.BackupSection
 import com.material.xray.core.data.repository.SettingsDataStore
 import com.material.xray.core.data.repository.SettingsRepository
 import com.material.xray.core.network.CoreTrafficRoutingSetting
@@ -49,6 +50,7 @@ import com.material.xray.core.xray.PlatformDns
 import com.material.xray.core.xray.TproxyCompatibilityCache
 import com.material.xray.core.xray.VpnTransportProbe
 import com.material.xray.core.xray.XrayPaths
+import com.material.xray.feature.xraycore.XrayCoreUpdateBackupSection
 import com.material.xray.feature.xraycore.XrayCoreUpdateWorker
 import com.material.xray.service.AppUpdateWorker
 import com.material.xray.service.GeoDataUpdateWorker
@@ -130,6 +132,7 @@ class KoinGraphTest {
             BackupStorage::class to ContentResolverBackupStorage::class,
             LauncherIconSwitcher::class to LauncherIconManager::class,
             AppInventorySource::class to AppInventory::class,
+            BackupSection::class to XrayCoreUpdateBackupSection::class,
         )
         val definitions = koin.instanceRegistry.instances.values.map { it.beanDefinition }
 

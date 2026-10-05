@@ -7,7 +7,6 @@ import android.content.pm.PackageManager
 import android.content.res.Resources
 import android.net.Uri
 import android.os.Build
-import android.os.Process
 import android.provider.Settings
 import android.text.format.DateFormat
 import android.text.format.Formatter
@@ -286,7 +285,7 @@ private fun SettingsScreenContent(
     val geoDataLastUpdated by viewModel.geoDataLastUpdated.collectAsStateWithLifecycle()
     val geoDataCachedSizes by viewModel.geoDataCachedSizes.collectAsStateWithLifecycle()
     val xrayCoreVersion by viewModel.xrayCoreVersion.collectAsStateWithLifecycle()
-    val databaseResetting by viewModel.databaseResetting.collectAsStateWithLifecycle()
+    val appResetting by viewModel.appResetting.collectAsStateWithLifecycle()
     val backupBusy by viewModel.backupBusy.collectAsStateWithLifecycle()
     val backupImportSummary by viewModel.backupImportSummary.collectAsStateWithLifecycle()
     val appUpdateCheckStatus by viewModel.appUpdateCheckStatus.collectAsStateWithLifecycle()
@@ -334,7 +333,7 @@ private fun SettingsScreenContent(
     var showNotificationFieldsDialog by rememberSaveable { mutableStateOf(false) }
     var showFieldStyleDialog by rememberSaveable { mutableStateOf(false) }
     var showUpdateFrequencyDialog by rememberSaveable { mutableStateOf(false) }
-    var showResetDatabaseDialog by rememberSaveable { mutableStateOf(false) }
+    var showResetAppDialog by rememberSaveable { mutableStateOf(false) }
     var showOpenSourceLicensesDialog by rememberSaveable { mutableStateOf(false) }
     var showAppUpdateIntervalDialog by rememberSaveable { mutableStateOf(false) }
     var geoDataToDelete by rememberSaveable { mutableStateOf<GeoDataAsset?>(null) }
@@ -443,17 +442,12 @@ private fun SettingsScreenContent(
 
     LaunchedEffect(viewModel, context, resources) {
         lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
-            viewModel.databaseResetEvents.collect { success ->
-                if (success) {
-                    (context as? Activity)?.finishAndRemoveTask()
-                        ?: Process.killProcess(Process.myPid())
-                } else {
-                    Toast.makeText(
-                        context,
-                        resources.getString(R.string.settings_internal_database_reset_failed),
-                        Toast.LENGTH_SHORT,
-                    ).show()
-                }
+            viewModel.appResetFailures.collect {
+                Toast.makeText(
+                    context,
+                    resources.getString(R.string.settings_app_reset_failed),
+                    Toast.LENGTH_SHORT,
+                ).show()
             }
         }
     }
@@ -1014,18 +1008,19 @@ private fun SettingsScreenContent(
                         navigates = true,
                     )
                 }
-                item(key = "database_reset") {
+                item(key = "app_reset") {
                     SettingsActionRow(
-                        title = stringResource(R.string.settings_reset_internal_database),
+                        title = stringResource(R.string.settings_reset_app),
                         subtitle = stringResource(
-                            if (databaseResetting) {
-                                R.string.settings_resetting_internal_database
+                            if (appResetting) {
+                                R.string.settings_resetting_app
                             } else {
-                                R.string.settings_reset_internal_database_description
+                                R.string.settings_reset_app_description
                             },
                         ),
-                        enabled = !databaseResetting,
-                        onClick = { showResetDatabaseDialog = true },
+                        enabled = !appResetting,
+                        onClick = { showResetAppDialog = true },
+                        navigates = true,
                     )
                 }
             }
@@ -1139,7 +1134,7 @@ private fun SettingsScreenContent(
         showNotificationFieldsDialog = showNotificationFieldsDialog,
         showUpdateFrequencyDialog = showUpdateFrequencyDialog,
         showFieldStyleDialog = showFieldStyleDialog,
-        showResetDatabaseDialog = showResetDatabaseDialog,
+        showResetAppDialog = showResetAppDialog,
         backupImportSummary = backupImportSummary,
         backupBusy = backupBusy,
         notificationSettings = notificationSettings,
@@ -1148,10 +1143,10 @@ private fun SettingsScreenContent(
             onDismissNotificationFields = { showNotificationFieldsDialog = false },
             onDismissUpdateFrequency = { showUpdateFrequencyDialog = false },
             onDismissFieldStyle = { showFieldStyleDialog = false },
-            onDismissResetDatabase = { showResetDatabaseDialog = false },
-            onResetDatabase = {
-                showResetDatabaseDialog = false
-                viewModel.resetInternalDatabase()
+            onDismissResetApp = { showResetAppDialog = false },
+            onResetApp = {
+                showResetAppDialog = false
+                viewModel.resetApp()
             },
             onDismissBackupImport = viewModel::dismissBackupImport,
             onConfirmBackupImport = viewModel::confirmBackupImport,
@@ -1658,8 +1653,8 @@ private data class SettingsDialogActions(
     val onDismissNotificationFields: () -> Unit,
     val onDismissUpdateFrequency: () -> Unit,
     val onDismissFieldStyle: () -> Unit,
-    val onDismissResetDatabase: () -> Unit,
-    val onResetDatabase: () -> Unit,
+    val onDismissResetApp: () -> Unit,
+    val onResetApp: () -> Unit,
     val onDismissBackupImport: () -> Unit,
     val onConfirmBackupImport: () -> Unit,
     val onFieldEnabledChange: (NotificationField, Boolean) -> Unit,
@@ -1674,7 +1669,7 @@ private fun SettingsDialogs(
     showNotificationFieldsDialog: Boolean,
     showUpdateFrequencyDialog: Boolean,
     showFieldStyleDialog: Boolean,
-    showResetDatabaseDialog: Boolean,
+    showResetAppDialog: Boolean,
     backupImportSummary: BackupSummary?,
     backupBusy: Boolean,
     notificationSettings: NotificationSettings,
@@ -1771,13 +1766,13 @@ private fun SettingsDialogs(
         )
     }
 
-    if (showResetDatabaseDialog) {
+    if (showResetAppDialog) {
         AlertDialog(
-            onDismissRequest = actions.onDismissResetDatabase,
-            title = { Text(stringResource(R.string.settings_reset_internal_database_title)) },
-            text = { Text(stringResource(R.string.settings_reset_internal_database_confirmation)) },
+            onDismissRequest = actions.onDismissResetApp,
+            title = { Text(stringResource(R.string.settings_reset_app_title)) },
+            text = { Text(stringResource(R.string.settings_reset_app_confirmation)) },
             confirmButton = {
-                TextButton(onClick = actions.onResetDatabase) {
+                TextButton(onClick = actions.onResetApp) {
                     Text(
                         text = stringResource(R.string.settings_reset),
                         color = MaterialTheme.colorScheme.error,
@@ -1785,7 +1780,7 @@ private fun SettingsDialogs(
                 }
             },
             dismissButton = {
-                TextButton(onClick = actions.onDismissResetDatabase) {
+                TextButton(onClick = actions.onDismissResetApp) {
                     Text(stringResource(R.string.settings_cancel))
                 }
             },

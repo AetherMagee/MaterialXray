@@ -31,9 +31,13 @@ class ActiveConfigOverrideStore(
         }.onFailure { temp.delete() }.isSuccess
     }
 
+    suspend fun read(): String? = withContext(ioDispatcher) {
+        runCatching { file.takeIf { it.isFile }?.readText() }.getOrNull()?.takeIf { it.isNotBlank() }
+    }
+
     /** Matches what the connect path treats as an override, so the UI never disagrees with it. */
     suspend fun exists(): Boolean = withContext(ioDispatcher) {
-        runCatching { file.takeIf { it.isFile }?.readText() }.getOrNull()?.isNotBlank() == true
+        read() != null
     }
 
     suspend fun clear(): Unit = withContext(ioDispatcher) {

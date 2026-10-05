@@ -13,6 +13,7 @@ dependencies {
     implementation(libs.activity.compose)
     implementation(libs.core.ktx)
     implementation(libs.coroutines.core)
+    implementation(libs.serialization.json)
     implementation(libs.work.runtime.ktx)
     implementation(libs.koin.android)
     implementation(libs.koin.androidx.workmanager)
