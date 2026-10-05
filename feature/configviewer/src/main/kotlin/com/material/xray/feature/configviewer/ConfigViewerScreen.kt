@@ -120,11 +120,17 @@ fun ConfigViewerScreen(
     val context = LocalContext.current
     val layoutDirection = LocalLayoutDirection.current
     val resources = LocalResources.current
-    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
     val copiedMessage = stringResource(R.string.config_viewer_copied)
     val clipboardLabel = stringResource(R.string.config_viewer_clipboard_label)
     val copyable = uiState.copyableText()
     val editing = uiState.isEditing()
+    val fixedEditorTopBar = request == ConfigViewerRequest.Running && editing
+    val editorScrollState = rememberTopAppBarState()
+    val previewScrollState = rememberTopAppBarState()
+    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(
+        state = if (fixedEditorTopBar) editorScrollState else previewScrollState,
+        canScroll = { !fixedEditorTopBar },
+    )
 
     // Typing stays inside the composition. Routing every keystroke through a StateFlow makes the
     // text arrive a frame late, which is what makes the cursor jump under fast or predictive input,
@@ -157,7 +163,7 @@ fun ConfigViewerScreen(
     }
 
     Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        modifier = if (fixedEditorTopBar) Modifier else Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         // Keep the bottom inset; previews include it in their scrollable padding so content can
         // pass behind the transparent system navigation bar without hiding the last line.
         contentWindowInsets = WindowInsets.navigationBars,
