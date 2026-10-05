@@ -89,13 +89,9 @@
     <string name="diagnostics_default_notice">MaterialXray по умолчанию отправляет приватные диагностические данные и статистику использования. Конфиденциальная информация не передаётся. Это можно отключить в настройках.</string>
     <string name="diagnostics_dismiss">Закрыть</string>
     <string name="settings_section_data">Данные</string>
+    <string name="settings_export">Экспорт</string>
     <string name="settings_import">Импорт</string>
     <string name="settings_clear_geodata">Очистить геоданные</string>
-    <string name="settings_export_backup">Экспорт резервной копии</string>
-    <string name="settings_export_backup_description">Сохранить подписки, серверы и маршрутизацию приложений в файл</string>
-    <string name="settings_import_backup">Импорт резервной копии</string>
-    <string name="settings_import_backup_description">Заменить текущую конфигурацию резервной копией из файла</string>
-    <string name="settings_clear_geodata_description">Удалить загруженные файлы geoip и geosite</string>
     <string name="settings_clearing_geodata">Очистка геоданных&#8230;</string>
     <string name="settings_geodata_cleared">Геоданные очищены</string>
     <string name="settings_geodata_clear_failed">Не удалось очистить геоданные</string>

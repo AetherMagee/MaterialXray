@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -63,6 +64,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
@@ -990,40 +992,39 @@ private fun SettingsScreenContent(
                     Text(stringResource(R.string.settings_section_data), style = MaterialTheme.typography.titleMedium)
                 }
             }
-            item(key = "backup_export") {
-                SettingsActionRow(
-                    title = stringResource(R.string.settings_export_backup),
-                    subtitle = stringResource(R.string.settings_export_backup_description),
-                    enabled = !backupBusy,
-                    onClick = { exportLauncher.launch("material-xray-backup.json") },
-                    navigates = true,
-                )
-            }
-            item(key = "backup_import") {
-                SettingsActionRow(
-                    title = stringResource(R.string.settings_import_backup),
-                    subtitle = stringResource(R.string.settings_import_backup_description),
-                    enabled = !backupBusy,
-                    onClick = { importLauncher.launch(arrayOf("application/json")) },
-                    navigates = true,
-                )
+            item(key = "data_actions") {
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    OutlinedButton(
+                        enabled = !backupBusy,
+                        onClick = { exportLauncher.launch("material-xray-backup.json") },
+                    ) {
+                        Text(stringResource(R.string.settings_export))
+                    }
+                    OutlinedButton(
+                        enabled = !backupBusy,
+                        onClick = { importLauncher.launch(arrayOf("application/json")) },
+                    ) {
+                        Text(stringResource(R.string.settings_import))
+                    }
+                    if (showAdvancedOptions) {
+                        OutlinedButton(
+                            enabled = canClearGeoData(connectionState) && !geoDataOperationInProgress,
+                            onClick = { showClearGeoDataDialog = true },
+                        ) {
+                            Text(
+                                stringResource(
+                                    if (geoDataClearing) R.string.settings_clearing_geodata else R.string.settings_clear_geodata,
+                                ),
+                            )
+                        }
+                    }
+                }
             }
             if (showAdvancedOptions) {
-                item(key = "clear_geodata") {
-                    SettingsActionRow(
-                        title = stringResource(R.string.settings_clear_geodata),
-                        subtitle = stringResource(
-                            if (geoDataClearing) {
-                                R.string.settings_clearing_geodata
-                            } else {
-                                R.string.settings_clear_geodata_description
-                            },
-                        ),
-                        enabled = canClearGeoData(connectionState) && !geoDataOperationInProgress,
-                        onClick = { showClearGeoDataDialog = true },
-                        navigates = true,
-                    )
-                }
                 item(key = "app_reset") {
                     SettingsActionRow(
                         title = stringResource(R.string.settings_reset_app),

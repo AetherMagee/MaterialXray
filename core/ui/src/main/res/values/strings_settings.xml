@@ -87,13 +87,9 @@
     <string name="diagnostics_default_notice">MaterialXray sends private diagnostics and usage statistics by default. No sensitive information is shared. You can turn this off in Settings.</string>
     <string name="diagnostics_dismiss">Dismiss</string>
     <string name="settings_section_data">Data</string>
+    <string name="settings_export">Export</string>
     <string name="settings_import">Import</string>
     <string name="settings_clear_geodata">Clear geodata</string>
-    <string name="settings_export_backup">Export backup</string>
-    <string name="settings_export_backup_description">Save subscriptions, servers, and app routing to a file</string>
-    <string name="settings_import_backup">Import backup</string>
-    <string name="settings_import_backup_description">Replace the current configuration with a backup file</string>
-    <string name="settings_clear_geodata_description">Delete downloaded geoip and geosite files</string>
     <string name="settings_clearing_geodata">Clearing geodata&#8230;</string>
     <string name="settings_geodata_cleared">Geodata cleared</string>
     <string name="settings_geodata_clear_failed">Unable to clear geodata</string>
