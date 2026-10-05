@@ -34,6 +34,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.indication
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -53,6 +54,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyListState
@@ -2883,6 +2885,7 @@ private fun EditSubscriptionDialog(
         customHeaders.text.toString().trim().ifBlank { null } != subscription.customHeaders
     AlertDialog(
         onDismissRequest = onDismiss,
+        modifier = Modifier.stableDialogHeight(onDismiss),
         title = { Text(stringResource(R.string.home_edit_subscription_title)) },
         text = {
             Column(
@@ -3027,6 +3030,7 @@ private fun AddSubscriptionDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
+        modifier = Modifier.stableDialogHeight(onDismiss),
         title = { Text(stringResource(R.string.home_add_manually)) },
         text = {
             Column(
@@ -3087,6 +3091,15 @@ private fun AddSubscriptionDialog(
     )
 }
 
+// Keep the Android window at its available height while the Material surface resizes inside it.
+// A wrap-content window would resize and recenter through WindowManager on every frame.
+private fun Modifier.stableDialogHeight(onDismiss: () -> Unit): Modifier = fillMaxHeight()
+    .pointerInput(onDismiss) { detectTapGestures { onDismiss() } }
+    .wrapContentHeight()
+    // The full-height window handles outside taps above and below the surface. Consume taps
+    // in its content so blank space inside the dialog does not dismiss it.
+    .pointerInput(Unit) { detectTapGestures {} }
+
 @Composable
 private fun SubscriptionAdvancedOptions(
     expanded: Boolean,
@@ -3118,7 +3131,7 @@ private fun SubscriptionAdvancedOptions(
     }
     AnimatedVisibility(
         visible = expanded,
-        // Animate the block once, rather than restart a viewport tween as the dialog window resizes.
+        // Animate only the Advanced block inside the fixed-height dialog window.
         enter = fadeIn(tween(150)) + expandVertically(tween(SUBSCRIPTION_DIALOG_RESIZE_MS), expandFrom = Alignment.Top),
         exit = fadeOut(tween(100)) + shrinkVertically(tween(SUBSCRIPTION_DIALOG_RESIZE_MS), shrinkTowards = Alignment.Top),
     ) {
