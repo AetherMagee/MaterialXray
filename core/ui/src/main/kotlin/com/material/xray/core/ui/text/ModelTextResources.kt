@@ -121,6 +121,14 @@ val OtherVpnMode.descriptionResource: Int
     }
 
 @get:StringRes
+val OtherVpnMode.dropdownDescriptionResource: Int
+    get() = when (this) {
+        OtherVpnMode.AutoRouting -> R.string.other_vpn_mode_auto_routing_dropdown_description
+        OtherVpnMode.TunnelInTunnel -> R.string.other_vpn_mode_tunnel_in_tunnel_dropdown_description
+        OtherVpnMode.StandDown -> R.string.other_vpn_mode_stand_down_description
+    }
+
+@get:StringRes
 val RootConnectionBackend.labelResource: Int
     get() = when (this) {
         RootConnectionBackend.Tun -> R.string.root_connection_backend_tun_label

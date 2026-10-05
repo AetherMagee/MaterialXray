@@ -158,6 +158,7 @@ import com.material.xray.core.ui.components.SettingsSwitchRow
 import com.material.xray.core.ui.components.TooltipIconButton
 import com.material.xray.core.ui.components.rememberSystemState
 import com.material.xray.core.ui.text.descriptionResource
+import com.material.xray.core.ui.text.dropdownDescriptionResource
 import com.material.xray.core.ui.text.labelResource
 import com.material.xray.core.xray.TproxyCompatibility
 import java.util.Date
@@ -1328,7 +1329,7 @@ private fun SettingsServiceSection(
                         DropdownOption(
                             value = mode,
                             label = stringResource(mode.labelResource),
-                            description = stringResource(mode.descriptionResource),
+                            description = stringResource(mode.dropdownDescriptionResource),
                         )
                     },
                     onSelected = actions.onOtherVpnModeChange,
