@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Keep the full logo within AndroidX SplashScreen's 192dp safe area. -->
+    <dimen name="splash_logo_size">192dp</dimen>
+</resources>
