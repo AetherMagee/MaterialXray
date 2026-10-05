@@ -2774,7 +2774,7 @@ private val FloatingConnectButtonClearance = 80.dp
 private const val DISABLED_FAB_CONTENT_ALPHA = 0.38f
 private const val QR_SCANNER_TRANSITION_MS = 180
 private const val SUBSCRIPTION_EXPANSION_MS = 180
-private const val SUBSCRIPTION_DIALOG_RESIZE_MS = 300
+private const val SUBSCRIPTION_DIALOG_RESIZE_MS = 250
 private const val CORE_UPTIME_REFRESH_INTERVAL_MS = 1_000L
 private const val CAMERA_PERMISSION_PREFS = "camera_permission"
 private const val CAMERA_PERMISSION_REQUESTED = "requested"
@@ -2889,9 +2889,7 @@ private fun EditSubscriptionDialog(
         title = { Text(stringResource(R.string.home_edit_subscription_title)) },
         text = {
             Column(
-                modifier = Modifier
-                    .animateContentSize(animationSpec = tween(SUBSCRIPTION_DIALOG_RESIZE_MS))
-                    .verticalScroll(rememberScrollState()),
+                modifier = Modifier.verticalScroll(rememberScrollState()),
             ) {
                 OutlinedTextField(
                     state = name,
@@ -3035,9 +3033,7 @@ private fun AddSubscriptionDialog(
         title = { Text(stringResource(R.string.home_add_manually)) },
         text = {
             Column(
-                modifier = Modifier
-                    .animateContentSize(animationSpec = tween(SUBSCRIPTION_DIALOG_RESIZE_MS))
-                    .verticalScroll(rememberScrollState()),
+                modifier = Modifier.verticalScroll(rememberScrollState()),
             ) {
                 OutlinedTextField(
                     state = url,
@@ -3125,9 +3121,9 @@ private fun SubscriptionAdvancedOptions(
     }
     AnimatedVisibility(
         visible = expanded,
-        // The dialog's scroll viewport animates its measured height; only fade the fields here.
-        enter = fadeIn(tween(180)),
-        exit = fadeOut(tween(120)),
+        // Animate the block once, rather than restart a viewport tween as the dialog window resizes.
+        enter = fadeIn(tween(150)) + expandVertically(tween(SUBSCRIPTION_DIALOG_RESIZE_MS), expandFrom = Alignment.Top),
+        exit = fadeOut(tween(100)) + shrinkVertically(tween(SUBSCRIPTION_DIALOG_RESIZE_MS), shrinkTowards = Alignment.Top),
     ) {
         Column {
             Spacer(modifier = Modifier.height(8.dp))
