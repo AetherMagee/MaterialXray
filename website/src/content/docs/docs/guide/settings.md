@@ -45,7 +45,7 @@ Add the Material Xray tile to toggle the connection from the notification shade.
 
 ## Data
 
-- **Export / Import**: a backup of subscriptions, servers and app routes. Importing replaces the current configuration.
+- **Export backup / Import backup**: a backup of subscriptions, servers and app routes. Importing replaces the current configuration.
 - **Reset internal database**: deletes subscriptions, servers and app routing but keeps app settings.
 
 ## Diagnostics

@@ -64,7 +64,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
@@ -981,42 +980,39 @@ private fun SettingsScreenContent(
                     Text(stringResource(R.string.settings_section_data), style = MaterialTheme.typography.titleMedium)
                 }
             }
-            item(key = "backup") {
-                Row(
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    OutlinedButton(
-                        enabled = !backupBusy,
-                        onClick = { exportLauncher.launch("material-xray-backup.json") },
-                    ) {
-                        Text(stringResource(R.string.settings_export))
-                    }
-                    OutlinedButton(
-                        enabled = !backupBusy,
-                        onClick = { importLauncher.launch(arrayOf("application/json")) },
-                    ) {
-                        Text(stringResource(R.string.settings_import))
-                    }
-                }
+            item(key = "backup_export") {
+                SettingsActionRow(
+                    title = stringResource(R.string.settings_export_backup),
+                    subtitle = stringResource(R.string.settings_export_backup_description),
+                    enabled = !backupBusy,
+                    onClick = { exportLauncher.launch("material-xray-backup.json") },
+                    navigates = true,
+                )
+            }
+            item(key = "backup_import") {
+                SettingsActionRow(
+                    title = stringResource(R.string.settings_import_backup),
+                    subtitle = stringResource(R.string.settings_import_backup_description),
+                    enabled = !backupBusy,
+                    onClick = { importLauncher.launch(arrayOf("application/json")) },
+                    navigates = true,
+                )
             }
             if (showAdvancedOptions) {
                 item(key = "clear_geodata") {
-                    OutlinedButton(
-                        onClick = { showClearGeoDataDialog = true },
+                    SettingsActionRow(
+                        title = stringResource(R.string.settings_clear_geodata),
+                        subtitle = stringResource(
+                            if (geoDataClearing) {
+                                R.string.settings_clearing_geodata
+                            } else {
+                                R.string.settings_clear_geodata_description
+                            },
+                        ),
                         enabled = canClearGeoData(connectionState) && !geoDataOperationInProgress,
-                        modifier = Modifier.padding(horizontal = 16.dp),
-                    ) {
-                        Text(
-                            stringResource(
-                                if (geoDataClearing) {
-                                    R.string.settings_clearing_geodata
-                                } else {
-                                    R.string.settings_clear_geodata
-                                },
-                            ),
-                        )
-                    }
+                        onClick = { showClearGeoDataDialog = true },
+                        navigates = true,
+                    )
                 }
                 item(key = "database_reset") {
                     SettingsActionRow(
