@@ -25,6 +25,7 @@ import com.material.xray.core.navigation.XrayCoreSettingsKey
 import com.material.xray.feature.configviewer.ConfigViewerRequest
 import com.material.xray.feature.configviewer.ConfigViewerScreen
 import com.material.xray.feature.home.HomeScreen
+import com.material.xray.feature.home.HomeViewModel
 import com.material.xray.feature.logs.LogsScreen
 import com.material.xray.feature.routing.EditableRoutingRule
 import com.material.xray.feature.routing.RoutingRuleEditorScreen
@@ -47,6 +48,7 @@ import org.koin.compose.viewmodel.koinViewModel
  */
 internal fun appEntryProvider(
     navigator: Navigator,
+    homeViewModel: HomeViewModel,
     settings: State<SettingsSnapshot>,
     pendingSubscriptionLink: State<String?>,
     onSubscriptionLinkHandled: State<() -> Unit>,
@@ -63,6 +65,7 @@ internal fun appEntryProvider(
             },
             onViewRunningConfig = { navigator.openDetail(ConfigViewerKey(ConfigViewerTarget.Running)) },
             addSubscriptionFocusRequester = addSubscriptionFocusRequester,
+            viewModel = homeViewModel,
         )
     }
     entry<RoutingKey> {

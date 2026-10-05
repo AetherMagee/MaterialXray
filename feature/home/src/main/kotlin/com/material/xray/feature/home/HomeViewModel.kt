@@ -182,6 +182,7 @@ class HomeViewModel(
 
     val serversBySubscription: StateFlow<Map<Long, List<ServerListItem>>> = serverItems
         .map { items -> items.groupBy { it.entity.subscriptionId } }
+        .flowOn(defaultDispatcher)
         .stateIn(
             viewModelScope,
             SharingStarted.WhileSubscribed(5000),
@@ -293,10 +294,6 @@ class HomeViewModel(
     private val _pendingHwidServerSelection = MutableStateFlow<Long?>(null)
     val pendingHwidServerSelection: StateFlow<Long?> = _pendingHwidServerSelection.asStateFlow()
     val showInstallPermissionRationale: StateFlow<Boolean> = appUpdates.installPermissionRationaleRequired
-
-    init {
-        refreshTunnelInterfaceState()
-    }
 
     fun connect() {
         val server = selectedServer.value ?: return

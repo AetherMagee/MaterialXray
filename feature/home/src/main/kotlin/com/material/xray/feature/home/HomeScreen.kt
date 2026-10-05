@@ -315,7 +315,6 @@ fun HomeScreen(
         }
     }
     LaunchedEffect(viewModel) {
-        viewModel.refreshTunnelInterfaceState()
         viewModel.checkForAppUpdateIfDue()
     }
 
@@ -348,18 +347,11 @@ fun HomeScreen(
         }
     }
 
-    DisposableEffect(lifecycleOwner, viewModel) {
+    DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
-            when (event) {
-                Lifecycle.Event.ON_RESUME -> {
-                    viewModel.refreshTunnelInterfaceState()
-                    viewModel.resumePendingAppUpdateInstall()
-                }
-                Lifecycle.Event.ON_STOP -> {
-                    showQrScanner = false
-                    keepQrScannerDialog = false
-                }
-                else -> Unit
+            if (event == Lifecycle.Event.ON_STOP) {
+                showQrScanner = false
+                keepQrScannerDialog = false
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)

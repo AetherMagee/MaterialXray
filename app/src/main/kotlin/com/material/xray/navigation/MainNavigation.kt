@@ -1,5 +1,6 @@
 package com.material.xray.navigation
 
+import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Box
@@ -32,6 +33,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.ViewModelStoreOwner
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.compose.rememberLifecycleOwner
@@ -52,6 +54,7 @@ import com.material.xray.core.navigation.toEntryLayers
 import com.material.xray.core.ui.R
 import com.material.xray.core.ui.adaptive.TwoPaneMinWidth
 import com.material.xray.core.ui.components.TopBarTint
+import com.material.xray.feature.home.HomeViewModel
 import org.koin.compose.viewmodel.koinViewModel
 
 /** Persistent tab chrome with one display for tabs and a full-window overlay for details. */
@@ -67,6 +70,7 @@ fun MainNavigation(
     val lifecycleOwner = LocalLifecycleOwner.current
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val loadedSettings = settings ?: return
+    val homeViewModel: HomeViewModel = koinViewModel(viewModelStoreOwner = requireNotNull(LocalActivity.current as? ViewModelStoreOwner))
     val showAdvancedOptions = loadedSettings.showAdvancedOptions
     val visibleTabs = remember(showAdvancedOptions) {
         if (showAdvancedOptions) TopLevelKeys else TopLevelKeys - LogsKey
@@ -74,10 +78,17 @@ fun MainNavigation(
     val currentTab = navigator.currentTopLevelKey
     var previousTab by remember { mutableStateOf(currentTab) }
 
-    DisposableEffect(lifecycleOwner) {
+    // This owner belongs to the Activity, outside NavDisplay's per-scene lifecycle. Switching
+    // tabs must not repeat runtime reconciliation or resume an APK installation.
+    DisposableEffect(lifecycleOwner, homeViewModel) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_STOP) {
-                viewModel.onAppBackgrounded()
+            when (event) {
+                Lifecycle.Event.ON_RESUME -> {
+                    homeViewModel.refreshTunnelInterfaceState()
+                    homeViewModel.resumePendingAppUpdateInstall()
+                }
+                Lifecycle.Event.ON_STOP -> viewModel.onAppBackgrounded()
+                else -> Unit
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -111,9 +122,10 @@ fun MainNavigation(
         scrimClickLabel = stringResource(R.string.navigation_close_sheet),
     )
 
-    val entryProvider = remember(navigator) {
+    val entryProvider = remember(navigator, homeViewModel) {
         appEntryProvider(
             navigator = navigator,
+            homeViewModel = homeViewModel,
             settings = settingsState,
             pendingSubscriptionLink = subscriptionLinkState,
             onSubscriptionLinkHandled = onSubscriptionLinkHandledState,
