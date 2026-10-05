@@ -29,6 +29,10 @@
     <string name="settings_xray_core_failed_too_old">Старше %1$s, не поддерживается.</string>
     <string name="settings_xray_core_updates">Обновления</string>
     <string name="settings_xray_core_periodic_checks">Автоматически проверять новые версии Xray-core</string>
+    <string name="settings_xray_core_interval_two_weeks">2 недели</string>
+    <string name="settings_xray_core_interval_one_month">1 месяц</string>
+    <string name="settings_xray_core_interval_two_weeks_description">Проверять новые версии на GitHub каждые 2 недели</string>
+    <string name="settings_xray_core_interval_one_month_description">Проверять новые версии на GitHub каждый месяц</string>
     <string name="settings_xray_core_update_action">Когда выходит новая версия</string>
     <string name="settings_xray_core_update_action_notify">Уведомить меня</string>
     <string name="settings_xray_core_update_action_install">Обновить автоматически</string>

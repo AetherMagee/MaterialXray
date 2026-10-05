@@ -1,8 +1,8 @@
 package com.material.xray.feature.xraycore
 
 import com.material.xray.core.data.repository.BackupSection
-import com.material.xray.core.model.AppUpdateInterval
 import com.material.xray.core.xraycore.XrayCoreUpdateAction
+import com.material.xray.core.xraycore.XrayCoreUpdateInterval
 import com.material.xray.core.xraycore.XrayCoreUpdateSettingsStore
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -34,7 +34,7 @@ class XrayCoreUpdateBackupSection(
     private data class Backup(
         val periodicChecks: Boolean = false,
         val action: XrayCoreUpdateAction = XrayCoreUpdateAction.Notify,
-        val intervalHours: Int = AppUpdateInterval.OneWeek.hours,
+        val intervalHours: Int = XrayCoreUpdateInterval.default.hours,
     )
 
     private companion object {

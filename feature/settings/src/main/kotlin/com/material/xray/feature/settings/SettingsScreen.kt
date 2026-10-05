@@ -127,6 +127,7 @@ import com.material.xray.core.android.locale.setAppLocales
 import com.material.xray.core.data.repository.BackupSummary
 import com.material.xray.core.data.repository.SettingsSnapshot
 import com.material.xray.core.model.AppUpdateCheckStatus
+import com.material.xray.core.model.AppUpdateInterval
 import com.material.xray.core.model.ConnectionState
 import com.material.xray.core.model.GeoDataUpdateInterval
 import com.material.xray.core.model.Ipv6Mode
@@ -1085,7 +1086,7 @@ private fun SettingsScreenContent(
                 UpdateChecksSetting(
                     title = stringResource(R.string.settings_app_update_checks_title),
                     checked = appUpdateChecksEnabled,
-                    interval = settings.appUpdateInterval,
+                    description = stringResource(settings.appUpdateInterval.descriptionResource),
                     onClick = { showAppUpdateIntervalDialog = true },
                     onCheckedChange = viewModel::setAppUpdateChecksEnabled,
                 )
@@ -1168,6 +1169,8 @@ private fun SettingsScreenContent(
     if (showAppUpdateIntervalDialog) {
         UpdateIntervalDialog(
             current = settings.appUpdateInterval,
+            default = AppUpdateInterval.default,
+            options = AppUpdateInterval.entries.map { DropdownOption(it, stringResource(it.labelResource)) },
             onDismiss = { showAppUpdateIntervalDialog = false },
             onConfirm = {
                 viewModel.setAppUpdateInterval(it)

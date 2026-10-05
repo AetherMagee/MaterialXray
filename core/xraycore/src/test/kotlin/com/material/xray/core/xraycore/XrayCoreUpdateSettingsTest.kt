@@ -15,7 +15,7 @@ class XrayCoreUpdateSettingsTest {
 
     @Test
     fun `core checks default to one week without changing app checks`() {
-        assertEquals(AppUpdateInterval.OneWeek, store().settings.value.interval)
+        assertEquals(XrayCoreUpdateInterval.OneWeek, store().settings.value.interval)
         assertEquals(AppUpdateInterval.TwelveHours, AppUpdateInterval.default)
     }
 
@@ -30,13 +30,13 @@ class XrayCoreUpdateSettingsTest {
         assertEquals(XrayCoreUpdateAction.Install, settings.action)
         assertEquals("v26.9.30", settings.notifiedTag)
         assertEquals("old-core", settings.autoInstalledId)
-        assertEquals(AppUpdateInterval.OneWeek, settings.interval)
+        assertEquals(XrayCoreUpdateInterval.OneWeek, settings.interval)
     }
 
     @Test
     fun `each interval survives reopening and toggling checks`() {
         val store = store()
-        AppUpdateInterval.entries.forEach { interval ->
+        XrayCoreUpdateInterval.entries.forEach { interval ->
             store.update { it.copy(periodicChecks = true, intervalHours = interval.hours) }
             assertEquals(interval, store().settings.value.interval)
             store.update { it.copy(periodicChecks = false) }
@@ -45,11 +45,13 @@ class XrayCoreUpdateSettingsTest {
     }
 
     @Test
-    fun `invalid interval falls back to one week without losing other settings`() {
-        File(temporary.root, "xray-core-updates.json").writeText("""{"periodicChecks":true,"intervalHours":0}""")
-        val settings = store().settings.value
-        assertTrue(settings.periodicChecks)
-        assertEquals(AppUpdateInterval.OneWeek, settings.interval)
+    fun `invalid or removed interval falls back to one week without losing other settings`() {
+        listOf(0, 12, 24).forEach { hours ->
+            File(temporary.root, "xray-core-updates.json").writeText("""{"periodicChecks":true,"intervalHours":$hours}""")
+            val settings = store().settings.value
+            assertTrue(settings.periodicChecks)
+            assertEquals(XrayCoreUpdateInterval.OneWeek, settings.interval)
+        }
     }
 
     private fun store() = XrayCoreUpdateSettingsStore(

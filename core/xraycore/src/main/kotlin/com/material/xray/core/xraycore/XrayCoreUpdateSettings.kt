@@ -1,6 +1,5 @@
 package com.material.xray.core.xraycore
 
-import com.material.xray.core.model.AppUpdateInterval
 import com.material.xray.core.xray.XrayPaths
 import java.io.File
 import java.io.IOException
@@ -16,18 +15,32 @@ import org.koin.core.annotation.Singleton
 @Serializable
 enum class XrayCoreUpdateAction { Notify, Install }
 
+enum class XrayCoreUpdateInterval(val hours: Int) {
+    ThreeDays(72),
+    OneWeek(168),
+    TwoWeeks(336),
+    OneMonth(720),
+    ;
+
+    companion object {
+        val default = OneWeek
+
+        fun fromHours(hours: Int?): XrayCoreUpdateInterval = entries.find { it.hours == hours } ?: default
+    }
+}
+
 @Serializable
 data class XrayCoreUpdateSettings(
     val periodicChecks: Boolean = false,
     val action: XrayCoreUpdateAction = XrayCoreUpdateAction.Notify,
-    val intervalHours: Int = AppUpdateInterval.OneWeek.hours,
+    val intervalHours: Int = XrayCoreUpdateInterval.default.hours,
     /** The last release a notification was shown for, so each one is announced once. */
     val notifiedTag: String? = null,
     /** The core the last automatic update installed, removed once a newer one replaces it. */
     val autoInstalledId: String? = null,
 ) {
-    val interval: AppUpdateInterval
-        get() = AppUpdateInterval.entries.find { it.hours == intervalHours } ?: AppUpdateInterval.OneWeek
+    val interval: XrayCoreUpdateInterval
+        get() = XrayCoreUpdateInterval.fromHours(intervalHours)
 }
 
 /**

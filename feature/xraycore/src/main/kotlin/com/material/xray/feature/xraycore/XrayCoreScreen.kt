@@ -72,7 +72,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.material.xray.core.model.AppUpdateInterval
 import com.material.xray.core.ui.R
 import com.material.xray.core.ui.components.DropdownOption
 import com.material.xray.core.ui.components.ReadOnlyDropdownField
@@ -89,6 +88,7 @@ import com.material.xray.core.xraycore.XrayCoreOperation
 import com.material.xray.core.xraycore.XrayCoreRelease
 import com.material.xray.core.xraycore.XrayCoreState
 import com.material.xray.core.xraycore.XrayCoreUpdateAction
+import com.material.xray.core.xraycore.XrayCoreUpdateInterval
 import com.material.xray.core.xraycore.XrayCoreUpdateSettings
 import com.material.xray.core.xraycore.compareXrayVersions
 import com.material.xray.core.xraycore.isRecommendedXrayVersion
@@ -252,7 +252,8 @@ fun XrayCoreScreen(
     if (showUpdateIntervalDialog) {
         UpdateIntervalDialog(
             current = updateSettings.interval,
-            default = AppUpdateInterval.OneWeek,
+            default = XrayCoreUpdateInterval.default,
+            options = XrayCoreUpdateInterval.entries.map { DropdownOption(it, stringResource(it.labelResource)) },
             onDismiss = { showUpdateIntervalDialog = false },
             onConfirm = {
                 viewModel.setUpdateInterval(it)
@@ -320,7 +321,7 @@ private fun UpdateSettings(
         UpdateChecksSetting(
             title = stringResource(R.string.settings_xray_core_periodic_checks),
             checked = settings.periodicChecks,
-            interval = settings.interval,
+            description = stringResource(settings.interval.descriptionResource),
             onClick = onIntervalClick,
             onCheckedChange = onPeriodicChecksChange,
         )

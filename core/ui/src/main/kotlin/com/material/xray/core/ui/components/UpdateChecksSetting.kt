@@ -20,7 +20,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -28,16 +28,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
-import com.material.xray.core.model.AppUpdateInterval
 import com.material.xray.core.ui.R
-import com.material.xray.core.ui.text.descriptionResource
-import com.material.xray.core.ui.text.labelResource
 
 @Composable
 fun UpdateChecksSetting(
     title: String,
     checked: Boolean,
-    interval: AppUpdateInterval,
+    description: String,
     onClick: () -> Unit,
     onCheckedChange: (Boolean) -> Unit,
 ) {
@@ -51,7 +48,7 @@ fun UpdateChecksSetting(
             Text(title, style = MaterialTheme.typography.bodyLarge)
             if (checked) {
                 Text(
-                    stringResource(interval.descriptionResource),
+                    description,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -65,40 +62,40 @@ fun UpdateChecksSetting(
 }
 
 @Composable
-fun UpdateIntervalDialog(
-    current: AppUpdateInterval,
-    default: AppUpdateInterval = AppUpdateInterval.default,
+fun <T> UpdateIntervalDialog(
+    current: T,
+    default: T,
+    options: List<DropdownOption<T>>,
     onDismiss: () -> Unit,
-    onConfirm: (AppUpdateInterval) -> Unit,
+    onConfirm: (T) -> Unit,
 ) {
-    var selectedHours by rememberSaveable { mutableStateOf(current.hours) }
+    var selectedIndex by rememberSaveable { mutableIntStateOf(options.indexOfFirst { it.value == current }.coerceAtLeast(0)) }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.settings_app_update_interval_title)) },
         text = {
             Column {
-                AppUpdateInterval.entries.forEach { interval ->
+                options.forEachIndexed { index, option ->
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .selectable(
-                                selected = interval.hours == selectedHours,
+                                selected = index == selectedIndex,
                                 role = Role.RadioButton,
-                                onClick = { selectedHours = interval.hours },
+                                onClick = { selectedIndex = index },
                             )
                             .padding(vertical = 8.dp),
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        RadioButton(selected = interval.hours == selectedHours, onClick = null)
-                        val label = stringResource(interval.labelResource)
-                        Text(if (interval == default) stringResource(R.string.settings_update_interval_default, label) else label)
+                        RadioButton(selected = index == selectedIndex, onClick = null)
+                        Text(if (option.value == default) stringResource(R.string.settings_update_interval_default, option.label) else option.label)
                     }
                 }
             }
         },
         confirmButton = {
-            TextButton(onClick = { onConfirm(AppUpdateInterval.fromHours(selectedHours)) }) {
+            TextButton(onClick = { onConfirm(options[selectedIndex].value) }) {
                 Text(stringResource(R.string.settings_ok))
             }
         },

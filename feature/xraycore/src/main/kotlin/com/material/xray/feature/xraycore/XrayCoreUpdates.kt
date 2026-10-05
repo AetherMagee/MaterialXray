@@ -21,10 +21,10 @@ import androidx.work.WorkerParameters
 import com.material.xray.core.android.locale.localizedString
 import com.material.xray.core.common.log.LogBuffer
 import com.material.xray.core.common.log.LogSource
-import com.material.xray.core.model.AppUpdateInterval
 import com.material.xray.core.ui.R
 import com.material.xray.core.xraycore.XrayCoreManager
 import com.material.xray.core.xraycore.XrayCoreUpdateAction
+import com.material.xray.core.xraycore.XrayCoreUpdateInterval
 import com.material.xray.core.xraycore.XrayCoreUpdateSettingsStore
 import com.material.xray.core.xraycore.normalizeXrayVersion
 import java.io.IOException
@@ -76,7 +76,7 @@ class XrayCoreUpdater(
 /** Runs [XrayCoreUpdater] at the chosen interval while automatic checks are on. */
 @Singleton
 class XrayCoreUpdateScheduler(private val context: Context) {
-    fun setEnabled(enabled: Boolean, interval: AppUpdateInterval) {
+    fun setEnabled(enabled: Boolean, interval: XrayCoreUpdateInterval) {
         val workManager = WorkManager.getInstance(context)
         if (!enabled) {
             workManager.cancelUniqueWork(WORK_NAME)

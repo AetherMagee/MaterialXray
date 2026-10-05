@@ -29,6 +29,10 @@
     <string name="settings_xray_core_failed_too_old">Older than %1$s, not supported.</string>
     <string name="settings_xray_core_updates">Updates</string>
     <string name="settings_xray_core_periodic_checks">Check for new Xray-core versions automatically</string>
+    <string name="settings_xray_core_interval_two_weeks">2 weeks</string>
+    <string name="settings_xray_core_interval_one_month">1 month</string>
+    <string name="settings_xray_core_interval_two_weeks_description">Check GitHub for new releases every 2 weeks</string>
+    <string name="settings_xray_core_interval_one_month_description">Check GitHub for new releases every month</string>
     <string name="settings_xray_core_update_action">When a new version releases</string>
     <string name="settings_xray_core_update_action_notify">Notify me</string>
     <string name="settings_xray_core_update_action_install">Update automatically</string>
