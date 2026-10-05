@@ -2774,6 +2774,7 @@ private val FloatingConnectButtonClearance = 80.dp
 private const val DISABLED_FAB_CONTENT_ALPHA = 0.38f
 private const val QR_SCANNER_TRANSITION_MS = 180
 private const val SUBSCRIPTION_EXPANSION_MS = 180
+private const val SUBSCRIPTION_DIALOG_RESIZE_MS = 300
 private const val CORE_UPTIME_REFRESH_INTERVAL_MS = 1_000L
 private const val CAMERA_PERMISSION_PREFS = "camera_permission"
 private const val CAMERA_PERMISSION_REQUESTED = "requested"
@@ -2888,7 +2889,9 @@ private fun EditSubscriptionDialog(
         title = { Text(stringResource(R.string.home_edit_subscription_title)) },
         text = {
             Column(
-                modifier = Modifier.verticalScroll(rememberScrollState()),
+                modifier = Modifier
+                    .animateContentSize(animationSpec = tween(SUBSCRIPTION_DIALOG_RESIZE_MS))
+                    .verticalScroll(rememberScrollState()),
             ) {
                 OutlinedTextField(
                     state = name,
@@ -3032,7 +3035,9 @@ private fun AddSubscriptionDialog(
         title = { Text(stringResource(R.string.home_add_manually)) },
         text = {
             Column(
-                modifier = Modifier.verticalScroll(rememberScrollState()),
+                modifier = Modifier
+                    .animateContentSize(animationSpec = tween(SUBSCRIPTION_DIALOG_RESIZE_MS))
+                    .verticalScroll(rememberScrollState()),
             ) {
                 OutlinedTextField(
                     state = url,
@@ -3120,8 +3125,9 @@ private fun SubscriptionAdvancedOptions(
     }
     AnimatedVisibility(
         visible = expanded,
-        enter = fadeIn() + expandVertically(expandFrom = Alignment.Top),
-        exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut(),
+        // The dialog's scroll viewport animates its measured height; only fade the fields here.
+        enter = fadeIn(tween(180)),
+        exit = fadeOut(tween(120)),
     ) {
         Column {
             Spacer(modifier = Modifier.height(8.dp))

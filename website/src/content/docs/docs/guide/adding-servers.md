@@ -22,7 +22,7 @@ Subscriptions can carry more: HTTP, SOCKS and WireGuard lines, plus raw Xray JSO
 
 ## Subscription options
 
-Each subscription has its own settings, set when you add it manually or later by editing the subscription.
+Each subscription has its own settings, set when you add it manually or later by editing the subscription. Expand **Advanced** to show the fetch type, User-Agent, custom headers and insecure-update options; the dialog resizes smoothly and keeps its fields scrollable.
 
 | Option | What it does |
 | --- | --- |
