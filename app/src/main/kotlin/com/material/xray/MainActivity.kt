@@ -32,6 +32,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -114,19 +115,21 @@ class MainActivity : AppCompatActivity() {
         openDatabase()
         setContent {
             MaterialXrayTheme {
-                when (databaseReadiness) {
-                    DatabaseReadiness.Checking -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator()
-                    }
-                    DatabaseReadiness.Failed -> DatabaseRecoveryScreen(
-                        resetFailed = resetFailed,
-                        resetting = resetting,
-                        onRetry = ::retryDatabaseOpen,
-                        onReset = ::clearAppData,
-                    )
-                    DatabaseReadiness.Ready -> {
-                        val loadedSettingsDataState = requireNotNull(settingsDataState)
-                        MainContent(loadedSettingsDataState)
+                Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+                    when (databaseReadiness) {
+                        DatabaseReadiness.Checking -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator()
+                        }
+                        DatabaseReadiness.Failed -> DatabaseRecoveryScreen(
+                            resetFailed = resetFailed,
+                            resetting = resetting,
+                            onRetry = ::retryDatabaseOpen,
+                            onReset = ::clearAppData,
+                        )
+                        DatabaseReadiness.Ready -> {
+                            val loadedSettingsDataState = requireNotNull(settingsDataState)
+                            MainContent(loadedSettingsDataState)
+                        }
                     }
                 }
             }
