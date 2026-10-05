@@ -16,6 +16,7 @@ A tour of the Settings tab. Some options only show up after you turn on **Show a
 | **Tunnel tethered clients** | Rootful only. Routes Wi-Fi hotspot and USB tethering traffic through Xray. |
 | **Route app traffic through Xray** | Sends Material Xray's own data updates through the active connection. Latency checks always bypass it. |
 | **Connection health watchdog** | Watches the local Xray API, the tunnel and root routing for failures, without sending external probes. |
+| **Always-on VPN** | Shows whether Android's always-on VPN is enabled for Material Xray. Tap the row below **Auto-connect on boot** to open Android's VPN settings and manage it there. |
 
 ## DNS
 

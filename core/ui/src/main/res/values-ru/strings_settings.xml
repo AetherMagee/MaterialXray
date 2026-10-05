@@ -179,6 +179,8 @@
     <string name="settings_retry_compatibility_check">Повторить проверку совместимости</string>
     <string name="settings_unavailable">Недоступно</string>
     <string name="settings_auto_connect_on_boot">Подключаться при запуске устройства</string>
+    <string name="settings_always_on_vpn">Постоянный VPN</string>
+    <string name="settings_always_on_vpn_description">Нажмите, чтобы перейти в системные настройки</string>
     <string name="settings_oem_autostart_required">Устройство может блокировать автоматическое подключение после перезапуска или обновления приложения. Разрешите автозапуск Material Xray в настройках устройства.</string>
     <string name="settings_oem_autostart_external_required">Возможно, на устройстве нужно отдельно разрешить автозапуск. Проверьте настройки батареи и фонового запуска приложения.</string>
     <string name="settings_open_autostart_settings">Открыть настройки автозапуска</string>

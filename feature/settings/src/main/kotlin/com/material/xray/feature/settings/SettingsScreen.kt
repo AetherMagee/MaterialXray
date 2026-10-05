@@ -1344,6 +1344,7 @@ private fun SettingsServiceSection(
             onCheckedChange = actions.onAutoConnectChange,
             enabled = !useRootService || rootServiceActive,
         )
+        AlwaysOnVpnSetting()
         if (autoConnect && oemAutostartGuidance.required && !oemAutostartGuidance.granted) {
             OemAutostartBanner(
                 directSettingsAvailable = oemAutostartGuidance.directSettingsAvailable,
