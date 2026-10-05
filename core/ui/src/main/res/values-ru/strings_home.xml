@@ -51,6 +51,7 @@
 
     <string name="home_no_server_selected">Сервер не выбран</string>
     <string name="home_selected_server">Выбранный сервер</string>
+    <string name="home_balancer_auto_mode">Авторежим</string>
     <string name="home_balancer_loading">Проверка серверов&#8230;</string>
     <string name="home_balancer_unavailable">Сведения о серверах недоступны</string>
     <string name="home_balancer_pool_description">Выбраны для новых соединений</string>

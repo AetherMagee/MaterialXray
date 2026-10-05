@@ -49,6 +49,7 @@
 
     <string name="home_no_server_selected">No server selected</string>
     <string name="home_selected_server">Selected server</string>
+    <string name="home_balancer_auto_mode">Auto mode</string>
     <string name="home_balancer_loading">Checking servers&#8230;</string>
     <string name="home_balancer_unavailable">Server details unavailable</string>
     <string name="home_balancer_pool_description">Selected for new connections</string>
