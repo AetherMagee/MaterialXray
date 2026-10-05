@@ -660,41 +660,43 @@ fun HomeScreen(
         onConfirm = viewModel::confirmDiscardEditedActiveConfig,
     )
     HwidRequiredDialogHost(
-        visible = uiState.pendingHwidServerSelection != null,
-        onDismiss = viewModel::dismissHwidRequiredSelection,
-        onConfirm = viewModel::confirmHwidRequiredSelection,
+        prompt = uiState.pendingHwidAddition,
+        onDismiss = { uiState.pendingHwidAddition?.let { viewModel.dismissHwidRequiredAddition(it.id) } },
+        onConfirm = { uiState.pendingHwidAddition?.let { viewModel.confirmHwidRequiredAddition(it.id) } },
     )
 }
 
 @Composable
 private fun HwidRequiredDialogHost(
-    visible: Boolean,
+    prompt: HardwareIdConsentPrompt?,
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
 ) {
-    if (!visible) return
+    if (prompt == null) return
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(
-                stringResource(R.string.home_hwid_required_title),
-                modifier = Modifier.fillMaxWidth(),
-                textAlign = TextAlign.Center,
-            )
-        },
-        text = { Text(stringResource(R.string.home_hwid_required_body)) },
-        confirmButton = {
-            TextButton(onClick = onConfirm) {
-                Text(stringResource(R.string.home_hwid_required_confirm))
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.home_hwid_required_cancel))
-            }
-        },
-    )
+    key(prompt.id) {
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            title = {
+                Text(
+                    stringResource(R.string.home_hwid_required_title),
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Center,
+                )
+            },
+            text = { Text(stringResource(R.string.home_hwid_required_body, prompt.subscription)) },
+            confirmButton = {
+                TextButton(onClick = onConfirm) {
+                    Text(stringResource(R.string.home_hwid_required_confirm))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = onDismiss) {
+                    Text(stringResource(R.string.home_hwid_required_cancel))
+                }
+            },
+        )
+    }
 }
 
 @Composable
@@ -1031,7 +1033,7 @@ private fun collectHomeUiState(viewModel: HomeViewModel): HomeUiState {
     val appUpdateInstallProgress by viewModel.appUpdateInstallProgress.collectAsStateWithLifecycle()
     val showInstallPermissionRationale by viewModel.showInstallPermissionRationale.collectAsStateWithLifecycle()
     val pendingServerSelection by viewModel.pendingServerSelection.collectAsStateWithLifecycle()
-    val pendingHwidServerSelection by viewModel.pendingHwidServerSelection.collectAsStateWithLifecycle()
+    val pendingHwidAddition by viewModel.pendingHwidAddition.collectAsStateWithLifecycle()
 
     return HomeUiState(
         connectionState = connectionState,
@@ -1056,7 +1058,7 @@ private fun collectHomeUiState(viewModel: HomeViewModel): HomeUiState {
         appUpdateInstallProgress = appUpdateInstallProgress,
         showInstallPermissionRationale = showInstallPermissionRationale,
         pendingServerSelection = pendingServerSelection,
-        pendingHwidServerSelection = pendingHwidServerSelection,
+        pendingHwidAddition = pendingHwidAddition,
     )
 }
 
@@ -1123,8 +1125,8 @@ private data class HomeUiState(
     val showInstallPermissionRationale: Boolean,
     /** Server awaiting confirmation because switching to it discards an edited active config. */
     val pendingServerSelection: Long?,
-    /** Server awaiting confirmation because its subscription requires the hardware ID. */
-    val pendingHwidServerSelection: Long?,
+    /** A new subscription awaiting consent to its required hardware ID policy. */
+    val pendingHwidAddition: HardwareIdConsentPrompt?,
 )
 
 private data class ConnectionUiState(

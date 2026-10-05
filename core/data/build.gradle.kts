@@ -18,6 +18,7 @@ dependencies {
 
     testImplementation(libs.okhttp.mockwebserver)
     testImplementation(libs.okhttp.tls)
+    testImplementation(libs.sqlite.bundled)
 }
 
 // WebsiteDocsTest compares the website's provider docs against the parsers.

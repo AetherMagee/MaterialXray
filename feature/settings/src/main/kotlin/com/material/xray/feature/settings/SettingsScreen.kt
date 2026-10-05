@@ -932,7 +932,7 @@ private fun SettingsScreenContent(
                     // that policy is active the toggle cannot be turned off from Settings.
                     val selectedSubscriptionRequiresHwid =
                         viewModel.selectedSubscriptionRequiresHwid.collectAsStateWithLifecycle().value
-                    val hwidLockedBySubscription = selectedSubscriptionRequiresHwid && subscriptionSendHardwareId
+                    val hwidLockedBySubscription = selectedSubscriptionRequiresHwid
                     SettingsSwitchRow(
                         title = stringResource(R.string.settings_send_hardware_id_title),
                         description = stringResource(
@@ -942,7 +942,7 @@ private fun SettingsScreenContent(
                                 R.string.settings_send_hardware_id_description
                             },
                         ),
-                        checked = subscriptionSendHardwareId,
+                        checked = subscriptionSendHardwareId || hwidLockedBySubscription,
                         onCheckedChange = viewModel::setSubscriptionSendHardwareId,
                         enabled = !hwidLockedBySubscription,
                     )

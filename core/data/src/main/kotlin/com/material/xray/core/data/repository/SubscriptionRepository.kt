@@ -3,6 +3,7 @@ package com.material.xray.core.data.repository
 import com.material.xray.core.data.parser.FetchedSubscription
 import com.material.xray.core.data.parser.ShareLinkParser
 import com.material.xray.core.data.parser.SubscriptionFetcher
+import com.material.xray.core.data.parser.SubscriptionHardwareIdRequiredException
 import com.material.xray.core.data.parser.SubscriptionUrlReplacement
 import com.material.xray.core.database.AppDatabase
 import com.material.xray.core.database.dao.ServerDao
@@ -83,7 +84,8 @@ class SubscriptionRepository(
         userAgentMode: SubscriptionUserAgentMode = SubscriptionUserAgentMode.default,
         customUserAgent: String = "",
         customHeaders: String = "",
-    ): Long {
+        confirmHardwareId: suspend () -> Boolean = { false },
+    ): Long? {
         val trimmedName = name.trim()
         val trimmedUrl = url.trim()
         shareLinkParser.parse(trimmedUrl)?.let { config ->
@@ -95,22 +97,32 @@ class SubscriptionRepository(
             )
         }
 
-        val id = subscriptionDao.insertAtEnd(
-            SubscriptionEntity(
-                name = trimmedName.ifEmpty { nextFallbackName() },
-                url = trimmedUrl,
-                preferJson = preferJson,
-                allowInsecureUpdates = allowInsecureUpdates,
-                userAgentMode = userAgentMode.value,
-                customUserAgent = customUserAgent.trim().ifBlank { null },
-                customHeaders = customHeaders.trim().ifBlank { null },
-            ),
+        val draft = SubscriptionEntity(
+            name = trimmedName,
+            url = trimmedUrl,
+            preferJson = preferJson,
+            allowInsecureUpdates = allowInsecureUpdates,
+            userAgentMode = userAgentMode.value,
+            customUserAgent = customUserAgent.trim().ifBlank { null },
+            customHeaders = customHeaders.trim().ifBlank { null },
         )
-        refresh(id, trimmedUrl)
-        return id
+        val sendHardwareId = settingsRepository.subscriptionSendHardwareId.first()
+        val fetched = try {
+            fetcher.fetchWithMetadata(trimmedUrl, draft.requestIdentity(sendHardwareId), preferJson, allowInsecureUpdates, requireHardwareIdConsent = true)
+        } catch (_: SubscriptionHardwareIdRequiredException) {
+            if (!confirmHardwareId()) return null
+            // Consent belongs to this subscription. Keep the user's global preference intact.
+            fetcher.fetchWithMetadata(trimmedUrl, draft.requestIdentity(true), preferJson, allowInsecureUpdates)
+                .let { it.copy(metadata = it.metadata.copy(requiresHardwareId = true)) }
+        }
+        return database.withWriteTransaction {
+            val id = subscriptionDao.insertAtEnd(draft.applyFetchedData(fetched))
+            serverDao.insertAll(fetched.configs.mapIndexed { index, config -> config.toServerEntity(id, index) })
+            id
+        }
     }
 
-    suspend fun addLink(link: String): Long = add(name = "", url = link)
+    suspend fun addLink(link: String, confirmHardwareId: suspend () -> Boolean = { false }): Long? = add(name = "", url = link, confirmHardwareId = confirmHardwareId)
 
     private suspend fun addServerConfig(
         name: String,
@@ -146,26 +158,12 @@ class SubscriptionRepository(
         return id
     }
 
-    private suspend fun refresh(subId: Long, url: String): RefreshResult? = withRefreshLock(subId) {
-        prepareRefresh(subId, url)?.let { commitRefresh(it) }
-    }
-
     internal suspend fun prepareRefresh(subId: Long, url: String): PreparedRefresh? {
         val existing = subscriptionDao.getById(subId) ?: return null
-        val identity = existing.requestIdentity(settingsRepository.subscriptionSendHardwareId.first())
+        val identity = existing.requestIdentity(settingsRepository.subscriptionSendHardwareId.first() || existing.requiresHardwareId)
         val preferJson = existing.preferJson ?: settingsRepository.legacySubscriptionPreferJson.first()
         val fetched = fetchWithFallback(existing, url, identity, preferJson)
-        val servers = fetched.configs.mapIndexed { index, config ->
-            ServerEntity(
-                subscriptionId = subId,
-                name = config.name,
-                protocol = config.protocol.name,
-                address = config.address,
-                port = config.port,
-                configJson = json.encodeToString(config),
-                sortOrder = index,
-            )
-        }
+        val servers = fetched.configs.mapIndexed { index, config -> config.toServerEntity(subId, index) }
 
         return PreparedRefresh(
             subscriptionId = subId,
@@ -190,7 +188,10 @@ class SubscriptionRepository(
             identity = identity,
             preferJson = preferJson,
             allowInsecureUpdates = existing.allowInsecureUpdates,
+            requireHardwareIdConsent = true,
         )
+    } catch (error: SubscriptionHardwareIdRequiredException) {
+        throw error
     } catch (error: CancellationException) {
         throw error
     } catch (error: IOException) {
@@ -201,7 +202,10 @@ class SubscriptionRepository(
                 identity = identity,
                 preferJson = preferJson,
                 allowInsecureUpdates = existing.allowInsecureUpdates,
+                requireHardwareIdConsent = true,
             )
+        } catch (error: SubscriptionHardwareIdRequiredException) {
+            throw error
         } catch (fallbackError: CancellationException) {
             throw fallbackError
         } catch (_: IOException) {
@@ -282,7 +286,7 @@ class SubscriptionRepository(
     private suspend fun SubscriptionEntity.applyFetchedData(fetched: FetchedSubscription): SubscriptionEntity {
         val providerName = fetched.metadata.profileTitle.trimToNull()
         return withSubscriptionMetadata(
-            metadata = fetched.metadata,
+            metadata = fetched.metadata.copy(requiresHardwareId = fetched.metadata.requiresHardwareId || requiresHardwareId),
             // A permanent redirect is the most current location; the provider's new-url/new-domain
             // directive is the next authority. Both move the subscription permanently.
             resolvedUrl = fetched.permanentRedirectUrl
@@ -322,6 +326,16 @@ class SubscriptionRepository(
         }
         return "Subscription $index"
     }
+
+    private fun ServerConfig.toServerEntity(subscriptionId: Long, sortOrder: Int) = ServerEntity(
+        subscriptionId = subscriptionId,
+        name = name,
+        protocol = protocol.name,
+        address = address,
+        port = port,
+        configJson = json.encodeToString(this),
+        sortOrder = sortOrder,
+    )
 
     private fun SubscriptionEntity.requestIdentity(sendHardwareId: Boolean): SubscriptionRequestIdentity = SubscriptionRequestIdentity(
         mode = SubscriptionUserAgentMode.fromValue(userAgentMode),

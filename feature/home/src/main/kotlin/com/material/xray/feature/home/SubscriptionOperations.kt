@@ -36,6 +36,7 @@ class SubscriptionOperations(
         userAgentMode: SubscriptionUserAgentMode,
         customUserAgent: String,
         customHeaders: String,
+        confirmHardwareId: suspend () -> Boolean,
     ) {
         subscriptionRepo.add(
             name = name,
@@ -45,11 +46,12 @@ class SubscriptionOperations(
             userAgentMode = userAgentMode,
             customUserAgent = customUserAgent,
             customHeaders = customHeaders,
+            confirmHardwareId = confirmHardwareId,
         )
     }
 
-    suspend fun addLink(link: String) {
-        subscriptionRepo.addLink(link)
+    suspend fun addLink(link: String, confirmHardwareId: suspend () -> Boolean) {
+        subscriptionRepo.addLink(link, confirmHardwareId)
     }
 
     suspend fun delete(sub: SubscriptionEntity) {

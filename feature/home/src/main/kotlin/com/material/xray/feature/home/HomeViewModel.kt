@@ -37,9 +37,11 @@ import com.material.xray.service.XrayService
 import java.io.IOException
 import java.net.ConnectException
 import java.net.SocketTimeoutException
+import java.net.URI
 import java.net.UnknownHostException
 import javax.net.ssl.SSLException
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
@@ -60,7 +62,9 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.job
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withTimeoutOrNull
 import org.koin.core.annotation.KoinViewModel
@@ -114,6 +118,8 @@ internal fun ProviderRoutingAvailability?.canApplyManually(
             xrayRoutingProvided &&
             (policy == RoutingPolicyControl.User || selectedProvider?.xrayRoutingProvided != true)
         )
+
+internal data class HardwareIdConsentPrompt(val id: Long, val subscription: String)
 
 sealed interface HomeUiEvent {
     data class Toast(val message: String) : HomeUiEvent
@@ -290,9 +296,11 @@ class HomeViewModel(
     private val _pendingServerSelection = MutableStateFlow<Long?>(null)
     val pendingServerSelection: StateFlow<Long?> = _pendingServerSelection.asStateFlow()
 
-    /** Server the user picked whose subscription requires the hardware ID, which is currently off. */
-    private val _pendingHwidServerSelection = MutableStateFlow<Long?>(null)
-    val pendingHwidServerSelection: StateFlow<Long?> = _pendingHwidServerSelection.asStateFlow()
+    private val hardwareIdConsentMutex = Mutex()
+    private var hardwareIdConsent: CompletableDeferred<Boolean>? = null
+    private var hardwareIdConsentId = 0L
+    private val _pendingHwidAddition = MutableStateFlow<HardwareIdConsentPrompt?>(null)
+    internal val pendingHwidAddition: StateFlow<HardwareIdConsentPrompt?> = _pendingHwidAddition.asStateFlow()
     val showInstallPermissionRationale: StateFlow<Boolean> = appUpdates.installPermissionRationaleRequired
 
     fun connect() {
@@ -347,25 +355,30 @@ class HomeViewModel(
 
     private suspend fun selectServerChecked(serverId: Long) {
         when (serverController.blocker(serverId)) {
-            ServerSelectionBlocker.HardwareIdRequired -> _pendingHwidServerSelection.value = serverId
             ServerSelectionBlocker.EditedActiveConfig -> _pendingServerSelection.value = serverId
             null -> serverController.apply(serverId)
         }
     }
 
-    fun confirmHwidRequiredSelection() {
-        val serverId = _pendingHwidServerSelection.value ?: return
-        _pendingHwidServerSelection.value = null
-        serverSelectionJob?.cancel()
-        serverSelectionJob = viewModelScope.launch {
-            serverController.enableHardwareId(serverId)
-            // Re-enter the normal flow so a pending edited-config confirmation still applies.
-            selectServerChecked(serverId)
-        }
+    fun confirmHwidRequiredAddition(promptId: Long) {
+        if (_pendingHwidAddition.value?.id == promptId) hardwareIdConsent?.complete(true)
     }
 
-    fun dismissHwidRequiredSelection() {
-        _pendingHwidServerSelection.value = null
+    fun dismissHwidRequiredAddition(promptId: Long) {
+        if (_pendingHwidAddition.value?.id == promptId) hardwareIdConsent?.complete(false)
+    }
+
+    private suspend fun requestHardwareIdConsent(name: String, url: String): Boolean = hardwareIdConsentMutex.withLock {
+        val answer = CompletableDeferred<Boolean>()
+        hardwareIdConsent = answer
+        val label = name.trim().ifBlank { runCatching { URI(url.trim()).host }.getOrNull() ?: url.trim() }
+        _pendingHwidAddition.value = HardwareIdConsentPrompt(++hardwareIdConsentId, label)
+        try {
+            answer.await()
+        } finally {
+            _pendingHwidAddition.value = null
+            hardwareIdConsent = null
+        }
     }
 
     fun confirmDiscardEditedActiveConfig() {
@@ -401,6 +414,7 @@ class HomeViewModel(
                     userAgentMode = userAgentMode,
                     customUserAgent = customUserAgent,
                     customHeaders = customHeaders,
+                    confirmHardwareId = { requestHardwareIdConsent(name, url) },
                 )
             }
         }
@@ -408,7 +422,7 @@ class HomeViewModel(
 
     fun addLink(link: String) {
         viewModelScope.launch {
-            runSubscriptionOperation { subscriptionOperations.addLink(link) }
+            runSubscriptionOperation { subscriptionOperations.addLink(link) { requestHardwareIdConsent("", link) } }
         }
     }
 

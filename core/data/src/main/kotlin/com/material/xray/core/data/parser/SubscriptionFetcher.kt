@@ -85,6 +85,8 @@ class SubscriptionFetchException(
     }
 }
 
+class SubscriptionHardwareIdRequiredException : IOException("Subscription requires hardware ID consent")
+
 @Singleton
 class SubscriptionFetcher(
     private val httpClient: AppHttpClient,
@@ -120,6 +122,7 @@ class SubscriptionFetcher(
         identity: SubscriptionRequestIdentity = SubscriptionRequestIdentity(),
         preferJson: Boolean = false,
         allowInsecureUpdates: Boolean = false,
+        requireHardwareIdConsent: Boolean = false,
     ): FetchedSubscription {
         val normalizedUrl = url.trim()
         val httpUrl = normalizedUrl.toHttpUrlOrNull()
@@ -133,7 +136,7 @@ class SubscriptionFetcher(
                 // the device in cleartext. OkHttp follows redirects internally, so enforce that boundary at
                 // the client level. The per-subscription opt-in deliberately relaxes both transport checks.
                 val client = baseClient.subscriptionClient(allowInsecureUpdates)
-                fetchWithMetadata(client, httpUrl, normalizedUrl, identity, preferJson, allowInsecureUpdates)
+                fetchWithMetadata(client, httpUrl, normalizedUrl, identity, preferJson, allowInsecureUpdates, requireHardwareIdConsent)
             }
         }
     }
@@ -145,6 +148,7 @@ class SubscriptionFetcher(
         identity: SubscriptionRequestIdentity,
         preferJson: Boolean,
         allowInsecureUpdates: Boolean,
+        requireHardwareIdConsent: Boolean,
     ): FetchedSubscription {
         if (preferJson) {
             httpUrl.jsonEndpointOrNull()?.let { jsonUrl ->
@@ -155,7 +159,10 @@ class SubscriptionFetcher(
                         identity,
                         originalUrl = jsonUrl.toString(),
                         allowInsecureUpdates = allowInsecureUpdates,
+                        requireHardwareIdConsent = requireHardwareIdConsent,
                     )
+                } catch (error: SubscriptionHardwareIdRequiredException) {
+                    throw error
                 } catch (error: CancellationException) {
                     throw error
                 } catch (_: Exception) {
@@ -173,6 +180,7 @@ class SubscriptionFetcher(
             identity,
             originalUrl = normalizedUrl,
             allowInsecureUpdates = allowInsecureUpdates,
+            requireHardwareIdConsent = requireHardwareIdConsent,
         )
     }
 
@@ -182,6 +190,7 @@ class SubscriptionFetcher(
         identity: SubscriptionRequestIdentity,
         originalUrl: String,
         allowInsecureUpdates: Boolean,
+        requireHardwareIdConsent: Boolean,
     ): FetchedSubscription {
         val request = SubscriptionStandardHeaders.applyRequestHeaders(
             builder = Request.Builder()
@@ -190,6 +199,11 @@ class SubscriptionFetcher(
         ).build()
 
         return client.newCall(request).execute().use { response ->
+            identity.checkHardwareIdConsent(parseMetadata(response.headers).requiresHardwareId, requireHardwareIdConsent)
+            if (requireHardwareIdConsent && !identity.sendHardwareId && !response.isSuccessful) {
+                val headers = SubscriptionBodyComments.merge(response.headers, bodyCommentHeaders(response.body.string()))
+                identity.checkHardwareIdConsent(parseMetadata(headers).requiresHardwareId, requireHardwareIdConsent)
+            }
             response.requireValidSubscriptionResponse(allowInsecureUpdates)
 
             val resolvedUrl = response.request.url.toString()
@@ -200,6 +214,7 @@ class SubscriptionFetcher(
                 bodyHeaders = bodyCommentHeaders(bodyText),
             )
             val metadata = parseMetadata(headers)
+            identity.checkHardwareIdConsent(metadata.requiresHardwareId, requireHardwareIdConsent)
             val configs = parseSubscriptionBody(
                 body = bodyText,
                 contentType = metadata.contentType,
@@ -221,6 +236,10 @@ class SubscriptionFetcher(
                 routing = parseRouting(headers),
             )
         }
+    }
+
+    private fun SubscriptionRequestIdentity.checkHardwareIdConsent(required: Boolean, checkConsent: Boolean) {
+        if (checkConsent && !sendHardwareId && required) throw SubscriptionHardwareIdRequiredException()
     }
 
     // Panels that cannot set response headers embed the same metadata as `#key: value` comment
@@ -640,7 +659,7 @@ class SubscriptionFetcher(
     )
 
     private fun customHeaderValues(identity: SubscriptionRequestIdentity): SubscriptionRequestHeaderValues {
-        val headers = identity.customHeaders
+        val headers = identity.customHeaders.filter { identity.sendHardwareId || !it.name.trim().equals(SubscriptionStandardHeaders.X_HWID, ignoreCase = true) }
         val hasHardwareIdHeader = headers.any {
             it.name.trim().equals(SubscriptionStandardHeaders.X_HWID, ignoreCase = true)
         }

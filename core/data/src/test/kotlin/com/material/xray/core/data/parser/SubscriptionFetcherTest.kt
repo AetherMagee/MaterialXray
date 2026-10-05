@@ -990,6 +990,50 @@ class SubscriptionFetcherTest {
         assertEquals("Header Title", fetched.metadata.profileTitle)
     }
 
+    @Test
+    fun `required hwid in body comments blocks adding before consent`() = runTest {
+        val capture = RequestCapture()
+        val fetcher = capturingFetcher(capture, body = "#subscription-always-hwid-enable: true\nvless://uuid@node.example:443#Node")
+        try {
+            fetcher.fetchWithMetadata("https://example.com/sub", SubscriptionRequestIdentity(sendHardwareId = false), requireHardwareIdConsent = true)
+            org.junit.Assert.fail("Expected hardware ID consent")
+        } catch (_: SubscriptionHardwareIdRequiredException) {
+            assertNull(requireNotNull(capture.request).header("x-hwid"))
+        }
+    }
+
+    @Test
+    fun `global hwid off also omits a custom hwid header`() = runTest {
+        val capture = RequestCapture()
+        capturingFetcher(capture).fetchWithMetadata(
+            "https://example.com/sub",
+            SubscriptionRequestIdentity(mode = SubscriptionUserAgentMode.CUSTOM, sendHardwareId = false, customHeaders = listOf(SubscriptionHeader("X-Hwid", "custom-device"))),
+        )
+        assertNull(requireNotNull(capture.request).header("x-hwid"))
+    }
+
+    @Test
+    fun `body metadata on rejected response can request hwid consent`() = runTest {
+        var captured: Request? = null
+        val client = OkHttpClient.Builder().addInterceptor { chain ->
+            captured = chain.request()
+            Response.Builder().request(chain.request()).protocol(OkHttpProtocol.HTTP_1_1)
+                .code(403).message("HWID required")
+                .body("#subscription-always-hwid-enable: true".toResponseBody())
+                .build()
+        }.build()
+        try {
+            SubscriptionFetcher(DirectHttpClient(client), testDeviceIdentity, testPlatform).fetchWithMetadata(
+                "https://example.com/sub",
+                SubscriptionRequestIdentity(sendHardwareId = false),
+                requireHardwareIdConsent = true,
+            )
+            org.junit.Assert.fail("Expected HWID consent")
+        } catch (_: SubscriptionHardwareIdRequiredException) {
+            assertNull(requireNotNull(captured).header("x-hwid"))
+        }
+    }
+
     private class RequestCapture {
         @Volatile
         var request: Request? = null

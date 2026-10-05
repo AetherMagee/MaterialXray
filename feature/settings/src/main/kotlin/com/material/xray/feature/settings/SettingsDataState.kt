@@ -25,7 +25,7 @@ class SettingsDataState(
 
     /**
      * Whether the subscription behind the currently selected server demands the hardware ID.
-     * While it does and sending is enabled, the toggle is locked so the provider policy holds.
+     * While it does, sending is forced on without changing the user's saved preference.
      */
     @OptIn(ExperimentalCoroutinesApi::class)
     val selectedSubscriptionRequiresHardwareId: StateFlow<Boolean> = settingsRepository.lastServerId
@@ -33,9 +33,5 @@ class SettingsDataState(
             subscriptionRepository.observeRequiresHardwareIdForServer(serverId)
         }
         .map { it == true }
-        .stateIn(scope, SharingStarted.WhileSubscribed(STOP_GRACE_MILLIS), false)
-
-    private companion object {
-        const val STOP_GRACE_MILLIS = 5_000L
-    }
+        .stateIn(scope, SharingStarted.Eagerly, false)
 }

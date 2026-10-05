@@ -212,7 +212,7 @@
     <string name="home_discard_edited_config_confirm">Discard and switch</string>
     <string name="home_discard_edited_config_cancel">Keep editing</string>
     <string name="home_hwid_required_title">This subscription requires HWID</string>
-    <string name="home_hwid_required_body">The provider of this subscription requires all connecting devices to provide HWID - a device identifier with information like model and OS version.</string>
-    <string name="home_hwid_required_confirm">Turn on HWID</string>
+    <string name="home_hwid_required_body">Subscription “%1$s” requires Send hardware ID (HWID). Proceed will enable it for this subscription.\n\nSending HWID may help link outgoing traffic to your device and reduce anonymity.</string>
+    <string name="home_hwid_required_confirm">Proceed</string>
     <string name="home_hwid_required_cancel">Cancel</string>
 </resources>
