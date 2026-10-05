@@ -78,6 +78,21 @@ class NavigatorTest {
     }
 
     @Test
+    fun `settings pages keep their detail when switching tabs and close back to settings`() {
+        listOf(DnsSettingsKey, XrayCoreSettingsKey).forEach { detail ->
+            navigator.selectTab(SettingsKey)
+            navigator.openDetail(detail)
+            navigator.selectTab(HomeKey)
+            assertNull(navigator.currentDetailKey)
+            navigator.selectTab(SettingsKey)
+            assertEquals(detail, navigator.currentDetailKey)
+            navigator.closeDetail()
+            assertEquals(SettingsKey, navigator.currentTopLevelKey)
+            assertNull(navigator.currentDetailKey)
+        }
+    }
+
+    @Test
     fun `selecting the current tab changes nothing`() {
         navigator.selectTab(RoutingKey)
         navigator.openDetail(viewer)

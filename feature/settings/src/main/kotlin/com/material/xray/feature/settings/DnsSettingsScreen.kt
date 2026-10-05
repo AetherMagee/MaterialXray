@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.input.TextFieldLineLimits
@@ -50,7 +51,7 @@ import com.material.xray.core.ui.text.labelResource
  *
  * DNS gets a page of its own because the two resolver lists only make sense next to an explanation
  * of which names each one answers, and that does not fit under a text field. It reuses
- * [SettingsViewModel] rather than owning one, since it lives inside the settings destination.
+ * [SettingsViewModel] rather than owning one, so the list and DNS page share their current settings and operations.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -63,7 +64,7 @@ fun DnsSettingsScreen(
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-        contentWindowInsets = WindowInsets(0.dp),
+        contentWindowInsets = WindowInsets.navigationBars,
         topBar = {
             ScrolledTopAppBar(
                 title = stringResource(R.string.settings_dns_title),

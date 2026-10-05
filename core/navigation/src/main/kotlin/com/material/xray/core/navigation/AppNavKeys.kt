@@ -31,6 +31,12 @@ data object SettingsKey : TopLevelKey
 val TopLevelKeys: List<TopLevelKey> = listOf(HomeKey, RoutingKey, LogsKey, SettingsKey)
 
 @Serializable
+data object DnsSettingsKey : DetailKey
+
+@Serializable
+data object XrayCoreSettingsKey : DetailKey
+
+@Serializable
 data class ConfigViewerKey(val request: ConfigViewerTarget) : DetailKey
 
 /** Which config the viewer shows. */

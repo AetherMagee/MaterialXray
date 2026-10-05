@@ -1,5 +1,10 @@
 package com.material.xray.core.navigation
 
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -15,8 +20,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.runtime.NavKey
@@ -84,17 +91,13 @@ data class DetailSheetScene(
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
             val sheetWidth = (maxWidth * DETAIL_SHEET_WIDTH_FRACTION).coerceIn(DetailSheetMinWidth, DetailSheetMaxWidth)
             backgroundEntry.Content()
-            val detailKey = detailEntry.navKey as DetailKey
             val animatedScope = LocalNavAnimatedContentScope.current
-            Box(
-                modifier = with(animatedScope) {
-                    Modifier
-                        .fillMaxSize()
-                        .animateEnterExit(enter = detailEnterTransition(detailKey), exit = detailExitTransition(detailKey))
-                },
-            ) {
+            val direction = if (LocalLayoutDirection.current == LayoutDirection.Rtl) -1 else 1
+            Box(modifier = Modifier.fillMaxSize()) {
                 Box(
-                    modifier = Modifier
+                    modifier = with(animatedScope) {
+                        Modifier.animateEnterExit(enter = fadeIn(tween(450)), exit = fadeOut(tween(450)))
+                    }
                         .fillMaxSize()
                         .background(MaterialTheme.colorScheme.scrim.copy(alpha = DETAIL_SHEET_SCRIM_ALPHA))
                         .clickable(
@@ -105,7 +108,12 @@ data class DetailSheetScene(
                         ),
                 )
                 Surface(
-                    modifier = Modifier
+                    modifier = with(animatedScope) {
+                        Modifier.animateEnterExit(
+                            enter = slideInHorizontally(tween(450, easing = PlatformPageEasing)) { direction * it },
+                            exit = slideOutHorizontally(tween(450, easing = PlatformPageEasing)) { direction * it },
+                        )
+                    }
                         .align(Alignment.CenterEnd)
                         .width(sheetWidth)
                         .fillMaxHeight(),

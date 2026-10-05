@@ -11,15 +11,9 @@ import android.provider.Settings
 import android.text.format.DateFormat
 import android.text.format.Formatter
 import android.widget.Toast
-import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatDelegate
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusGroup
@@ -82,22 +76,16 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.runtime.toMutableStateList
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusProperties
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.InputMode
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -167,103 +155,30 @@ import kotlinx.coroutines.flow.collect
 import org.koin.compose.viewmodel.koinViewModel
 import org.xmlpull.v1.XmlPullParser
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     showTitleBarLogo: Boolean,
+    onOpenDnsSettings: () -> Unit,
+    onOpenXrayCore: () -> Unit,
     xrayCorePage: OptionalSettingsPage? = null,
     viewModel: SettingsViewModel = koinViewModel(),
 ) {
-    val persistedSettings by viewModel.settings.collectAsStateWithLifecycle()
-    val settings = persistedSettings
-    // Subpages are local state rather than navigation destinations, because the app keeps a single
-    // flat graph of tabs. They are drawn over the settings list rather than swapped with it, so the
-    // list keeps its scroll position and its event collectors while a subpage is open.
-    var subpage by rememberSaveable { mutableStateOf<SettingsSubpage?>(null) }
-    val closeSubpage = {
-        if (subpage == SettingsSubpage.XrayCore) viewModel.refreshXrayCoreVersion()
-        subpage = null
-    }
-    BackHandler(enabled = subpage != null, onBack = closeSubpage)
-
-    if (settings == null) {
+    val settings by viewModel.settings.collectAsStateWithLifecycle()
+    val loaded = settings
+    if (loaded == null) {
         SettingsLoadingScreen(showTitleBarLogo)
         return
     }
-
-    // With a remote or keyboard, focus follows the page on top: into a subpage when it opens, and
-    // back to the row that opened it when it closes. The list underneath cannot take focus meanwhile.
-    val listFocus = remember { FocusRequester() }
-    val subpageFocus = remember { FocusRequester() }
-    val inputModeManager = LocalInputModeManager.current
-    var subpageWasOpen by remember { mutableStateOf(false) }
-    LaunchedEffect(subpage) {
-        if (inputModeManager.inputMode == InputMode.Keyboard) {
-            when {
-                subpage != null -> {
-                    // Let AnimatedContent compose the page first.
-                    withFrameNanos {}
-                    subpageFocus.requestFocus()
-                }
-                subpageWasOpen -> listFocus.requestFocus()
-            }
-        }
-        subpageWasOpen = subpage != null
-    }
-
-    Box {
-        Box(
-            modifier = Modifier
-                .focusRequester(listFocus)
-                .focusProperties { onEnter = { if (subpage != null) cancelFocusChange() } }
-                .focusRestorer()
-                .focusGroup(),
-        ) {
-            SettingsScreenContent(
-                viewModel = viewModel,
-                settings = settings,
-                onOpenDnsSettings = { subpage = SettingsSubpage.Dns },
-                xrayCorePage = xrayCorePage,
-                onOpenXrayCore = { subpage = SettingsSubpage.XrayCore },
-            )
-        }
-
-        AnimatedContent(
-            targetState = subpage,
-            transitionSpec = {
-                fadeIn(tween(SUBPAGE_FADE_MS)) togetherWith fadeOut(tween(SUBPAGE_FADE_MS)) using null
-            },
-            label = "settingsSubpage",
-        ) { openSubpage ->
-            Box(modifier = if (openSubpage == subpage) Modifier.focusRequester(subpageFocus).focusGroup() else Modifier) {
-                SubpageContent(openSubpage, settings, viewModel, xrayCorePage, closeSubpage)
-            }
-        }
-    }
-}
-
-@Composable
-private fun SubpageContent(
-    openSubpage: SettingsSubpage?,
-    settings: SettingsSnapshot,
-    viewModel: SettingsViewModel,
-    xrayCorePage: OptionalSettingsPage?,
-    closeSubpage: () -> Unit,
-) {
-    when (openSubpage) {
-        SettingsSubpage.Dns -> DnsSettingsScreen(
-            settings = settings,
+    Box(modifier = Modifier.focusRestorer().focusGroup()) {
+        SettingsScreenContent(
             viewModel = viewModel,
-            onBack = closeSubpage,
+            settings = loaded,
+            onOpenDnsSettings = onOpenDnsSettings,
+            xrayCorePage = xrayCorePage,
+            onOpenXrayCore = onOpenXrayCore,
         )
-        SettingsSubpage.XrayCore -> xrayCorePage?.content(settings.useRootService, closeSubpage)
-        null -> Unit
     }
 }
-
-private enum class SettingsSubpage { Dns, XrayCore }
-
-private const val SUBPAGE_FADE_MS = 180
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Suppress("CyclomaticComplexMethod")

@@ -14,15 +14,22 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.input.InputMode
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -36,6 +43,8 @@ import com.material.xray.core.navigation.Navigator
 import com.material.xray.core.navigation.RoutingKey
 import com.material.xray.core.navigation.TopLevelKey
 import com.material.xray.core.navigation.TopLevelKeys
+import com.material.xray.core.navigation.appDetailPredictivePopTransitionSpec
+import com.material.xray.core.navigation.appDetailTransitionSpec
 import com.material.xray.core.navigation.appPredictivePopTransitionSpec
 import com.material.xray.core.navigation.appTransitionSpec
 import com.material.xray.core.navigation.rememberDetailSheetSceneStrategy
@@ -96,6 +105,7 @@ fun MainNavigation(
     val topBarTint = remember { TopBarTint() }
     val layoutDirectionSign = if (LocalLayoutDirection.current == LayoutDirection.Rtl) -1 else 1
     val interruptedDirection = navigator.latestTabDirection(visibleTabs)
+    val pageShiftPx = with(LocalDensity.current) { 96.dp.roundToPx() }
     val detailSheetStrategy = rememberDetailSheetSceneStrategy(
         minWindowWidth = TwoPaneMinWidth,
         scrimClickLabel = stringResource(R.string.navigation_close_sheet),
@@ -116,14 +126,30 @@ fun MainNavigation(
         maxLifecycle = if (hasDetail) Lifecycle.State.STARTED else Lifecycle.State.RESUMED,
     )
     val focusManager = LocalFocusManager.current
+    val inputModeManager = LocalInputModeManager.current
+    val backgroundFocus = remember { FocusRequester() }
+    val detailFocus = remember { FocusRequester() }
     var backgroundHasFocus by remember { mutableStateOf(false) }
+    var detailWasOpen by remember { mutableStateOf(false) }
     LaunchedEffect(hasDetail) {
         if (hasDetail && backgroundHasFocus) focusManager.clearFocus()
+        if (inputModeManager.inputMode == InputMode.Keyboard) {
+            when {
+                hasDetail -> {
+                    withFrameNanos {}
+                    detailFocus.requestFocus()
+                }
+                detailWasOpen -> backgroundFocus.requestFocus()
+            }
+        }
+        detailWasOpen = hasDetail
     }
     val backgroundModifier = Modifier
         .then(if (hasDetail) Modifier.clearAndSetSemantics {} else Modifier)
+        .focusRequester(backgroundFocus)
         .onFocusChanged { backgroundHasFocus = it.hasFocus }
         .focusProperties { onEnter = { if (hasDetail) cancelFocusChange() } }
+        .focusRestorer()
         .focusGroup()
 
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
@@ -146,13 +172,15 @@ fun MainNavigation(
                 )
             }
         }
-        NavDisplay(
-            entries = layers.details,
-            onBack = navigator::closeDetail,
-            sceneStrategies = listOf(detailSheetStrategy),
-            transitionSpec = appTransitionSpec(visibleTabs, layoutDirectionSign, interruptedDirection),
-            popTransitionSpec = appTransitionSpec(visibleTabs, layoutDirectionSign, interruptedDirection),
-            predictivePopTransitionSpec = appPredictivePopTransitionSpec(visibleTabs, layoutDirectionSign, interruptedDirection),
-        )
+        Box(modifier = Modifier.fillMaxSize().focusRequester(detailFocus).focusGroup()) {
+            NavDisplay(
+                entries = layers.details,
+                onBack = navigator::closeDetail,
+                sceneStrategies = listOf(detailSheetStrategy),
+                transitionSpec = appDetailTransitionSpec(pageShiftPx, layoutDirectionSign),
+                popTransitionSpec = appDetailTransitionSpec(pageShiftPx, layoutDirectionSign, isPop = true),
+                predictivePopTransitionSpec = appDetailPredictivePopTransitionSpec(),
+            )
+        }
     }
 }

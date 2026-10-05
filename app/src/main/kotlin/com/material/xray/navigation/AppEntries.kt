@@ -2,6 +2,7 @@ package com.material.xray.navigation
 
 import androidx.activity.compose.LocalActivity
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.remember
 import androidx.compose.ui.focus.FocusRequester
@@ -12,6 +13,7 @@ import androidx.navigation3.runtime.entryProvider
 import com.material.xray.core.data.repository.SettingsSnapshot
 import com.material.xray.core.navigation.ConfigViewerKey
 import com.material.xray.core.navigation.ConfigViewerTarget
+import com.material.xray.core.navigation.DnsSettingsKey
 import com.material.xray.core.navigation.HomeKey
 import com.material.xray.core.navigation.LogsKey
 import com.material.xray.core.navigation.Navigator
@@ -19,6 +21,7 @@ import com.material.xray.core.navigation.RoutingKey
 import com.material.xray.core.navigation.RoutingRuleEditorKey
 import com.material.xray.core.navigation.RoutingRuleViewerKey
 import com.material.xray.core.navigation.SettingsKey
+import com.material.xray.core.navigation.XrayCoreSettingsKey
 import com.material.xray.feature.configviewer.ConfigViewerRequest
 import com.material.xray.feature.configviewer.ConfigViewerScreen
 import com.material.xray.feature.home.HomeScreen
@@ -29,8 +32,10 @@ import com.material.xray.feature.routing.RoutingRuleViewerRequest
 import com.material.xray.feature.routing.RoutingRuleViewerScreen
 import com.material.xray.feature.routing.RoutingScreen
 import com.material.xray.feature.routing.RoutingViewModel
+import com.material.xray.feature.settings.DnsSettingsScreen
 import com.material.xray.feature.settings.OptionalSettingsPage
 import com.material.xray.feature.settings.SettingsScreen
+import com.material.xray.feature.settings.SettingsViewModel
 import com.material.xray.feature.xraycore.XrayCoreScreen
 import com.material.xray.feature.xraycore.xrayCoreSummary
 import kotlinx.serialization.json.Json
@@ -69,7 +74,25 @@ internal fun appEntryProvider(
         )
     }
     entry<LogsKey> { LogsScreen(settings.value.showTitleBarLogo) }
-    entry<SettingsKey> { SettingsScreen(settings.value.showTitleBarLogo, xrayCorePage = xrayCoreSettingsPage) }
+    entry<SettingsKey> {
+        SettingsScreen(
+            showTitleBarLogo = settings.value.showTitleBarLogo,
+            onOpenDnsSettings = { navigator.openDetail(DnsSettingsKey) },
+            onOpenXrayCore = { navigator.openDetail(XrayCoreSettingsKey) },
+            xrayCorePage = xrayCoreSettingsPage,
+            viewModel = activitySettingsViewModel(),
+        )
+    }
+    entry<DnsSettingsKey> {
+        DnsSettingsScreen(settings = settings.value, viewModel = activitySettingsViewModel(), onBack = navigator::closeDetail)
+    }
+    entry<XrayCoreSettingsKey> {
+        val settingsViewModel = activitySettingsViewModel()
+        DisposableEffect(settingsViewModel) {
+            onDispose { settingsViewModel.refreshXrayCoreVersion() }
+        }
+        xrayCoreSettingsPage.content(settings.value.useRootService, navigator::closeDetail)
+    }
     entry<ConfigViewerKey> { key ->
         val request = remember(key) { key.request.toConfigViewerRequest() }
         ConfigViewerScreen(request = request, onBack = navigator::closeDetail)
@@ -90,6 +113,9 @@ internal fun appEntryProvider(
  */
 @Composable
 private fun activityRoutingViewModel(): RoutingViewModel = koinViewModel(viewModelStoreOwner = requireNotNull(LocalActivity.current as? ViewModelStoreOwner))
+
+@Composable
+private fun activitySettingsViewModel(): SettingsViewModel = koinViewModel(viewModelStoreOwner = requireNotNull(LocalActivity.current as? ViewModelStoreOwner))
 
 private fun ConfigViewerTarget.toConfigViewerRequest(): ConfigViewerRequest = when (this) {
     ConfigViewerTarget.Running -> ConfigViewerRequest.Running

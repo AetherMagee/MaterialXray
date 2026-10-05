@@ -10,6 +10,6 @@ import androidx.compose.runtime.Composable
 class OptionalSettingsPage(
     /** The supporting text of the page's row in the Core section. */
     val summary: @Composable () -> String,
-    /** The page, drawn over the settings list like the DNS page. */
+    /** The page, hosted by the app as a navigation destination. */
     val content: @Composable (useRootService: Boolean, onBack: () -> Unit) -> Unit,
 )
