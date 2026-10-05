@@ -1,6 +1,5 @@
 package com.material.xray.feature.routing
 
-import androidx.activity.compose.BackHandler
 import androidx.annotation.StringRes
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
@@ -94,7 +93,6 @@ fun RoutingRuleEditorScreen(
     onBack: () -> Unit,
     viewModel: RoutingViewModel = koinViewModel(),
 ) {
-    BackHandler(onBack = onBack)
     val rule = editableRule.rule
     val profileRouting by viewModel.profileRouting.collectAsStateWithLifecycle()
     val routingPolicyControl by viewModel.routingPolicyControl.collectAsStateWithLifecycle()
