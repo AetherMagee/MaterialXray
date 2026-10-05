@@ -169,7 +169,7 @@ fun ConfigViewerScreen(
     ) { content ->
         val editing = content.state.isEditing()
         val copyable = content.state.copyableText()
-        val fixedEditorTopBar = request == ConfigViewerRequest.Running && editing
+        val fixedEditorTopBar = editing
         val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(
             state = if (fixedEditorTopBar) editorScrollState else previewScrollState,
             canScroll = { !fixedEditorTopBar },
