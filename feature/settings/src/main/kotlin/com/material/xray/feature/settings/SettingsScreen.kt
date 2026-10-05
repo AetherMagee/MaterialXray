@@ -296,12 +296,9 @@ private fun SettingsScreenContent(
     val tunName = settings.tunName
     val dnsServers = settings.dnsServers
     val domesticDnsServers = settings.domesticDnsServers
-    val autoConnect = settings.autoConnect
     val useRootService = settings.useRootService
     val rootConnectionBackend = settings.rootConnectionBackend
     val bypassLan = settings.bypassLan
-    val tunnelTetheredClients = settings.tunnelTetheredClients
-    val otherVpnMode = settings.otherVpnMode
     val ipv6Mode = settings.ipv6Mode
     val xrayBufferSizeKiB = settings.xrayBufferSizeKiB
     val tunMtu = settings.tunMtu
@@ -486,17 +483,12 @@ private fun SettingsScreenContent(
             item(key = "service") {
                 Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     SettingsServiceSection(
+                        settings = settings,
                         rootAvailable = rootAvailable,
                         rootAccessChecking = rootAccessChecking,
                         rootServiceAvailable = rootServiceAvailable,
                         rootServiceActive = rootServiceActive,
-                        useRootService = useRootService,
-                        showAdvancedOptions = showAdvancedOptions,
-                        rootConnectionBackend = rootConnectionBackend,
-                        tunnelTetheredClients = tunnelTetheredClients,
-                        otherVpnMode = otherVpnMode,
                         tproxyCompatibility = tproxyCompatibility,
-                        autoConnect = autoConnect,
                         oemAutostartGuidance = oemAutostartGuidance,
                         rootTunNameSetting = {
                             Column(
@@ -1264,17 +1256,12 @@ private data class SettingsServiceActions(
 
 @Composable
 private fun SettingsServiceSection(
+    settings: SettingsSnapshot,
     rootAvailable: Boolean?,
     rootAccessChecking: Boolean,
     rootServiceAvailable: Boolean,
     rootServiceActive: Boolean,
-    useRootService: Boolean,
-    showAdvancedOptions: Boolean,
-    rootConnectionBackend: RootConnectionBackend,
-    tunnelTetheredClients: Boolean,
-    otherVpnMode: OtherVpnMode,
     tproxyCompatibility: TproxyCompatibility,
-    autoConnect: Boolean,
     oemAutostartGuidance: OemAutostartGuidance,
     rootTunNameSetting: @Composable () -> Unit,
     actions: SettingsServiceActions,
@@ -1314,7 +1301,7 @@ private fun SettingsServiceSection(
         } else {
             SettingsSwitchRow(
                 title = stringResource(R.string.settings_use_root_service),
-                checked = useRootService,
+                checked = settings.useRootService,
                 onCheckedChange = actions.onUseRootServiceChange,
                 enabled = rootServiceAvailable && !rootAccessChecking,
             )
@@ -1328,7 +1315,7 @@ private fun SettingsServiceSection(
                     SettingsRadioRow(
                         title = stringResource(backend.labelResource),
                         description = stringResource(backend.descriptionResource),
-                        selected = backend == rootConnectionBackend,
+                        selected = backend == settings.rootConnectionBackend,
                         enabled = backend == RootConnectionBackend.Tun || tproxySelectable,
                         onClick = { actions.onRootConnectionBackendChange(backend) },
                     )
@@ -1354,15 +1341,15 @@ private fun SettingsServiceSection(
             SettingsSwitchRow(
                 title = stringResource(R.string.settings_tunnel_tethered_clients_title),
                 description = stringResource(R.string.settings_tunnel_tethered_clients_description),
-                checked = tunnelTetheredClients,
+                checked = settings.tunnelTetheredClients,
                 onCheckedChange = actions.onTunnelTetheredClientsChange,
             )
 
-            if (showAdvancedOptions && rootConnectionBackend == RootConnectionBackend.Tproxy) {
+            if (settings.showAdvancedOptions && settings.rootConnectionBackend == RootConnectionBackend.Tproxy) {
                 ReadOnlyDropdownField(
                     label = stringResource(R.string.settings_other_vpn_mode),
-                    selectedText = stringResource(otherVpnMode.labelResource),
-                    supportingText = stringResource(otherVpnMode.descriptionResource),
+                    selectedText = stringResource(settings.otherVpnMode.labelResource),
+                    supportingText = stringResource(settings.otherVpnMode.descriptionResource),
                     options = OtherVpnMode.entries.map { mode ->
                         DropdownOption(
                             value = mode,
@@ -1373,19 +1360,19 @@ private fun SettingsServiceSection(
                     onSelected = actions.onOtherVpnModeChange,
                     modifier = Modifier.padding(horizontal = 16.dp),
                 )
-            } else if (showAdvancedOptions) {
+            } else if (settings.showAdvancedOptions) {
                 rootTunNameSetting()
             }
         }
 
         SettingsSwitchRow(
             title = stringResource(R.string.settings_auto_connect_on_boot),
-            checked = autoConnect,
+            checked = settings.autoConnect,
             onCheckedChange = actions.onAutoConnectChange,
-            enabled = !useRootService || rootServiceActive,
+            enabled = !settings.useRootService || rootServiceActive,
         )
         AlwaysOnVpnSetting(rootServiceActive = rootServiceActive)
-        if (autoConnect && oemAutostartGuidance.required && !oemAutostartGuidance.granted) {
+        if (settings.autoConnect && oemAutostartGuidance.required && !oemAutostartGuidance.granted) {
             OemAutostartBanner(
                 directSettingsAvailable = oemAutostartGuidance.directSettingsAvailable,
                 onOpenSettings = actions.onOpenOemAutostartSettings,
