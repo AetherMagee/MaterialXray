@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AlertDialogDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
@@ -672,70 +673,69 @@ private fun AppRoutePickerDialog(
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = 420.dp),
-                ) {
-                    items(
-                        items = presetOptions,
-                        key = { it.key },
-                        contentType = { "routeOption" },
-                    ) { option ->
-                        RouteOptionRow(
-                            option = option,
-                            selected = option.key == app.routeKey ||
-                                (singleServerRouteHidden && app.routeKind == AppRouteKind.SERVER && option.kind == AppRouteKind.DEFAULT),
-                            onSelected = { onSelected(option) },
-                        )
-                    }
-                    if (showAlwaysProxied) {
-                        item(key = "alwaysProxied", contentType = "alwaysProxied") {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable(
-                                        interactionSource = null,
-                                        indication = OptionFocusHighlight,
-                                    ) { onAlwaysProxiedChanged(!app.alwaysProxied) }
-                                    .padding(vertical = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Checkbox(checked = app.alwaysProxied, onCheckedChange = null)
-                                Column(modifier = Modifier.padding(start = 8.dp)) {
-                                    Text(stringResource(R.string.apps_route_always_proxied_title))
-                                    Text(
-                                        stringResource(R.string.apps_route_always_proxied_description),
-                                        style = MaterialTheme.typography.bodySmall,
-                                    )
+                Box(modifier = Modifier.fillMaxWidth().heightIn(max = 420.dp)) {
+                    LazyColumn(modifier = Modifier.fillMaxWidth()) {
+                        items(
+                            items = presetOptions,
+                            key = { it.key },
+                            contentType = { "routeOption" },
+                        ) { option ->
+                            RouteOptionRow(
+                                option = option,
+                                selected = option.key == app.routeKey ||
+                                    (singleServerRouteHidden && app.routeKind == AppRouteKind.SERVER && option.kind == AppRouteKind.DEFAULT),
+                                onSelected = { onSelected(option) },
+                            )
+                        }
+                        if (showAlwaysProxied) {
+                            item(key = "alwaysProxied", contentType = "alwaysProxied") {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable(
+                                            interactionSource = null,
+                                            indication = OptionFocusHighlight,
+                                        ) { onAlwaysProxiedChanged(!app.alwaysProxied) }
+                                        .padding(vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Checkbox(checked = app.alwaysProxied, onCheckedChange = null)
+                                    Column(modifier = Modifier.padding(start = 8.dp)) {
+                                        Text(stringResource(R.string.apps_route_always_proxied_title))
+                                        Text(
+                                            stringResource(R.string.apps_route_always_proxied_description),
+                                            style = MaterialTheme.typography.bodySmall,
+                                        )
+                                    }
                                 }
                             }
                         }
-                    }
-                    if (serverOptions.isNotEmpty()) {
-                        item(contentType = "routeOptionDivider") {
-                            HorizontalDivider(modifier = Modifier.padding(vertical = 6.dp))
+                        if (serverOptions.isNotEmpty()) {
+                            item(contentType = "routeOptionDivider") {
+                                HorizontalDivider(modifier = Modifier.padding(vertical = 6.dp))
+                            }
+                            item(key = "serverHeading", contentType = "serverHeading") {
+                                Text(
+                                    stringResource(R.string.apps_route_specific_server_heading),
+                                    style = MaterialTheme.typography.titleSmall,
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                                )
+                            }
                         }
-                        item(key = "serverHeading", contentType = "serverHeading") {
-                            Text(
-                                stringResource(R.string.apps_route_specific_server_heading),
-                                style = MaterialTheme.typography.titleSmall,
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                        items(
+                            items = serverOptions,
+                            key = { it.key },
+                            contentType = { "routeOption" },
+                        ) { option ->
+                            RouteOptionRow(
+                                option = option,
+                                selected = option.key == app.routeKey ||
+                                    (singleServerRouteHidden && app.routeKind == AppRouteKind.SERVER && option.kind == AppRouteKind.DEFAULT),
+                                onSelected = { onSelected(option) },
                             )
                         }
                     }
-                    items(
-                        items = serverOptions,
-                        key = { it.key },
-                        contentType = { "routeOption" },
-                    ) { option ->
-                        RouteOptionRow(
-                            option = option,
-                            selected = option.key == app.routeKey ||
-                                (singleServerRouteHidden && app.routeKind == AppRouteKind.SERVER && option.kind == AppRouteKind.DEFAULT),
-                            onSelected = { onSelected(option) },
-                        )
-                    }
+                    ScrollFadeEdges(fadeColor = AlertDialogDefaults.containerColor)
                 }
             }
         },

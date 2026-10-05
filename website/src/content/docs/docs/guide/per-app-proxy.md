@@ -15,6 +15,8 @@ Open **Routing → Apps** to choose a route for each app. Search by name, show s
 | **Specific server** | Sends the app through a server of your choice. Routing rules still apply. | Rootful |
 | **Always proxied** | With a specific server: sends *all* of the app's traffic through it, ignoring routing rules. | Rootful |
 
+The route picker fades into the dialog background at both ends, matching the main scrolling lists.
+
 In rootless mode, rootful-only routes are skipped, and the log says how many were.
 
 ## Bulk actions

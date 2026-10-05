@@ -10,6 +10,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 
 /**
@@ -17,11 +18,10 @@ import androidx.compose.ui.unit.dp
  * rather than clipped.
  *
  * Overlays the list, so it belongs in the same [Box] and after the list in the composition order.
- * Fades to the surface colour, which is what every screen using this puts its lists on.
+ * Defaults to the screen's surface colour; dialogs can supply their own container colour.
  */
 @Composable
-fun BoxScope.ScrollFadeEdges() {
-    val fadeColor = MaterialTheme.colorScheme.surface
+fun BoxScope.ScrollFadeEdges(fadeColor: Color = MaterialTheme.colorScheme.surface) {
     Box(
         modifier = Modifier
             .align(Alignment.TopCenter)
