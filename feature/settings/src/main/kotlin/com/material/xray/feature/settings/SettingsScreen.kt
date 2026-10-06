@@ -151,6 +151,7 @@ import com.material.xray.core.ui.components.DropdownOption
 import com.material.xray.core.ui.components.FadingOutlinedTextField as OutlinedTextField
 import com.material.xray.core.ui.components.ReadOnlyDropdownField
 import com.material.xray.core.ui.components.ScrolledTopAppBar
+import com.material.xray.core.ui.components.SettingsItemSpacing
 import com.material.xray.core.ui.components.SettingsSwitchRow
 import com.material.xray.core.ui.components.TooltipIconButton
 import com.material.xray.core.ui.components.UpdateChecksSetting
@@ -420,9 +421,9 @@ private fun SettingsScreenContent(
                 }
             }
 
-            settingsItem(key = "appearance_header") {
+            settingsItem(key = "appearance_header", spaceAfter = 16.dp) {
                 Column(
-                    modifier = Modifier.padding(horizontal = 16.dp),
+                    modifier = Modifier.padding(horizontal = 16.dp).padding(top = 16.dp - SettingsItemSpacing),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
                     HorizontalDivider()
@@ -430,7 +431,7 @@ private fun SettingsScreenContent(
                 }
             }
             settingsItem(key = "appearance") {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(SettingsItemSpacing)) {
                     AppLanguageSetting()
 
                     SettingsSwitchRow(
@@ -465,7 +466,7 @@ private fun SettingsScreenContent(
                     }
 
                     SettingsNestedSection(title = stringResource(R.string.settings_app_icon_title)) {
-                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Column(verticalArrangement = Arrangement.spacedBy(SettingsItemSpacing)) {
                             LauncherIcon.entries.forEach { icon ->
                                 Row(
                                     modifier = Modifier
@@ -491,9 +492,9 @@ private fun SettingsScreenContent(
                 }
             }
 
-            settingsItem(key = "routing_header") {
+            settingsItem(key = "routing_header", spaceAfter = 16.dp) {
                 Column(
-                    modifier = Modifier.padding(horizontal = 16.dp),
+                    modifier = Modifier.padding(horizontal = 16.dp).padding(top = 16.dp - SettingsItemSpacing),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
                     HorizontalDivider()
@@ -502,7 +503,7 @@ private fun SettingsScreenContent(
             }
 
             settingsItem(key = "routing") {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(SettingsItemSpacing)) {
                     SettingsNestedSection(title = stringResource(R.string.settings_connectivity_title), spacing = 0.dp) {
                         SettingsSwitchRow(
                             title = stringResource(R.string.settings_bypass_lan_title),
@@ -511,7 +512,7 @@ private fun SettingsScreenContent(
                             onCheckedChange = { viewModel.setBypassLan(it) },
                         )
 
-                        Spacer(Modifier.height(6.dp))
+                        Spacer(Modifier.height(SettingsItemSpacing))
                         val ipv6Selectable = isIpv6SelectionEnabled(rootServiceActive, rootConnectionBackend, tproxyCompatibility)
                         ReadOnlyDropdownField(
                             label = stringResource(R.string.settings_ipv6_mode_label),
@@ -538,13 +539,13 @@ private fun SettingsScreenContent(
                         // hand-written list. Worth saying here, because the switch looks like it
                         // applies to DNS and in that state it cannot.
                         AnimatedOptionContent(visible = ipv6Mode != Ipv6Mode.Off && hasIpv4OnlyDnsServers(dnsServers, domesticDnsServers)) {
-                            Spacer(Modifier.height(6.dp))
+                            Spacer(Modifier.height(SettingsItemSpacing))
                             SettingsNotice(text = stringResource(R.string.settings_allow_ipv6_dns_ipv4_only))
                         }
                     }
 
                     SettingsNestedSection(title = stringResource(R.string.settings_routing_policy_title)) {
-                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Column(verticalArrangement = Arrangement.spacedBy(SettingsItemSpacing)) {
                             RoutingPolicyControl.entries.forEach { policy ->
                                 Row(
                                     modifier = Modifier
@@ -578,9 +579,9 @@ private fun SettingsScreenContent(
                 }
             }
 
-            settingsItem(key = "core_header") {
+            settingsItem(key = "core_header", spaceAfter = 16.dp) {
                 Column(
-                    modifier = Modifier.padding(horizontal = 16.dp),
+                    modifier = Modifier.padding(horizontal = 16.dp).padding(top = 16.dp - SettingsItemSpacing),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
                     HorizontalDivider()
@@ -789,7 +790,7 @@ private fun SettingsScreenContent(
                         },
                     )
                     AnimatedOptionContent(visible = hasGeoipUrlChanges) {
-                        Spacer(Modifier.height(16.dp))
+                        Spacer(Modifier.height(SettingsItemSpacing))
                         Button(onClick = { viewModel.setGeoipUrl(editingGeoipUrl.text.toString()) }) {
                             Text(stringResource(R.string.settings_save))
                         }
@@ -843,7 +844,7 @@ private fun SettingsScreenContent(
                         },
                     )
                     AnimatedOptionContent(visible = hasGeositeUrlChanges) {
-                        Spacer(Modifier.height(16.dp))
+                        Spacer(Modifier.height(SettingsItemSpacing))
                         Button(onClick = { viewModel.setGeositeUrl(editingGeositeUrl.text.toString()) }) {
                             Text(stringResource(R.string.settings_save))
                         }
@@ -864,7 +865,7 @@ private fun SettingsScreenContent(
                         supportingText = { Text(stringResource(R.string.settings_latency_check_url_supporting_text)) },
                     )
                     AnimatedOptionContent(visible = hasLatencyCheckUrlChanges) {
-                        Spacer(Modifier.height(16.dp))
+                        Spacer(Modifier.height(SettingsItemSpacing))
                         Button(onClick = { viewModel.setLatencyCheckUrl(editingLatencyCheckUrl.text.toString()) }) {
                             Text(stringResource(R.string.settings_save))
                         }
@@ -872,9 +873,9 @@ private fun SettingsScreenContent(
                 }
             }
 
-            settingsItem(key = "data_header") {
+            settingsItem(key = "data_header", spaceAfter = 16.dp) {
                 Column(
-                    modifier = Modifier.padding(horizontal = 16.dp),
+                    modifier = Modifier.padding(horizontal = 16.dp).padding(top = 16.dp - SettingsItemSpacing),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
                     HorizontalDivider()
@@ -885,7 +886,7 @@ private fun SettingsScreenContent(
                 FlowRow(
                     modifier = Modifier.fillMaxWidth().animateContentSize(tween(250)).padding(horizontal = 16.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(SettingsItemSpacing),
                 ) {
                     OutlinedButton(
                         enabled = !backupBusy,
@@ -923,9 +924,9 @@ private fun SettingsScreenContent(
                     }
                 }
             }
-            settingsItem(key = "settings_header") {
+            settingsItem(key = "settings_header", spaceAfter = 16.dp) {
                 Column(
-                    modifier = Modifier.padding(horizontal = 16.dp),
+                    modifier = Modifier.padding(horizontal = 16.dp).padding(top = 16.dp - SettingsItemSpacing),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
                     HorizontalDivider()
@@ -933,7 +934,7 @@ private fun SettingsScreenContent(
                 }
             }
             settingsItem(key = "app_settings") {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(SettingsItemSpacing)) {
                     // A provider may pin its hardware ID policy onto the selected server; while
                     // that policy is active the toggle cannot be turned off from Settings.
                     val selectedSubscriptionRequiresHwid =
@@ -966,9 +967,9 @@ private fun SettingsScreenContent(
                 }
             }
 
-            settingsItem(key = "about_header") {
+            settingsItem(key = "about_header", spaceAfter = 16.dp) {
                 Column(
-                    modifier = Modifier.padding(horizontal = 16.dp),
+                    modifier = Modifier.padding(horizontal = 16.dp).padding(top = 16.dp - SettingsItemSpacing),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
                     HorizontalDivider()
@@ -1017,7 +1018,7 @@ private fun SettingsScreenContent(
                     style = MaterialTheme.typography.bodyMedium,
                 )
             }
-            settingsItem(key = "xray_version", spaceAfter = false) {
+            settingsItem(key = "xray_version", spaceAfter = 0.dp) {
                 Text(
                     xrayCoreVersionText,
                     modifier = Modifier.padding(horizontal = 16.dp),
@@ -1198,13 +1199,13 @@ private fun SettingsServiceSection(
         }
 
         AnimatedOptionContent(visible = rootServiceActive) {
-            Spacer(Modifier.height(6.dp))
+            Spacer(Modifier.height(SettingsItemSpacing))
             val tproxySelectable = tproxyCompatibility !is TproxyCompatibility.Unsupported
             val supportingText = tproxyCompatibilitySupportingText(tproxyCompatibility)
             val shownSupportingText = rememberOptionValue(supportingText != null, supportingText.orEmpty())
             SettingsNestedSection(title = stringResource(R.string.settings_root_connection_backend), spacing = 0.dp) {
                 RootConnectionBackend.entries.forEachIndexed { index, backend ->
-                    if (index > 0) Spacer(Modifier.height(6.dp))
+                    if (index > 0) Spacer(Modifier.height(SettingsItemSpacing))
                     SettingsRadioRow(
                         title = stringResource(backend.labelResource),
                         description = stringResource(backend.descriptionResource),
@@ -1214,7 +1215,7 @@ private fun SettingsServiceSection(
                     )
                 }
                 AnimatedOptionContent(visible = supportingText != null) {
-                    Spacer(Modifier.height(6.dp))
+                    Spacer(Modifier.height(SettingsItemSpacing))
                     Text(
                         shownSupportingText,
                         modifier = Modifier.padding(horizontal = 16.dp),
@@ -1224,7 +1225,7 @@ private fun SettingsServiceSection(
                 }
             }
             AnimatedOptionContent(visible = tproxyCompatibility is TproxyCompatibility.Unsupported) {
-                Spacer(Modifier.height(6.dp))
+                Spacer(Modifier.height(SettingsItemSpacing))
                 TextButton(
                     onClick = actions.onRetryTproxyCompatibility,
                     modifier = Modifier.padding(horizontal = 16.dp),
@@ -1233,7 +1234,7 @@ private fun SettingsServiceSection(
                 }
             }
 
-            Spacer(Modifier.height(6.dp))
+            Spacer(Modifier.height(SettingsItemSpacing))
             SettingsSwitchRow(
                 title = stringResource(R.string.settings_tunnel_tethered_clients_title),
                 description = stringResource(R.string.settings_tunnel_tethered_clients_description),
@@ -1242,7 +1243,7 @@ private fun SettingsServiceSection(
             )
 
             AnimatedOptionContent(visible = settings.showAdvancedOptions && settings.rootConnectionBackend == RootConnectionBackend.Tproxy) {
-                Spacer(Modifier.height(6.dp))
+                Spacer(Modifier.height(SettingsItemSpacing))
                 ReadOnlyDropdownField(
                     label = stringResource(R.string.settings_other_vpn_mode),
                     selectedText = stringResource(settings.otherVpnMode.labelResource),
@@ -1259,22 +1260,22 @@ private fun SettingsServiceSection(
                 )
             }
             AnimatedOptionContent(visible = settings.showAdvancedOptions && settings.rootConnectionBackend == RootConnectionBackend.Tun) {
-                Spacer(Modifier.height(6.dp))
+                Spacer(Modifier.height(SettingsItemSpacing))
                 rootTunNameSetting()
             }
         }
 
-        Spacer(Modifier.height(6.dp))
+        Spacer(Modifier.height(SettingsItemSpacing))
         SettingsSwitchRow(
             title = stringResource(R.string.settings_auto_connect_on_boot),
             checked = settings.autoConnect,
             onCheckedChange = actions.onAutoConnectChange,
             enabled = !settings.useRootService || rootServiceActive,
         )
-        Spacer(Modifier.height(6.dp))
+        Spacer(Modifier.height(SettingsItemSpacing))
         AlwaysOnVpnSetting(rootServiceActive = rootServiceActive)
         AnimatedOptionContent(visible = settings.autoConnect && oemAutostartGuidance.required && !oemAutostartGuidance.granted) {
-            Spacer(Modifier.height(6.dp))
+            Spacer(Modifier.height(SettingsItemSpacing))
             OemAutostartBanner(
                 directSettingsAvailable = oemAutostartGuidance.directSettingsAvailable,
                 onOpenSettings = actions.onOpenOemAutostartSettings,
@@ -1345,7 +1346,7 @@ private fun SettingsNotice(
             .clip(RoundedCornerShape(16.dp))
             .background(MaterialTheme.colorScheme.tertiaryContainer)
             .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(SettingsItemSpacing),
     ) {
         Text(
             text = text,
@@ -1406,12 +1407,12 @@ internal fun hasIpv4OnlyDnsServers(dnsServers: String, domesticDnsServers: Strin
 @Composable
 private fun SettingsNestedSection(
     title: String,
-    spacing: Dp = 6.dp,
+    spacing: Dp = SettingsItemSpacing,
     content: @Composable () -> Unit,
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(SettingsItemSpacing),
     ) {
         Text(
             text = title,
@@ -1454,7 +1455,7 @@ private fun NotificationSettingsSection(
                 subtitle = stringResource(R.string.settings_notification_permission_unavailable_description),
                 onClick = { showAccessDialog = true },
             )
-            Spacer(Modifier.height(6.dp))
+            Spacer(Modifier.height(SettingsItemSpacing))
         }
 
         SettingsActionRow(
@@ -1462,13 +1463,13 @@ private fun NotificationSettingsSection(
             subtitle = notificationFieldSummary(settings, rootMode),
             onClick = onConfigureFields,
         )
-        Spacer(Modifier.height(6.dp))
+        Spacer(Modifier.height(SettingsItemSpacing))
         SettingsActionRow(
             title = stringResource(R.string.settings_notification_field_style),
             subtitle = stringResource(settings.style.labelResource),
             onClick = onConfigureStyle,
         )
-        Spacer(Modifier.height(6.dp))
+        Spacer(Modifier.height(SettingsItemSpacing))
         SettingsActionRow(
             title = stringResource(R.string.settings_notification_update_frequency),
             subtitle = pluralStringResource(
@@ -1792,7 +1793,7 @@ private fun RootTunNameSetting(
         supportingText = { Text(stringResource(R.string.settings_tun_interface_name_automatic)) },
     )
     AnimatedOptionContent(visible = hasTunNameChanges) {
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(SettingsItemSpacing))
         Button(onClick = onSave) { Text(stringResource(R.string.settings_save)) }
     }
 }
@@ -1844,7 +1845,7 @@ private fun AdvancedIntegerSetting(
         modifier = Modifier.fillMaxWidth(),
     )
     AnimatedOptionContent(visible = hasChanges) {
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(SettingsItemSpacing))
         Button(onClick = onSave, enabled = isValid) {
             Text(stringResource(R.string.settings_save))
         }
@@ -1862,18 +1863,21 @@ private fun GeoDataSupportingText(description: String, lastUpdated: Long?, enabl
             DateFormat.format("HH:mm:ss", date),
         )
     }
+    val shownUpdatedText = rememberOptionValue(updatedText != null, updatedText.orEmpty())
     val linkStyle = SpanStyle(color = MaterialTheme.colorScheme.primary, textDecoration = TextDecoration.Underline)
-    Text(
-        buildAnnotatedString {
-            append(description)
-            if (updatedText != null) {
-                append("\n\n")
-                withLink(LinkAnnotation.Clickable("delete_asset", TextLinkStyles(style = linkStyle)) { if (enabled) onClick() }) {
-                    append(updatedText)
-                }
-            }
-        },
-    )
+    Column {
+        Text(description)
+        AnimatedOptionContent(visible = updatedText != null) {
+            Spacer(Modifier.height(SettingsItemSpacing))
+            Text(
+                buildAnnotatedString {
+                    withLink(LinkAnnotation.Clickable("delete_asset", TextLinkStyles(style = linkStyle)) { if (enabled) onClick() }) {
+                        append(shownUpdatedText)
+                    }
+                },
+            )
+        }
+    }
 }
 
 @Composable
@@ -2437,13 +2441,13 @@ private fun Color.withLuminance(target: Float): Color {
 private fun LazyListScope.settingsItem(
     key: String,
     visible: Boolean = true,
-    spaceAfter: Boolean = true,
+    spaceAfter: Dp = SettingsItemSpacing,
     content: @Composable () -> Unit,
 ) {
     item(key = key) {
         AnimatedOptionContent(visible = visible) {
             content()
-            if (spaceAfter) Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(spaceAfter))
         }
     }
 }

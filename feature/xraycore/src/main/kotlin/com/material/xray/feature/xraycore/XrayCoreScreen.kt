@@ -82,6 +82,7 @@ import com.material.xray.core.ui.components.DropdownOption
 import com.material.xray.core.ui.components.ReadOnlyDropdownField
 import com.material.xray.core.ui.components.ScrolledTopAppBar
 import com.material.xray.core.ui.components.SelectableOptionRow
+import com.material.xray.core.ui.components.SettingsItemSpacing
 import com.material.xray.core.ui.components.TooltipIconButton
 import com.material.xray.core.ui.components.UpdateChecksSetting
 import com.material.xray.core.ui.components.UpdateIntervalDialog
@@ -329,7 +330,7 @@ private fun UpdateSettings(
             style = MaterialTheme.typography.titleSmall,
             color = MaterialTheme.colorScheme.primary,
         )
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(SettingsItemSpacing))
         UpdateChecksSetting(
             title = stringResource(R.string.settings_xray_core_periodic_checks),
             checked = settings.periodicChecks,
@@ -343,7 +344,7 @@ private fun UpdateSettings(
                 selectedText = updateActionLabel(settings.action),
                 options = XrayCoreUpdateAction.entries.map { DropdownOption(it, updateActionLabel(it)) },
                 onSelected = onActionSelected,
-                modifier = Modifier.padding(start = 16.dp, top = 8.dp, end = 16.dp, bottom = 8.dp),
+                modifier = Modifier.padding(start = 16.dp, top = SettingsItemSpacing, end = 16.dp, bottom = SettingsItemSpacing),
             )
         }
     }

@@ -49,6 +49,7 @@ fun UpdateChecksSetting(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(
+            verticalArrangement = Arrangement.Center,
             // Draw the separator at the label's measured edge. IntrinsicSize.Min would ask
             // AnimatedVisibility for its final height and make the whole row jump on expansion.
             modifier = Modifier.weight(1f).heightIn(min = 48.dp).drawBehind {
@@ -56,7 +57,7 @@ fun UpdateChecksSetting(
                 val thickness = 1.dp.toPx()
                 val edge = if (layoutDirection == LayoutDirection.Rtl) 0f else size.width - thickness
                 drawRect(dividerColor, Offset(edge, inset), Size(thickness, (size.height - 2 * inset).coerceAtLeast(0f)))
-            }.clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 12.dp),
+            }.clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 8.dp),
         ) {
             Text(title, style = MaterialTheme.typography.bodyLarge)
             AnimatedOptionContent(visible = checked, blockOutgoingInput = false) {

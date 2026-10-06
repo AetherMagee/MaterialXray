@@ -16,6 +16,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 
+/** Space between adjacent settings controls; section headers use a larger gap. */
+val SettingsItemSpacing = 6.dp
+
 /**
  * A settings entry whose whole row toggles a switch.
  *

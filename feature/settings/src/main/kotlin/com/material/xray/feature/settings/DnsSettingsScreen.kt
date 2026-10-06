@@ -44,6 +44,7 @@ import com.material.xray.core.ui.components.DropdownOption
 import com.material.xray.core.ui.components.FadingOutlinedTextField as OutlinedTextField
 import com.material.xray.core.ui.components.ReadOnlyDropdownField
 import com.material.xray.core.ui.components.ScrolledTopAppBar
+import com.material.xray.core.ui.components.SettingsItemSpacing
 import com.material.xray.core.ui.components.SettingsSwitchRow
 import com.material.xray.core.ui.components.TooltipIconButton
 import com.material.xray.core.ui.components.rememberOptionValue
@@ -90,7 +91,7 @@ fun DnsSettingsScreen(
                 .fillMaxSize()
                 .padding(padding),
             contentPadding = PaddingValues(vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            verticalArrangement = Arrangement.spacedBy(SettingsItemSpacing),
         ) {
             item(key = "intro") {
                 Text(
@@ -177,7 +178,7 @@ private fun DnsResolverSection(
     val shownServers = rememberOptionValue(customVisible, servers)
 
     Column(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().padding(top = 16.dp - SettingsItemSpacing),
     ) {
         HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
 
@@ -194,7 +195,7 @@ private fun DnsResolverSection(
             )
         }
 
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(SettingsItemSpacing))
         ReadOnlyDropdownField(
             label = stringResource(R.string.settings_dns_provider_label),
             selectedText = preset.label(emptyLabel),
@@ -216,7 +217,7 @@ private fun DnsResolverSection(
         )
 
         AnimatedOptionContent(visible = preset.supportsEncryption) {
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(SettingsItemSpacing))
             SettingsSwitchRow(
                 title = stringResource(R.string.settings_dns_encrypted_title),
                 description = if (shownEncryptionWanted && !shownPreset.encryptsIpv6) {
@@ -237,7 +238,7 @@ private fun DnsResolverSection(
         }
 
         AnimatedOptionContent(visible = customVisible) {
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(SettingsItemSpacing))
             Column(
                 modifier = Modifier.padding(horizontal = 16.dp),
             ) {
@@ -249,7 +250,7 @@ private fun DnsResolverSection(
                     supportingText = { Text(stringResource(R.string.settings_dns_custom_supporting_text)) },
                 )
                 AnimatedOptionContent(visible = customDraft.text.toString().trim() != shownServers) {
-                    Spacer(Modifier.height(12.dp))
+                    Spacer(Modifier.height(SettingsItemSpacing))
                     Button(onClick = { onServersChange(customDraft.text.toString()) }, enabled = customVisible) {
                         Text(stringResource(R.string.settings_save))
                     }
