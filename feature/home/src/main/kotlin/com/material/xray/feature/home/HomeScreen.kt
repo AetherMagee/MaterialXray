@@ -191,6 +191,7 @@ import com.material.xray.core.ui.R
 import com.material.xray.core.ui.adaptive.SinglePaneMaxWidth
 import com.material.xray.core.ui.adaptive.TwoPaneMinWidth
 import com.material.xray.core.ui.components.AnimatedDropdownMenu
+import com.material.xray.core.ui.components.AnimatedOptionContent
 import com.material.xray.core.ui.components.DropdownOption
 import com.material.xray.core.ui.components.ExpansionArrow
 import com.material.xray.core.ui.components.FadingOutlinedTextField as OutlinedTextField
@@ -2773,7 +2774,6 @@ private val FloatingConnectButtonClearance = 80.dp
 private const val DISABLED_FAB_CONTENT_ALPHA = 0.38f
 private const val QR_SCANNER_TRANSITION_MS = 180
 private const val SUBSCRIPTION_EXPANSION_MS = 180
-private const val SUBSCRIPTION_DIALOG_RESIZE_MS = 250
 private const val CORE_UPTIME_REFRESH_INTERVAL_MS = 1_000L
 private const val CAMERA_PERMISSION_PREFS = "camera_permission"
 private const val CAMERA_PERMISSION_REQUESTED = "requested"
@@ -3129,12 +3129,7 @@ private fun SubscriptionAdvancedOptions(
             ),
         )
     }
-    AnimatedVisibility(
-        visible = expanded,
-        // Animate only the Advanced block inside the fixed-height dialog window.
-        enter = fadeIn(tween(150)) + expandVertically(tween(SUBSCRIPTION_DIALOG_RESIZE_MS), expandFrom = Alignment.Top),
-        exit = fadeOut(tween(100)) + shrinkVertically(tween(SUBSCRIPTION_DIALOG_RESIZE_MS), shrinkTowards = Alignment.Top),
-    ) {
+    AnimatedOptionContent(visible = expanded) {
         Column {
             Spacer(modifier = Modifier.height(8.dp))
             SubscriptionFetchTypeDropdown(
@@ -3205,7 +3200,7 @@ private fun SubscriptionUserAgentSection(
         },
         onSelected = onModeChange,
     )
-    if (selectedMode == SubscriptionUserAgentMode.CUSTOM) {
+    AnimatedOptionContent(visible = selectedMode == SubscriptionUserAgentMode.CUSTOM) {
         Spacer(modifier = Modifier.height(8.dp))
         OutlinedTextField(
             state = customUserAgent,

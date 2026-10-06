@@ -7,12 +7,6 @@ import android.os.Build
 import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -83,6 +77,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.material.xray.core.ui.R
+import com.material.xray.core.ui.components.AnimatedOptionContent
 import com.material.xray.core.ui.components.DropdownOption
 import com.material.xray.core.ui.components.ReadOnlyDropdownField
 import com.material.xray.core.ui.components.ScrolledTopAppBar
@@ -342,11 +337,7 @@ private fun UpdateSettings(
             onClick = onIntervalClick,
             onCheckedChange = onPeriodicChecksChange,
         )
-        AnimatedVisibility(
-            visible = settings.periodicChecks,
-            enter = fadeIn(tween(150)) + expandVertically(tween(250), expandFrom = Alignment.Top),
-            exit = fadeOut(tween(100)) + shrinkVertically(tween(250), shrinkTowards = Alignment.Top),
-        ) {
+        AnimatedOptionContent(visible = settings.periodicChecks) {
             ReadOnlyDropdownField(
                 label = stringResource(R.string.settings_xray_core_update_action),
                 selectedText = updateActionLabel(settings.action),

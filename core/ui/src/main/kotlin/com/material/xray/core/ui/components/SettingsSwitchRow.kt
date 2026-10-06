@@ -34,6 +34,7 @@ fun SettingsSwitchRow(
     // its availability is still being determined, and that must not yet read as unavailable.
     titleColor: Color = MaterialTheme.colorScheme.onSurface,
 ) {
+    val shownDescription = rememberOptionValue(description != null, description.orEmpty())
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -56,9 +57,9 @@ fun SettingsSwitchRow(
                 style = MaterialTheme.typography.bodyLarge,
                 color = titleColor,
             )
-            if (description != null) {
+            AnimatedOptionContent(visible = description != null, blockOutgoingInput = false) {
                 Text(
-                    text = description,
+                    text = shownDescription,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

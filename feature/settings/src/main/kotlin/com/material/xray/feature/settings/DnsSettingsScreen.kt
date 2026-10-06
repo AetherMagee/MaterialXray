@@ -3,9 +3,11 @@ package com.material.xray.feature.settings
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -37,12 +39,14 @@ import com.material.xray.core.model.DnsPreset
 import com.material.xray.core.model.dnsPresetFor
 import com.material.xray.core.model.isEncryptedDnsValue
 import com.material.xray.core.ui.R
+import com.material.xray.core.ui.components.AnimatedOptionContent
 import com.material.xray.core.ui.components.DropdownOption
 import com.material.xray.core.ui.components.FadingOutlinedTextField as OutlinedTextField
 import com.material.xray.core.ui.components.ReadOnlyDropdownField
 import com.material.xray.core.ui.components.ScrolledTopAppBar
 import com.material.xray.core.ui.components.SettingsSwitchRow
 import com.material.xray.core.ui.components.TooltipIconButton
+import com.material.xray.core.ui.components.rememberOptionValue
 import com.material.xray.core.ui.text.descriptionResource
 import com.material.xray.core.ui.text.labelResource
 
@@ -166,13 +170,18 @@ private fun DnsResolverSection(
     }
     val editingServers = rememberSaveable(servers, saver = TextFieldState.Saver) { TextFieldState(servers) }
     val preset = if (customPicked) DnsPreset.Custom else storedPreset
+    val shownPreset = rememberOptionValue(preset.supportsEncryption, preset)
+    val shownEncryptionWanted = rememberOptionValue(preset.supportsEncryption, encryptionWanted)
+    val customVisible = preset == DnsPreset.Custom
+    val customDraft = rememberOptionValue(customVisible, editingServers)
+    val shownServers = rememberOptionValue(customVisible, servers)
 
     Column(
         modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
 
+        Spacer(Modifier.height(12.dp))
         Column(
             modifier = Modifier.padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -185,6 +194,7 @@ private fun DnsResolverSection(
             )
         }
 
+        Spacer(Modifier.height(12.dp))
         ReadOnlyDropdownField(
             label = stringResource(R.string.settings_dns_provider_label),
             selectedText = preset.label(emptyLabel),
@@ -205,39 +215,42 @@ private fun DnsResolverSection(
             modifier = Modifier.padding(horizontal = 16.dp),
         )
 
-        if (preset.supportsEncryption) {
+        AnimatedOptionContent(visible = preset.supportsEncryption) {
+            Spacer(Modifier.height(12.dp))
             SettingsSwitchRow(
                 title = stringResource(R.string.settings_dns_encrypted_title),
-                description = if (encryptionWanted && !preset.encryptsIpv6) {
+                description = if (shownEncryptionWanted && !shownPreset.encryptsIpv6) {
                     stringResource(
                         R.string.settings_dns_encrypted_ipv4_only,
-                        stringResource(preset.labelResource),
+                        stringResource(shownPreset.labelResource),
                     )
                 } else {
                     null
                 },
-                checked = encryptionWanted,
+                checked = shownEncryptionWanted,
+                enabled = preset.supportsEncryption,
                 onCheckedChange = { wanted ->
                     encryptionWanted = wanted
-                    onServersChange(preset.servers(wanted))
+                    onServersChange(shownPreset.servers(wanted))
                 },
             )
         }
 
-        if (preset == DnsPreset.Custom) {
+        AnimatedOptionContent(visible = customVisible) {
+            Spacer(Modifier.height(12.dp))
             Column(
                 modifier = Modifier.padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 OutlinedTextField(
-                    state = editingServers,
+                    state = customDraft,
                     label = { Text(stringResource(R.string.settings_dns_custom_label)) },
                     lineLimits = TextFieldLineLimits.SingleLine,
                     modifier = Modifier.fillMaxWidth(),
                     supportingText = { Text(stringResource(R.string.settings_dns_custom_supporting_text)) },
                 )
-                if (editingServers.text.toString().trim() != servers) {
-                    Button(onClick = { onServersChange(editingServers.text.toString()) }) {
+                AnimatedOptionContent(visible = customDraft.text.toString().trim() != shownServers) {
+                    Spacer(Modifier.height(12.dp))
+                    Button(onClick = { onServersChange(customDraft.text.toString()) }, enabled = customVisible) {
                         Text(stringResource(R.string.settings_save))
                     }
                 }
