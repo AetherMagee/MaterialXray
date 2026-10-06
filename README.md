@@ -17,7 +17,7 @@
 
 ## Get started
 
-You'll need Android 7.0 or newer on an arm64, armv7 or x86_64 device, plus a proxy server or subscription of your own. Material Xray is a client, not a service that provides servers.
+You'll need Android 7.0 or newer on an arm64, armv7 or x86_64 device, and a proxy server or subscription of your own. Material Xray is a client, not a service that provides servers.
 
 1. Download the APK from the [latest release](https://github.com/AetherMagee/MaterialXray/releases/latest) and install it. Android may ask you to allow installation from your browser or file manager.
 2. Open the app and choose **Add new server or subscription**. Paste a link, scan a QR code, or enter it manually.
@@ -38,15 +38,15 @@ Advanced options expose live app and Xray logs, a configuration viewer and edito
 
 | Category | Rootless | Rootful |
 | --- | --- | --- |
-| Detection points | ⚠️ Establishes an Android VPN, which apps can detect through the system's network APIs. | ✅ Configures routing tables to make the tunnel hidden from the apps that bypass it. |
-| Ease of setup | ✅ Approve Android's VPN permission, just like any other VPN app. | ⚠️ Requires superuser access through `su`. KernelSU is preferred. |
-| Android VPN state | ⚠️ Occupies Android's VPN slot, easily detected by other apps. | ✅ Uses root-managed routing instead, allowing it to hide itself and even coexist with other VPNs like Tailscale. |
-| Per-app control | ✅ Choose which apps use the proxy and which bypass it. | ✅ Choose which apps use the proxy and which bypass it + assign different proxy servers to individual apps. |
+| Detection points | ❗️ Establishes an Android VpnService, which apps can detect through the system's network APIs. | ✅ Configures routing tables to make the tunnel hidden from the apps that bypass it. |
+| Ease of setup | ✅ Approve Android's VPN permission, just like any other VPN app. | ⚠️ Requires superuser access through `su`. |
+| Android VPN state | ❗️ Occupies Android's VPN slot, easily detected by other apps. | ✅ Uses root-managed routing instead, allowing it to hide itself and even coexist with other VPNs like Tailscale. |
+| Per-app control | ✅ Choose which apps use the proxy and which bypass it. | ✅ Choose which apps use the proxy and which bypass it assign different proxy servers to individual apps. |
 | Hotspot and tethering | ⚠️ Does not tunnel tethered clients. | ✅ Can tunnel tethered clients through the proxy. |
 | Always-on VPN | ✅ Supports Android's always-on VPN. | ⚠️ Enabling Android's always-on VPN switches the app to rootless mode. |
 | Auto-connect after reboot | ✅ Supported | ✅ Supported |
-| If Android kills the app process | ⚠️ The proxy process stops too. Always-on VPN can restart the service. | ✅ The proxy process can keep running independently of the app. |
-| Stability | ✅ Traffic is routed by Android, standard and battle-tested. | ⚠️ Rigorously tested but may have rough edges. |
+| If Android kills the app process | ℹ️ The proxy process stops too. Always-on VPN can restart the service. | ✅ The proxy process can keep running independently of the app. |
+| Stability | ✅ Traffic is routed by Android, standard and battle-tested. | ℹ️ Rigorously tested but may have rough edges. |
 
 **TL;DR**: Use rootful mode when avoiding VPN detection by other apps is the priority. Use rootless when root is unavailable or you prefer Android's standard VPN integration.
 
