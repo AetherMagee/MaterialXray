@@ -13,8 +13,8 @@ A tour of the Settings tab. Some options only show up after you turn on **Show a
 | **Routing policy** | *Subscription provider* (default) applies routing and per-app rules from the selected subscription. *User* keeps your own. |
 | **Default outbound** | Where rootful *Default outbound* app routes go. |
 | **IPv6 connections** | **Off**: IPv4 only. **Auto**: uses IPv6 once a quick check through the server passes. **On**: always prefers IPv6 when the network has it. |
+| **TUN interface name** | Names the rootful TUN interface. With advanced options enabled, shown above **Tunnel tethered clients** when **TUN interface** is selected; **Transparent proxy** shows **When another VPN is active** in the same place. |
 | **Tunnel tethered clients** | Rootful only. Routes Wi-Fi hotspot and USB tethering traffic through Xray. |
-| **TUN interface name** | Names the rootful TUN interface. With advanced options enabled, shown below **Tunnel tethered clients** when **TUN interface** is selected; **Transparent proxy** shows **When another VPN is active** in the same place. |
 | **Route app traffic through Xray** | Sends Material Xray's own data updates through the active connection. Latency checks always bypass it. |
 | **Connection health watchdog** | Watches the local Xray API, the tunnel and root routing for failures, without sending external probes. |
 | **Always-on VPN** | Shows whether Android's always-on VPN is enabled for Material Xray. Tap the row below **Auto-connect on boot** to open Android's VPN settings and manage it there. The row is disabled while root service is enabled. |

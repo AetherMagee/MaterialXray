@@ -1234,14 +1234,6 @@ private fun SettingsServiceSection(
                 }
             }
 
-            Spacer(Modifier.height(SettingsItemSpacing))
-            SettingsSwitchRow(
-                title = stringResource(R.string.settings_tunnel_tethered_clients_title),
-                description = stringResource(R.string.settings_tunnel_tethered_clients_description),
-                checked = settings.tunnelTetheredClients,
-                onCheckedChange = actions.onTunnelTetheredClientsChange,
-            )
-
             AnimatedOptionContent(visible = settings.showAdvancedOptions && settings.rootConnectionBackend == RootConnectionBackend.Tproxy) {
                 Spacer(Modifier.height(SettingsFieldSpacing))
                 OtherVpnModeSetting(
@@ -1253,6 +1245,14 @@ private fun SettingsServiceSection(
                 Spacer(Modifier.height(SettingsFieldSpacing))
                 rootTunNameSetting()
             }
+
+            Spacer(Modifier.height(SettingsItemSpacing))
+            SettingsSwitchRow(
+                title = stringResource(R.string.settings_tunnel_tethered_clients_title),
+                description = stringResource(R.string.settings_tunnel_tethered_clients_description),
+                checked = settings.tunnelTetheredClients,
+                onCheckedChange = actions.onTunnelTetheredClientsChange,
+            )
         }
 
         Spacer(Modifier.height(SettingsItemSpacing))
