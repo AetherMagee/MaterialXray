@@ -7,6 +7,8 @@ description: Logs, common problems and how to report an issue.
 
 The **Logs** tab shows live output from both the app and Xray-core. Raise the **Xray log level** in Settings (advanced) for more detail. With advanced options on, you can also open the generated configuration in the viewer.
 
+The JSON editor for the active Xray configuration or an individual server has no fade or fixed bands at its top and bottom edges. Its content padding scrolls with the text, and a small gap keeps the text clear of the outline.
+
 ## Common problems
 
 **The subscription won't refresh.**

@@ -368,6 +368,7 @@ private fun JsonEditorContent(
                 lineHeight = 17.sp,
             ),
             isError = state.errorRes != null,
+            scrollableContentPadding = PaddingValues(14.dp),
         )
     }
 }

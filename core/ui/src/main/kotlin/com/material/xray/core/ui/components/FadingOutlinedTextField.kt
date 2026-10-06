@@ -4,6 +4,7 @@ import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -15,6 +16,7 @@ import androidx.compose.foundation.text.input.TextFieldBuffer
 import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.selection.LocalTextSelectionColors
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -26,6 +28,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -58,6 +61,7 @@ import androidx.compose.ui.unit.sp
  *
  * It only opens the keyboard on focus while the user is touching the screen. With a TV remote or
  * a keyboard, focus passes through it like any other control, and OK opens the keyboard.
+ * [scrollableContentPadding] makes multiline editor padding scroll with the text, without fading.
  */
 @Composable
 fun FadingOutlinedTextField(
@@ -74,6 +78,7 @@ fun FadingOutlinedTextField(
     outputTransformation: OutputTransformation? = null,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
     lineLimits: TextFieldLineLimits = TextFieldLineLimits.Default,
+    scrollableContentPadding: PaddingValues? = null,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val focused by interactionSource.collectIsFocusedAsState()
@@ -86,6 +91,8 @@ fun FadingOutlinedTextField(
         }
     }
     val scroll = rememberScrollState()
+    // The editor's outer scroll owns the padded document; the inner field measures at full height.
+    val fieldScroll = if (scrollableContentPadding == null) scroll else rememberScrollState()
     val density = LocalDensity.current
     val labelLineHeight = MaterialTheme.typography.bodySmall.lineHeight
     val labelPadding = with(density) { (if (labelLineHeight.isSp) labelLineHeight else 16.sp).toDp() / 2 }
@@ -113,6 +120,11 @@ fun FadingOutlinedTextField(
         supportingText = supportingText,
         isError = isError,
         colors = colors,
+        contentPadding = if (scrollableContentPadding == null) {
+            OutlinedTextFieldDefaults.contentPadding()
+        } else {
+            PaddingValues(OutlinedTextFieldDefaults.FocusedBorderThickness)
+        },
     )
 
     CompositionLocalProvider(LocalTextSelectionColors provides colors.textSelectionColors) {
@@ -139,10 +151,19 @@ fun FadingOutlinedTextField(
             outputTransformation = outputTransformation,
             decorator = { innerTextField ->
                 materialDecorator.Decoration {
-                    Box(modifier = Modifier.textEdgeFade(scroll, horizontal = singleLine)) { innerTextField() }
+                    val textModifier = if (scrollableContentPadding == null) {
+                        Modifier.textEdgeFade(scroll, horizontal = singleLine)
+                    } else {
+                        // Only the outline's thickness stays outside the viewport. Padding inside
+                        // the scroll moves away with the document instead of masking its edges.
+                        Modifier.clipToBounds().verticalScroll(scroll).padding(scrollableContentPadding)
+                    }
+                    Box(modifier = textModifier) {
+                        innerTextField()
+                    }
                 }
             },
-            scrollState = scroll,
+            scrollState = fieldScroll,
         )
     }
 }
