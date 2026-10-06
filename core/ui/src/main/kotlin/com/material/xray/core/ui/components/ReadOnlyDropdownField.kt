@@ -1,6 +1,7 @@
 package com.material.xray.core.ui.components
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.input.TextFieldState
@@ -17,6 +18,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -39,6 +41,7 @@ fun <T> ReadOnlyDropdownField(
     onSelected: (T) -> Unit,
     modifier: Modifier = Modifier,
     supportingText: String? = null,
+    supportingAction: (@Composable () -> Unit)? = null,
 ) {
     var expanded by remember { mutableStateOf(false) }
 
@@ -47,16 +50,33 @@ fun <T> ReadOnlyDropdownField(
         onExpandedChange = { expanded = it },
         modifier = modifier,
     ) {
-        OutlinedTextField(
-            state = remember(selectedText) { TextFieldState(selectedText) },
-            readOnly = true,
-            label = { Text(label) },
-            supportingText = supportingText?.let { { Text(it) } },
-            trailingIcon = { ExpansionArrow(expanded = expanded, contentDescription = null) },
-            modifier = Modifier
-                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
-                .fillMaxWidth(),
-        )
+        Column {
+            OutlinedTextField(
+                state = remember(selectedText) { TextFieldState(selectedText) },
+                readOnly = true,
+                label = { Text(label) },
+                supportingText = if (supportingAction == null) supportingText?.let { { Text(it) } } else null,
+                trailingIcon = { ExpansionArrow(expanded = expanded, contentDescription = null) },
+                modifier = Modifier
+                    .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
+                    .fillMaxWidth(),
+            )
+            if (supportingAction != null && supportingText != null) {
+                // Keep the action outside menuAnchor, so tapping help does not open the dropdown.
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(start = 16.dp, top = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        supportingText,
+                        modifier = Modifier.weight(1f),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    supportingAction()
+                }
+            }
+        }
         ExposedDropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },

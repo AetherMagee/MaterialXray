@@ -160,7 +160,6 @@ import com.material.xray.core.ui.components.UpdateIntervalDialog
 import com.material.xray.core.ui.components.rememberOptionValue
 import com.material.xray.core.ui.components.rememberSystemState
 import com.material.xray.core.ui.text.descriptionResource
-import com.material.xray.core.ui.text.dropdownDescriptionResource
 import com.material.xray.core.ui.text.labelResource
 import com.material.xray.core.xray.TproxyCompatibility
 import java.util.Date
@@ -1245,19 +1244,9 @@ private fun SettingsServiceSection(
 
             AnimatedOptionContent(visible = settings.showAdvancedOptions && settings.rootConnectionBackend == RootConnectionBackend.Tproxy) {
                 Spacer(Modifier.height(SettingsFieldSpacing))
-                ReadOnlyDropdownField(
-                    label = stringResource(R.string.settings_other_vpn_mode),
-                    selectedText = stringResource(settings.otherVpnMode.labelResource),
-                    supportingText = stringResource(settings.otherVpnMode.descriptionResource),
-                    options = OtherVpnMode.entries.map { mode ->
-                        DropdownOption(
-                            value = mode,
-                            label = stringResource(mode.labelResource),
-                            description = stringResource(mode.dropdownDescriptionResource),
-                        )
-                    },
-                    onSelected = actions.onOtherVpnModeChange,
-                    modifier = Modifier.padding(horizontal = 16.dp),
+                OtherVpnModeSetting(
+                    mode = settings.otherVpnMode,
+                    onModeChange = actions.onOtherVpnModeChange,
                 )
             }
             AnimatedOptionContent(visible = settings.showAdvancedOptions && settings.rootConnectionBackend == RootConnectionBackend.Tun) {

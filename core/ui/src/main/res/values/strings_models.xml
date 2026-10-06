@@ -33,7 +33,7 @@
     <string name="other_vpn_mode_auto_routing_label">Auto</string>
     <string name="other_vpn_mode_auto_routing_description">Traffic from proxied apps goes through Material Xray. Apps marked as “Not proxied” will use the other VPN when it is connected.</string>
     <string name="other_vpn_mode_auto_routing_dropdown_description">Material Xray will take priority for apps selected for proxying in Routing, while apps explicitly marked as “Not proxied” will use another configured VPN (one that uses Android’s built-in VPN service) when it is active.\n\nOtherwise, these apps will connect directly.\n\nProxied apps can still access the other VPN’s networks through that VPN. For example, a browser can open websites through Material Xray and reach a home server through Tailscale. This exception does not apply to apps with “Always proxied” enabled.</string>
-    <string name="other_vpn_mode_tunnel_in_tunnel_label">Tunnel-in-tunnel</string>
+    <string name="other_vpn_mode_tunnel_in_tunnel_label">Tunnel-in-Tunnel</string>
     <string name="other_vpn_mode_tunnel_in_tunnel_description">App traffic will be routed through another active VPN, while Material Xray proxies the VPN app itself.</string>
     <string name="other_vpn_mode_tunnel_in_tunnel_dropdown_description">App traffic will be routed through another active VPN, while Material Xray proxies the VPN app itself. This could be useful for apps like Tailscale that use Android’s built-in VPN service and have trouble connecting directly.\n\nThe other VPN app should be configured to use a proxy in Routing.</string>
     <string name="other_vpn_mode_stand_down_label">Stand down</string>

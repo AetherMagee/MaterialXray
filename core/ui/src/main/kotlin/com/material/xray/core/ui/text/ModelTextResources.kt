@@ -121,7 +121,7 @@ val OtherVpnMode.descriptionResource: Int
     }
 
 @get:StringRes
-val OtherVpnMode.dropdownDescriptionResource: Int
+val OtherVpnMode.detailedDescriptionResource: Int
     get() = when (this) {
         OtherVpnMode.AutoRouting -> R.string.other_vpn_mode_auto_routing_dropdown_description
         OtherVpnMode.TunnelInTunnel -> R.string.other_vpn_mode_tunnel_in_tunnel_dropdown_description

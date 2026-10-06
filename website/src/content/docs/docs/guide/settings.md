@@ -19,6 +19,8 @@ A tour of the Settings tab. Some options only show up after you turn on **Show a
 | **Connection health watchdog** | Watches the local Xray API, the tunnel and root routing for failures, without sending external probes. |
 | **Always-on VPN** | Shows whether Android's always-on VPN is enabled for Material Xray. Tap the row below **Auto-connect on boot** to open Android's VPN settings and manage it there. The row is disabled while root service is enabled. |
 
+With **Transparent proxy** and advanced options enabled, **When another VPN is active** uses the same short descriptions in the dropdown and below the selected mode. Tap the **(?)** button beside the description for **Auto** or **Tunnel-in-Tunnel** to read the detailed explanation, then tap **Understand** to close it. **Stand down** has no help button.
+
 If root access is unavailable, **Use root service** shows a **Retry** button. Granting access and retrying restores an off switch; enabling root mode remains your choice. Opening Settings reuses the known root-access result without a new permission check. Root access is checked when you tap Retry, enable root mode, or connect; a running root connection also monitors it. Losing access switches the app back to rootless mode. Android's VPN permission is required to connect in rootless mode.
 
 ## DNS
