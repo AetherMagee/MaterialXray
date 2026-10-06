@@ -52,6 +52,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
@@ -2886,6 +2887,7 @@ private fun EditSubscriptionDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         modifier = Modifier.stableDialogHeight(onDismiss),
+        properties = DialogProperties(decorFitsSystemWindows = false),
         title = { Text(stringResource(R.string.home_edit_subscription_title)) },
         text = {
             Column(
@@ -3031,6 +3033,7 @@ private fun AddSubscriptionDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         modifier = Modifier.stableDialogHeight(onDismiss),
+        properties = DialogProperties(decorFitsSystemWindows = false),
         title = { Text(stringResource(R.string.home_add_manually)) },
         text = {
             Column(
@@ -3091,10 +3094,11 @@ private fun AddSubscriptionDialog(
     )
 }
 
-// Keep the Android window at its available height while the Material surface resizes inside it.
+// Keep the Android window at full height and center the surface in the space above the IME.
 // A wrap-content window would resize and recenter through WindowManager on every frame.
 private fun Modifier.stableDialogHeight(onDismiss: () -> Unit): Modifier = fillMaxHeight()
     .pointerInput(onDismiss) { detectTapGestures { onDismiss() } }
+    .safeDrawingPadding()
     .wrapContentHeight()
     // The full-height window handles outside taps above and below the surface. Consume taps
     // in its content so blank space inside the dialog does not dismiss it.
