@@ -82,6 +82,7 @@ import com.material.xray.core.ui.components.DropdownOption
 import com.material.xray.core.ui.components.ReadOnlyDropdownField
 import com.material.xray.core.ui.components.ScrolledTopAppBar
 import com.material.xray.core.ui.components.SelectableOptionRow
+import com.material.xray.core.ui.components.SettingsFieldSpacing
 import com.material.xray.core.ui.components.SettingsItemSpacing
 import com.material.xray.core.ui.components.TooltipIconButton
 import com.material.xray.core.ui.components.UpdateChecksSetting
@@ -344,7 +345,7 @@ private fun UpdateSettings(
                 selectedText = updateActionLabel(settings.action),
                 options = XrayCoreUpdateAction.entries.map { DropdownOption(it, updateActionLabel(it)) },
                 onSelected = onActionSelected,
-                modifier = Modifier.padding(start = 16.dp, top = SettingsItemSpacing, end = 16.dp, bottom = SettingsItemSpacing),
+                modifier = Modifier.padding(start = 16.dp, top = SettingsFieldSpacing, end = 16.dp, bottom = SettingsFieldSpacing),
             )
         }
     }

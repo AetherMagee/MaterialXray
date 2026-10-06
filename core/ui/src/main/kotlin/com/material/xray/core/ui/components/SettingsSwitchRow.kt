@@ -19,6 +19,9 @@ import androidx.compose.ui.unit.dp
 /** Space between adjacent settings controls; section headers use a larger gap. */
 val SettingsItemSpacing = 6.dp
 
+/** Outlined text and dropdown fields need slightly more separation. */
+val SettingsFieldSpacing = 8.dp
+
 /**
  * A settings entry whose whole row toggles a switch.
  *

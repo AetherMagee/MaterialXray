@@ -36,7 +36,7 @@ Resolvers are comma-separated and tried in order. Each one is an IP address or a
 
 **Choose Xray-core version** opens the core manager. **Check for new Xray-core versions automatically** has a separate switch and interval picker: tap the text to choose **3 days**, **1 week** (default), **2 weeks**, or **1 month** (30 days). Changing this interval does not affect app update checks. When checks are enabled, choose whether to be notified of a new core or install it automatically. The interval is included in backups. Loaded version pages are cached across app restarts; reopening the picker reuses them. Tap Refresh to fetch the latest list. A failed refresh keeps the cached list available, while automatic update checks always request current releases.
 
-Dependent controls expand and collapse smoothly when their parent option changes, including root-service options, custom DNS fields and update settings. Hidden controls leave no empty gaps. Ordinary settings use consistent compact spacing, while section headers retain extra separation.
+Dependent controls expand and collapse smoothly when their parent option changes, including root-service options, custom DNS fields and update settings. Hidden controls leave no empty gaps. Ordinary settings use compact 6 dp spacing, text and dropdown fields use 8 dp, and section headers retain extra separation.
 
 Advanced options cover the Xray log level, buffer size, TUN MTU, a RAM threshold that restarts the core, the latency-check URL, and geodata URLs and update interval.
 

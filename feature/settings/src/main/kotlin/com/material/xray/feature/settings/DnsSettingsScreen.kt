@@ -44,6 +44,7 @@ import com.material.xray.core.ui.components.DropdownOption
 import com.material.xray.core.ui.components.FadingOutlinedTextField as OutlinedTextField
 import com.material.xray.core.ui.components.ReadOnlyDropdownField
 import com.material.xray.core.ui.components.ScrolledTopAppBar
+import com.material.xray.core.ui.components.SettingsFieldSpacing
 import com.material.xray.core.ui.components.SettingsItemSpacing
 import com.material.xray.core.ui.components.SettingsSwitchRow
 import com.material.xray.core.ui.components.TooltipIconButton
@@ -195,7 +196,7 @@ private fun DnsResolverSection(
             )
         }
 
-        Spacer(Modifier.height(SettingsItemSpacing))
+        Spacer(Modifier.height(SettingsFieldSpacing))
         ReadOnlyDropdownField(
             label = stringResource(R.string.settings_dns_provider_label),
             selectedText = preset.label(emptyLabel),
@@ -238,7 +239,7 @@ private fun DnsResolverSection(
         }
 
         AnimatedOptionContent(visible = customVisible) {
-            Spacer(Modifier.height(SettingsItemSpacing))
+            Spacer(Modifier.height(SettingsFieldSpacing))
             Column(
                 modifier = Modifier.padding(horizontal = 16.dp),
             ) {

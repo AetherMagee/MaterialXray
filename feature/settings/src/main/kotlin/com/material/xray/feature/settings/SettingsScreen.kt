@@ -151,6 +151,7 @@ import com.material.xray.core.ui.components.DropdownOption
 import com.material.xray.core.ui.components.FadingOutlinedTextField as OutlinedTextField
 import com.material.xray.core.ui.components.ReadOnlyDropdownField
 import com.material.xray.core.ui.components.ScrolledTopAppBar
+import com.material.xray.core.ui.components.SettingsFieldSpacing
 import com.material.xray.core.ui.components.SettingsItemSpacing
 import com.material.xray.core.ui.components.SettingsSwitchRow
 import com.material.xray.core.ui.components.TooltipIconButton
@@ -512,7 +513,7 @@ private fun SettingsScreenContent(
                             onCheckedChange = { viewModel.setBypassLan(it) },
                         )
 
-                        Spacer(Modifier.height(SettingsItemSpacing))
+                        Spacer(Modifier.height(SettingsFieldSpacing))
                         val ipv6Selectable = isIpv6SelectionEnabled(rootServiceActive, rootConnectionBackend, tproxyCompatibility)
                         ReadOnlyDropdownField(
                             label = stringResource(R.string.settings_ipv6_mode_label),
@@ -608,7 +609,7 @@ private fun SettingsScreenContent(
                     onCheckedChange = viewModel::setRouteMxrayTrafficThroughXray,
                 )
             }
-            settingsItem(key = "xray_buffer", visible = showAdvancedOptions) {
+            settingsItem(key = "xray_buffer", visible = showAdvancedOptions, spaceAfter = SettingsFieldSpacing) {
                 Column(
                     modifier = Modifier.padding(horizontal = 16.dp),
 
@@ -630,7 +631,7 @@ private fun SettingsScreenContent(
                 }
             }
 
-            settingsItem(key = "tun_mtu", visible = showAdvancedOptions && (!rootServiceActive || rootConnectionBackend == RootConnectionBackend.Tun)) {
+            settingsItem(key = "tun_mtu", visible = showAdvancedOptions && (!rootServiceActive || rootConnectionBackend == RootConnectionBackend.Tun), spaceAfter = SettingsFieldSpacing) {
                 Column(
                     modifier = Modifier.padding(horizontal = 16.dp),
 
@@ -645,7 +646,7 @@ private fun SettingsScreenContent(
                 }
             }
 
-            settingsItem(key = "memory_restart_threshold", visible = showAdvancedOptions) {
+            settingsItem(key = "memory_restart_threshold", visible = showAdvancedOptions, spaceAfter = SettingsFieldSpacing) {
                 Column(
                     modifier = Modifier.padding(horizontal = 16.dp),
 
@@ -677,7 +678,7 @@ private fun SettingsScreenContent(
                     onCheckedChange = viewModel::setPassiveHealthMonitoringEnabled,
                 )
             }
-            settingsItem(key = "default_outbound", visible = showAdvancedOptions) {
+            settingsItem(key = "default_outbound", visible = showAdvancedOptions, spaceAfter = SettingsFieldSpacing) {
                 ReadOnlyDropdownField(
                     label = stringResource(R.string.settings_default_outbound_label),
                     selectedText = stringResource(defaultOutbound.labelResource),
@@ -703,7 +704,7 @@ private fun SettingsScreenContent(
                 )
             }
 
-            settingsItem(key = "log_level", visible = showAdvancedOptions) {
+            settingsItem(key = "log_level", visible = showAdvancedOptions, spaceAfter = SettingsFieldSpacing) {
                 ReadOnlyDropdownField(
                     label = stringResource(R.string.settings_xray_log_level_label),
                     selectedText = stringResource(xrayLogLevel.labelResource),
@@ -719,7 +720,7 @@ private fun SettingsScreenContent(
                 )
             }
 
-            settingsItem(key = "geo_data_update_interval") {
+            settingsItem(key = "geo_data_update_interval", spaceAfter = SettingsFieldSpacing) {
                 Column(
                     modifier = Modifier.padding(horizontal = 16.dp),
 
@@ -744,7 +745,7 @@ private fun SettingsScreenContent(
                 }
             }
 
-            settingsItem(key = "geoip") {
+            settingsItem(key = "geoip", spaceAfter = SettingsFieldSpacing) {
                 Column(
                     modifier = Modifier.padding(horizontal = 16.dp),
 
@@ -798,7 +799,7 @@ private fun SettingsScreenContent(
                 }
             }
 
-            settingsItem(key = "geosite") {
+            settingsItem(key = "geosite", spaceAfter = SettingsFieldSpacing) {
                 Column(
                     modifier = Modifier.padding(horizontal = 16.dp),
 
@@ -852,7 +853,7 @@ private fun SettingsScreenContent(
                 }
             }
 
-            settingsItem(key = "latency_check_url", visible = showAdvancedOptions) {
+            settingsItem(key = "latency_check_url", visible = showAdvancedOptions, spaceAfter = SettingsFieldSpacing) {
                 Column(
                     modifier = Modifier.padding(horizontal = 16.dp),
 
@@ -875,7 +876,7 @@ private fun SettingsScreenContent(
 
             settingsItem(key = "data_header", spaceAfter = 16.dp) {
                 Column(
-                    modifier = Modifier.padding(horizontal = 16.dp).padding(top = 16.dp - SettingsItemSpacing),
+                    modifier = Modifier.padding(horizontal = 16.dp).padding(top = 16.dp - SettingsFieldSpacing),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
                     HorizontalDivider()
@@ -994,7 +995,7 @@ private fun SettingsScreenContent(
                     onClick = viewModel::checkForAppUpdate,
                 )
             }
-            settingsItem(key = "licenses") {
+            settingsItem(key = "licenses", spaceAfter = 8.dp) {
                 SettingsActionRow(
                     title = stringResource(R.string.settings_open_source_licenses),
                     subtitle = stringResource(R.string.settings_open_source_licenses_description),
@@ -1243,7 +1244,7 @@ private fun SettingsServiceSection(
             )
 
             AnimatedOptionContent(visible = settings.showAdvancedOptions && settings.rootConnectionBackend == RootConnectionBackend.Tproxy) {
-                Spacer(Modifier.height(SettingsItemSpacing))
+                Spacer(Modifier.height(SettingsFieldSpacing))
                 ReadOnlyDropdownField(
                     label = stringResource(R.string.settings_other_vpn_mode),
                     selectedText = stringResource(settings.otherVpnMode.labelResource),
@@ -1260,7 +1261,7 @@ private fun SettingsServiceSection(
                 )
             }
             AnimatedOptionContent(visible = settings.showAdvancedOptions && settings.rootConnectionBackend == RootConnectionBackend.Tun) {
-                Spacer(Modifier.height(SettingsItemSpacing))
+                Spacer(Modifier.height(SettingsFieldSpacing))
                 rootTunNameSetting()
             }
         }
